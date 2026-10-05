@@ -8,6 +8,7 @@ import type { BrandKind } from './data'
 /** A4 PDF in the Al Saqr template layout. Arabic text in images (letterhead/stamp) is preserved; typed text uses Helvetica. */
 export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   companyName: string; images: Partial<Record<BrandKind, { bytes: Uint8Array; png: boolean }>>; showHeaderFooter: boolean; showStamp: boolean; bankDetails?: string | null; paid?: number
+  companyTrn?: string | null; sealSize?: number; signatureWidth?: number; signAlign?: 'left' | 'center' | 'right'; signSpacing?: number
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
   pdf.setTitle(`${DOC_META[doc.doc_type].label} ${doc.number}`); pdf.setCreator('SaqrFlow'); pdf.setProducer('SaqrFlow')
@@ -60,25 +61,29 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   center(title, W / 2, y - 12, isInv ? 14 : 13, bold)
   if (isInv) { const tw = bold.widthOfTextAtSize(title, 14); page.drawLine({ start: { x: W / 2 - tw / 2, y: y - 14 }, end: { x: W / 2 + tw / 2, y: y - 14 }, thickness: 0.8 }) }
   y -= 24
+  if (isInv && opts.companyTrn) { center(`TRN: ${opts.companyTrn}`, W / 2, y - 4, 9, bold); y -= 12 }
 
   // party + reference boxes
   const dash = (s?: string | null) => (s && s.trim() ? s : '-')
   const fd = (d?: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}` : '-')
   const left: [string, string][] = [...(isQtn ? [['Attention:', dash(doc.attention)] as [string, string]] : []), ['Company Name:', dash(doc.customer_name)],
     ...(!isQtn ? [['TRN:', dash(doc.customer_trn)] as [string, string]] : []), ...(!isQtn && doc.customer_phone ? [['Tel:', doc.customer_phone] as [string, string]] : []),
-    ['Address:', dash(doc.customer_address)], ...(doc.site ? [[isDn ? 'Delivery to:' : 'Site:', doc.site] as [string, string]] : [])]
-  const rightRows: [string, string][] = [[isDn ? 'Delivery No.' : isInv ? 'Invoice No.' : 'No.', dash(doc.number)], ['Date:', fd(doc.issue_date)],
+    ...(isQtn && doc.customer_phone ? [['Tel:', doc.customer_phone] as [string, string]] : []), ...(doc.customer_email ? [['Email:', doc.customer_email] as [string, string]] : []),
+    ['Address:', dash(doc.customer_address)], ...(doc.site ? [[isDn ? 'Delivery to:' : 'Site:', doc.site] as [string, string]] : []),
+    ...(doc.project_name ? [['Project:', doc.project_name] as [string, string]] : [])]
+  const rightRows: [string, string][] = [[isDn ? 'Delivery No.' : isInv ? 'Invoice No.' : 'Ref No.', dash(doc.number)], ['Date:', fd(doc.issue_date)],
     ...(!isQtn ? [['L.P.O:', dash(doc.lpo_ref)] as [string, string]] : []), ...(isInv ? [['DEL NO:', dash(doc.del_no)] as [string, string]] : []),
-    ...(isInv && doc.reference ? [['REF:', doc.reference] as [string, string]] : []), ...(isInv && doc.due_date ? [['Due:', fd(doc.due_date)] as [string, string]] : []),
+    ...(doc.reference ? [['Your Ref:', doc.reference] as [string, string]] : []), ...(isInv && doc.due_date ? [['Due:', fd(doc.due_date)] as [string, string]] : []),
     ...(isQtn && doc.valid_until ? [['Valid till:', fd(doc.valid_until)] as [string, string]] : [])]
   const lw = CW - 160, lab = 82, fs = 9.5, lh = 13
   const leftLines = left.map(([k, v]) => [k, wrap(v, font, fs, lw - lab - 16)] as const)
-  const leftH = leftLines.reduce((s, [, ls]) => s + ls.length * lh, 0) + 12, rightH = rightRows.length * lh + 12, boxH = Math.max(leftH, rightH)
+  const rightLines = rightRows.map(([k, v]) => [k, wrap(v, font, fs, CW - lw - 10 - 78)] as const)
+  const leftH = leftLines.reduce((s, [, ls]) => s + ls.length * lh, 0) + 12, rightH = rightLines.reduce((s, [, ls]) => s + ls.length * lh, 0) + 12, boxH = Math.max(leftH, rightH)
   rect(M, y - boxH, lw, boxH, boxBg); rect(M + lw + 10, y - boxH, CW - lw - 10, boxH, boxBg)
   let ly = y - 15
   for (const [k, ls] of leftLines) { text(k, M + 8, ly, fs, bold); ls.forEach((l, i) => text(l, M + 8 + lab, ly - i * lh, fs)); ly -= ls.length * lh }
   let ry = y - 15
-  for (const [k, v] of rightRows) { text(k, M + lw + 18, ry, fs, bold); text(v, M + lw + 18 + 62, ry, fs); ry -= lh }
+  for (const [k, ls] of rightLines) { text(k, M + lw + 18, ry, fs, bold); ls.forEach((l, i) => text(l, M + lw + 18 + 62, ry - i * lh, fs)); ry -= ls.length * lh }
   y -= boxH + 10
 
   if (isQtn && doc.intro) for (const l of wrap(doc.intro, font, 9.5, CW)) { text(l, M, y - 9, 9.5); y -= 12 }
@@ -142,10 +147,26 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   // closing / terms / bank / signatures
   const ensure = (h: number) => { if (y - h < bottom) newPage() }
   if (isQtn && doc.closing) { y -= 6; doc.closing.split('\n').forEach((l, i) => { for (const w of wrap(l, i === 0 ? bold : font, 9.5, CW)) { ensure(12); text(w, M, y - 9, 9.5, i === 0 ? bold : font); y -= 12 } }) }
-  const sigTop = y - 8
+  // seal + signature sit beside the terms (as on screen); sizes come from Settings (px at 96 dpi → pt × 0.75)
+  const showSign = opts.showStamp && !isInv && !!(img.stamp || img.signature)
+  const sealPt = (opts.sealSize ?? 140) * 0.75, sigWPt = (opts.signatureWidth ?? 160) * 0.75, sigHPt = sigWPt * 0.75
+  const overlap = img.stamp && img.signature ? sealPt * 0.18 : 0
+  const signW = showSign ? (img.stamp ? sealPt : 0) + (img.signature ? sigWPt - overlap : 0) : 0
+  const signH = showSign ? Math.max(img.stamp ? sealPt : 0, img.signature ? sigHPt : 0) + (opts.signSpacing ?? 8) * 0.75 : 0
+  if (showSign && y - signH - 10 < bottom) newPage()                      // the block never splits: move it (and what follows) to a new page
+  const signPage = page, sigTop = y - (opts.signSpacing ?? 8) * 0.75 - 4
+  const signLeft = opts.signAlign === 'left'
+  const tx = showSign && signLeft ? M + signW + 12 : M, tw0 = showSign ? CW - signW - 12 : CW
   const list = (titleS: string, arr: string[]) => {
-    if (!arr.length) return; ensure(30); y -= 8; text(titleS, M, y - 11, 11.5, bold); const tw = bold.widthOfTextAtSize(titleS, 11.5); page.drawLine({ start: { x: M, y: y - 13 }, end: { x: M + tw, y: y - 13 }, thickness: 0.7 }); y -= 18
-    arr.forEach((a, i) => { for (const l of wrap(`${i + 1}. ${a}`, font, 10, CW - 200)) { ensure(13); text(l, M, y - 9, 10); y -= 13 } })
+    if (!arr.length) return; ensure(30); y -= 8; const hx = showSign && page === signPage && y > sigTop - signH - 4 ? tx : M; text(titleS, hx, y - 11, 11.5, bold); const tw = bold.widthOfTextAtSize(titleS, 11.5); page.drawLine({ start: { x: hx, y: y - 13 }, end: { x: hx + tw, y: y - 13 }, thickness: 0.7 }); y -= 18
+    // lines beside the seal block are narrower; below it (or on later pages) they use the full width — like the screen float
+    const beside = () => showSign && page === signPage && y > sigTop - signH - 4
+    arr.forEach((a, i) => {
+      const x = beside() ? tx : M, w = beside() ? tw0 : CW
+      const ls = wrap(a, font, 10, w - 18)
+      if (ls.length * 13 < 200) ensure(ls.length * 13)                    // keep a clause together when it fits on a page
+      ls.forEach((l, j) => { ensure(13); if (j === 0) text(`${i + 1}.`, x, y - 9, 10); text(l, x + 18, y - 9, 10); y -= 13 })
+    })
   }
   if (isQtn) { list('Terms and Conditions: -', doc.terms); list('Payment Terms: -', doc.payment_terms) }
   if (isInv) {
@@ -158,10 +179,12 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
     text('Delivered By:', M, y, 10, font, red); page.drawLine({ start: { x: M + 68, y: y - 2 }, end: { x: M + 210, y: y - 2 }, thickness: 0.7, color: red }); if (doc.vehicle_no) text(`Vehicle: ${doc.vehicle_no}`, M + 218, y, 9)
     y -= 30; text('Received By:', M, y, 10, font, red); page.drawLine({ start: { x: M + 68, y: y - 2 }, end: { x: M + 210, y: y - 2 }, thickness: 0.7, color: red }); if (doc.receiver_name) text(doc.receiver_name, M + 218, y, 9)
   }
-  if (opts.showStamp && !isInv && (img.stamp || img.signature)) {
-    const top = Math.max(sigTop, bottom + 80)
-    if (img.stamp) drawImage(img.stamp, W - M - 190, top, 70, 70)
-    if (img.signature) drawImage(img.signature, W - M - 110, top, 110, 70)
+  if (showSign) {
+    const x0 = signLeft ? M : W - M - signW, cur = page
+    page = signPage
+    if (img.stamp) drawImage(img.stamp, x0, sigTop, sealPt, sealPt)
+    if (img.signature) drawImage(img.signature, x0 + (img.stamp ? sealPt - overlap : 0), sigTop - Math.max(0, (sealPt - sigHPt) / 2), sigWPt, sigHPt)
+    page = cur
   }
   drawFooter()
   const pages = pdf.getPages()

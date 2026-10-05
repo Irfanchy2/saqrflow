@@ -9,7 +9,7 @@ import { addDays, formatAed } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SmartDocumentCenter } from '@/components/inbox/smart-center'
 import { Progress } from '@/components/projects/project-fields'
-import { salesKpis } from '@/lib/sales/summary'
+import { loadSalesKpis } from '@/lib/sales/kpis'
 import { PROJECT_STATUS } from '@/lib/projects'
 import { HardHat, Receipt, Target } from 'lucide-react'
 
@@ -32,14 +32,11 @@ export default async function Dashboard() {
     c.can('documents.view') ? sb.from('documents').select('id', head).is('deleted_at', null).eq('status', 'renewal_in_progress') : null,
   ])
   const alerts = buildAlerts((sources.data ?? []) as any, c.today)
-  const [salesRows, salesBals, salesPays, activeProjects] = await Promise.all([
-    canFin ? sb.from('invoices').select('id,doc_type,status,number,customer_name,customer_id,issue_date,due_date,total').in('doc_type', ['quotation', 'invoice']).limit(5000) : null,
-    canFin ? sb.from('invoice_balances').select('id,paid').limit(5000) : null,
-    canFin ? sb.from('payments').select('amount,paid_on').gte('paid_on', c.today.slice(0, 7) + '-01').limit(5000) : null,
+  const [salesData, activeProjects] = await Promise.all([
+    canFin ? loadSalesKpis(c) : null,
     c.can('documents.view') ? sb.from('projects').select('id,name,status,fabrication_progress,site_progress,customer:customers(name)').in('status', ['active', 'planning', 'on_hold']).order('updated_at', { ascending: false }).limit(5) : null,
   ])
-  const paidOf = new Map((salesBals?.data ?? []).map((b: any) => [b.id, Number(b.paid)]))
-  const sk = salesRows ? salesKpis((salesRows.data ?? []).map((r: any) => ({ ...r, total: Number(r.total), paid: paidOf.get(r.id) ?? 0 })), (salesPays?.data ?? []) as any, c.today) : null
+  const sk = salesData?.kpis ?? null
   const cs = cheques ? summarizeCheques((cheques.data ?? []) as any, c.today) : null
   const expiryData = months.map(m => ({ month: m.label, employee: 0, company: 0 }))
   for (const d of docDates?.data ?? []) { const i = months.findIndex(m => m.key === d.expiry_date!.slice(0, 7)); if (i >= 0) expiryData[i][d.owner_type === 'employee' ? 'employee' : 'company']++ }

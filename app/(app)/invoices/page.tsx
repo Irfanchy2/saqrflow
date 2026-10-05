@@ -7,7 +7,8 @@ import { Badge, Card, EmptyState, PageHeader, Pagination, StatCard, Td, Th, Tabl
 import { NewSalesButtons } from '@/components/sales/new-buttons'
 import { DOC_META, STATUS_LABEL, STATUS_TONE, type SalesType } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
-import { AGE_BUCKETS, receivablesAgeing, salesKpis, type InvRow } from '@/lib/sales/summary'
+import { AGE_BUCKETS, receivablesAgeing, type InvRow } from '@/lib/sales/summary'
+import { loadSalesKpis } from '@/lib/sales/kpis'
 import { formatAed } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
@@ -24,16 +25,12 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const tab = TABS.some(t => t.k === sp.tab) ? sp.tab! : 'quotation'
   const edit = c.can('records.edit')
 
-  // KPI base: all sales docs (light columns) + their balances + payments this year
-  const [{ data: all }, { data: bals }, { data: pays }] = await Promise.all([
-    c.supabase.from('invoices').select('id,doc_type,status,number,customer_name,customer_id,issue_date,due_date,total').in('doc_type', ['quotation', 'invoice', 'delivery_note']).limit(5000),
-    c.supabase.from('invoice_balances').select('id,paid').limit(5000),
-    c.supabase.from('payments').select('amount,paid_on').gte('paid_on', `${c.today.slice(0, 4)}-01-01`).limit(5000),
-  ])
-  const paidOf = new Map((bals ?? []).map(b => [b.id, Number(b.paid)]))
-  const rows: InvRow[] = (all ?? []).map(r => ({ ...r, total: Number(r.total), paid: paidOf.get(r.id) ?? 0 }))
-  const k = salesKpis(rows, (pays ?? []) as any, c.today)
-  const counts: Record<string, number> = Object.fromEntries(['quotation', 'invoice', 'delivery_note'].map(t => [t, rows.filter(r => r.doc_type === t).length]))
+  // KPIs + per-tab counts with targeted queries (never every invoice)
+  const head = { count: 'exact' as const, head: true }
+  const [{ kpis: k, openRows }, ...tabCounts] = await Promise.all([loadSalesKpis(c),
+    ...(['quotation', 'invoice', 'delivery_note'] as const).map(t => c.supabase.from('invoices').select('id', head).eq('doc_type', t))])
+  const counts: Record<string, number> = { quotation: tabCounts[0].count ?? 0, invoice: tabCounts[1].count ?? 0, delivery_note: tabCounts[2].count ?? 0 }
+  const rows = openRows
 
   const base = '/invoices'
   const tabHref = (t: string) => `${base}?tab=${t}`
@@ -54,17 +51,20 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <t.icon size={14} aria-hidden />{t.label}{t.k in counts && <span className="rounded-full bg-surface-2 px-1.5 text-[11px] tabular-nums text-muted">{counts[t.k]}</span>}</Link>)}
     </nav>
 
-    {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} /> : <DocsTab t={tab as SalesType} sp={sp} paidOf={paidOf} edit={edit} />}
+    {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} /> : <DocsTab t={tab as SalesType} sp={sp} edit={edit} />}
   </>
 }
 
-async function DocsTab({ t, sp, paidOf, edit }: { t: SalesType; sp: Record<string, string | undefined>; paidOf: Map<string, number>; edit: boolean }) {
+async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, string | undefined>; edit: boolean }) {
   const c = await getCtx()
   const meta = DOC_META[t], page = pageOf(sp.page), term = sanitizeQ(sp.q)
   let q = c.supabase.from('invoices').select('id,number,status,customer_name,subject,site,issue_date,due_date,valid_until,total,project:projects(name)', { count: 'exact' }).eq('doc_type', t)
   if (term) q = q.or(`number.ilike.%${term}%,customer_name.ilike.%${term}%,subject.ilike.%${term}%,site.ilike.%${term}%,lpo_ref.ilike.%${term}%`)
   if (sp.status && meta.statuses.includes(sp.status)) q = q.eq('status', sp.status)
   const { data, count } = await q.order('issue_date', { ascending: false }).order('number', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+  const ids = t === 'invoice' ? (data ?? []).map((r: any) => r.id) : []
+  const { data: bals } = ids.length ? await c.supabase.from('invoice_balances').select('id,paid').in('id', ids) : { data: [] as { id: string; paid: number }[] }
+  const paidOf = new Map((bals ?? []).map(b => [b.id, Number(b.paid)]))
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   const isInv = t === 'invoice'
   return <Card>

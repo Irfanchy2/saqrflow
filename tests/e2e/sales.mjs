@@ -58,7 +58,7 @@ try {
   await p.getByRole('button', { name: 'New quotation' }).first().click(); await p.waitForURL(/\/invoices\/[0-9a-f-]{36}$/); await settle()
   const qid = p.url().split('/').pop()
   const qnum = (await one(`select number from invoices where id=$1`, [qid])).number
-  ok(/^QTN-\d{4}-0001$/.test(qnum), `quotation numbered automatically (${qnum})`)
+  ok(/^AS00\d{5}\/\d{4}$/.test(qnum), `quotation numbered automatically (${qnum})`)
   await p.getByLabel('Company name').fill('ABC Contracting LLC'); await p.getByLabel('Attention (contact name)').fill('Mr. Ahmed')
   await p.getByText('Save “ABC Contracting LLC” as a customer').click()
   await p.getByLabel('Address').fill('Musaffah M-44, Abu Dhabi'); await p.getByLabel('Working place / site').fill('Villa 22, Fujairah')

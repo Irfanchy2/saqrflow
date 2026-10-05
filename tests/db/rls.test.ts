@@ -350,9 +350,21 @@ describe('Sales documents, payments & projects (0008)', () => {
     const n2 = (await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n
     const i1 = (await as(U.accA, `select next_document_number('invoice') n`)).rows[0].n
     const b1 = (await as(U.ownerB, `select next_document_number('quotation') n`)).rows[0].n
-    expect(n1).toMatch(/^QTN-\d{4}-0001$/); expect(n2).toMatch(/-0002$/); expect(i1).toMatch(/^INV-\d{4}-0001$/); expect(b1).toMatch(/-0001$/)
+    const yr = new Date().getFullYear()
+    expect(n1).toBe(`AS0025180/${yr}`); expect(n2).toBe(`AS0025181/${yr}`); expect(i1).toMatch(/^INV-\d{4}-0001$/); expect(b1).toBe(`AS0025180/${yr}`)
     await fails(as(U.viewerA, `select next_document_number('invoice')`), /insufficient privilege/)
     await fails(as(U.accA, `select next_document_number('bogus')`), /unknown document type/)
+  })
+  it('AS numbering: configurable by settings.manage only, skips numbers already used, continues across years', async () => {
+    const yr = new Date().getFullYear()
+    await fails(as(U.accA, `update document_number_formats set next_seq = 1 where doc_type='quotation' returning *`).then(r => { if (!r.rowCount) throw new Error('blocked') }))
+    await as(U.ownerA, `update document_number_formats set next_seq = 30000 where doc_type='quotation'`)
+    await as(U.accA, `insert into invoices(company_id,doc_type,number) values ($1,'quotation',$2)`, [A, `AS0030000/${yr}`])   // e.g. typed by hand earlier
+    expect((await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n).toBe(`AS0030001/${yr}`)
+    await sup(`update document_number_formats set last_year = last_year - 1 where company_id=$1 and doc_type='quotation'`, [A])  // simulate a new year
+    expect((await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n).toBe(`AS0030002/${yr}`)
+    expect((await sup(`select format_document_number('AS','00',5,7,'/',2027) n`)).rows[0].n).toBe('AS0000007/2027')
+    expect((await sup(`select count(*)::int n from document_number_formats where company_id=$1 and doc_type='invoice'`, [A])).rows[0].n).toBe(0)   // other types unchanged
   })
   it('payments: only on issued invoices, never above the balance; status follows the money', async () => {
     qtn = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status) values ($1,'quotation','QTN-T-1',1050,'sent') returning id`, [A])).rows[0].id

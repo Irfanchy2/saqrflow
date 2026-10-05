@@ -1,19 +1,23 @@
 'use client'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
-/** Scales the fixed-width (794px) A4 paper to fit its column while keeping text crisp and layout identical to print. */
+const A4_PX = 793.7   // 210 mm at 96 dpi
+
+/**
+ * Fits the fixed-width A4 paper into its column. Uses CSS `zoom` (re-lays out text at the target size → sharp text and
+ * logos) instead of a transform (which rasterises and blurs), and never changes the paper's own layout.
+ */
 export function FitPaper({ children, max = 1 }: { children: ReactNode; max?: number }) {
-  const outer = useRef<HTMLDivElement>(null), inner = useRef<HTMLDivElement>(null)
-  const [s, setS] = useState({ scale: 0.6, h: 700 })
+  const outer = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(0.6)
   useLayoutEffect(() => {
-    const o = outer.current, i = inner.current; if (!o || !i) return
-    const fit = () => { const scale = Math.min(max, o.clientWidth / 794); setS({ scale, h: i.offsetHeight * scale }) }
+    const o = outer.current; if (!o) return
+    const fit = () => setScale(Math.min(max, o.clientWidth / A4_PX))
     fit()
-    const ro = new ResizeObserver(fit); ro.observe(o); ro.observe(i)
+    const ro = new ResizeObserver(fit); ro.observe(o)
     return () => ro.disconnect()
   }, [max])
-  return <div ref={outer} className="w-full" style={{ height: s.h }}>
-    <div ref={inner} style={{ width: 794, transform: `scale(${s.scale})`, transformOrigin: 'top left' }}
-      className="overflow-hidden rounded-sm shadow-[0_2px_6px_rgba(15,23,42,.08),0_12px_32px_-8px_rgba(15,23,42,.18)] ring-1 ring-black/5">{children}</div>
+  return <div ref={outer} className="w-full">
+    <div style={{ width: A4_PX, zoom: scale }} className="overflow-hidden rounded-sm shadow-[0_2px_6px_rgba(15,23,42,.08),0_12px_32px_-8px_rgba(15,23,42,.18)] ring-1 ring-black/5">{children}</div>
   </div>
 }

@@ -1,7 +1,7 @@
 import { ImageIcon } from 'lucide-react'
 import type { Ctx } from '@/lib/auth'
 import { brandingFor, salesSettings } from '@/lib/sales/data'
-import { Badge, Card, CardHeader, Field, Input, Textarea } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { removeBranding, saveSalesSettings, uploadBranding } from '@/app/actions/sales'
 
@@ -51,6 +51,13 @@ export async function BrandingSettings({ c }: { c: Ctx }) {
         </div>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_header_footer" defaultChecked={b.showHeaderFooter} />Print letterhead and footer (turn off for pre-printed paper)</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_stamp" defaultChecked={b.showStamp} />Add stamp and signature to quotations and delivery notes</label>
+        <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-4"><legend className="px-1 text-sm font-medium">Seal &amp; signature on the document</legend>
+          <Field label="Seal size (px)" hint="70–220 · 140 ≈ 37 mm"><Input name="seal_size" type="number" min={70} max={220} defaultValue={b.sealSize} required /></Field>
+          <Field label="Signature width (px)" hint="80–260 · 160 ≈ 42 mm"><Input name="signature_width" type="number" min={80} max={260} defaultValue={b.signatureWidth} required /></Field>
+          <Field label="Horizontal alignment"><Select name="sign_align" defaultValue={b.signAlign}><option value="right">Right</option><option value="center">Centre</option><option value="left">Left</option></Select></Field>
+          <Field label="Space above (px)" hint="0–80"><Input name="sign_spacing" type="number" min={0} max={80} defaultValue={b.signSpacing} required /></Field>
+          <p className="text-xs text-muted sm:col-span-4">Images keep their proportions (never stretched). The preview, print view and PDF all use these sizes.</p>
+        </fieldset>
       </ActionForm>
     </div>
   </Card>

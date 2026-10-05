@@ -13,6 +13,7 @@ import { aiSettings } from '@/lib/inbox/pipeline'
 import { ocrProviders } from '@/lib/ai/ocr'
 import { aiProviders, pickAi } from '@/lib/ai/llm'
 import { cn } from '@/lib/utils'
+import { zonedToUtc } from '@/lib/time'
 
 export const metadata = { title: 'Smart Document Inbox' }
 export const maxDuration = 60
@@ -25,9 +26,16 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const tab = batch.length ? 'batch' : TABS.some(([k]) => k === sp.tab) ? sp.tab! : 'recent'
   let q = c.supabase.from('document_inbox').select('id,file_name,status,doc_type,confidence,review_reasons,suggestion,created_at,filed_document_id,source').order('created_at', { ascending: false }).limit(100)
   if (tab === 'batch') q = q.in('id', batch); else if (tab === 'processing') q = q.in('status', PROCESSING); else if (tab !== 'recent') q = q.eq('status', tab)
-  const [{ data: rows }, { data: all }, st, ocrP, aiP] = await Promise.all([q, c.supabase.from('document_inbox').select('status,created_at').limit(5000), aiSettings(c), ocrProviders(c.company.id), aiProviders(c.company.id)])
-  const n = (s: string) => (all ?? []).filter(r => (s === 'processing' ? PROCESSING.includes(r.status) : r.status === s)).length
-  const todayRows = (all ?? []).filter(r => new Date(r.created_at).toLocaleDateString('en-CA', { timeZone: c.company.timezone }) === c.today)
+  // tab badges = count-only queries; "Today" = only today's rows (not the whole inbox history)
+  const head = { count: 'exact' as const, head: true }, STATUSES = ['ready', 'needs_review', 'duplicate', 'filed', 'failed', 'rejected']
+  const dayStart = zonedToUtc(c.today, '00:00', c.company.timezone).toISOString()   // company-local midnight
+  const [{ data: rows }, st, ocrP, aiP, { data: todayAll }, procCount, ...statusCounts] = await Promise.all([q, aiSettings(c), ocrProviders(c.company.id), aiProviders(c.company.id),
+    c.supabase.from('document_inbox').select('status,created_at').gte('created_at', dayStart).limit(1000),
+    c.supabase.from('document_inbox').select('id', head).in('status', PROCESSING),
+    ...STATUSES.map(x => c.supabase.from('document_inbox').select('id', head).eq('status', x))])
+  const countOf: Record<string, number> = Object.fromEntries(STATUSES.map((x, i) => [x, statusCounts[i].count ?? 0]))
+  const n = (s: string) => (s === 'processing' ? procCount.count ?? 0 : countOf[s] ?? 0)
+  const todayRows = (todayAll ?? []).filter(r => new Date(r.created_at).toLocaleDateString('en-CA', { timeZone: c.company.timezone }) === c.today)
   const t = (f: (s: string) => boolean) => todayRows.filter(r => f(r.status)).length
   const ocrNames = (st.ocr === 'auto' ? (['google_vision', 'ocrspace', 'tesseract'] as const) : st.ocr === 'tesseract' ? (['tesseract'] as const) : [st.ocr, 'tesseract'] as const).filter(k => ocrP[k].configured()).map(k => ocrP[k].label)
   const ai = st.ai === 'rules' ? null : pickAi(st.ai, aiP, true)

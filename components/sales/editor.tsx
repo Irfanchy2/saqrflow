@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { SalesPaper, type Branding, type PaperItem } from './paper'
 import { FitPaper } from './preview'
+import { CustomerPicker, type CustomerOpt } from './customer-picker'
 import { Badge, Button, Input, Select, Textarea } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -16,11 +17,13 @@ import { amountInWords, computeTotals, fmtMoney, lineAmount } from '@/lib/sales/
 import { archivePdfToVault, convertSalesDoc, deleteSalesDraft, duplicateSalesDoc, saveSalesDoc, setSalesStatus, type SalesDocInput } from '@/app/actions/sales'
 import type { ActionState } from '@/lib/utils'
 
-export interface CustomerOpt { id: string; name: string; address: string | null; trn: string | null; phone: string | null; contact_person: string | null; email: string | null }
+export type { CustomerOpt }
 export interface ProjectOpt { id: string; name: string; code: string | null; customer_id: string | null; location: string | null }
 type Item = PaperItem & { key: string; materials: string; unit: string }
 type Head = Omit<SalesDocInput, 'items' | 'terms' | 'payment_terms'> & { termsText: string; paymentText: string }
 
+/** textareas grow with their content (up to a limit, then scroll) instead of hiding text */
+const GROW = '[field-sizing:content] min-h-[4.5rem] max-h-72'
 const ICON: Record<string, typeof FileText> = { quotation: ScrollText, invoice: Receipt, delivery_note: Truck }
 let seq = 0
 const key = () => `k${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -34,6 +37,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const [head, setHead] = useState<Head>(() => ({
     customer_id: doc.customer_id, new_customer: false, project_id: doc.project_id, issue_date: doc.issue_date, due_date: doc.due_date ?? '', valid_until: doc.valid_until ?? '',
     attention: doc.attention ?? '', customer_name: doc.customer_name ?? '', customer_address: doc.customer_address ?? '', customer_trn: doc.customer_trn ?? '', customer_phone: doc.customer_phone ?? '',
+    customer_email: doc.customer_email ?? '', update_customer: false,
     site: doc.site ?? '', subject: doc.subject ?? '', reference: doc.reference ?? '', lpo_ref: doc.lpo_ref ?? '', intro: doc.intro ?? '', closing: doc.closing ?? '',
     receiver_name: doc.receiver_name ?? '', vehicle_no: doc.vehicle_no ?? '', notes: doc.notes ?? '',
     vat_rate: Number(doc.vat_rate ?? 5), discount: Number(doc.discount ?? 0), show_total: doc.show_total !== false,
@@ -52,11 +56,15 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const move = (i: number, d: -1 | 1) => { setItems(xs => { const n = [...xs]; const j = i + d; if (j < 0 || j >= n.length) return xs; [n[i], n[j]] = [n[j], n[i]]; return n }); setDirty(true) }
   const lines = (s: string) => s.split('\n').map(x => x.trim()).filter(Boolean)
 
-  const paperDoc = useMemo(() => ({
+  const projectName = projects.find(p => p.id === head.project_id)?.name ?? null
+  const paperDocNow = useMemo(() => ({
+    project_name: projectName,
     ...doc, ...head, doc_type: t, number: doc.number, due_date: head.due_date || null, valid_until: head.valid_until || null,
     terms: lines(head.termsText), payment_terms: lines(head.paymentText), vat_rate: Number(head.vat_rate) || 0, discount: Number(head.discount) || 0,
-  }), [doc, head, t])
-  const paperItems = useMemo(() => items.filter(i => i.description.trim() || Number(i.unit_price) || i === items[0]), [items])
+  }), [doc, head, t, projectName])
+  const paperItemsNow = useMemo(() => items.filter(i => i.description.trim() || Number(i.unit_price) || i === items[0]), [items])
+  // typing stays instant: the A4 preview renders from deferred copies and only re-renders when they change (SalesPaper is memoised)
+  const paperDoc = useDeferredValue(paperDocNow), paperItems = useDeferredValue(paperItemsNow)
   const tot = computeTotals(paperItems, Number(head.vat_rate) || 0, Number(head.discount) || 0, isInv)
 
   const payload = useCallback((): SalesDocInput => {
@@ -95,16 +103,16 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
     })
     if (opts.saveFirst && dirty) save(go); else go()
   }
-  const pickCustomer = (id: string) => {
-    const cu = customers.find(c => c.id === id)
-    setHead(h => cu ? { ...h, customer_id: cu.id, new_customer: false, customer_name: cu.name, customer_address: cu.address ?? '', customer_trn: cu.trn ?? '', customer_phone: cu.phone ?? '', attention: cu.contact_person ?? h.attention }
-      : { ...h, customer_id: null })
+  // picking a customer copies their details into THIS document; edits here never change the customer record unless “update” is ticked
+  const pickCustomer = (cu: CustomerOpt | null) => {
+    setHead(h => cu ? { ...h, customer_id: cu.id, new_customer: false, update_customer: false, customer_name: cu.name, customer_address: cu.address ?? '', customer_trn: cu.trn ?? '', customer_phone: cu.phone ?? '', customer_email: cu.email ?? '', attention: cu.contact_person ?? h.attention }
+      : { ...h, customer_id: null, update_customer: false })
     setDirty(true)
   }
   const pickProject = (id: string) => {
     const p = projects.find(x => x.id === id)
     setHead(h => ({ ...h, project_id: id || null, site: p?.location && !h.site ? p.location : h.site }))
-    if (p?.customer_id && !head.customer_id) pickCustomer(p.customer_id)
+    if (p?.customer_id && !head.customer_id) pickCustomer(customers.find(c => c.id === p.customer_id) ?? null)
     setDirty(true)
   }
   const customer = customers.find(c => c.id === head.customer_id)
@@ -152,20 +160,21 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
         <fieldset disabled={!editable} className="contents">
           <Section icon={Building2} title={isDn ? 'Customer & delivery' : 'Customer'} sub={`${meta.label} recipient`}>
             <F label="Customer">
-              <Select value={head.customer_id ?? ''} onChange={e => pickCustomer(e.target.value)}>
-                <option value="">— One-off / new customer —</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
+              <CustomerPicker customers={customers} value={head.customer_id} onPick={pickCustomer} disabled={!editable} />
             </F>
             <div className="grid gap-3 sm:grid-cols-2">
               <F label="Company name"><Input value={head.customer_name ?? ''} onChange={e => set('customer_name', e.target.value)} placeholder="e.g. ABC Contracting LLC" /></F>
               <F label={isQtn ? 'Attention (contact name)' : 'Contact person'}><Input value={head.attention ?? ''} onChange={e => set('attention', e.target.value)} placeholder="e.g. Mr. Ahmed" /></F>
             </div>
+            {customer && (customer.name !== head.customer_name || (customer.address ?? '') !== (head.customer_address ?? '') || (customer.trn ?? '') !== (head.customer_trn ?? '') || (customer.phone ?? '') !== (head.customer_phone ?? '') || (customer.email ?? '') !== (head.customer_email ?? '')) &&
+              <label className="flex cursor-pointer items-start gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm"><input type="checkbox" checked={!!head.update_customer} onChange={e => set('update_customer', e.target.checked)} className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]" />
+                <span>These details differ from the saved customer. They are used for <b>this document only</b> — tick to also update “{customer.name}” in Clients.</span></label>}
             {!head.customer_id && head.customer_name && <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={!!head.new_customer} onChange={e => set('new_customer', e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" />Save “{head.customer_name}” as a customer</label>}
-            <F label="Address"><Textarea rows={2} value={head.customer_address ?? ''} onChange={e => set('customer_address', e.target.value)} placeholder="e.g. Musaffah M-44, Abu Dhabi" /></F>
+            <F label="Address" hint="Use separate lines for building, street, area, city — they print the same way"><Textarea rows={3} className={GROW} value={head.customer_address ?? ''} onChange={e => set('customer_address', e.target.value)} placeholder={'e.g. Office 12, Al Saqr Building\nMusaffah M-44\nAbu Dhabi, UAE'} /></F>
             <div className="grid gap-3 sm:grid-cols-2">
               {!isQtn && <F label="Customer TRN" hint="15 digits"><Input inputMode="numeric" value={head.customer_trn ?? ''} onChange={e => set('customer_trn', e.target.value)} placeholder="100xxxxxxxxxxxx" /></F>}
               <F label="Phone"><Input type="tel" value={head.customer_phone ?? ''} onChange={e => set('customer_phone', e.target.value)} placeholder="+971 …" /></F>
+              <F label="Email"><Input type="email" value={head.customer_email ?? ''} onChange={e => set('customer_email', e.target.value)} placeholder="name@company.com" /></F>
               <F label={isDn ? 'Delivery to' : 'Working place / site'} className={isQtn ? '' : 'sm:col-span-2'}><Input value={head.site ?? ''} onChange={e => set('site', e.target.value)} placeholder="e.g. Villa 22, Fujairah" /></F>
             </div>
           </Section>
@@ -202,7 +211,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
                     <IconBtn label="Remove line" danger onClick={() => { setItems(xs => xs.length > 1 ? xs.filter((_, j) => j !== i) : [blank()]); setDirty(true) }}><Trash2 size={14} /></IconBtn>
                   </div>}
                 </div>
-                <Textarea aria-label={`Line ${i + 1} description`} rows={2} value={it.description} onChange={e => setItem(i, { description: e.target.value })} placeholder="e.g. Supply and installation of steel staircase with handrail" />
+                <Textarea aria-label={`Line ${i + 1} description`} rows={2} className={GROW} value={it.description} onChange={e => setItem(i, { description: e.target.value })} placeholder="e.g. Supply and installation of steel staircase with handrail" />
                 {isQtn && <Input aria-label={`Line ${i + 1} materials`} className="mt-2" value={it.materials} onChange={e => setItem(i, { materials: e.target.value })} placeholder="Materials to be used (optional)" />}
                 <div className={cn('mt-2 grid gap-2', meta.priced ? 'grid-cols-[1fr_1fr_1.3fr]' : 'grid-cols-2')}>
                   <F label="Qty" small><Input type="number" min={0} step="any" inputMode="decimal" value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} /></F>
@@ -231,10 +240,10 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
           </Section>}
 
           {isQtn && <Section icon={ScrollText} title="Letter & terms" sub="Defaults come from Settings → Documents" collapsed>
-            <F label="Opening"><Textarea rows={3} value={head.intro ?? ''} onChange={e => set('intro', e.target.value)} /></F>
-            <F label="Closing note"><Textarea rows={3} value={head.closing ?? ''} onChange={e => set('closing', e.target.value)} /></F>
-            <F label="Terms and conditions" hint="One per line"><Textarea rows={3} value={head.termsText} onChange={e => set('termsText', e.target.value)} /></F>
-            <F label="Payment terms" hint="One per line"><Textarea rows={3} value={head.paymentText} onChange={e => set('paymentText', e.target.value)} /></F>
+            <F label="Opening"><Textarea rows={3} className={GROW} value={head.intro ?? ''} onChange={e => set('intro', e.target.value)} /></F>
+            <F label="Closing note"><Textarea rows={3} className={GROW} value={head.closing ?? ''} onChange={e => set('closing', e.target.value)} /></F>
+            <F label="Terms and conditions" hint="One clause per line — they are numbered automatically"><Textarea rows={3} className={GROW} value={head.termsText} onChange={e => set('termsText', e.target.value)} /></F>
+            <F label="Payment terms" hint="One per line"><Textarea rows={3} className={GROW} value={head.paymentText} onChange={e => set('paymentText', e.target.value)} /></F>
           </Section>}
 
           <Section icon={PenLine} title="Internal notes" sub="Never printed" collapsed={!head.notes}>
@@ -248,7 +257,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
         <div className="sticky top-32">
           <div className="mb-2 flex items-center justify-between text-xs text-muted"><span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />Live A4 preview</span><span>Exactly what prints</span></div>
           <div className="rounded-xl bg-[repeating-linear-gradient(45deg,hsl(var(--surface-2)),hsl(var(--surface-2))_10px,hsl(var(--bg))_10px,hsl(var(--bg))_20px)] p-3 sm:p-5">
-            <FitPaper><SalesPaper doc={paperDoc as any} items={paperItems} branding={branding} paid={paid} /></FitPaper>
+            <FitPaper><SalesPaper doc={paperDoc as any} items={paperItems} branding={branding} paid={paid} pageGuides /></FitPaper>
           </div>
         </div>
       </div>

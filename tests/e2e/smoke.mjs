@@ -39,7 +39,7 @@ try {
   await shot(p, '02-dashboard-empty')
   for (const l of ['Overview', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Sales & Invoices', 'Projects', 'Clients & Suppliers', 'Vehicles & Assets', 'Smart Reminders', 'Calendar', 'Reports & Analytics', 'AI Search', 'User Management', 'Settings'])
     ok(await p.getByRole('link', { name: l }).first().isVisible(), `sidebar has “${l}”`)
-  ok((await bodyText(p)).toLowerCase().includes('soon'), 'unbuilt modules are labelled Planned in the sidebar')
+  ok(!(await p.locator('aside').first().innerText()).match(/\bSoon\b/i) && (await p.locator('aside').first().innerText()).includes('Beta'), 'no module left as “Soon”; partially built ones are labelled Beta')
 
   console.log('\n[2] Company documents, versions, secure access')
   await p.goto(`${BASE}/documents`); ok((await bodyText(p)).includes('No company documents yet'), 'documents empty state')

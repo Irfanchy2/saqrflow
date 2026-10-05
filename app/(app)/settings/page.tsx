@@ -8,6 +8,7 @@ import { whatsappStatus } from '@/lib/reminders/mode'
 import { TEMPLATE_META, templateBody } from '@/lib/whatsapp/templates'
 import { LOCALE_NAMES, LOCALES } from '@/lib/i18n'
 import { BrandingSettings } from '@/components/sales/branding-settings'
+import { NumberingSettings } from '@/components/settings/numbering'
 import { AiAutomation } from '@/components/settings/ai-automation'
 
 export const metadata = { title: 'Settings' }
@@ -36,6 +37,8 @@ export default async function Settings() {
       {admin && <AiAutomation c={c} wa={wa} />}
 
       {admin && <BrandingSettings c={c} />}
+
+      {admin && <NumberingSettings c={c} />}
 
       {admin && wa && <Card className="lg:col-span-2"><CardHeader title="WhatsApp Business Platform (Meta Cloud API)" action={<Badge tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.mode === 'live' ? 'Live' : 'Sandbox'}</Badge>} />
         <div className="grid gap-6 p-4 lg:grid-cols-2"><div className="space-y-4">

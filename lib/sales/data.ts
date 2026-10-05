@@ -1,7 +1,7 @@
 import 'server-only'
 import type { Ctx } from '../auth'
 import { createAdminClient } from '../supabase/admin'
-import type { Branding, PaperDoc, PaperItem } from '@/components/sales/paper'
+import { SIGN_DEFAULTS, type Branding, type PaperDoc, type PaperItem } from '@/components/sales/paper'
 import { DEFAULTS, type SalesType } from './docs'
 
 export const BRAND_KINDS = ['header', 'header_invoice', 'footer', 'stamp', 'signature'] as const
@@ -22,6 +22,17 @@ export async function salesSettings(c: Ctx): Promise<SalesSettings & { raw: Reco
   }
 }
 
+/** Seal / signature size and placement (Settings → Branding), clamped to print-safe ranges. */
+export function signLayout(raw: Record<string, any>) {
+  const num = (v: unknown, d: number, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : d)
+  return {
+    sealSize: num(raw['branding.seal_size'], SIGN_DEFAULTS.sealSize, 70, 220),
+    signatureWidth: num(raw['branding.signature_width'], SIGN_DEFAULTS.signatureWidth, 80, 260),
+    signAlign: (['left', 'center', 'right'] as const).find(a => a === raw['branding.sign_align']) ?? SIGN_DEFAULTS.signAlign,
+    signSpacing: num(raw['branding.sign_spacing'], SIGN_DEFAULTS.signSpacing, 0, 80),
+  }
+}
+
 /** Branding for on-screen rendering: images are served by /api/branding/<kind> (auth + company-scoped, never public). */
 export async function brandingFor(c: Ctx): Promise<Branding> {
   const { raw } = await salesSettings(c)
@@ -31,6 +42,7 @@ export async function brandingFor(c: Ctx): Promise<Branding> {
     showHeaderFooter: raw['branding.show_header_footer'] !== false, showStamp: raw['branding.show_stamp'] !== false,
     bankDetails: typeof raw['branding.bank_details'] === 'string' ? raw['branding.bank_details'] : null,
     companyTrn: typeof raw['branding.company_trn'] === 'string' ? raw['branding.company_trn'] : null,
+    ...signLayout(raw),
   }
 }
 
@@ -60,7 +72,7 @@ export async function loadSalesDoc(c: Ctx, id: string) {
   const paid = (pays ?? []).reduce((s: number, p: any) => s + Number(p.amount), 0)
   const dn = (related ?? []).find((r: any) => r.doc_type === 'delivery_note')
   return {
-    doc: { ...doc, doc_type: doc.doc_type as SalesType, vat_rate: Number(doc.vat_rate), discount: Number(doc.discount), terms: doc.terms ?? [], payment_terms: doc.payment_terms ?? [], del_no: dn?.number ?? null } as SalesDoc,
+    doc: { ...doc, project_name: project?.name ?? null, doc_type: doc.doc_type as SalesType, vat_rate: Number(doc.vat_rate), discount: Number(doc.discount), terms: doc.terms ?? [], payment_terms: doc.payment_terms ?? [], del_no: dn?.number ?? null } as SalesDoc,
     items: (items ?? []).map((i: any) => ({ ...i, quantity: Number(i.quantity), unit_price: Number(i.unit_price) })) as (PaperItem & { id: string })[],
     payments: (pays ?? []) as any[], paid, related: (related ?? []) as any[], project, customer,
   }

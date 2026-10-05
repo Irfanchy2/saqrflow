@@ -21,13 +21,16 @@ export default async function Projects({ searchParams }: { searchParams: Promise
   let q = c.supabase.from('projects').select('id,name,code,location,status,contract_value,start_date,expected_completion,fabrication_progress,site_progress,customer:customers(id,name)').order('created_at', { ascending: false }).limit(300)
   if (status === 'open') q = q.in('status', ['planning', 'active', 'on_hold']); else if (status) q = q.eq('status', status)
   if (term) q = q.or(`name.ilike.%${term}%,code.ilike.%${term}%,location.ilike.%${term}%`)
-  const [{ data: projects }, { data: customers }, { data: invs }, { data: bals }, { data: exps }, { data: ms }] = await Promise.all([
-    q, c.supabase.from('customers').select('id,name').order('name').limit(1000),
-    fin ? c.supabase.from('invoices').select('id,project_id,doc_type,status,total').not('project_id', 'is', null).eq('doc_type', 'invoice').limit(5000) : Promise.resolve({ data: [] as any[] }),
-    fin ? c.supabase.from('invoice_balances').select('id,paid').limit(5000) : Promise.resolve({ data: [] as any[] }),
-    fin ? c.supabase.from('project_expenses').select('project_id,amount,category').limit(10000) : Promise.resolve({ data: [] as any[] }),
-    c.supabase.from('project_milestones').select('project_id,due_date,done,title').eq('done', false).order('due_date').limit(2000),
-  ])
+  // only the figures for the projects on screen (not every invoice / expense in the company)
+  const [{ data: projects }, { data: customers }] = await Promise.all([q, c.supabase.from('customers').select('id,name').order('name').limit(1000)])
+  const pids = (projects ?? []).map((p: any) => p.id)
+  const [{ data: invs }, { data: exps }, { data: ms }] = pids.length ? await Promise.all([
+    fin ? c.supabase.from('invoices').select('id,project_id,doc_type,status,total').in('project_id', pids).eq('doc_type', 'invoice') : Promise.resolve({ data: [] as any[] }),
+    fin ? c.supabase.from('project_expenses').select('project_id,amount,category').in('project_id', pids) : Promise.resolve({ data: [] as any[] }),
+    c.supabase.from('project_milestones').select('project_id,due_date,done,title').in('project_id', pids).eq('done', false).order('due_date'),
+  ]) : [{ data: [] as any[] }, { data: [] as any[] }, { data: [] as any[] }]
+  const invIds = (invs ?? []).map((i: any) => i.id)
+  const { data: bals } = invIds.length ? await c.supabase.from('invoice_balances').select('id,paid').in('id', invIds.slice(0, 1000)) : { data: [] as any[] }
   const paid = new Map((bals ?? []).map((b: any) => [b.id, Number(b.paid)]))
   const finOf = (id: string, contract: number | null) => projectFinancials(contract, (invs ?? []).filter((i: any) => i.project_id === id).map((i: any) => ({ ...i, paid: paid.get(i.id) ?? 0 })), (exps ?? []).filter((e: any) => e.project_id === id))
   const rows = (projects ?? []).map((p: any) => ({ ...p, f: finOf(p.id, p.contract_value), next: (ms ?? []).find((m: any) => m.project_id === p.id) }))

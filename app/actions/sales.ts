@@ -28,6 +28,8 @@ const itemSchema = z.object({
 const docSchema = z.object({
   customer_id: z.string().uuid().nullable().optional(),
   new_customer: z.boolean().optional(),
+  update_customer: z.boolean().optional(),                // explicit opt-in: copy this document's details back to the customer record
+  customer_email: z.union([z.string().trim().email('Enter a valid email').max(200), z.literal('')]).optional().nullable().transform(v => v || null),
   project_id: z.string().uuid().nullable().optional(),
   issue_date: date, due_date: optDate, valid_until: optDate,
   attention: optText(200), customer_name: optText(250), customer_address: optText(500), customer_trn: optText(30), customer_phone: optText(40),
@@ -57,11 +59,11 @@ export async function newSalesDoc(type: string, opts: { customerId?: string; pro
     const t = typeSchema.parse(type)
     const s = await salesSettings(c)
     let customer: any = null
-    if (opts.customerId) customer = (await c.supabase.from('customers').select('id,name,address,trn,phone,contact_person').eq('id', opts.customerId).maybeSingle()).data
+    if (opts.customerId) customer = (await c.supabase.from('customers').select('id,name,address,trn,phone,contact_person,email').eq('id', opts.customerId).maybeSingle()).data
     let project: any = null
     if (opts.projectId) {
       project = (await c.supabase.from('projects').select('id,name,location,customer_id').eq('id', opts.projectId).maybeSingle()).data
-      if (project?.customer_id && !customer) customer = (await c.supabase.from('customers').select('id,name,address,trn,phone,contact_person').eq('id', project.customer_id).maybeSingle()).data
+      if (project?.customer_id && !customer) customer = (await c.supabase.from('customers').select('id,name,address,trn,phone,contact_person,email').eq('id', project.customer_id).maybeSingle()).data
     }
     const number = await nextNumber(c, t)
     const { data, error } = await c.supabase.from('invoices').insert({
@@ -70,7 +72,7 @@ export async function newSalesDoc(type: string, opts: { customerId?: string; pro
       vat_rate: s.vatRate, terms: t === 'quotation' ? s.terms : [], payment_terms: t === 'quotation' ? s.paymentTerms : [],
       intro: t === 'quotation' ? s.intro : null, closing: t === 'quotation' ? s.closing : null,
       customer_id: customer?.id ?? null, customer_name: customer?.name ?? null, customer_address: customer?.address ?? null, customer_trn: customer?.trn ?? null,
-      customer_phone: customer?.phone ?? null, attention: customer?.contact_person ?? null,
+      customer_phone: customer?.phone ?? null, customer_email: customer?.email ?? null, attention: customer?.contact_person ?? null,
       project_id: project?.id ?? null, site: project?.location ?? null,
     }).select('id').single()
     if (error) throw error
@@ -97,7 +99,7 @@ export async function saveSalesDoc(id: string, input: SalesDocInput): Promise<Ac
       const { data: existing } = await c.supabase.from('customers').select('id').ilike('name', v.customer_name).maybeSingle()
       if (existing) customerId = existing.id
       else {
-        const { data: cu, error } = await c.supabase.from('customers').insert({ company_id: c.company.id, name: v.customer_name, address: v.customer_address, trn: v.customer_trn, phone: v.customer_phone, contact_person: v.attention }).select('id').single()
+        const { data: cu, error } = await c.supabase.from('customers').insert({ company_id: c.company.id, name: v.customer_name, address: v.customer_address, trn: v.customer_trn, phone: v.customer_phone, email: v.customer_email, contact_person: v.attention }).select('id').single()
         if (error) throw error
         customerId = cu.id
       }
@@ -108,7 +110,11 @@ export async function saveSalesDoc(id: string, input: SalesDocInput): Promise<Ac
       const { data: b } = await c.supabase.from('invoice_balances').select('paid').eq('id', id).maybeSingle()
       if (b && Number(b.paid) > tot.total + 0.005) return { error: 'The new total is lower than what has already been paid.' }
     }
-    const { items, new_customer: _nc, customer_id: _ci, ...head } = v
+    if (customerId && v.update_customer) {
+      const { error: ue } = await c.supabase.from('customers').update({ name: v.customer_name ?? undefined, address: v.customer_address, trn: v.customer_trn?.replace(/\s|-/g, '') ?? null, phone: v.customer_phone, email: v.customer_email, contact_person: v.attention }).eq('id', customerId)
+      if (ue) throw ue
+    }
+    const { items, new_customer: _nc, customer_id: _ci, update_customer: _uc, ...head } = v
     const { error } = await c.supabase.from('invoices').update({
       ...head, customer_id: customerId, customer_trn: v.customer_trn?.replace(/\s|-/g, '') ?? null,
       subtotal: priced ? tot.subtotal : 0, discount: priced ? tot.discount : 0, vat_amount: priced ? tot.vat : 0, total: priced ? tot.total : 0,
@@ -161,7 +167,7 @@ async function copyDoc(c: Ctx, id: string, to: SalesType, link: boolean): Promis
   const { data, error } = await c.supabase.from('invoices').insert({
     company_id: c.company.id, doc_type: to, number, status: 'draft', issue_date: c.today, created_by: c.userId,
     customer_id: d.customer_id, project_id: d.project_id, attention: d.attention, customer_name: d.customer_name, customer_address: d.customer_address,
-    customer_trn: d.customer_trn, customer_phone: d.customer_phone, site: d.site, subject: d.subject, reference: d.reference, lpo_ref: d.lpo_ref,
+    customer_trn: d.customer_trn, customer_phone: d.customer_phone, customer_email: d.customer_email, site: d.site, subject: d.subject, reference: d.reference, lpo_ref: d.lpo_ref,
     vat_rate: d.vat_rate, discount: to === d.doc_type ? d.discount : 0, show_total: d.show_total,
     intro: to === 'quotation' ? d.intro ?? s.intro : null, closing: to === 'quotation' ? d.closing ?? s.closing : null,
     terms: to === 'quotation' ? d.terms : [], payment_terms: to === 'quotation' ? d.payment_terms : [],
@@ -356,6 +362,8 @@ export async function saveSalesSettings(_: ActionState, fd: FormData): Promise<A
       ['sales.vat_rate', n('vat_rate', 0, 100)], ['sales.due_days', n('due_days', 0, 365)], ['sales.validity_days', n('validity_days', 1, 365)],
       ['branding.bank_details', (str(fd, 'bank_details') ?? '').slice(0, 1000)], ['branding.company_trn', trn],
       ['branding.show_header_footer', fd.get('show_header_footer') === 'on'], ['branding.show_stamp', fd.get('show_stamp') === 'on'],
+      ['branding.seal_size', n('seal_size', 70, 220)], ['branding.signature_width', n('signature_width', 80, 260)],
+      ['branding.sign_align', z.enum(['left', 'center', 'right']).parse(str(fd, 'sign_align') ?? 'right')], ['branding.sign_spacing', n('sign_spacing', 0, 80)],
     ]
     const { error } = await c.supabase.from('app_settings').upsert(rows.map(([key, value]) => ({ company_id: c.company.id, key, value, updated_at: new Date().toISOString() })))
     if (error) throw error

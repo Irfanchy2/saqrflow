@@ -23,9 +23,14 @@ export const LinkButton = ({ href, className, variant, size, children }: { href:
   <Link href={href} className={cn(button({ variant, size }), className)}>{children}</Link>
 
 const field = 'w-full rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted/70 transition-colors hover:border-muted/50 disabled:opacity-60'
-export const Input = ({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) => <input className={cn(field, 'h-9', className)} {...p} />
+// dir="auto": typed text takes its own direction (English stays left-aligned inside the Arabic RTL UI and vice versa)
+// instead of inheriting the page direction — the cause of names/addresses jumping to the wrong side of the box.
+const TEXTUAL = new Set([undefined, 'text', 'search', 'email', 'tel', 'url', 'password'])
+export const Input = ({ className, dir, type, ...p }: InputHTMLAttributes<HTMLInputElement>) =>
+  <input type={type} dir={dir ?? (TEXTUAL.has(type) ? 'auto' : undefined)} className={cn(field, 'h-9 text-start', className)} {...p} />
 export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'h-9 pr-8', className)} {...p} />
-export const Textarea = ({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea className={cn(field, 'py-2 min-h-[72px]', className)} {...p} />
+export const Textarea = ({ className, dir, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) =>
+  <textarea dir={dir ?? 'auto'} className={cn(field, 'min-h-[72px] resize-y py-2 text-start leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap', className)} {...p} />
 export function Field({ label, hint, children, className }: { label: string; hint?: string; children: ReactNode; className?: string }) {
   return <label className={cn('flex flex-col gap-1.5 text-sm', className)}><span className="font-medium">{label}</span>{children}{hint && <span className="text-xs text-muted">{hint}</span>}</label>
 }

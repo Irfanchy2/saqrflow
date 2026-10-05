@@ -27,6 +27,64 @@ dialog[open] { animation: pop .16s ease-out; }
 .skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .06), transparent); animation: shimmer 1.4s infinite; }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
 @media print { aside, header, .no-print { display: none !important; } body { background: #fff; } main { padding: 0 !important; } }
-@page { size: A4; margin: 0; }
-.print-sheet .sales-paper { box-shadow: none; }
-@media print { .print-sheet { padding: 0 !important; background: #fff !important; } .print-sheet .sales-paper { margin: 0; } html.dark body { background: #fff; } }
+/* ═════════ Sales documents (quotation / tax invoice / delivery note) — one layout for screen preview and print ═════════ */
+@page { size: A4 portrait; margin: 0; }
+.sales-paper {
+  --ink: #111; --rule: #1f1f1f; --box: #efe8da; --box-rule: #8a7f6c; --red: #b42318; --hatch-a: #f3eee5; --hatch-b: #ddd2bf;
+  position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; color: var(--ink);
+  padding: 0 10mm; box-sizing: border-box; display: flex; flex-direction: column;
+  font: 14px/1.4 Arial, Helvetica, sans-serif; letter-spacing: normal; word-spacing: normal; text-align: left;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;               /* backgrounds & brand colours print as on screen */
+}
+.sales-paper * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+.sales-paper[dir], .sales-paper { direction: ltr; }                          /* the document layout is LTR even in the Arabic UI */
+.paper-frame { width: 100%; border-collapse: collapse; table-layout: fixed; flex: 1; }
+.paper-frame > thead > tr > td, .paper-frame > tfoot > tr > td, .paper-frame > tbody > tr > td { padding: 0; border: 0; vertical-align: top; }
+.pf-top { height: 8mm; }
+.pf-bottom { height: 4mm; }
+.paper-letterhead { display: flex; justify-content: center; align-items: center; height: 31mm; margin-bottom: 1mm; }
+.paper-letterhead img { max-height: 29mm; max-width: 100%; width: auto; height: auto; object-fit: contain; image-rendering: auto; }
+.paper-title { text-align: center; margin-bottom: 2.5mm; break-after: avoid; }
+.paper-title h1 { font-size: 18px; font-weight: 700; margin: 0; }
+.paper-boxes { display: flex; gap: 3.5mm; margin-bottom: 3mm; break-inside: avoid; }
+.paper-box { flex: 1 1 auto; min-width: 0; margin: 0; padding: 2mm 3mm; background: var(--box); border: 1px solid var(--box-rule); }
+.paper-box--meta { flex: 0 0 62mm; }
+.paper-pair { display: grid; grid-template-columns: 31mm minmax(0, 1fr); column-gap: 2mm; padding: 0.4mm 0; }
+.paper-box--meta .paper-pair { grid-template-columns: 22mm minmax(0, 1fr); }
+.paper-pair dt { font-weight: 700; white-space: nowrap; }
+.paper-pair dd { margin: 0; }
+.paper-pair dd, .paper-text { white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; line-height: 1.45; }   /* keeps line breaks, wraps long words / URLs */
+.paper-items { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+.paper-items th, .paper-items td { border: 1px solid var(--rule); padding: 1.2mm 1.5mm; vertical-align: middle; overflow-wrap: anywhere; }
+.paper-items th { font-weight: 700; text-align: center; line-height: 1.2; background: #fff; }
+.paper-items thead { display: table-header-group; }                         /* header row repeats on every page */
+.paper-items tr { break-inside: avoid; page-break-inside: avoid; }            /* a row is never split across pages */
+.paper-items td.paper-desc { vertical-align: top; }
+.paper-total td { break-inside: avoid; }
+.paper-hatch { background: repeating-linear-gradient(45deg, var(--hatch-a), var(--hatch-a) 4px, var(--hatch-b) 4px, var(--hatch-b) 5px); }
+.paper-red { color: var(--red); }
+.paper-keep { break-inside: avoid; page-break-inside: avoid; }
+.paper-keep-next { break-after: avoid; page-break-after: avoid; }
+/* seal + signature float beside the first lines of the terms; long terms then continue at full width underneath */
+.paper-tail { margin-top: 3mm; display: flow-root; }
+.paper-tail-text { min-width: 0; font-size: 15px; }
+.paper-sign { float: right; margin: 0 0 2mm 4mm; display: flex; align-items: center; break-inside: avoid; page-break-inside: avoid; }
+.paper-tail--sign-left .paper-sign { float: left; margin: 0 4mm 2mm 0; }
+.paper-sign--center { float: none; justify-content: center; margin: 2mm auto 0; }
+.paper-sign img { object-fit: contain; display: block; max-width: none; }   /* fixed box + contain = never stretched */
+.paper-clauses ol { list-style: none; margin: 0; padding: 0; }
+.paper-clauses li { display: grid; grid-template-columns: 7mm minmax(0, 1fr); break-inside: avoid; page-break-inside: avoid; }
+.paper-clauses .paper-keep-next + ol li:first-child { break-before: avoid; }
+.paper-footer { margin-top: auto; padding: 2mm 0 5mm; }
+.paper-footer img { width: 100%; max-height: 22mm; object-fit: contain; display: block; }
+/* screen-only page guides (every 297 mm) so you can see where pages break */
+.paper-guides { position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(297mm - 1px), rgb(59 130 246 / .55) calc(297mm - 1px), rgb(59 130 246 / .55) 297mm); }
+@media print {
+  html, body { background: #fff !important; }
+  .sales-paper { margin: 0; box-shadow: none !important; min-height: auto; }
+  .pf-top { height: 8mm; }
+  .sales-paper.has-footer .pf-bottom { height: 30mm; }                       /* room for the footer repeated on each page */
+  .sales-paper.has-footer .paper-footer { position: fixed; left: 0; right: 0; bottom: 4mm; width: 210mm; margin: 0 auto; padding: 0 10mm; }
+  .print-sheet { padding: 0 !important; background: #fff !important; }
+}
