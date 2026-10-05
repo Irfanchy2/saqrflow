@@ -37,7 +37,7 @@ try {
   ok((await bodyText(p)).includes('Welcome, Faisal'), 'owner lands on dashboard after onboarding')
   ok((await bodyText(p)).includes('Let’s get you set up'), 'empty dashboard shows the setup guide (no fake data)')
   await shot(p, '02-dashboard-empty')
-  for (const l of ['Overview', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Sales & Invoices', 'Projects', 'Clients & Suppliers', 'Vehicles & Assets', 'Smart Reminders', 'Calendar', 'Reports & Analytics', 'AI Assistant', 'User Management', 'Settings'])
+  for (const l of ['Overview', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Sales & Invoices', 'Projects', 'Clients & Suppliers', 'Vehicles & Assets', 'Smart Reminders', 'Calendar', 'Reports & Analytics', 'AI Search', 'User Management', 'Settings'])
     ok(await p.getByRole('link', { name: l }).first().isVisible(), `sidebar has “${l}”`)
   ok((await bodyText(p)).toLowerCase().includes('soon'), 'unbuilt modules are labelled Planned in the sidebar')
 

@@ -9,7 +9,7 @@ export interface WaStatus { mode: 'live' | 'sandbox'; reason: string; hasToken: 
 /** Tells the UI honestly whether WhatsApp messages would actually leave the system. Never exposes the token. */
 export async function whatsappStatus(companyId: string): Promise<WaStatus> {
   const emailLive = !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM
-  if (!adminConfigured()) return { mode: 'sandbox', reason: 'SUPABASE_SERVICE_ROLE_KEY is not set on the server.', hasToken: false, phoneNumberId: null, emailLive }
+  if (!adminConfigured()) return { mode: 'sandbox', reason: 'SUPABASE_SECRET_KEY is not set on the server.', hasToken: false, phoneNumberId: null, emailLive }
   const admin = createAdminClient()
   const { data } = await admin.from('app_settings').select('key,value').eq('company_id', companyId)
   const s = parseSettings(data ?? [])

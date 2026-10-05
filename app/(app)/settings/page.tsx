@@ -7,9 +7,8 @@ import { parseSettings } from '@/lib/reminders/settings'
 import { whatsappStatus } from '@/lib/reminders/mode'
 import { TEMPLATE_META, templateBody } from '@/lib/whatsapp/templates'
 import { LOCALE_NAMES, LOCALES } from '@/lib/i18n'
-import { setAiOcr } from '@/app/actions/inbox'
-import { claudeAvailable, CLAUDE_MODEL } from '@/lib/inbox/claude'
 import { BrandingSettings } from '@/components/sales/branding-settings'
+import { AiAutomation } from '@/components/settings/ai-automation'
 
 export const metadata = { title: 'Settings' }
 export default async function Settings() {
@@ -34,11 +33,7 @@ export default async function Settings() {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="digest" defaultChecked={s.digestEnabled} />Send the daily summary to recipients who opted in</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="fallback" defaultChecked={s.emailFallback} />Email fallback when a WhatsApp message fails permanently</label></ActionForm></div></Card>}
 
-      {admin && <Card className="lg:col-span-2"><CardHeader title="Smart Inbox — AI document reading" action={<Badge tone={(st ?? []).find((r: any) => r.key === 'ai.ocr_provider')?.value === 'claude' && claudeAvailable() ? 'green' : 'neutral'}>{(st ?? []).find((r: any) => r.key === 'ai.ocr_provider')?.value === 'claude' && claudeAvailable() ? 'AI on' : 'Local rules'}</Badge>} />
-        <div className="space-y-3 p-4 text-sm"><p>By default SaqrFlow reads digital PDFs on your own server with local rules — no document leaves your system. Scanned images and photos then go to manual review.</p>
-          <p>Turning on AI reading sends each uploaded file to the Anthropic API (model <code>{CLAUDE_MODEL}</code>) for OCR and classification. Anthropic does not train on API data by default, but passports and IDs will be processed by a third party — confirm this is acceptable under your data-protection obligations first.</p>
-          {!claudeAvailable() && <Alert tone="amber">Set <code>ANTHROPIC_API_KEY</code> in the server environment (e.g. Vercel → Environment Variables) to enable this option.</Alert>}
-          <div className="flex gap-2"><ActionButton action={setAiOcr.bind(null, true)} variant="primary" size="md">Enable AI reading</ActionButton><ActionButton action={setAiOcr.bind(null, false)} size="md">Use local rules only</ActionButton></div></div></Card>}
+      {admin && <AiAutomation c={c} wa={wa} />}
 
       {admin && <BrandingSettings c={c} />}
 
@@ -55,7 +50,7 @@ export default async function Settings() {
           <div className="space-y-3 text-sm"><h3 className="font-medium">Webhook (delivery receipts &amp; STOP replies)</h3>
             <p className="text-muted">In Meta → WhatsApp → Configuration set:</p>
             <dl className="space-y-1 rounded-md bg-surface-2 p-3 font-mono text-xs"><div>Callback URL: <b className="select-all">{appUrl}/api/webhooks/whatsapp</b></div><div>Verify token: the value of <b>WHATSAPP_VERIFY_TOKEN</b></div><div>Subscribe to field: <b>messages</b></div></dl>
-            <p className="text-muted">The server also needs <code>WHATSAPP_APP_SECRET</code> to verify signatures; unsigned requests are rejected.</p>
+            <p className="text-muted">The server also needs <code>META_APP_SECRET</code> to verify signatures; unsigned requests are rejected.</p>
             <h3 className="pt-2 font-medium">Message templates to approve in Meta</h3>
             {(Object.keys(TEMPLATE_META) as (keyof typeof TEMPLATE_META)[]).map(k => <details key={k} className="rounded-md border border-border p-2"><summary className="cursor-pointer font-mono text-xs">{TEMPLATE_META[k].metaName} <span className="text-muted">({TEMPLATE_META[k].language}, utility)</span></summary><pre className="mt-2 whitespace-pre-wrap text-xs text-muted">{templateBody(k)}</pre></details>)}</div></div></Card>}
     </div></>

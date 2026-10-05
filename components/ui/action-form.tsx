@@ -1,5 +1,6 @@
 'use client'
 import { useActionState, useEffect, useRef, type ReactNode } from 'react'
+import { useFormStatus } from 'react-dom'
 import { Loader2 } from 'lucide-react'
 import { Button, Alert } from './primitives'
 import { useDialog } from './dialog'
@@ -34,4 +35,10 @@ export function ActionButton({ action, children, confirm, variant = 'secondary',
     {state?.error && <span className="text-xs text-danger">{state.error}</span>}
     {state?.ok && state.message && <span className="text-xs text-success">{state.message}</span>}
   </form>
+}
+
+/** Submit button for a custom ActionForm layout (hideSubmit): shows a spinner while the action runs. */
+export function SubmitButton({ children, variant = 'secondary' }: { children: ReactNode; variant?: 'primary' | 'secondary' | 'ghost' | 'danger' }) {
+  const { pending } = useFormStatus()
+  return <Button type="submit" variant={variant} disabled={pending}>{pending && <Loader2 size={14} className="animate-spin" />}{children}</Button>
 }

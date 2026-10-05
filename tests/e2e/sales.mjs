@@ -142,6 +142,7 @@ try {
 
   console.log('\n[S7] Local OCR of a photographed Emirates ID (AI off)')
   const ayub = (await one(`insert into employees(company_id,employee_no,full_name) values ($1,'S-201','Mohammed Ayub') returning id`, [co])).id
+  await db.query(`insert into app_settings(company_id,key,value) values ($1,'ai.provider','"rules"'),($1,'ocr.provider','"tesseract"')`, [co])
   await p.goto(`${BASE}/inbox`); await p.getByRole('button', { name: 'Upload documents' }).click()
   await dlg().locator('input[type=file]').setInputFiles({ name: 'eid-photo.png', mimeType: 'image/png', buffer: fs.readFileSync('tests/fixtures/emirates-id-photo.png') })
   await dlg().getByRole('button', { name: 'Upload & analyse' }).click(); await p.waitForURL(/\/inbox\?batch=/, { timeout: 90000 }); await settle()

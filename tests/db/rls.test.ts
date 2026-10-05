@@ -397,3 +397,25 @@ describe('Sales documents, payments & projects (0008)', () => {
     expect((await as(U.ownerA, `select count(*)::int n from audit_logs where table_name in ('project_expenses','invoice_items')`)).rows[0].n).toBeGreaterThan(0)
   })
 })
+
+describe('AI document reader logs (0009)', () => {
+  it('OCR / AI logs: insert as yourself only, append-only, admins see usage, other companies see nothing', async () => {
+    await as(U.hrA, `insert into ocr_logs(company_id,provider,ok,chars,created_by) values ($1,'ocrspace',true,120,$2)`, [A, U.hrA])
+    await as(U.hrA, `insert into ai_processing_logs(company_id,provider,model,purpose,ok,input_chars,redacted,created_by) values ($1,'gemini','gemini-2.5-flash','classify',true,900,true,$2)`, [A, U.hrA])
+    await fails(as(U.hrA, `insert into ocr_logs(company_id,provider,ok,created_by) values ($1,'ocrspace',true,$2)`, [A, U.ownerA]))      // impersonation
+    await fails(as(U.viewerA, `insert into ocr_logs(company_id,provider,ok,created_by) values ($1,'ocrspace',true,$2)`, [A, U.viewerA])) // no upload permission
+    await fails(as(U.hrA, `insert into ai_processing_logs(company_id,provider,purpose,ok,created_by) values ($1,'gemini','other',true,$2)`, [A, U.hrA]))
+    expect((await as(U.ownerA, `update ocr_logs set ok=false returning id`)).rowCount).toBe(0)
+    expect((await as(U.ownerA, `delete from ai_processing_logs returning id`)).rowCount).toBe(0)
+    const usage = (await as(U.ownerA, `select kind,provider,calls,volume from ai_usage_daily order by kind`)).rows
+    expect(usage).toEqual([{ kind: 'ai', provider: 'gemini', calls: 1, volume: '900' }, { kind: 'ocr', provider: 'ocrspace', calls: 1, volume: '120' }])
+    expect((await as(U.ownerB, `select count(*)::int n from ai_usage_daily`)).rows[0].n).toBe(0)
+    expect((await as(U.viewerA, `select count(*)::int n from ocr_logs`)).rows[0].n).toBe(0)
+  })
+  it('inbox life-cycle statuses and the payment relationship type are accepted', async () => {
+    const id = (await as(U.hrA, `insert into document_inbox(company_id,uploaded_by,storage_path,file_name,mime_type,size_bytes,sha256,status) values ($1,$2,'x/y.pdf','y.pdf','application/pdf',10,'abc','uploaded') returning id`, [A, U.hrA])).rows[0].id
+    for (const s of ['processing', 'ocr_complete', 'classification_complete', 'needs_review']) await as(U.hrA, `update document_inbox set status=$2 where id=$1`, [id, s])
+    await fails(as(U.hrA, `update document_inbox set status='bogus' where id=$1`, [id]))
+    await as(U.hrA, `insert into document_relationships(company_id,document_id,related_type,related_id) values ($1,$2,'payment',gen_random_uuid())`, [A, docCompany])
+  })
+})

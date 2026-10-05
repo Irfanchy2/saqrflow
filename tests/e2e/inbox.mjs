@@ -28,6 +28,8 @@ try {
   const ra = (await one(`insert into employees(company_id,employee_no,full_name) values ($1,'S-102','Rahim Uddin') returning id`, [co])).id
   await one(`insert into employees(company_id,employee_no,full_name) values ($1,'S-103','Mohammed Rafiq') returning id`, [co])
   const abc = (await one(`insert into customers(company_id,name) values ($1,'ABC Contracting LLC') returning id`, [co])).id
+  // this suite covers the private, local-only path (the AI / OCR.Space path is covered by ai-reader.mjs)
+  await db.query(`insert into app_settings(company_id,key,value) values ($1,'ai.provider','"rules"'),($1,'ocr.provider','"tesseract"')`, [co])
   ok(await p.getByRole('link', { name: 'Smart Inbox' }).first().isVisible(), 'sidebar shows “Smart Inbox”')
   ok((await body()).includes('Smart Document Center'), 'dashboard shows the Smart Document Center widget')
 
@@ -57,7 +59,7 @@ try {
   console.log('\n[I3] Review screen & confirm one item manually')
   await p.goto(`${BASE}/inbox?tab=ready`); await p.locator('tr', { hasText: 'emirates-id-mohammed.pdf' }).getByRole('link', { name: 'Confirm' }).click(); await settle()
   const rv = await body()
-  ok(rv.includes('What SaqrFlow found') && rv.includes('Mohammed Ayub') && rv.includes('97%'), 'review screen shows detection with confidence (Mohammed Ayub · 97%)')
+  ok(rv.includes('Document detected') && rv.includes('Mohammed Ayub') && rv.includes('97%'), 'review screen shows detection with confidence (Mohammed Ayub · 97%)')
   ok(rv.includes('784-1990-1234567-6') && rv.includes('9 January 2027'), 'extracted ID number + expiry shown for verification')
   ok(await p.locator('iframe[title="Uploaded document"]').isVisible(), 'document preview shown next to the form')
   ok(rv.includes('90d →') && rv.includes('on expiry →'), 'reminder schedule preview (90d … on expiry)')
@@ -73,7 +75,7 @@ try {
   ok(docs.length === 10, `10 documents created (${docs.length})`)
   ok(docs.filter(d => d.owner_id === ra).map(d => d.cat).sort().join() === 'Emirates ID,Residence Visa', 'Rahim has Emirates ID + Residence Visa')
   ok(docs.find(d => d.cat === 'Vehicle Registration (Mulkiya)')?.folder === 'Vehicles/Dubai K 45821', 'vehicle category created on the fly + filed under Vehicles/plate')
-  ok(docs.find(d => d.cat === 'Customer Invoice')?.folder === 'Customers/ABC Contracting LLC/Tax Invoices', 'invoice filed under the customer folder')
+  ok(docs.find(d => d.cat === 'Customer Invoice')?.folder === 'Customers/ABC Contracting LLC/Invoices', 'invoice filed under Customers → ABC Contracting LLC → Invoices')
   ok((await one(`select count(*)::int n from document_relationships where company_id=$1 and related_type='customer' and related_id=$2`, [co, abc])).n === 2, 'invoice + delivery note linked to ABC Contracting (relationship, no copy)')
   const objs = (await (await fetch(`${GW}/__objects`)).json()).filter(k => k.includes(co))
   const vers = (await db.query(`select storage_path from document_versions where company_id=$1`, [co])).rows
@@ -91,7 +93,7 @@ try {
   ok(ren.suggestion.duplicates.some(d => d.kind === 'renewal'), 'renewed licence recognised as a renewal of the existing Trade License')
   ok(dup.status === 'duplicate' && dup.suggestion.duplicates[0].kind === 'same_file', 're-uploading the same file → “Possible duplicate detected”')
   ok(unk.status === 'needs_review' && unk.review_reasons.includes('Document type not recognised'), 'unrelated letter → manual review (not guessed)')
-  ok(img.status === 'needs_review' && /No readable text/.test(img.review_reasons.join()), 'scanned photo without AI → manual review with explanation')
+  ok(img.status === 'failed' && /OCR failed/.test(img.review_reasons.join()), 'unreadable photo → Failed with the OCR error (file kept, retry / manual entry offered)')
   await shot('22-inbox-second-batch')
   // renewal → new version of existing
   const renId = (await one(`select id from document_inbox where company_id=$1 and file_name='renewed-trade-license.pdf'`, [co])).id
@@ -105,7 +107,7 @@ try {
   // manual correction of the scanned image + learning
   const imgId = (await one(`select id from document_inbox where company_id=$1 and file_name='photo-of-id.jpg'`, [co])).id
   await p.goto(`${BASE}/inbox/${imgId}`); await settle()
-  ok((await body()).includes('Manual review required'), 'review screen says “Manual review required”')
+  ok((await body()).includes('Could not read this document') && (await body()).includes('Reprocess'), 'review screen offers retry (Reprocess) and manual entry')
   await p.locator('select[name=doc_type]').selectOption('training_certificate')
   const otherCat = (await one(`select id from document_categories where company_id=$1 and name='Other Certificate'`, [co])).id
   await p.locator('select[name=category_id]').selectOption(otherCat); await p.locator('select[name=owner_id]').selectOption(ra)
@@ -115,12 +117,12 @@ try {
   ok((await one(`select count(*)::int n from document_type_mappings where company_id=$1 and doc_type='training_certificate' and category_id=$2`, [co, otherCat])).n === 1, 'correction learned locally (doc type → chosen category)')
   // reject the unknown letter
   const unkId = (await one(`select id from document_inbox where company_id=$1 and file_name='unknown-letter.pdf'`, [co])).id
-  await p.goto(`${BASE}/inbox/${unkId}`); await p.getByRole('button', { name: 'Reject' }).click(); await settle(1200)
+  await p.goto(`${BASE}/inbox/${unkId}`); await p.getByRole('button', { name: 'Delete upload' }).click(); await settle(1200)
   ok((await one(`select status from document_inbox where id=$1`, [unkId])).status === 'rejected', 'unknown document rejected (kept for audit, not deleted)')
   // re-analyse
   const dupId = (await one(`select id from document_inbox where company_id=$1 and status='duplicate'`, [co])).id
-  await p.goto(`${BASE}/inbox/${dupId}`); await p.getByRole('button', { name: 'Analyse again' }).click(); await settle(2000)
-  ok((await one(`select count(*)::int n from document_extractions where inbox_id=$1`, [dupId])).n === 2, '“Analyse again” re-reads the stored private file')
+  await p.goto(`${BASE}/inbox/${dupId}`); await p.getByRole('button', { name: 'Reprocess' }).click(); await settle(2000)
+  ok((await one(`select count(*)::int n from document_extractions where inbox_id=$1`, [dupId])).n === 2, '“Reprocess” re-reads the stored private file')
 
   console.log('\n[I6] Timeline, statuses, dashboard, security')
   await p.goto(`${BASE}/employees/${mo}?tab=history`); await settle()

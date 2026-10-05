@@ -5,7 +5,7 @@ import { DOC_TYPES, UNKNOWN_TYPE, typeDef, type FieldKey } from './catalog'
 
 export interface Field { value: string; confidence: number; source: 'label' | 'pattern' | 'inferred' | 'mrz' | 'ai' }
 export type Fields = Partial<Record<FieldKey, Field>>
-export interface Extraction { engine: 'rules' | 'claude'; engineVersion: string; docType: string; docTypeConfidence: number; fields: Fields; alternatives: { key: string; score: number }[] }
+export interface Extraction { engine: 'rules' | 'claude' | 'gemini'; engineVersion: string; docType: string; docTypeConfidence: number; fields: Fields; alternatives: { key: string; score: number }[] }
 
 export const RULES_VERSION = 'rules-2026.10.1'
 
@@ -42,7 +42,7 @@ function fromMatch(m: RegExpExecArray): string | null {
   if (m[10]) { const mo = MONTHS[m[10].toLowerCase().slice(0, 4)] ?? MONTHS[m[10].toLowerCase().slice(0, 3)]; return mo ? iso(+m[12], mo, +m[11]) : null }
   return null
 }
-function allDates(text: string): { iso: string; index: number }[] {
+export function allDates(text: string): { iso: string; index: number }[] {
   const out: { iso: string; index: number }[] = []; DATE_RE.lastIndex = 0; let m
   while ((m = DATE_RE.exec(text))) { const v = fromMatch(m); if (v) out.push({ iso: v, index: m.index }) }
   return out
@@ -144,6 +144,17 @@ export function extractFields(text: string, docType: string): Fields {
     case 'delivery_note': put('document_number', num('(?:delivery\\s*note|DN|D\\.N\\.)\\s*(?:no|number|#)\\.?') ?? (/\bDN-[\w-]+/.exec(text)?.[0] ?? null), 0.9); break
     case 'purchase_order': put('document_number', num('(?:purchase\\s*order|P\\.?O\\.?)\\s*(?:no|number|#)\\.?'), 0.9); break
   }
+  if (['receipt', 'credit_note', 'supplier_invoice'].includes(docType)) put('document_number', num('(?:receipt|credit\\s*note|invoice|voucher|ref)\\s*(?:no|number|#)\\.?'), 0.85)
+  if (docType === 'drawing') put('document_number', num('(?:drawing|dwg)\\s*(?:no|number)\\.?'), 0.85)
+  if (['vehicle_insurance', 'inspection_certificate', 'maintenance_document'].includes(docType)) {
+    put('plate_number', num('(?:traffic\\s*)?plate\\s*(?:no|number)\\.?', '([A-Z0-9][A-Z0-9 \\-/]{1,15}?)(?=\\s{2,}|\\n|$)'), 0.8)
+    put('document_number', num('(?:policy|certificate|job\\s*card|report)\\s*(?:no|number)\\.?'), 0.8)
+  }
+  const po = num('(?:L\\.?P\\.?O\\.?|P\\.?O\\.?|purchase\\s*order)\\s*(?:no|number|ref|#)\\.?')
+  if (po && docType !== 'purchase_order') put('po_number', po, 0.8)
+  put('employee_id', labelled(text, '(?:employee\\s*(?:id|no|number|code)|staff\\s*(?:id|no))', '([A-Z]{0,4}-?\\d{1,6})', false), 0.8)
+  put('project_name', clean(labelled(text, '(?:project(?:\\s*name)?|job\\s*name)', "([A-Za-z0-9][A-Za-z0-9&,'.\\- ]{2,80})")), 0.75)
+  if (docType === 'supplier_invoice') put('supplier_name', clean(labelled(text, '(?:supplier|vendor|bill\\s*from|from)', "([A-Za-z0-9][A-Za-z0-9&'.\\- ]{2,80})")), 0.8)
   if (!f.document_number && eid && docType !== 'emirates_id') { /* an EID on a visa etc. is a holder identifier, not this document's number */ }
 
   // people & parties — only the fields that make sense for this kind of document
@@ -170,7 +181,7 @@ export function extractFields(text: string, docType: string): Fields {
     put('customer_name', clean(labelled(text, '(?:bill\\s*to|customer|client|messrs\\.?|delivered\\s*to|ship\\s*to)', "([A-Za-z0-9][A-Za-z0-9&'.\\- ]{2,80})")), conf(0.85))
     if (!f.issue_date) put('issue_date', labelledDate(text, /(?:^|\n)\s*date\s*:/), conf(0.75))
   }
-  if (kind === 'customer' || docType === 'tenancy_contract' || docType === 'ejari' || docType === 'company_insurance' || any) {
+  if (kind === 'customer' || kind === 'supplier' || docType === 'tenancy_contract' || docType === 'ejari' || docType === 'company_insurance' || any) {
     const amt = labelled(text, '(?:grand\\s*total|total\\s*amount|amount\\s*due|net\\s*total|annual\\s*rent|sum\\s*insured|total)', '(?:\\(?AED\\)?\\s*)?([0-9][0-9,]*(?:\\.\\d{1,2})?)')
     if (amt) put('amount', amt.replace(/,/g, ''), conf(0.8))
   }

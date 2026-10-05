@@ -30,12 +30,15 @@ sleep 2
 mint() { node -e "const c=require('crypto'),b=x=>Buffer.from(x).toString('base64url'),h=b(JSON.stringify({alg:'HS256',typ:'JWT'})),p=b(JSON.stringify({role:'$1',iss:'e2e',exp:4102444800}));console.log(h+'.'+p+'.'+c.createHmac('sha256',process.env.JWT_SECRET).update(h+'.'+p).digest('base64url'))"; }
 export NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54399 NEXT_PUBLIC_SUPABASE_ANON_KEY=$(mint anon) SUPABASE_SERVICE_ROLE_KEY=$(mint service_role)
 export NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 CRON_SECRET=e2e-cron-secret-0123456789 SETTINGS_ENCRYPTION_KEY=$(node -e "console.log(Buffer.alloc(32,9).toString('base64'))")
+# OCR.Space + Gemini point at the gateway's /mock endpoints (same HTTP contract as the real APIs)
+export OCR_SPACE_API_KEY=test-ocr-key OCR_SPACE_ENDPOINT=http://127.0.0.1:54399/mock/ocrspace/parse/image GEMINI_API_KEY=test-gemini-key GEMINI_ENDPOINT=http://127.0.0.1:54399/mock/gemini GEMINI_MODEL=gemini-2.5-flash
 export DATABASE_URL="postgresql://postgres@localhost:$PGPORT/e2e?host=/tmp" WHATSAPP_APP_SECRET=e2e-app-secret WHATSAPP_VERIFY_TOKEN=e2e-verify E2E_BASE=http://127.0.0.1:3100 E2E_GATEWAY=http://127.0.0.1:54399
 rm -rf .next; NEXT_TELEMETRY_DISABLED=1 npx next build >"$WORK/build.log" 2>&1   # NEXT_PUBLIC_* are inlined at build time
 NEXT_TELEMETRY_DISABLED=1 npx next start -p 3100 >"$WORK/next.log" 2>&1 & PIDS+=($!)
 for i in $(seq 1 40); do curl -sf http://127.0.0.1:3100/api/health >/dev/null && break; sleep 1; done
 mkdir -p tests/e2e/shots
 if [ -n "${E2E_HOLD:-}" ]; then echo READY; sleep 3600; exit 0; fi   # keep the stack up for debugging
-set +e; node tests/e2e/smoke.mjs; RC=$?; node tests/e2e/inbox.mjs; RC2=$?; node tests/e2e/sales.mjs; RC3=$?; set -e; if [ $RC2 -ne 0 ]; then RC=$RC2; fi; if [ $RC3 -ne 0 ]; then RC=$RC3; fi
+if [ -n "${E2E_ONLY:-}" ]; then set +e; node "tests/e2e/$E2E_ONLY"; RC=$?; set -e; exit $RC; fi   # run a single suite
+set +e; node tests/e2e/smoke.mjs; RC=$?; node tests/e2e/inbox.mjs; RC2=$?; node tests/e2e/sales.mjs; RC3=$?; node tests/e2e/ai-reader.mjs; RC4=$?; set -e; if [ $RC4 -ne 0 ]; then RC=$RC4; fi; if [ $RC2 -ne 0 ]; then RC=$RC2; fi; if [ $RC3 -ne 0 ]; then RC=$RC3; fi
 echo "--- logs: $WORK (next.log, pgrst.log) ---"; grep -iE "error|PGRST" "$WORK/next.log" | head -20 || true
 exit $RC

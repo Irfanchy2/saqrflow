@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { supabaseConfigured, supabasePublishableKey, supabaseUrl } from './lib/env'
 
 // ── naive per-instance rate limiter (fixed window). Use Redis/Upstash when running >1 instance. ──
 const hits = new Map<string, { n: number; reset: number }>()
@@ -17,9 +18,9 @@ export async function middleware(req: NextRequest) {
   if (limited(`${strict ? 'auth' : pathname.startsWith('/api') ? 'api' : 'web'}:${ip}`, strict ? 10 : pathname.startsWith('/api') ? 120 : 600, strict ? 60_000 : 60_000))
     return new NextResponse('Too many requests. Please wait a minute and try again.', { status: 429, headers: { 'Retry-After': '60' } })
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return NextResponse.next()      // setup screen is rendered by the layout
+  if (!supabaseConfigured()) return NextResponse.next()      // setup screen is rendered by the layout
   let res = NextResponse.next({ request: req })
-  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  const supabase = createServerClient(supabaseUrl(), supabasePublishableKey(), {
     cookies: {
       getAll: () => req.cookies.getAll(),
       setAll: (list: { name: string; value: string; options: CookieOptions }[]) => { list.forEach(({ name, value }) => req.cookies.set(name, value)); res = NextResponse.next({ request: req }); list.forEach(({ name, value, options }) => res.cookies.set(name, value, options)) },

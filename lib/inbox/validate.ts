@@ -67,6 +67,10 @@ export function mergeReadings(ai: Extraction, local: Extraction): { merged: Extr
     else if (l) fields[k] = { ...l, confidence: Math.min(l.confidence, 0.75) }
   }
   let docTypeConfidence = ai.docTypeConfidence
+  if (ai.docType === 'unknown' && local.docType !== 'unknown' && local.docTypeConfidence >= 0.8) {
+    w.push(`AI could not identify the document; text rules suggest ${local.docType.replace(/_/g, ' ')} — please confirm the type.`)
+    return { merged: { ...ai, docType: local.docType, docTypeConfidence: Math.min(local.docTypeConfidence, 0.75), fields, alternatives: local.alternatives }, warnings: w }
+  }
   if (local.docType === ai.docType && local.docTypeConfidence >= 0.5) docTypeConfidence = Math.min(0.99, docTypeConfidence + 0.05)
   else if (local.docTypeConfidence >= 0.8 && local.docType !== ai.docType) { docTypeConfidence = Math.min(docTypeConfidence, 0.65); w.push(`AI read this as ${ai.docType.replace(/_/g, ' ')}, the text rules as ${local.docType.replace(/_/g, ' ')} — please confirm the type.`) }
   return { merged: { ...ai, fields, docTypeConfidence, alternatives: local.alternatives }, warnings: w }

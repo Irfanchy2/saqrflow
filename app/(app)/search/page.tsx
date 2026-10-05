@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { flat, sanitizeQ } from '@/lib/queries'
 import { Card, CardHeader, EmptyState, PageHeader } from '@/components/ui/primitives'
+import { Sparkles } from 'lucide-react'
 
 export const metadata = { title: 'Search' }
 export default async function SearchPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -18,6 +19,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const Section = ({ title, children, n }: { title: string; children: React.ReactNode; n: number }) => n ? <Card><CardHeader title={title} /><ul className="divide-y divide-border text-sm">{children}</ul></Card> : null
   const row = 'flex items-center justify-between px-4 py-2.5 hover:bg-surface-2/60'
   return <><PageHeader title="Search" sub={run ? `Results for “${q}”` : 'Type at least 2 characters in the search bar.'} />
+    {run && <Link href={`/assistant?q=${encodeURIComponent(sp.q ?? '')}`} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"><Sparkles size={14} />Ask AI Search: “{sp.q}”</Link>}
     {run && total === 0 ? <Card><EmptyState icon={Search} title="No results" body="Try a different spelling, or part of a name or reference." /></Card> :
       <div className="grid gap-5 lg:grid-cols-3">
         <Section title="Documents" n={docs?.data?.length ?? 0}>{docs?.data?.map(d => <li key={d.id}><Link href={`/documents/${d.id}`} className={row}><span>{d.name}</span><span className="text-xs text-muted">{d.expiry_date ?? d.owner_type}</span></Link></li>)}</Section>

@@ -2,6 +2,8 @@
 //   /rest/v1/*    → real PostgREST (talking to local Postgres with the real migrations + RLS)
 //   /auth/v1/*    → tiny GoTrue clone (password sign-up / sign-in / user / refresh / logout), HS256 JWTs
 //   /storage/v1/* → in-memory object store with signed URLs
+//   /mock/*       → stand-ins for the OCR.Space and Gemini HTTP APIs (same request/response format as the real services),
+//                   driven by fixtures the tests register — lets the e2e suite exercise the real provider code paths offline
 import http from 'node:http'
 import crypto from 'node:crypto'
 import pg from 'pg'
@@ -22,6 +24,8 @@ const session = u => {
 const user = u => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, email_confirmed_at: new Date().toISOString(), app_metadata: {}, user_metadata: {}, factors: [], created_at: new Date().toISOString() })
 const body = req => new Promise(r => { const c = []; req.on('data', d => c.push(d)); req.on('end', () => r(Buffer.concat(c))) })
 const json = (res, code, o) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)) }
+const ocrFixtures = new Map(), geminiFixtures = [], mockCalls = { ocrspace: [], gemini: [] }
+const UNKNOWN_DOC = { document_type: 'unknown', category: 'other', document_owner_type: 'unknown', company_name: null, employee_name: null, document_number: null, issue_date: null, expiry_date: null, issuing_authority: null, confidence: 0.3, fields: [], requires_manual_review: true }
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'); const path = url.pathname
@@ -46,6 +50,34 @@ http.createServer(async (req, res) => {
       return json(res, 200, user({ id: c.sub, email: c.email }))
     }
     if (path === '/auth/v1/logout') { res.writeHead(204); return res.end() }
+
+    if (path === '/mock/fixtures' && req.method === 'POST') {
+      const b = JSON.parse((await body(req)).toString())
+      for (const [k, v] of Object.entries(b.ocr ?? {})) ocrFixtures.set(k, v)
+      for (const g of b.gemini ?? []) geminiFixtures.unshift(g)
+      return json(res, 200, { ok: true })
+    }
+    if (path === '/mock/calls') return json(res, 200, mockCalls)
+    if (path === '/mock/ocrspace/parse/image' && req.method === 'POST') {
+      const buf = await body(req)
+      if (req.headers.apikey !== 'test-ocr-key') { res.writeHead(403, { 'content-type': 'text/plain' }); return res.end('The API key is invalid or has been revoked') }
+      const fd = await new Request('http://x/', { method: 'POST', headers: { 'content-type': req.headers['content-type'] }, body: buf }).formData()
+      const f = fd.get('file'), bytes = Buffer.from(await f.arrayBuffer()), sha = crypto.createHash('sha256').update(bytes).digest('hex')
+      mockCalls.ocrspace.push({ sha, name: f.name, engine: fd.get('OCREngine'), language: fd.get('language'), filetype: fd.get('filetype') })
+      const t = ocrFixtures.get(sha)
+      if (t === '__RATE__') { res.writeHead(403, { 'content-type': 'text/plain' }); return res.end('You may only perform this action upto maximum 180 number of times within 3600 seconds') }
+      if (t === undefined || t === '__FAIL__') return json(res, 200, { OCRExitCode: 3, IsErroredOnProcessing: true, ErrorMessage: ['Unable to recognize the file type or E216:Unable to detect the file extension'], ProcessingTimeInMilliseconds: '15' })
+      return json(res, 200, { ParsedResults: [{ TextOverlay: { Lines: [] }, FileParseExitCode: 1, ParsedText: t.replace(/\n/g, '\r\n'), ErrorMessage: '', ErrorDetails: '' }], OCRExitCode: 1, IsErroredOnProcessing: false, ProcessingTimeInMilliseconds: '187' })
+    }
+    if (path.startsWith('/mock/gemini/v1beta/models/') && req.method === 'POST') {
+      const b = JSON.parse((await body(req)).toString())
+      if (req.headers['x-goog-api-key'] !== 'test-gemini-key') return json(res, 400, { error: { code: 400, message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT' } })
+      const prompt = b.contents?.[0]?.parts?.[0]?.text ?? ''
+      mockCalls.gemini.push({ model: decodeURIComponent(path.split('/').pop()), prompt, schema: !!b.generationConfig?.responseSchema, mime: b.generationConfig?.responseMimeType })
+      const fx = geminiFixtures.find(g => prompt.includes(g.needle))
+      if (fx?.response === '__DOWN__') return json(res, 503, { error: { code: 503, message: 'The model is overloaded. Please try again later.', status: 'UNAVAILABLE' } })
+      return json(res, 200, { candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify(fx ? fx.response : UNKNOWN_DOC) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 100 } })
+    }
 
     let m
     if ((m = path.match(/^\/storage\/v1\/object\/sign\/([^/]+)\/(.+)$/)) && req.method === 'POST') {     // create signed URL

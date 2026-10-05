@@ -17,7 +17,8 @@ export interface Suggestion {
 }
 export interface Decision { status: 'ready' | 'needs_review' | 'duplicate'; confidence: number; reasons: string[]; suggestion: Suggestion }
 
-export function decide(x: Extraction, ctx: { companyName: string; companyMatch: number; employees: Match[]; customers: Match[]; duplicates: DuplicateCandidate[]; hasText: boolean }): Decision {
+export interface DecideCtx { companyName: string; companyMatch: number; employees: Match[]; customers: Match[]; suppliers?: Match[]; projects?: Match[]; vehicles?: Match[]; duplicates: DuplicateCandidate[]; hasText: boolean }
+export function decide(x: Extraction, ctx: DecideCtx): Decision {
   const def = typeDef(x.docType)
   const reasons: string[] = [], warnings: string[] = []
   if (!ctx.hasText && x.engine === 'rules') reasons.push('No readable text found — upload a sharper scan, enable AI reading in Settings, or enter the details manually')
@@ -40,9 +41,22 @@ export function decide(x: Extraction, ctx: { companyName: string; companyMatch: 
     const [a] = ctx.customers
     if (a && a.confidence >= OWNER_THRESHOLD) owner = { id: a.id, name: a.name, confidence: a.confidence, reason: a.reason }
     else reasons.push(x.fields.customer_name ? `Customer “${x.fields.customer_name.value}” not found in Clients` : 'Customer not identified')
+  } else if (def?.owner === 'supplier') {
+    candidates = ctx.suppliers ?? []
+    const [a] = candidates
+    if (a && a.confidence >= OWNER_THRESHOLD) owner = { id: a.id, name: a.name, confidence: a.confidence, reason: a.reason }
+    else reasons.push(x.fields.supplier_name ? `Supplier “${x.fields.supplier_name.value}” not found in Suppliers` : 'Supplier not identified')
+  } else if (def?.owner === 'project') {
+    candidates = ctx.projects ?? []
+    const [a] = candidates
+    if (a && a.confidence >= OWNER_THRESHOLD) owner = { id: a.id, name: a.name, confidence: a.confidence, reason: a.reason }
+    else reasons.push('Project not identified — choose the project')
   } else if (def?.owner === 'vehicle') {
     const plate = x.fields.plate_number?.value
-    owner = { id: null, name: plate ? `Plate ${plate}` : 'Vehicle', confidence: plate ? 0.85 : 0.5 }
+    candidates = ctx.vehicles ?? []
+    const [a] = candidates
+    if (a && a.confidence >= OWNER_THRESHOLD) owner = { id: a.id, name: a.name, confidence: a.confidence, reason: a.reason }
+    else owner = { id: null, name: plate ? `Plate ${plate}` : 'Vehicle', confidence: plate ? 0.85 : 0.5 }
     if (!plate) reasons.push('Plate number not found')
   }
 
@@ -54,7 +68,7 @@ export function decide(x: Extraction, ctx: { companyName: string; companyMatch: 
   const sameFile = ctx.duplicates.find(d => d.kind === 'same_file')
   if (ctx.duplicates.some(d => d.kind === 'same_number')) reasons.push('Possible duplicate detected')
 
-  const path = (def?.path ?? ['Needs review']).map(p => p.replace('{company}', ctx.companyName).replace('{employee}', owner?.name ?? '?').replace('{customer}', owner?.name ?? x.fields.customer_name?.value ?? '?').replace('{vehicle}', owner?.name ?? '?'))
+  const path = (def?.path ?? ['Needs review']).map(p => p.replace('{company}', ctx.companyName).replace('{employee}', owner?.name ?? '?').replace('{customer}', owner?.name ?? x.fields.customer_name?.value ?? '?').replace('{vehicle}', owner?.name ?? '?').replace('{supplier}', owner?.name ?? x.fields.supplier_name?.value ?? '?').replace('{project}', owner?.name ?? x.fields.project_name?.value ?? '?'))
   const confidence = Math.round(Math.min(x.docTypeConfidence, owner?.confidence ?? (def ? 0.5 : 0), def?.hasExpiry ? (x.fields.expiry_date?.confidence ?? 0.4) : 1) * 100) / 100
   return {
     status: sameFile ? 'duplicate' : reasons.length ? 'needs_review' : 'ready',

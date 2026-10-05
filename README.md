@@ -25,8 +25,9 @@ Architecture and decisions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Oper
 | **Projects**: contract value, client, fabrication & site progress, milestones (with reminders), costs by category, profit & margin, project files, linked quotations/invoices | ✅ |
 | Customer profile (documents, invoices, payments, cheques, projects) | ✅ |
 | Vehicles/assets UI, weekly report, native XLSX export | ⏳ planned (tables exist) |
-| **Smart Document Inbox**: upload anything → classified (22 UAE doc types), matched to company/employee/customer/vehicle, duplicate & renewal detection, confirm-to-file, versions, auto reminders, timelines — see [`docs/SMART_INBOX.md`](docs/SMART_INBOX.md) | ✅ photos/scans are read on the server (Tesseract OCR, no API needed); optional Claude reading via `ANTHROPIC_API_KEY` is cross-checked against it |
-| AI assistant / AI search, accounting-software sync | ⏳ planned |
+| **Smart Document Inbox**: upload anything → classified (22 UAE doc types), matched to company/employee/customer/vehicle, duplicate & renewal detection, confirm-to-file, versions, auto reminders, timelines — see [`docs/SMART_INBOX.md`](docs/SMART_INBOX.md) | ✅ OCR provider chain (Google Cloud Vision → OCR.Space → local Tesseract) + Gemini classification with strict JSON and server-side validation — see [`docs/AI_DOCUMENT_READER.md`](docs/AI_DOCUMENT_READER.md) (needs your OCR / Gemini keys) |
+| AI Search (natural-language questions, permission-aware) | ✅ (rules without a key; Gemini understands free-form questions) |
+| Accounting-software sync | ⏳ planned |
 | Multi-company onboarding UI, billing, super-admin console, branding | ⏳ Phase 4 (tenancy itself is already enforced) |
 | Malware scanning | ⏳ hook point only (`lib/doc-upload.ts`); type/size/magic-byte checks are active |
 
@@ -35,7 +36,7 @@ Architecture and decisions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Oper
 ```bash
 cp .env.example .env.local           # fill in values (see below)
 npm install
-# 1. Create a Supabase project → SQL editor → run supabase/migrations/0001…0008 in order
+# 1. Create a Supabase project → SQL editor → run supabase/migrations/0001…0009 in order
 #    (or: supabase db push). 0004 creates the private "vault" bucket.
 npm run dev                          # http://localhost:3000 → Sign up → create company
 ```

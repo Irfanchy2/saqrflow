@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
 /** Delivery receipts + inbound STOP/START. Unsigned or mis-signed requests are rejected. */
 export async function POST(req: NextRequest) {
-  const secret = process.env.WHATSAPP_APP_SECRET
+  const secret = process.env.META_APP_SECRET || process.env.WHATSAPP_APP_SECRET
   if (!secret) return new NextResponse('Webhook not configured', { status: 503 })
   const raw = await req.text()
   if (!verifySignature(secret, raw, req.headers.get('x-hub-signature-256'))) return new NextResponse('Invalid signature', { status: 401 })

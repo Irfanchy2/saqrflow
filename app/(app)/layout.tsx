@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { key: 'cheques', group: 'Finance & projects', href: '/cheques', status: 'live', show: c.can('finance.view') },
     { key: 'parties', group: 'Finance & projects', href: '/parties', status: 'live', show: c.can('documents.view') },
     { key: 'reports', group: 'Insights', href: '/reports', status: 'partial', show: c.can('data.export') },
-    { key: 'assistant', group: 'Insights', href: '/assistant', status: 'planned', show: true },
+    { key: 'assistant', group: 'Insights', href: '/assistant', status: 'live', show: true },
     { key: 'users', group: 'Admin', href: '/users', status: 'live', show: c.can('users.manage') },
     { key: 'settings', group: 'Admin', href: '/settings', status: 'live', show: true },
   ].map(i => ({ ...i, label: t(l, i.key as any) }) as NavItem & { show: boolean })
