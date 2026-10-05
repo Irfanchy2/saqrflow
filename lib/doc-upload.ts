@@ -34,3 +34,21 @@ export async function saveVersion(c: Ctx, docId: string, file: File, note?: stri
   }
   throw new Error('Could not save the file version, please retry.')
 }
+
+/** Register an ALREADY-STORED file (e.g. from the Smart Inbox) as the next version of `docId` — no second copy of the file. */
+export async function registerExistingVersion(c: Ctx, docId: string, file: { storage_path: string; file_name: string; mime_type: string; size_bytes: number; sha256: string }, note?: string): Promise<SavedVersion> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: last } = await c.supabase.from('document_versions').select('version_no').eq('document_id', docId).order('version_no', { ascending: false }).limit(1).maybeSingle()
+    const versionNo = (last?.version_no ?? 0) + 1
+    const { data: v, error } = await c.supabase.from('document_versions').insert({
+      company_id: c.company.id, document_id: docId, version_no: versionNo, storage_path: file.storage_path, file_name: file.file_name,
+      mime_type: file.mime_type, size_bytes: file.size_bytes, sha256: file.sha256, note: note || null, uploaded_by: c.userId,
+    }).select('id').single()
+    if (error?.code === '23505') continue
+    if (error) throw error
+    await c.supabase.from('documents').update({ current_version_id: v.id }).eq('id', docId)
+    await c.supabase.from('document_access_logs').insert({ company_id: c.company.id, document_id: docId, user_id: c.userId, action: versionNo > 1 ? 'replace' : 'upload' })
+    return { versionId: v.id, versionNo, duplicateOf: [] }
+  }
+  throw new Error('Could not save the file version, please retry.')
+}

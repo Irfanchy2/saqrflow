@@ -29,7 +29,7 @@ export function Filters({ sp, categories, base, extra }: { sp: SP; categories: {
   return <form action={base} className="mb-4 flex flex-wrap items-center gap-2">
     <input name="q" defaultValue={sp.q} placeholder="Search name, reference, authority…" className={`${cls} min-w-52 flex-1`} />
     <select name="category" defaultValue={sp.category ?? ''} className={cls}><option value="">All categories</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-    <select name="status" defaultValue={sp.status ?? ''} className={cls}><option value="">Any status</option><option value="valid">Valid</option><option value="expiring">Expiring ≤ 30d</option><option value="expired">Expired</option><option value="none">No expiry</option></select>
+    <select name="status" defaultValue={sp.status ?? ''} className={cls}><option value="">Any status</option><option value="valid">Valid</option><option value="expiring">Expiring ≤ 60d</option><option value="expired">Expired</option><option value="none">No expiry</option></select>
     {extra}<button className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-fg">Filter</button>
     {(sp.q || sp.category || sp.status || sp.owner) && <Link href={base} className="text-sm text-muted hover:text-fg">Clear</Link>}</form>
 }

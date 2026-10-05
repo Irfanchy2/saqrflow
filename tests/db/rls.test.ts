@@ -296,3 +296,49 @@ describe('TypeScript ↔ SQL parity (prevents UI/DB drift)', () => {
     }
   })
 })
+
+describe('Smart Inbox (0007): privacy of unfiled uploads, no deletes, relationships', () => {
+  const ins = (u: string, extra = '') => as(u, `insert into document_inbox(company_id,uploaded_by,storage_path,file_name,mime_type,size_bytes,sha256${extra ? ',status' : ''}) values ($1, auth.uid(), 'p', 'passport.pdf', 'application/pdf', 10, 'h'${extra ? `,'${extra}'` : ''}) returning id`, [A])
+  let pmItem: string, hrItem: string
+  it('uploader must have documents.upload and can only insert as themselves', async () => {
+    pmItem = (await ins(U.pmA)).rows[0].id
+    hrItem = (await ins(U.hrA)).rows[0].id
+    await fails(ins(U.viewerA), /row-level security/)
+    await fails(as(U.pmA, `insert into document_inbox(company_id,uploaded_by,storage_path,file_name,mime_type,size_bytes,sha256) values ($1,$2,'p','x.pdf','application/pdf',1,'h')`, [A, U.hrA]), /row-level security/)
+  })
+  it('unfiled uploads (may hold passports) are visible to the uploader and HR/owner only', async () => {
+    expect((await as(U.pmA, 'select id from document_inbox')).rows.map(r => r.id)).toEqual([pmItem])
+    expect((await as(U.hrA, 'select count(*)::int n from document_inbox')).rows[0].n).toBe(2)
+    expect((await as(U.ownerA, 'select count(*)::int n from document_inbox')).rows[0].n).toBe(2)
+    expect((await as(U.accA, 'select count(*)::int n from document_inbox')).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, 'select count(*)::int n from document_inbox')).rows[0].n).toBe(0)
+  })
+  it('a PM cannot change someone else’s upload; nobody can delete', async () => {
+    expect((await as(U.pmA, `update document_inbox set status='rejected' where id=$1`, [hrItem])).rowCount).toBe(0)
+    expect((await as(U.ownerA, 'delete from document_inbox')).rowCount).toBe(0)
+  })
+  it('extractions (document text) follow the inbox item visibility', async () => {
+    await as(U.hrA, `insert into document_extractions(company_id,inbox_id,engine,engine_version,doc_type,doc_type_confidence,text_excerpt) values ($1,$2,'rules','t','passport',0.9,'P<IND...')`, [A, hrItem])
+    expect((await as(U.pmA, 'select count(*)::int n from document_extractions')).rows[0].n).toBe(0)
+    expect((await as(U.hrA, 'select count(*)::int n from document_extractions')).rows[0].n).toBe(1)
+    await fails(as(U.pmA, `insert into document_extractions(company_id,inbox_id,engine,engine_version,doc_type,doc_type_confidence) values ($1,$2,'rules','t','x',0.1)`, [A, hrItem]), /row-level security/)
+  })
+  it('inbox changes are audit-logged; extraction text is not copied into the audit log', async () => {
+    const a = await sup(`select count(*)::int n from audit_logs where table_name='document_inbox'`)
+    expect(a.rows[0].n).toBeGreaterThanOrEqual(2)
+    expect((await sup(`select count(*)::int n from audit_logs where table_name='document_extractions'`)).rows[0].n).toBe(0)
+  })
+  it('documents can be archived; relationships respect document visibility', async () => {
+    await as(U.ownerA, `update documents set status='archived' where id=$1`, [docCompany])
+    await as(U.ownerA, `update documents set status='active' where id=$1`, [docCompany])
+    await as(U.hrA, `insert into document_relationships(company_id,document_id,related_type,related_id) values ($1,$2,'employee',$3)`, [A, docEmpPassport, empRecA2])
+    expect((await as(U.hrA, 'select count(*)::int n from document_relationships')).rows[0].n).toBe(1)
+    expect((await as(U.pmA, 'select count(*)::int n from document_relationships')).rows[0].n).toBe(0)   // PM can't see employee ID docs, so not their links either
+    await fails(as(U.viewerA, `insert into document_relationships(company_id,document_id,related_type) values ($1,$2,'company')`, [A, docCompany]), /row-level security/)
+  })
+  it('learned category mappings are per company', async () => {
+    const cat = (await as(U.ownerA, `select id from document_categories where name='Trade License'`)).rows[0].id
+    await as(U.ownerA, `insert into document_type_mappings(company_id,doc_type,category_id) values ($1,'trade_license',$2)`, [A, cat])
+    expect((await as(U.ownerB, 'select count(*)::int n from document_type_mappings')).rows[0].n).toBe(0)
+  })
+})

@@ -23,7 +23,8 @@ export default {
     return [
       // The file route sets its own (stricter) CSP; a global object-src 'none' would stop the browser PDF viewer.
       { source: '/api/documents/:path*', headers: common },
-      { source: '/((?!api/documents).*)', headers: [{ key: 'Content-Security-Policy', value: csp }, ...common] },
+      { source: '/api/inbox/:path*', headers: common },
+      { source: '/((?!api/documents|api/inbox).*)', headers: [{ key: 'Content-Security-Policy', value: csp }, ...common] },
     ]
   },
 }

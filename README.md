@@ -22,7 +22,8 @@ Architecture and decisions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Oper
 | Clients & Suppliers directory | ✅ |
 | Arabic (RTL) / Bengali | 🟡 navigation & chrome only |
 | Invoices & payments, projects, vehicles/assets UI, weekly report, native XLSX/PDF | ⏳ Phase 2 (tables exist) |
-| OCR / AI reader / assistant, bulk import | ⏳ Phase 3 |
+| **Smart Document Inbox**: upload anything → classified (22 UAE doc types), matched to company/employee/customer/vehicle, duplicate & renewal detection, confirm-to-file, versions, auto reminders, timelines — see [`docs/SMART_INBOX.md`](docs/SMART_INBOX.md) | ✅ (AI OCR for scans needs `ANTHROPIC_API_KEY`) |
+| AI assistant / AI search, accounting-software sync | ⏳ planned |
 | Multi-company onboarding UI, billing, super-admin console, branding | ⏳ Phase 4 (tenancy itself is already enforced) |
 | Malware scanning | ⏳ hook point only (`lib/doc-upload.ts`); type/size/magic-byte checks are active |
 

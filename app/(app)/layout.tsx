@@ -17,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const l = c.profile.locale
   const items: (NavItem & { show: boolean })[] = [
     { key: 'overview', href: '/', status: 'live', show: true },
+    { key: 'inbox', href: '/inbox', status: 'live', show: c.can('documents.upload') || c.can('employees.view_sensitive') },
     { key: 'documents', href: '/documents', status: 'live', show: c.can('documents.view') },
     { key: 'employees', href: '/employees', status: 'live', show: true },
     { key: 'vault', href: '/vault', status: 'live', show: c.can('documents.view') },

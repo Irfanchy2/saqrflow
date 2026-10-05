@@ -14,6 +14,8 @@ import { createDocument } from '@/app/actions/documents'
 import { employeeChecklist } from '@/lib/compliance'
 import { daysBetween, formatAed } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { documentTimeline } from '@/lib/timeline'
+import { Timeline } from '@/components/timeline'
 
 export const metadata = { title: 'Employee' }
 const TABS = [['personal', 'Personal'], ['documents', 'Documents'], ['salary', 'Salary'], ['leave', 'Leave'], ['history', 'History']] as const
@@ -110,8 +112,9 @@ async function LeaveTab({ id, c }: { id: string; c: Awaited<ReturnType<typeof ge
 
 async function HistoryTab({ id, c, e }: { id: string; c: Awaited<ReturnType<typeof getCtx>>; e: any }) {
   const { data: logs } = c.can('audit.view') ? await c.supabase.from('audit_logs').select('id,action,table_name,created_at').eq('record_id', id).order('created_at', { ascending: false }).limit(30) : { data: [] as any[] }
-  return <Card><CardHeader title="Employment history" />
+  const events = await documentTimeline(c, { type: 'employee', id })
+  return <div className="grid gap-5 lg:grid-cols-2"><Card><CardHeader title="Document timeline" sub="Uploads, versions, renewals and reminders — previous documents stay in history" /><div className="p-4"><Timeline events={events} /></div></Card><Card><CardHeader title="Employment history" />
     <ul className="divide-y divide-border text-sm"><li className="px-4 py-3">Joined <b>{e.joining_date ?? 'unknown date'}</b> · current status <b>{e.status.replace('_', ' ')}</b></li>
       <li className="px-4 py-3 text-muted">Record created {e.created_at.slice(0, 10)}</li>
-      {c.can('audit.view') && (logs ?? []).map((l: any) => <li key={l.id} className="flex justify-between px-4 py-2.5"><span><b className="capitalize">{l.action.toLowerCase()}</b> {l.table_name.replace('_', ' ')}</span><span className="text-xs text-muted">{l.created_at.slice(0, 16).replace('T', ' ')}</span></li>)}</ul></Card>
+      {c.can('audit.view') && (logs ?? []).map((l: any) => <li key={l.id} className="flex justify-between px-4 py-2.5"><span><b className="capitalize">{l.action.toLowerCase()}</b> {l.table_name.replace('_', ' ')}</span><span className="text-xs text-muted">{l.created_at.slice(0, 16).replace('T', ' ')}</span></li>)}</ul></Card></div>
 }

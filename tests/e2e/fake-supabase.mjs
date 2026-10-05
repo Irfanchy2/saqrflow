@@ -63,6 +63,11 @@ http.createServer(async (req, res) => {
       const key = `${m[1]}/${decodeURIComponent(m[2])}`; if (objects.has(key)) return json(res, 400, { error: 'Duplicate', message: 'The resource already exists', statusCode: '409' })
       objects.set(key, { buf: await body(req), type: req.headers['content-type'] ?? 'application/octet-stream' }); return json(res, 200, { Key: key, Id: crypto.randomUUID() })
     }
+    if ((m = path.match(/^\/storage\/v1\/object\/(?:authenticated\/)?([^/]+)\/(.+)$/)) && req.method === 'GET') {   // authenticated download (service role)
+      const c = verify((req.headers.authorization ?? '').replace(/^Bearer /, '')); if (!c || c.role !== 'service_role') return json(res, 403, { error: 'Unauthorized', statusCode: '403' })
+      const o = objects.get(`${m[1]}/${decodeURIComponent(m[2])}`); if (!o) return json(res, 404, { error: 'not_found', statusCode: '404' })
+      res.writeHead(200, { 'content-type': o.type }); return res.end(o.buf)
+    }
     if (path === '/__objects') return json(res, 200, [...objects.keys()])            // test introspection
     json(res, 404, { error: 'not found', path })
   } catch (e) { console.error(e); json(res, 500, { error: String(e) }) }

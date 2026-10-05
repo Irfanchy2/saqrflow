@@ -7,6 +7,7 @@ import { buildAlerts, monthBuckets } from '@/lib/dashboard'
 import { summarizeCheques } from '@/lib/cheques'
 import { addDays, formatAed } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { SmartDocumentCenter } from '@/components/inbox/smart-center'
 
 export const metadata = { title: 'Overview' }
 
@@ -44,7 +45,7 @@ export default async function Dashboard() {
     <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {emp && <StatCard label="Active employees" value={emp.count ?? 0} icon={Users} href="/employees" />}
       {docs && <StatCard label="Documents stored" value={docs.count ?? 0} icon={FileText} href="/vault" />}
-      {exp30 && <StatCard label="Expiring within 30 days" value={exp30.count ?? 0} icon={CalendarClock} tone={exp30.count ? 'amber' : 'neutral'} href="/documents?status=expiring" />}
+      {exp30 && <StatCard label="Expiring within 30 days" value={exp30.count ?? 0} icon={CalendarClock} tone={exp30.count ? 'amber' : 'neutral'} href="/documents?status=expiring30" />}
       {expired && <StatCard label="Already expired" value={expired.count ?? 0} icon={AlertOctagon} tone={expired.count ? 'red' : 'neutral'} href="/documents?status=expired" />}
       {cs && <StatCard label="Cheques due this week" value={cs.dueThisWeek.length} hint={formatAed(cs.dueThisWeek.reduce((a, x) => a + Number(x.amount), 0))} icon={Landmark} tone="blue" href="/cheques" />}
       {cs && <StatCard label="Cheques overdue" value={cs.overdue.length} hint="Cheque date passed, not banked" icon={AlertTriangle} tone={cs.overdue.length ? 'red' : 'neutral'} href="/cheques?view=list" />}
@@ -52,6 +53,7 @@ export default async function Dashboard() {
       {tasks && <StatCard label="Renewals in progress" value={tasks.count ?? 0} icon={BellRing} href="/documents" />}
     </div>
 
+    {(c.can('documents.upload') || c.can('employees.view_sensitive')) && <SmartDocumentCenter c={c} />}
     <div className="grid gap-5 lg:grid-cols-5 [&>*]:min-w-0">
       <Card className="lg:col-span-3"><CardHeader title="Priority alerts" sub="Overdue and due within 30 days — click to open the record" />
         {!alerts.length ? <EmptyState icon={CheckCircle2} title="Nothing needs attention" body="No documents, cheques or reminders are due in the next 30 days." /> :

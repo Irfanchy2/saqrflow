@@ -16,9 +16,10 @@ export async function listDocs(c: Ctx, sp: SP, opts: { ownerTypes?: string[]; de
   if (sp.employee) q = q.eq('owner_type', 'employee').eq('owner_id', sp.employee)
   if (sp.folder) q = q.eq('folder', sp.folder)
   switch (sp.status) {
+    case 'expiring30': q = q.gte('expiry_date', c.today).lte('expiry_date', addDays(c.today, 30)); break
     case 'expired': q = q.lt('expiry_date', c.today); break
-    case 'expiring': q = q.gte('expiry_date', c.today).lte('expiry_date', addDays(c.today, 30)); break
-    case 'valid': q = q.gt('expiry_date', addDays(c.today, 30)); break
+    case 'expiring': q = q.gte('expiry_date', c.today).lte('expiry_date', addDays(c.today, 60)); break
+    case 'valid': q = q.gt('expiry_date', addDays(c.today, 60)); break
     case 'none': q = q.is('expiry_date', null); break
   }
   const sort = (DOC_SORTS as readonly string[]).includes(sp.sort ?? '') ? sp.sort! : 'expiry_date'

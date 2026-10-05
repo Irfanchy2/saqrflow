@@ -35,6 +35,6 @@ rm -rf .next; NEXT_TELEMETRY_DISABLED=1 npx next build >"$WORK/build.log" 2>&1  
 NEXT_TELEMETRY_DISABLED=1 npx next start -p 3100 >"$WORK/next.log" 2>&1 & PIDS+=($!)
 for i in $(seq 1 40); do curl -sf http://127.0.0.1:3100/api/health >/dev/null && break; sleep 1; done
 mkdir -p tests/e2e/shots
-set +e; node tests/e2e/smoke.mjs; RC=$?; set -e
+set +e; node tests/e2e/smoke.mjs; RC=$?; node tests/e2e/inbox.mjs; RC2=$?; set -e; if [ $RC2 -ne 0 ]; then RC=$RC2; fi
 echo "--- logs: $WORK (next.log, pgrst.log) ---"; grep -iE "error|PGRST" "$WORK/next.log" | head -20 || true
 exit $RC

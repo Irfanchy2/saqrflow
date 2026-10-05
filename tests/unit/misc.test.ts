@@ -45,8 +45,9 @@ describe('document status', () => {
   it('computes status from expiry', () => {
     expect(effectiveStatus({ expiry_date: '2026-10-03' }, t)).toBe('expired')
     expect(effectiveStatus({ expiry_date: '2026-10-04' }, t)).toBe('expiring_soon')
-    expect(effectiveStatus({ expiry_date: '2026-11-03' }, t)).toBe('expiring_soon')
-    expect(effectiveStatus({ expiry_date: '2026-11-04' }, t)).toBe('valid')
+    expect(effectiveStatus({ expiry_date: '2026-12-03' }, t)).toBe('expiring_soon')   // 60 days
+    expect(effectiveStatus({ expiry_date: '2026-12-04' }, t)).toBe('valid')           // 61 days → Active
+    expect(effectiveStatus({ expiry_date: '2027-01-01', status: 'archived' }, t)).toBe('archived')
     expect(effectiveStatus({}, t)).toBe('no_expiry')
     expect(effectiveStatus({ expiry_date: '2026-10-10', status: 'renewal_in_progress' }, t)).toBe('renewal_in_progress')
     expect(effectiveStatus({ expiry_date: '2026-10-01', status: 'renewal_in_progress' }, t)).toBe('expired')

@@ -7,6 +7,8 @@ import { parseSettings } from '@/lib/reminders/settings'
 import { whatsappStatus } from '@/lib/reminders/mode'
 import { TEMPLATE_META, templateBody } from '@/lib/whatsapp/templates'
 import { LOCALE_NAMES, LOCALES } from '@/lib/i18n'
+import { setAiOcr } from '@/app/actions/inbox'
+import { claudeAvailable, CLAUDE_MODEL } from '@/lib/inbox/claude'
 
 export const metadata = { title: 'Settings' }
 export default async function Settings() {
@@ -30,6 +32,12 @@ export default async function Settings() {
         <div className="grid gap-4 sm:grid-cols-3"><Field label="Overdue: repeat every (days)"><Input type="number" name="overdue_every" min="0" max="90" defaultValue={s.overdueEveryDays} /></Field><Field label="Max overdue reminders"><Input type="number" name="overdue_max" min="0" max="52" defaultValue={s.overdueMax} /></Field><Field label="Daily summary hour"><Input type="number" name="digest_hour" min="0" max="23" defaultValue={s.digestHour} /></Field></div>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="digest" defaultChecked={s.digestEnabled} />Send the daily summary to recipients who opted in</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="fallback" defaultChecked={s.emailFallback} />Email fallback when a WhatsApp message fails permanently</label></ActionForm></div></Card>}
+
+      {admin && <Card className="lg:col-span-2"><CardHeader title="Smart Inbox — AI document reading" action={<Badge tone={(st ?? []).find((r: any) => r.key === 'ai.ocr_provider')?.value === 'claude' && claudeAvailable() ? 'green' : 'neutral'}>{(st ?? []).find((r: any) => r.key === 'ai.ocr_provider')?.value === 'claude' && claudeAvailable() ? 'AI on' : 'Local rules'}</Badge>} />
+        <div className="space-y-3 p-4 text-sm"><p>By default SaqrFlow reads digital PDFs on your own server with local rules — no document leaves your system. Scanned images and photos then go to manual review.</p>
+          <p>Turning on AI reading sends each uploaded file to the Anthropic API (model <code>{CLAUDE_MODEL}</code>) for OCR and classification. Anthropic does not train on API data by default, but passports and IDs will be processed by a third party — confirm this is acceptable under your data-protection obligations first.</p>
+          {!claudeAvailable() && <Alert tone="amber">Set <code>ANTHROPIC_API_KEY</code> in the server environment (e.g. Vercel → Environment Variables) to enable this option.</Alert>}
+          <div className="flex gap-2"><ActionButton action={setAiOcr.bind(null, true)} variant="primary" size="md">Enable AI reading</ActionButton><ActionButton action={setAiOcr.bind(null, false)} size="md">Use local rules only</ActionButton></div></div></Card>}
 
       {admin && wa && <Card className="lg:col-span-2"><CardHeader title="WhatsApp Business Platform (Meta Cloud API)" action={<Badge tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.mode === 'live' ? 'Live' : 'Sandbox'}</Badge>} />
         <div className="grid gap-6 p-4 lg:grid-cols-2"><div className="space-y-4">
