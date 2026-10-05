@@ -2,7 +2,7 @@ import { nextOccurrence, type ScheduleOptions } from './schedule'
 import { documentParams, paymentParams, type Params, type TemplateName } from '../whatsapp/templates'
 
 export interface Source {
-  company_id: string; source_type: 'document' | 'cheque' | 'custom' | 'invoice'; source_id: string
+  company_id: string; source_type: 'document' | 'cheque' | 'custom' | 'invoice' | 'milestone'; source_id: string
   title: string; subject: string | null; category: string; owner_type: string | null
   due_date: string; offsets: number[] | null; amount: number | null; direction: string | null; link: string
 }
@@ -39,6 +39,7 @@ export function planNotifications(sources: Source[], recipients: Recipient[], to
     const params = isFinanceSource(s)
       ? paymentParams({ direction: s.direction, kind: s.source_type === 'cheque' ? 'Cheque' : 'Invoice', party: s.subject ?? s.title, amount: s.amount, date: s.due_date, daysRemaining: occ.daysRemaining })
       : documentParams({ title: s.title, subject: s.subject, expiry: s.due_date, daysRemaining: occ.daysRemaining })
+    if (s.source_type === 'milestone') params.status = occ.daysRemaining < 0 ? `Project milestone overdue by ${-occ.daysRemaining} day(s)` : occ.daysRemaining === 0 ? 'Project milestone due today' : 'Project milestone coming up'
     const severity = occ.daysRemaining < 0 ? 'critical' : occ.daysRemaining <= 7 ? 'warning' : 'info'
     for (const r of recipients) {
       if (!r.is_active || !recipientWantsSource(r, s)) continue

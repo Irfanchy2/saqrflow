@@ -37,7 +37,7 @@ try {
   ok((await bodyText(p)).includes('Welcome, Faisal'), 'owner lands on dashboard after onboarding')
   ok((await bodyText(p)).includes('Let’s get you set up'), 'empty dashboard shows the setup guide (no fake data)')
   await shot(p, '02-dashboard-empty')
-  for (const l of ['Overview', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Invoices & Payments', 'Projects', 'Clients & Suppliers', 'Vehicles & Assets', 'Smart Reminders', 'Calendar', 'Reports & Analytics', 'AI Assistant', 'User Management', 'Settings'])
+  for (const l of ['Overview', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Sales & Invoices', 'Projects', 'Clients & Suppliers', 'Vehicles & Assets', 'Smart Reminders', 'Calendar', 'Reports & Analytics', 'AI Assistant', 'User Management', 'Settings'])
     ok(await p.getByRole('link', { name: l }).first().isVisible(), `sidebar has “${l}”`)
   ok((await bodyText(p)).toLowerCase().includes('soon'), 'unbuilt modules are labelled Planned in the sidebar')
 
@@ -82,7 +82,7 @@ try {
   ok((await db.query(`select phone from employees where id=$1`, [empId])).rows[0].phone === '+971501234567', 'UAE phone normalised to E.164')
   await p.getByRole('link', { name: 'Documents', exact: true }).click(); await settle(p); ok((await bodyText(p)).includes('Missing'), 'compliance checklist flags missing documents')
   await p.getByRole('button', { name: 'Add' }).first().click(); await dlg(p).getByLabel('Document name *').fill('Emirates ID – Mohammed'); await dlg(p).getByLabel('Category *').selectOption({ label: 'Emirates ID' })
-  await dlg(p).getByLabel('Reference number').fill('784-1990-1234567-1'); await dlg(p).getByLabel('Expiry date').fill(plus(10)); await dlg(p).locator('input[type=file]').setInputFiles(files.eid); await dlg(p).getByRole('button', { name: 'Save document' }).click(); await settle(p, 1500)
+  await dlg(p).getByLabel('Reference number').fill('784-1990-1234567-6'); await dlg(p).getByLabel('Expiry date').fill(plus(10)); await dlg(p).locator('input[type=file]').setInputFiles(files.eid); await dlg(p).getByRole('button', { name: 'Save document' }).click(); await settle(p, 1500)
   ok((await bodyText(p)).includes('Emirates ID'), 'employee document added on profile')
   const linked = (await db.query(`select owner_type, owner_id from documents where name like 'Emirates ID%'`)).rows; ok(linked.length === 1 && linked[0].owner_id === empId, 'document linked to employee (single record, no duplicate)')
   await p.goto(`${BASE}/vault?owner=employee`); ok((await bodyText(p)).includes('Emirates ID – Mohammed'), 'same document appears in the Vault')

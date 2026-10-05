@@ -26,7 +26,7 @@ describe('PDF text extraction + classification of the 12 sample documents', () =
   it('extracts the key fields with high confidence', () => {
     const f = (n: string) => read[n].x.fields
     expect(f('trade-license.pdf')).toMatchObject({ document_number: { value: '789456' }, issue_date: { value: '2026-05-13' }, expiry_date: { value: '2027-05-12' }, company_name: { value: 'AL SAQR AL AHMAR WELDING AND BLACKSMITH LLC' }, issuing_authority: { value: 'Dubai Economy and Tourism (DET)' } })
-    expect(f('emirates-id-mohammed.pdf')).toMatchObject({ document_number: { value: '784-1990-1234567-1' }, holder_name: { value: 'Mohammed Ayub' }, nationality: { value: 'Bangladesh' }, expiry_date: { value: '2027-01-09' }, date_of_birth: { value: '1990-02-14' } })
+    expect(f('emirates-id-mohammed.pdf')).toMatchObject({ document_number: { value: '784-1990-1234567-6' }, holder_name: { value: 'Mohammed Ayub' }, nationality: { value: 'Bangladesh' }, expiry_date: { value: '2027-01-09' }, date_of_birth: { value: '1990-02-14' } })
     expect(f('visa-mohammed.pdf')).toMatchObject({ holder_name: { value: 'MOHAMMED AYUB' }, profession: { value: 'Welder' }, expiry_date: { value: '2027-02-14' }, issuing_authority: { value: 'GDRFA' } })
     expect(f('tenancy-contract.pdf')).toMatchObject({ document_number: { value: 'TC-2026-0457' }, landlord: { value: 'Gulf Properties LLC' }, expiry_date: { value: '2027-03-31' }, amount: { value: '85000' } })
     expect(f('invoice-abc.pdf')).toMatchObject({ document_number: { value: 'INV-301' }, customer_name: { value: 'ABC Contracting LLC' }, amount: { value: '26250' }, trn: { value: '100123456700003' } })
@@ -66,7 +66,7 @@ describe('date parsing (UAE day-first)', () => {
 describe('employee matching engine', () => {
   const emps: EmployeeCandidate[] = [
     { id: 'e1', full_name: 'Mohammed Ayub', employee_no: 'E-001', idNumbers: [] },
-    { id: 'e2', full_name: 'Rahim Uddin', employee_no: 'E-002', idNumbers: ['784-1988-7654321-2'] },
+    { id: 'e2', full_name: 'Rahim Uddin', employee_no: 'E-002', idNumbers: ['784-1988-7654321-0'] },
     { id: 'e3', full_name: 'Mohammed Rafiq', employee_no: 'E-003', idNumbers: [] },
   ]
   it('exact name → 97%', () => expect(matchEmployee({ holderName: 'MOHAMMED AYUB', text: '' }, emps)[0]).toMatchObject({ id: 'e1', confidence: 0.97 }))
@@ -75,7 +75,7 @@ describe('employee matching engine', () => {
     expect(nameScore('Muhammad Ayub', 'Mohammed Ayub')).toBe(0.97)
   })
   it('an ID number already on file beats the name', () => {
-    const m = matchEmployee({ holderName: 'R. Uddin', documentNumber: '784198876543212', text: '' }, emps)
+    const m = matchEmployee({ holderName: 'R. Uddin', documentNumber: '784198876543210', text: '' }, emps)
     expect(m[0]).toMatchObject({ id: 'e2', confidence: 0.99 })
   })
   it('a shared first name alone is not a confident match', () => {

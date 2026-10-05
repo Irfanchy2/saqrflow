@@ -20,7 +20,7 @@ export interface Decision { status: 'ready' | 'needs_review' | 'duplicate'; conf
 export function decide(x: Extraction, ctx: { companyName: string; companyMatch: number; employees: Match[]; customers: Match[]; duplicates: DuplicateCandidate[]; hasText: boolean }): Decision {
   const def = typeDef(x.docType)
   const reasons: string[] = [], warnings: string[] = []
-  if (!ctx.hasText && x.engine === 'rules') reasons.push('No readable text (scanned image) — enable AI OCR in Settings or enter the details manually')
+  if (!ctx.hasText && x.engine === 'rules') reasons.push('No readable text found — upload a sharper scan, enable AI reading in Settings, or enter the details manually')
   if (!def || x.docType === UNKNOWN_TYPE) reasons.push('Document type not recognised')
   else if (x.docTypeConfidence < AUTO_SUGGEST_THRESHOLD) reasons.push(`Document type uncertain (${Math.round(x.docTypeConfidence * 100)}%)`)
 

@@ -8,6 +8,10 @@ import { summarizeCheques } from '@/lib/cheques'
 import { addDays, formatAed } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SmartDocumentCenter } from '@/components/inbox/smart-center'
+import { Progress } from '@/components/projects/project-fields'
+import { salesKpis } from '@/lib/sales/summary'
+import { PROJECT_STATUS } from '@/lib/projects'
+import { HardHat, Receipt, Target } from 'lucide-react'
 
 export const metadata = { title: 'Overview' }
 
@@ -28,6 +32,14 @@ export default async function Dashboard() {
     c.can('documents.view') ? sb.from('documents').select('id', head).is('deleted_at', null).eq('status', 'renewal_in_progress') : null,
   ])
   const alerts = buildAlerts((sources.data ?? []) as any, c.today)
+  const [salesRows, salesBals, salesPays, activeProjects] = await Promise.all([
+    canFin ? sb.from('invoices').select('id,doc_type,status,number,customer_name,customer_id,issue_date,due_date,total').in('doc_type', ['quotation', 'invoice']).limit(5000) : null,
+    canFin ? sb.from('invoice_balances').select('id,paid').limit(5000) : null,
+    canFin ? sb.from('payments').select('amount,paid_on').gte('paid_on', c.today.slice(0, 7) + '-01').limit(5000) : null,
+    c.can('documents.view') ? sb.from('projects').select('id,name,status,fabrication_progress,site_progress,customer:customers(name)').in('status', ['active', 'planning', 'on_hold']).order('updated_at', { ascending: false }).limit(5) : null,
+  ])
+  const paidOf = new Map((salesBals?.data ?? []).map((b: any) => [b.id, Number(b.paid)]))
+  const sk = salesRows ? salesKpis((salesRows.data ?? []).map((r: any) => ({ ...r, total: Number(r.total), paid: paidOf.get(r.id) ?? 0 })), (salesPays?.data ?? []) as any, c.today) : null
   const cs = cheques ? summarizeCheques((cheques.data ?? []) as any, c.today) : null
   const expiryData = months.map(m => ({ month: m.label, employee: 0, company: 0 }))
   for (const d of docDates?.data ?? []) { const i = months.findIndex(m => m.key === d.expiry_date!.slice(0, 7)); if (i >= 0) expiryData[i][d.owner_type === 'employee' ? 'employee' : 'company']++ }
@@ -68,5 +80,20 @@ export default async function Dashboard() {
       {docDates && <Card className="lg:col-span-3"><CardHeader title="Document expiries — next 6 months" /><div className="p-4"><ExpiryChart data={expiryData} /></div></Card>}
       {cs && <Card className="lg:col-span-2"><CardHeader title="Cheque commitments — next 6 months" sub="Open cheques by cheque date" /><div className="p-4"><ChequeChart data={chequeData} /></div></Card>}
     </div>
-    <p className="mt-6 text-xs text-muted">Receivables, supplier payments, active projects and tasks appear here once the Invoicing and Projects modules ship (Phase 2).</p></>
+    {(sk || activeProjects) && <div className="mt-5 grid gap-5 lg:grid-cols-5 [&>*]:min-w-0">
+      {sk && <Card className="lg:col-span-2"><CardHeader title="Sales & receivables" action={<Link href="/invoices" className="text-xs text-primary hover:underline">Open sales</Link>} />
+        <div className="grid grid-cols-2 gap-px bg-border">
+          {[{ l: 'Outstanding', v: formatAed(sk.outstanding), h: `${sk.openCount} open invoices`, i: Wallet, href: '/invoices?tab=receivables' },
+            { l: 'Overdue', v: formatAed(sk.overdue), h: `${sk.overdueCount} invoices`, i: AlertTriangle, href: '/invoices?tab=invoice&status=overdue', bad: sk.overdueCount > 0 },
+            { l: 'Collected this month', v: formatAed(sk.collectedThisMonth), h: `Invoiced ${formatAed(sk.invoicedThisMonth)}`, i: Receipt, href: '/invoices?tab=payments' },
+            { l: 'Open quotations', v: formatAed(sk.pipeline), h: sk.winRate !== null ? `${sk.winRate}% win rate` : `${sk.pipelineCount} open`, i: Target, href: '/invoices?tab=quotation' }].map(x =>
+            <Link key={x.l} href={x.href} className="bg-surface p-4 transition-colors hover:bg-surface-2/60"><div className="flex items-center gap-1.5 text-xs text-muted"><x.i size={13} aria-hidden />{x.l}</div>
+              <div className={cn('mt-1 text-lg font-semibold tabular-nums', x.bad && 'text-danger')}>{x.v}</div><div className="text-xs text-muted">{x.h}</div></Link>)}
+        </div></Card>}
+      {activeProjects && <Card className="lg:col-span-3"><CardHeader title="Active projects" action={<Link href="/projects" className="text-xs text-primary hover:underline">All projects</Link>} />
+        {!(activeProjects.data ?? []).length ? <EmptyState icon={HardHat} title="No open projects" body="Create a project to track fabrication, site progress, costs and billing." /> :
+          <ul className="divide-y divide-border">{(activeProjects.data ?? []).map((p: any) => <li key={p.id}><Link href={`/projects/${p.id}`} className="grid gap-2 px-4 py-3 hover:bg-surface-2/60 sm:grid-cols-[1fr_140px_140px] sm:items-center">
+            <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}</span><span className="text-xs text-muted">{p.customer?.name ?? '—'} · {PROJECT_STATUS[p.status]?.label}</span></span>
+            <Progress label="Fabrication" value={p.fabrication_progress} /><Progress label="Site" value={p.site_progress} tone="bg-success" /></Link></li>)}</ul>}</Card>}
+    </div>}</>
 }

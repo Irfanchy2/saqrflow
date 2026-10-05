@@ -70,6 +70,8 @@ export async function runReminderCycle(admin: Admin, now = new Date(), opts: { c
   let planned = 0, inserted = 0, digests = 0
   let dispatchTz = 'Asia/Dubai'; let fallback = true
 
+  // sent invoices past their due date become 'overdue' before reminders are planned
+  if (!opts.companyId) { const { error: e } = await admin.rpc('mark_overdue_invoices'); if (e) console.warn('[reminders] mark_overdue_invoices', e.message) }
   for (const co of companies ?? []) {
     dispatchTz = co.timezone
     const today = todayInTz(now, co.timezone)

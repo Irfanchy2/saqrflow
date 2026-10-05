@@ -64,7 +64,7 @@ export const PageHeader = ({ title, sub, actions }: { title: string; sub?: strin
     <div className="flex flex-wrap items-center gap-2">{actions}</div></div>
 
 export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: ReactNode }) =>
-  <div className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/30 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/30 bg-warning/10' : t === 'green' ? 'border-success/30 bg-success/5' : 'border-primary/20 bg-primary-soft')}>{children}</div>
+  <div role={t === 'red' ? 'alert' : undefined} className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/30 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/30 bg-warning/10' : t === 'green' ? 'border-success/30 bg-success/5' : 'border-primary/20 bg-primary-soft')}>{children}</div>
 
 export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th className={cn('whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted', className)}>{children}</th>
 export const Td = ({ children, className, title }: { children?: ReactNode; className?: string; title?: string }) => <td title={title} className={cn('px-4 py-3 align-middle', className)}>{children}</td>

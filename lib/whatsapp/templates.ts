@@ -61,7 +61,7 @@ export function paymentParams(a: { direction: string | null; kind: string; party
     type: sanitizeParam(a.direction ? `${out ? 'Outgoing' : 'Incoming'} ${a.kind}` : a.kind),
     party: sanitizeParam(a.party || '-'), amount: a.amount != null ? formatAed(a.amount) : '-',
     date: formatLongDate(a.date),
-    action: a.daysRemaining < 0 ? 'Overdue – follow up now' : out ? 'Verify available funds and payment status' : 'Prepare cheque for deposit and confirm status',
+    action: a.daysRemaining < 0 ? 'Overdue – follow up now' : a.kind === 'Invoice' ? 'Remind the customer before the due date' : out ? 'Verify available funds and payment status' : 'Prepare cheque for deposit and confirm status',
   }
 }
 export const digestParams = (n: { expiring: number; cheques: number; invoices: number; renewals: number }): Params =>

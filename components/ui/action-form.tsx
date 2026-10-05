@@ -3,6 +3,7 @@ import { useActionState, useEffect, useRef, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button, Alert } from './primitives'
 import { useDialog } from './dialog'
+import { toast } from './toast'
 import type { ActionState } from '@/lib/utils'
 
 type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>
@@ -14,7 +15,7 @@ export function ActionForm({ action, children, submit = 'Save', className, reset
   const [state, run, pending] = useActionState(action, null)
   const { close } = useDialog()
   const ref = useRef<HTMLFormElement>(null)
-  useEffect(() => { if (state?.ok) { if (resetOnSuccess) ref.current?.reset(); close() } }, [state, close, resetOnSuccess])
+  useEffect(() => { if (state?.ok) { if (resetOnSuccess) ref.current?.reset(); if (state.message) toast(state.message); close() } }, [state, close, resetOnSuccess])
   return <form ref={ref} action={run} className={className ?? 'flex flex-col gap-4'}>
     {children}
     {state?.error && <Alert tone="red">{state.error}</Alert>}
@@ -27,7 +28,7 @@ export function ActionForm({ action, children, submit = 'Save', className, reset
 export function ActionButton({ action, children, confirm, variant = 'secondary', size = 'sm', className }: {
   action: () => Promise<ActionState>; children: ReactNode; confirm?: string; variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; size?: 'sm' | 'md'; className?: string
 }) {
-  const [state, run, pending] = useActionState(async () => action(), null)
+  const [state, run, pending] = useActionState(async () => { const r = await action(); if (r?.error) toast(r.error, 'error'); return r }, null)
   return <form action={run} onSubmit={e => { if (confirm && !window.confirm(confirm)) e.preventDefault() }} className="inline-flex items-center gap-2">
     <Button type="submit" variant={variant} size={size} disabled={pending} className={className}>{pending && <Loader2 size={13} className="animate-spin" />}{children}</Button>
     {state?.error && <span className="text-xs text-danger">{state.error}</span>}

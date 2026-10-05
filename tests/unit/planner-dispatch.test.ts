@@ -21,7 +21,7 @@ describe('message content & privacy', () => {
     expect(t).toContain('Verify available funds and payment status')
   })
   it('long digit runs (ID / passport / account numbers) are masked', () => {
-    expect(sanitizeParam('Emirates ID 784-1990-1234567-1 / 784199012345671')).not.toMatch(/\d{8,}/)
+    expect(sanitizeParam('Emirates ID 784-1990-1234567-6 / 784199012345671')).not.toMatch(/\d{8,}/)
     expect(sanitizeParam('P1234567')).toBe('P1234567')
     expect(sanitizeParam('line1\nline2\t  x')).toBe('line1 line2 x')
   })

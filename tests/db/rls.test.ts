@@ -342,3 +342,58 @@ describe('Smart Inbox (0007): privacy of unfiled uploads, no deletes, relationsh
     expect((await as(U.ownerB, 'select count(*)::int n from document_type_mappings')).rows[0].n).toBe(0)
   })
 })
+
+describe('Sales documents, payments & projects (0008)', () => {
+  let inv: string, qtn: string
+  it('numbers documents per company, type and year without gaps', async () => {
+    const n1 = (await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n
+    const n2 = (await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n
+    const i1 = (await as(U.accA, `select next_document_number('invoice') n`)).rows[0].n
+    const b1 = (await as(U.ownerB, `select next_document_number('quotation') n`)).rows[0].n
+    expect(n1).toMatch(/^QTN-\d{4}-0001$/); expect(n2).toMatch(/-0002$/); expect(i1).toMatch(/^INV-\d{4}-0001$/); expect(b1).toMatch(/-0001$/)
+    await fails(as(U.viewerA, `select next_document_number('invoice')`), /insufficient privilege/)
+    await fails(as(U.accA, `select next_document_number('bogus')`), /unknown document type/)
+  })
+  it('payments: only on issued invoices, never above the balance; status follows the money', async () => {
+    qtn = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status) values ($1,'quotation','QTN-T-1',1050,'sent') returning id`, [A])).rows[0].id
+    inv = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status,due_date,quotation_id) values ($1,'invoice','INV-T-1',1050,'draft','2099-01-01',$2) returning id`, [A, qtn])).rows[0].id
+    await as(U.accA, `insert into invoice_items(company_id,invoice_id,description,quantity,unit_price) values ($1,$2,'Staircase',1,1000)`, [A, inv])
+    await fails(as(U.accA, `insert into payments(company_id,invoice_id,amount) values ($1,$2,100)`, [A, inv]), /issue the invoice/)
+    await fails(as(U.accA, `insert into payments(company_id,invoice_id,amount) values ($1,$2,100)`, [A, qtn]), /tax invoices/)
+    await as(U.accA, `update invoices set status='sent' where id=$1`, [inv])
+    await as(U.accA, `insert into payments(company_id,invoice_id,amount,method) values ($1,$2,400,'cash')`, [A, inv])
+    const st = async () => (await as(U.accA, `select i.status, b.paid, b.balance from invoices i join invoice_balances b on b.id=i.id where i.id=$1`, [inv])).rows[0]
+    expect(await st()).toMatchObject({ status: 'partially_paid', paid: '400.00', balance: '650.00' })
+    await fails(as(U.accA, `insert into payments(company_id,invoice_id,amount) values ($1,$2,700)`, [A, inv]), /exceeds the invoice balance/)
+    const p2 = (await as(U.accA, `insert into payments(company_id,invoice_id,amount,method) values ($1,$2,650,'bank_transfer') returning id`, [A, inv])).rows[0].id
+    expect((await st()).status).toBe('paid')
+    await as(U.ownerA, `delete from payments where id=$1`, [p2])
+    expect((await st()).status).toBe('partially_paid')
+  })
+  it('a payment cannot point at another company’s invoice', async () => {
+    const binv = (await as(U.ownerB, `insert into invoices(company_id,doc_type,number,total,status) values ($1,'invoice','B-1',500,'sent') returning id`, [B])).rows[0].id
+    await fails(as(U.accA, `insert into payments(company_id,invoice_id,amount) values ($1,$2,10)`, [A, binv]))
+  })
+  it('overdue job and reminders: unpaid balance surfaces, paid invoices drop out', async () => {
+    const late = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status,due_date) values ($1,'invoice','INV-T-LATE',300,'sent','2020-01-01') returning id`, [A])).rows[0].id
+    await fails(as(U.accA, `select mark_overdue_invoices()`))
+    await sup(`select mark_overdue_invoices()`)
+    expect((await as(U.accA, `select status from invoices where id=$1`, [late])).rows[0].status).toBe('overdue')
+    const src = (await as(U.accA, `select source_id, amount from reminder_sources where source_type='invoice'`)).rows
+    expect(src.find(r => r.source_id === late)?.amount).toBe('300.00')
+    expect(src.find(r => r.source_id === inv)?.amount).toBe('650.00')
+  })
+  it('line items, costs and milestones are tenant-isolated; costs need finance access', async () => {
+    expect((await as(U.ownerB, `select count(*)::int n from invoice_items`)).rows[0].n).toBe(0)
+    expect((await as(U.viewerA, `select count(*)::int n from invoice_items`)).rows[0].n).toBe(0)   // invoices hidden → items hidden
+    const prj = (await as(U.pmA, `insert into projects(company_id,name,contract_value) values ($1,'Villa 22 staircase',100000) returning id`, [A])).rows[0].id
+    await as(U.accA, `insert into project_expenses(company_id,project_id,category,description,amount) values ($1,$2,'material','MS hollow section',4000)`, [A, prj])
+    await fails(as(U.accA, `insert into project_expenses(company_id,project_id,category,description,amount) values ($1,$2,'material','neg',-1)`, [A, prj]))
+    expect((await as(U.pmA, `select count(*)::int n from project_expenses`)).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, `select count(*)::int n from project_expenses`)).rows[0].n).toBe(0)
+    await as(U.pmA, `insert into project_milestones(company_id,project_id,title,due_date) values ($1,$2,'Delivery to site',current_date + 3)`, [A, prj])
+    expect((await as(U.viewerA, `select count(*)::int n from reminder_sources where source_type='milestone'`)).rows[0].n).toBe(1)
+    await fails(as(U.viewerA, `insert into project_milestones(company_id,project_id,title,due_date) values ($1,$2,'x',current_date)`, [A, prj]))
+    expect((await as(U.ownerA, `select count(*)::int n from audit_logs where table_name in ('project_expenses','invoice_items')`)).rows[0].n).toBeGreaterThan(0)
+  })
+})

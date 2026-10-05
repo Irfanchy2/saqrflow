@@ -58,7 +58,7 @@ try {
   await p.goto(`${BASE}/inbox?tab=ready`); await p.locator('tr', { hasText: 'emirates-id-mohammed.pdf' }).getByRole('link', { name: 'Confirm' }).click(); await settle()
   const rv = await body()
   ok(rv.includes('What SaqrFlow found') && rv.includes('Mohammed Ayub') && rv.includes('97%'), 'review screen shows detection with confidence (Mohammed Ayub · 97%)')
-  ok(rv.includes('784-1990-1234567-1') && rv.includes('9 January 2027'), 'extracted ID number + expiry shown for verification')
+  ok(rv.includes('784-1990-1234567-6') && rv.includes('9 January 2027'), 'extracted ID number + expiry shown for verification')
   ok(await p.locator('iframe[title="Uploaded document"]').isVisible(), 'document preview shown next to the form')
   ok(rv.includes('90d →') && rv.includes('on expiry →'), 'reminder schedule preview (90d … on expiry)')
   await shot('21-inbox-review')

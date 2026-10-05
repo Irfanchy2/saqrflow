@@ -12,7 +12,7 @@ Architecture and decisions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Oper
 |---|---|
 | Auth (email+password), onboarding wizard, optional TOTP MFA, session cookies | ✅ implemented |
 | Roles & 14 permissions, enforced in RLS (+ UI/server pre-checks), audit log, user invite/roles | ✅ |
-| Dashboard (stats, charts, clickable priority alerts, recent activity) | ✅ (receivables / projects / tasks cards await Phase 2) |
+| Dashboard (stats, charts, clickable priority alerts, recent activity) | ✅ incl. receivables and active-projects cards |
 | Company documents: categories (custom), upload, preview, signed download, versions, renewals, soft delete/restore, access log | ✅ |
 | Employees: profile, documents + compliance checklist, salary (separate RLS), advances, leave, photo | ✅ (attendance, onboarding checklists, accommodation records, WPS export: schema only / planned) |
 | Document Vault: drag-and-drop bulk upload, filters, duplicate (SHA-256) detection, recycle bin | ✅ (folder tree UI, bulk export zip: planned) |
@@ -21,8 +21,11 @@ Architecture and decisions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Oper
 | Calendar, global search, CSV exports, printable reports | ✅ |
 | Clients & Suppliers directory | ✅ |
 | Arabic (RTL) / Bengali | 🟡 navigation & chrome only |
-| Invoices & payments, projects, vehicles/assets UI, weekly report, native XLSX/PDF | ⏳ Phase 2 (tables exist) |
-| **Smart Document Inbox**: upload anything → classified (22 UAE doc types), matched to company/employee/customer/vehicle, duplicate & renewal detection, confirm-to-file, versions, auto reminders, timelines — see [`docs/SMART_INBOX.md`](docs/SMART_INBOX.md) | ✅ (AI OCR for scans needs `ANTHROPIC_API_KEY`) |
+| **Sales & invoices**: quotations, tax invoices (VAT per line), delivery notes in your own letterhead/stamp/signature, live A4 builder, auto-numbering, convert QTN → INV → DN, PDF download + print, save PDF to the Vault, partial payments (DB-enforced, no overpayment), automatic paid/overdue status, receivables ageing, invoice reminders — see [`docs/SALES_PROJECTS.md`](docs/SALES_PROJECTS.md) | ✅ (not certified e-invoicing software) |
+| **Projects**: contract value, client, fabrication & site progress, milestones (with reminders), costs by category, profit & margin, project files, linked quotations/invoices | ✅ |
+| Customer profile (documents, invoices, payments, cheques, projects) | ✅ |
+| Vehicles/assets UI, weekly report, native XLSX export | ⏳ planned (tables exist) |
+| **Smart Document Inbox**: upload anything → classified (22 UAE doc types), matched to company/employee/customer/vehicle, duplicate & renewal detection, confirm-to-file, versions, auto reminders, timelines — see [`docs/SMART_INBOX.md`](docs/SMART_INBOX.md) | ✅ photos/scans are read on the server (Tesseract OCR, no API needed); optional Claude reading via `ANTHROPIC_API_KEY` is cross-checked against it |
 | AI assistant / AI search, accounting-software sync | ⏳ planned |
 | Multi-company onboarding UI, billing, super-admin console, branding | ⏳ Phase 4 (tenancy itself is already enforced) |
 | Malware scanning | ⏳ hook point only (`lib/doc-upload.ts`); type/size/magic-byte checks are active |
@@ -32,7 +35,7 @@ Architecture and decisions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Oper
 ```bash
 cp .env.example .env.local           # fill in values (see below)
 npm install
-# 1. Create a Supabase project → SQL editor → run supabase/migrations/0001…0005 in order
+# 1. Create a Supabase project → SQL editor → run supabase/migrations/0001…0008 in order
 #    (or: supabase db push). 0004 creates the private "vault" bucket.
 npm run dev                          # http://localhost:3000 → Sign up → create company
 ```
@@ -42,9 +45,9 @@ Supabase settings: Auth → disable "public sign-ups" after you create your own 
 ## Tests (all runnable here, no cloud needed)
 
 ```bash
-npm test            # 69 unit tests: reminder dates, timezone, dedupe, retry/backoff, quiet hours, cheques, files, crypto, webhook signatures
-npm run test:db     # 36 tests on a real Postgres: migrations, RLS, tenant isolation, salary secrecy, immutable versions, cheque machine, queue, storage policy, TS↔SQL parity
-npm run test:e2e    # 100+ browser checks: real Next server + real PostgREST + Postgres RLS (auth/storage faked), see scripts/e2e.sh
+npm test            # 130 unit tests: sales maths & PDF, OCR + validators, reminder dates, timezone, dedupe, retry/backoff, quiet hours, cheques, files, crypto, webhook signatures
+npm run test:db     # 48 tests on a real Postgres: migrations, RLS, tenant isolation, salary secrecy, immutable versions, cheque machine, queue, storage policy, TS↔SQL parity
+npm run test:e2e    # 150+ browser checks: real Next server + real PostgREST + Postgres RLS (auth/storage faked), see scripts/e2e.sh
 ```
 The e2e harness replaces only Supabase **Auth and Storage** with a small local stand-in (`tests/e2e/fake-supabase.mjs`); everything else (SQL, RLS, PostgREST queries, Next.js, server actions, UI) is real. It does **not** exercise real Supabase Auth/Storage, real WhatsApp or real email — those need your credentials (below).
 
@@ -77,6 +80,6 @@ Costs: Meta bills per conversation/message by category and country; enter your p
 
 * **UAE PDPL / data residency:** personal data (passports, Emirates IDs, salaries) is regulated; confirm hosting region, processor agreements (Supabase, Vercel, Meta, Resend), retention periods and breach procedures with counsel. Not legal advice.
 * Never collect bank credentials/OTPs; cheque module stores only labels. Cheque "cleared" is a manual user confirmation.
-* Not certified tax/e-invoicing software; invoicing (Phase 2) must be reviewed against UAE FTA requirements.
+* Not certified tax/e-invoicing software; have your accountant review invoice layout/VAT against UAE FTA requirements (and the upcoming e-invoicing mandate) before relying on it.
 * WhatsApp content is limited to whitelisted, non-sensitive fields; long digit runs are masked.
 * Known gaps: in-memory rate limiter (per instance) → use Redis/Upstash for multi-instance; CSP allows inline scripts (Next.js default without nonces); no malware scanner; MFA is optional and not enforceable per role yet; RLS on `storage.objects` is verified on stock Postgres with a stub, not on a live Supabase project.

@@ -11,6 +11,11 @@ const csp = [
 /** @type {import('next').NextConfig} */
 export default {
   poweredByHeader: false,
+  // local OCR runs in a worker thread and loads its language data from disk — keep it unbundled and ship the data files
+  serverExternalPackages: ['tesseract.js', 'tesseract.js-core'],
+  outputFileTracingIncludes: {
+    '/**': ['./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**', './node_modules/tesseract.js-core/*-lstm.wasm'],
+  },
   experimental: { serverActions: { bodySizeLimit: '16mb' } },
   async headers() {
     const common = [
