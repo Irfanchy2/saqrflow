@@ -4,14 +4,26 @@ import { RESPONSE_SCHEMA, SYSTEM_PROMPT, validateAiOutput } from './schema'
 import { AiError, type AIProvider, type ClassifyInput, type ClassifyOutput } from './types'
 
 export const GEMINI_DEFAULT_MODEL = 'gemini-2.5-flash'
-export interface GeminiOptions { apiKey: string | null; model?: string; endpoint?: string; timeoutMs?: number; fetchImpl?: typeof fetch }
+export interface GeminiOptions { apiKey: string | null; model?: string; endpoint?: string; timeoutMs?: number; fetchImpl?: typeof fetch; maxRetryWaitMs?: number }
 
 export function geminiProvider(o: GeminiOptions): AIProvider {
   const model = o.model || GEMINI_DEFAULT_MODEL, base = (o.endpoint || 'https://generativelanguage.googleapis.com').replace(/\/$/, '')
   const doFetch = o.fetchImpl ?? fetch, timeoutMs = o.timeoutMs ?? 60_000
   const fail = (m: string, code: AiError['code']) => new AiError(m, code, 'gemini')
 
+  /** Free-tier keys allow ~10 requests/minute: on 429 wait for Google's suggested retryDelay (≤ 25 s) and try again, twice at most. */
   async function generate(system: string, user: string, schema: object): Promise<unknown> {
+    for (let attempt = 0; ; attempt++) {
+      try { return await generateOnce(system, user, schema) }
+      catch (e) {
+        const wait = e instanceof AiError && e.code === 'rate_limited' ? (e as AiError & { retryMs?: number }).retryMs ?? 0 : 0
+        if (!wait || attempt >= 2 || wait > (o.maxRetryWaitMs ?? 25_000)) throw e
+        await new Promise(r => setTimeout(r, wait))
+      }
+    }
+  }
+
+  async function generateOnce(system: string, user: string, schema: object): Promise<unknown> {
     if (!o.apiKey) throw fail('GEMINI_API_KEY is not configured', 'not_configured')
     let res: Response
     try {
@@ -29,7 +41,13 @@ export function geminiProvider(o: GeminiOptions): AIProvider {
     }
     const j = await res.json().catch(() => null) as any
     const msg = String(j?.error?.message ?? '').slice(0, 300)
-    if (res.status === 429) throw fail('Gemini rate limit / quota reached — try again later', 'rate_limited')
+    if (res.status === 429) {
+      const delay = (j?.error?.details ?? []).find((d: any) => String(d?.['@type'] ?? '').endsWith('RetryInfo'))?.retryDelay as string | undefined
+      const err = fail('Gemini rate limit / quota reached — try again later', 'rate_limited') as AiError & { retryMs?: number }
+      err.retryMs = delay && /^\d+(\.\d+)?s$/.test(delay) ? Math.ceil(parseFloat(delay) * 1000) + 250 : 5_000
+      if (/per\s*day|PerDay/i.test(JSON.stringify(j?.error ?? ''))) err.retryMs = undefined                      // daily quota: waiting won't help
+      throw err
+    }
     if (res.status === 401 || res.status === 403 || /API key not valid|API_KEY_INVALID|permission/i.test(msg)) throw fail('Gemini rejected the API key', 'auth')
     if (!res.ok || !j) throw fail(`Gemini error ${res.status}${msg ? `: ${msg}` : ''}`, 'provider')
     if (j.promptFeedback?.blockReason) throw fail(`Gemini blocked the request (${j.promptFeedback.blockReason})`, 'blocked')

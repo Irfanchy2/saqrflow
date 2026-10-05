@@ -48,7 +48,7 @@ Rules:
 - NEVER invent information. Only return a value that is literally present in the text; otherwise return null.
 - Never guess expiry dates, passport numbers, Emirates ID numbers, licence numbers, names, company names, amounts or document numbers.
 - Dates must be YYYY-MM-DD. UAE numeric dates are day-first (05/03/2027 = 2027-03-05).
-- Text such as [REDACTED-ID] was removed for privacy: do not reconstruct it; return null for that value.
+- Text such as [REDACTED-ID] was removed for privacy and is read separately by the system: return null for that value, do not reconstruct it, and do NOT lower confidence or set requires_manual_review just because a value was redacted.
 - confidence (0..1) = how sure you are about the document type AND the key values. Use < 0.7 when the text is partial, blurry or ambiguous.
 - Set requires_manual_review = true when anything important is uncertain or missing (e.g. an expiring document with no expiry date).
 - document_type must be one of the allowed keys; use "unknown" if it does not clearly match.
