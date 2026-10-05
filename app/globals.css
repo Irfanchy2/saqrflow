@@ -1,0 +1,27 @@
+@tailwind base; @tailwind components; @tailwind utilities;
+
+:root {
+  --bg: 220 20% 97%; --surface: 0 0% 100%; --surface-2: 220 20% 96%; --border: 220 14% 90%;
+  --fg: 222 30% 12%; --muted: 220 9% 46%;
+  --primary: 221 83% 53%; --primary-fg: 0 0% 100%; --primary-soft: 221 90% 96%;
+  --success: 152 60% 36%; --warning: 36 92% 44%; --danger: 0 72% 51%;
+}
+.dark {
+  --bg: 224 24% 8%; --surface: 224 22% 11%; --surface-2: 224 20% 15%; --border: 224 16% 20%;
+  --fg: 220 20% 94%; --muted: 220 10% 62%;
+  --primary: 217 91% 63%; --primary-fg: 224 30% 8%; --primary-soft: 222 40% 18%;
+  --success: 152 55% 50%; --warning: 38 92% 56%; --danger: 0 80% 66%;
+}
+html { color-scheme: light; } html.dark { color-scheme: dark; }
+body { @apply bg-bg text-fg antialiased; font-feature-settings: 'cv11', 'ss01'; }
+* { @apply border-border; }
+:focus-visible { @apply outline-none ring-2 ring-primary/60 ring-offset-1 ring-offset-bg; }
+::selection { background: hsl(var(--primary) / .2); }
+dialog::backdrop { background: hsl(220 30% 8% / .5); backdrop-filter: blur(2px); }
+dialog[open] { animation: pop .16s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+.skeleton { @apply relative overflow-hidden rounded-md bg-surface-2; }
+.skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .06), transparent); animation: shimmer 1.4s infinite; }
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
+@media print { aside, header, .no-print { display: none !important; } body { background: #fff; } main { padding: 0 !important; } }

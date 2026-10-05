@@ -1,0 +1,34 @@
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
+
+// ── naive per-instance rate limiter (fixed window). Use Redis/Upstash when running >1 instance. ──
+const hits = new Map<string, { n: number; reset: number }>()
+function limited(key: string, max: number, windowMs: number) {
+  const now = Date.now(), h = hits.get(key)
+  if (!h || h.reset < now) { hits.set(key, { n: 1, reset: now + windowMs }); if (hits.size > 5000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k); return false }
+  return ++h.n > max
+}
+const PUBLIC = ['/login', '/signup', '/api/webhooks', '/api/cron', '/api/health', '/auth']
+
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const strict = (pathname === '/login' || pathname === '/signup') && req.method === 'POST'
+  if (limited(`${strict ? 'auth' : pathname.startsWith('/api') ? 'api' : 'web'}:${ip}`, strict ? 10 : pathname.startsWith('/api') ? 120 : 600, strict ? 60_000 : 60_000))
+    return new NextResponse('Too many requests. Please wait a minute and try again.', { status: 429, headers: { 'Retry-After': '60' } })
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return NextResponse.next()      // setup screen is rendered by the layout
+  let res = NextResponse.next({ request: req })
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll: () => req.cookies.getAll(),
+      setAll: (list: { name: string; value: string; options: CookieOptions }[]) => { list.forEach(({ name, value }) => req.cookies.set(name, value)); res = NextResponse.next({ request: req }); list.forEach(({ name, value, options }) => res.cookies.set(name, value, options)) },
+    },
+  })
+  const { data: { user } } = await supabase.auth.getUser()
+  const isPublic = PUBLIC.some(p => pathname === p || pathname.startsWith(p + '/'))
+  if (!user && !isPublic) { const u = req.nextUrl.clone(); u.pathname = '/login'; u.searchParams.set('next', pathname); return NextResponse.redirect(u) }
+  if (user && (pathname === '/login' || pathname === '/signup')) { const u = req.nextUrl.clone(); u.pathname = '/'; u.search = ''; return NextResponse.redirect(u) }
+  return res
+}
+export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|ico|webp)$).*)'] }
