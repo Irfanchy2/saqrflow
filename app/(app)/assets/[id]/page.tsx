@@ -1,13 +1,16 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Archive, ArchiveRestore, ArrowLeft, BellRing, FileText, MapPin, Pencil, Upload, UserRound } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, BellRing, FileText, MapPin, Pencil, Plus, Trash2, Upload, UserRound, Wrench } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { Alert, Badge, Card, CardHeader, EmptyState, Field, Input, Select } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { AssetFields } from '@/components/assets/asset-fields'
-import { setAssetArchived, updateAsset, uploadAssetFiles } from '@/app/actions/assets'
-import { ASSET_DOCS, ASSET_STATUS, EQUIPMENT_KINDS, VEHICLE_DOCS, assetDeadlines, deadlineTone } from '@/lib/assets'
+import { addMaintenance, setAssetArchived, updateAsset, uploadAssetFiles } from '@/app/actions/assets'
+import { trashRecord } from '@/app/actions/trash'
+import { Td, Th, TableWrap } from '@/components/ui/primitives'
+import { ASSET_DOCS, ASSET_STATUS, EQUIPMENT_KINDS, MAINT_KINDS, VEHICLE_DOCS, assetDeadlines, deadlineTone } from '@/lib/assets'
+import { fmtMoney } from '@/lib/sales/money'
 import { formatAed, formatLongDate } from '@/lib/time'
 import { ACCEPT_ATTR } from '@/lib/files'
 
@@ -20,12 +23,15 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   const { data: a } = await c.supabase.from('assets').select('*, employee:employees(id,full_name)').eq('id', id).maybeSingle()
   if (!a) notFound()
   const edit = c.can('records.edit'), isV = a.kind === 'vehicle'
-  const [{ data: owned }, { data: rel }, { data: emps }, { data: sups }] = await Promise.all([
+  const [{ data: owned }, { data: rel }, { data: emps }, { data: sups }, { data: maint }] = await Promise.all([
     c.supabase.from('documents').select('id,name,expiry_date,reference_no,folder,created_at').eq('owner_type', 'asset').eq('owner_id', id).is('deleted_at', null).order('created_at', { ascending: false }).limit(100),
     c.supabase.from('document_relationships').select('role,document:documents(id,name,expiry_date,folder,created_at,deleted_at)').in('related_type', ['vehicle', 'asset']).eq('related_id', id).limit(100),
     edit ? c.supabase.from('employees').select('id,full_name').neq('status', 'archived').order('full_name').limit(1000) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
     edit ? c.supabase.from('suppliers').select('name').order('name').limit(500) : Promise.resolve({ data: [] as { name: string }[] }),
+    c.supabase.from('asset_maintenance').select('*, employee:employees(full_name)').eq('asset_id', id).order('performed_on', { ascending: false }).limit(200),
   ])
+  const repairCost = (maint ?? []).reduce((s: number, m: any) => s + Number(m.cost), 0)
+  const yearCost = (maint ?? []).filter((m: any) => m.performed_on >= c.today.slice(0, 4) + '-01-01').reduce((s: number, m: any) => s + Number(m.cost), 0)
   const docs = new Map<string, any>()
   for (const d of owned ?? []) docs.set(d.id, d)
   for (const r of rel ?? []) { const d: any = r.document; if (d && !d.deleted_at && !docs.has(d.id)) docs.set(d.id, d) }
@@ -53,6 +59,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         <DialogButton wide variant="secondary" label="Edit" title={`Edit ${isV ? 'vehicle' : 'asset'}`} icon={<Pencil size={14} />}><ActionForm action={updateAsset.bind(null, id)} resetOnSuccess={false}><AssetFields kind={isV ? 'vehicle' : 'asset'} a={a} employees={emps ?? []} suppliers={(sups ?? []).map(s => s.name)} /></ActionForm></DialogButton>
         {a.archived_at ? <ActionButton size="md" action={setAssetArchived.bind(null, id, false)}><ArchiveRestore size={14} />Restore</ActionButton>
           : <ActionButton size="md" variant="ghost" action={setAssetArchived.bind(null, id, true)} confirm="Archive this item? Its documents and history are kept; reminders stop."><Archive size={14} />Archive</ActionButton>}
+        {c.can('records.delete') && <ActionButton size="md" variant="ghost" action={trashRecord.bind(null, 'asset', id)} confirm="Move this item to the trash? It can be restored from Settings → Trash."><Trash2 size={14} />Delete</ActionButton>}
       </div>}
     </div>
     {a.archived_at && <div className="mb-4"><Alert tone="amber">Archived on {formatLongDate(a.archived_at.slice(0, 10))}. No reminders are sent for archived items.</Alert></div>}
@@ -66,6 +73,28 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         {!deadlines.length ? <p className="px-4 py-5 text-sm text-muted">No dates set. {edit && 'Use Edit to add Mulkiya, insurance, warranty or maintenance dates.'}</p>
           : <ul className="divide-y divide-border">{deadlines.map(d => <li key={d.key} className="flex items-center gap-3 px-4 py-2.5 text-sm"><span className="flex-1">{d.label}</span>
             <span className="tabular-nums text-xs text-muted">{formatLongDate(d.date)}</span><Badge tone={deadlineTone(d.days)}>{d.days < 0 ? `${-d.days}d overdue` : d.days === 0 ? 'today' : `${d.days}d`}</Badge></li>)}</ul>}
+      </Card>
+
+      <Card className="xl:col-span-3"><CardHeader title="Maintenance history" sub={`Last ${isV ? 'service' : 'maintenance'}: ${a.last_service_date ? formatLongDate(a.last_service_date) : '—'} · Next: ${a.next_service_date ? formatLongDate(a.next_service_date) : '—'} · Cost this year AED ${fmtMoney(yearCost)} · All time AED ${fmtMoney(repairCost)}`}
+        action={edit && !a.archived_at ? <DialogButton wide size="sm" label="Add record" title="Record maintenance / repair" icon={<Plus size={14} />}><ActionForm action={addMaintenance.bind(null, id)} submit="Save record">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Date *"><Input name="performed_on" type="date" required max={c.today} defaultValue={c.today} /></Field>
+            <Field label="Type"><Select name="kind" defaultValue="service">{Object.entries(MAINT_KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+            <Field label="Work done *" className="sm:col-span-2"><Input name="description" required maxLength={1000} placeholder={isV ? 'e.g. Oil + filter change, brake pads' : 'e.g. Replaced torch cable, calibrated'} /></Field>
+            <Field label="Cost (AED)"><Input name="cost" type="number" min={0} step="0.01" defaultValue={0} inputMode="decimal" /></Field>
+            <Field label="Workshop / vendor"><Input name="vendor" maxLength={200} /></Field>
+            {isV && <Field label="Odometer (km)"><Input name="odometer" type="number" min={0} /></Field>}
+            <Field label="Handled by"><Select name="employee_id" defaultValue=""><option value="">—</option>{(emps ?? []).map((e: any) => <option key={e.id} value={e.id}>{e.full_name}</option>)}</Select></Field>
+            <Field label="Next due" hint="Updates the next service / inspection date and its reminders"><Input name="next_due" type="date" min={c.today} /></Field>
+            {c.can('documents.upload') && <Field label="Invoice / report (optional)" className="sm:col-span-2"><input type="file" name="file" accept={ACCEPT_ATTR} className="text-sm" /></Field>}
+          </div></ActionForm></DialogButton> : null} />
+        {!(maint ?? []).length ? <EmptyState icon={Wrench} title="No maintenance recorded" body={isV ? 'Record services, repairs and RTA inspections — the next due date becomes a reminder.' : 'Record servicing, repairs and calibration with cost and next due date.'} />
+          : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Type</Th><Th>Work done</Th><Th>Vendor</Th>{isV && <Th className="text-right">Odometer</Th>}<Th>By</Th><Th>Next due</Th><Th className="text-right">Cost (AED)</Th></tr></thead>
+            <tbody className="divide-y divide-border">{(maint ?? []).map((m: any) => <tr key={m.id} className="hover:bg-surface-2/50">
+              <Td className="whitespace-nowrap tabular-nums">{m.performed_on}</Td><Td>{MAINT_KINDS[m.kind] ?? m.kind}</Td>
+              <Td className="max-w-[320px]">{m.description}{m.document_id && <Link href={`/documents/${m.document_id}`} className="ms-1 text-xs text-primary hover:underline">file</Link>}</Td>
+              <Td className="text-muted">{m.vendor ?? '—'}</Td>{isV && <Td className="text-right tabular-nums">{m.odometer ?? '—'}</Td>}<Td className="text-muted">{m.employee?.full_name ?? '—'}</Td>
+              <Td className="tabular-nums">{m.next_due ?? '—'}</Td><Td className="text-right font-medium tabular-nums">{fmtMoney(m.cost)}</Td></tr>)}</tbody></TableWrap>}
       </Card>
 
       <Card className="xl:col-span-3"><CardHeader title="Documents" sub={isV ? 'Mulkiya, insurance, inspection, maintenance — private and versioned' : 'Invoices, warranty, maintenance records — private and versioned'}

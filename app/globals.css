@@ -16,6 +16,7 @@ html { color-scheme: light; } html.dark { color-scheme: dark; }
 body { @apply bg-bg text-fg antialiased; font-feature-settings: 'cv11', 'ss01'; }
 * { @apply border-border; }
 :focus-visible { @apply outline-none ring-2 ring-primary/60 ring-offset-1 ring-offset-bg; }
+[aria-invalid="true"] { border-color: hsl(var(--danger)) !important; box-shadow: 0 0 0 1px hsl(var(--danger) / 0.4); }
 ::selection { background: hsl(var(--primary) / .2); }
 dialog::backdrop { background: hsl(220 30% 8% / .5); backdrop-filter: blur(2px); }
 dialog[open] { animation: pop .16s ease-out; }
@@ -37,7 +38,7 @@ dialog[open] { animation: pop .16s ease-out; }
   -webkit-print-color-adjust: exact; print-color-adjust: exact;               /* backgrounds & brand colours print as on screen */
 }
 .sales-paper * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
-.sales-paper[dir], .sales-paper { direction: ltr; }                          /* the document layout is LTR even in the Arabic UI */
+.sales-paper[dir], .sales-paper { direction: ltr; color-scheme: light; }                          /* the document layout is LTR even in the Arabic UI */
 .paper-frame { width: 100%; border-collapse: collapse; table-layout: fixed; flex: 1; }
 .paper-frame > thead > tr > td, .paper-frame > tfoot > tr > td, .paper-frame > tbody > tr > td { padding: 0; border: 0; vertical-align: top; }
 .pf-top { height: 8mm; }
@@ -72,6 +73,13 @@ dialog[open] { animation: pop .16s ease-out; }
 .paper-tail--sign-left .paper-sign { float: left; margin: 0 4mm 2mm 0; }
 .paper-sign--center { float: none; justify-content: center; margin: 2mm auto 0; }
 .paper-sign img { object-fit: contain; display: block; max-width: none; }   /* fixed box + contain = never stretched */
+.paper-sign { flex-wrap: wrap; }
+.paper-signatory { flex-basis: 100%; text-align: center; font-size: 12px; line-height: 1.3; margin-top: 1mm; }
+.paper-signatory span { display: block; }
+.paper-textheader { padding: 2mm 0 3mm; border-bottom: 0.6mm solid var(--paper-accent, #111); margin-bottom: 2mm; }
+.sales-paper.has-accent .paper-accent { color: var(--paper-accent); }
+.sales-paper.has-accent .paper-items thead th { background: var(--paper-accent); color: #fff; }
+.sales-paper.has-accent .paper-title h1 { color: var(--paper-accent); }
 .paper-clauses ol { list-style: none; margin: 0; padding: 0; }
 .paper-clauses li { display: grid; grid-template-columns: 7mm minmax(0, 1fr); break-inside: avoid; page-break-inside: avoid; }
 .paper-clauses .paper-keep-next + ol li:first-child { break-before: avoid; }
@@ -81,7 +89,7 @@ dialog[open] { animation: pop .16s ease-out; }
 .paper-guides { position: absolute; inset: 0; pointer-events: none; z-index: 1;
   background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(297mm - 1px), rgb(59 130 246 / .55) calc(297mm - 1px), rgb(59 130 246 / .55) 297mm); }
 @media print {
-  html, body { background: #fff !important; }
+  html, html.dark, body { background: #fff !important; color: #111 !important; color-scheme: light; }   /* dark UI theme never prints */
   .sales-paper { margin: 0; box-shadow: none !important; min-height: auto; }
   .pf-top { height: 8mm; }
   .sales-paper.has-footer .pf-bottom { height: 30mm; }                       /* room for the footer repeated on each page */

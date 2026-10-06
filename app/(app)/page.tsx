@@ -11,7 +11,8 @@ import { SmartDocumentCenter } from '@/components/inbox/smart-center'
 import { Progress } from '@/components/projects/project-fields'
 import { loadSalesKpis } from '@/lib/sales/kpis'
 import { PROJECT_STATUS } from '@/lib/projects'
-import { HardHat, Receipt, Target } from 'lucide-react'
+import { BellRing as FollowIcon, HardHat, Receipt, Target, TrendingUp, Plane } from 'lucide-react'
+import { ACTION_LABEL, TABLE_LABEL } from '@/lib/audit'
 
 export const metadata = { title: 'Overview' }
 
@@ -28,14 +29,25 @@ export default async function Dashboard() {
     sb.from('reminder_sources').select('source_type,source_id,title,subject,owner_type,due_date,amount,direction,link').lte('due_date', addDays(c.today, 30)).order('due_date').limit(60),
     canDocs ? sb.from('documents').select('expiry_date,owner_type').is('deleted_at', null).gte('expiry_date', c.today).lte('expiry_date', last).limit(5000) : null,
     canFin ? sb.from('cheques').select('direction,status,amount,cheque_date').limit(5000) : null,
-    c.can('audit.view') ? sb.from('audit_logs').select('id,action,table_name,created_at,user_id,record_id').order('created_at', { ascending: false }).limit(10) : null,
+    c.can('audit.view') ? sb.from('audit_logs').select('id,action,table_name,created_at,user_id,record_id').in('table_name', ['invoices', 'payments', 'customers', 'projects', 'cheques', 'documents', 'employees', 'assets', 'project_expenses']).order('created_at', { ascending: false }).limit(12) : null,
     c.can('documents.view') ? sb.from('documents').select('id', head).is('deleted_at', null).eq('status', 'renewal_in_progress') : null,
   ])
   const alerts = buildAlerts((sources.data ?? []) as any, c.today)
-  const [salesData, activeProjects] = await Promise.all([
+  const month = c.today.slice(0, 7) + '-01', week = addDays(c.today, 7)
+  const [salesData, activeProjects, activeCount, followDue, visas, monthInv, monthExp, dueSoon, people] = await Promise.all([
     canFin ? loadSalesKpis(c) : null,
     c.can('documents.view') ? sb.from('projects').select('id,name,status,fabrication_progress,site_progress,customer:customers(name)').in('status', ['active', 'planning', 'on_hold']).order('updated_at', { ascending: false }).limit(5) : null,
+    c.can('documents.view') ? sb.from('projects').select('id', head).eq('status', 'active') : null,
+    canFin ? sb.from('sales_followups').select('id', head).is('done_at', null).lte('due_date', c.today) : null,
+    c.can('employees.view_sensitive') ? sb.from('documents').select('id, category:document_categories!inner(name)', head).is('deleted_at', null).eq('owner_type', 'employee').ilike('category.name', '%visa%').gte('expiry_date', c.today).lte('expiry_date', addDays(c.today, 60)) : null,
+    canFin ? sb.from('invoices').select('total,vat_amount').eq('doc_type', 'invoice').not('status', 'in', '(draft,cancelled)').gte('issue_date', month).lte('issue_date', c.today).limit(5000) : null,
+    canFin ? sb.from('project_expenses').select('amount').gte('spent_on', month).lte('spent_on', c.today).limit(10000) : null,
+    canFin ? sb.from('invoices').select('id', head).eq('doc_type', 'invoice').in('status', ['sent', 'partially_paid']).gte('due_date', c.today).lte('due_date', week) : null,
+    activity ? sb.from('profiles').select('id,full_name') : null,
   ])
+  const salesNet = (monthInv?.data ?? []).reduce((s2, r) => s2 + Number(r.total) - Number(r.vat_amount), 0)
+  const expenses = (monthExp?.data ?? []).reduce((s2, r) => s2 + Number(r.amount), 0)
+  const who = new Map((people?.data ?? []).map(p => [p.id, p.full_name]))
   const sk = salesData?.kpis ?? null
   const cs = cheques ? summarizeCheques((cheques.data ?? []) as any, c.today) : null
   const expiryData = months.map(m => ({ month: m.label, employee: 0, company: 0 }))
@@ -51,7 +63,17 @@ export default async function Dashboard() {
       <ol className="mt-2 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">{[['1. Add company documents', '/documents', 'Trade licence, VAT, tenancy…'], ['2. Add employees', '/employees', 'Passports, visas, Emirates IDs'], ['3. Add cheques', '/cheques', 'Incoming, outgoing, PDC'], ['4. Set up reminders', '/reminders', 'Recipients & WhatsApp opt-in']].map(([t, h, s]) =>
         <li key={h}><Link href={h} className="block rounded-md border border-border bg-surface p-3 hover:border-primary/40"><div className="font-medium">{t}</div><div className="text-xs text-muted">{s}</div></Link></li>)}</ol></Card>}
 
+    {salesData && <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <StatCard label="Outstanding receivables" value={formatAed(salesData.kpis.outstanding)} hint={`${salesData.kpis.overdueCount} overdue · ${formatAed(salesData.kpis.overdue)}`} icon={Wallet} tone={salesData.kpis.overdueCount ? 'red' : 'blue'} href="/invoices?tab=receivables" />
+      <StatCard label="Invoices due in 7 days" value={dueSoon?.count ?? 0} icon={Receipt} tone={dueSoon?.count ? 'amber' : 'neutral'} href="/invoices?tab=invoice&status=sent" />
+      <StatCard label="Monthly sales (ex VAT)" value={formatAed(salesNet)} hint={`Collected ${formatAed(salesData.kpis.collectedThisMonth)}`} icon={TrendingUp} tone="green" href="/invoices?tab=invoice" />
+      <StatCard label="Monthly expenses" value={formatAed(expenses)} icon={Wallet} href="/expenses" />
+      <StatCard label="Estimated profit this month" value={formatAed(salesNet - expenses)} hint="Invoiced ex VAT − recorded expenses" tone={salesNet - expenses < 0 ? 'red' : 'neutral'} />
+    </div>}
     <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {activeCount && <StatCard label="Active projects" value={activeCount.count ?? 0} icon={HardHat} href="/projects" />}
+      {followDue && <StatCard label="Quotation follow-ups due" value={followDue.count ?? 0} icon={FollowIcon} tone={followDue.count ? 'amber' : 'neutral'} href="/invoices?tab=followups" />}
+      {visas && <StatCard label="Visa expiries (60 days)" value={visas.count ?? 0} icon={Plane} tone={visas.count ? 'amber' : 'neutral'} href="/documents?status=expiring30" />}
       {emp && <StatCard label="Active employees" value={emp.count ?? 0} icon={Users} href="/employees" />}
       {docs && <StatCard label="Documents stored" value={docs.count ?? 0} icon={FileText} href="/vault" />}
       {exp30 && <StatCard label="Expiring within 30 days" value={exp30.count ?? 0} icon={CalendarClock} tone={exp30.count ? 'amber' : 'neutral'} href="/documents?status=expiring30" />}
@@ -70,9 +92,9 @@ export default async function Dashboard() {
             <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', a.severity === 'critical' ? 'bg-danger' : a.severity === 'warning' ? 'bg-warning' : 'bg-primary')} />
             <span className="min-w-0 flex-1"><span className="block font-medium">{a.text}</span><span className="text-xs text-muted">{a.sub}</span></span>
             <ArrowRight size={14} className="shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" /></Link></li>)}</ul>}</Card>
-      <Card className="lg:col-span-2"><CardHeader title="Recent activity" />
+      <Card className="lg:col-span-2"><CardHeader title="Recent activity" action={c.can('audit.view') ? <Link href="/audit" className="text-xs text-primary hover:underline">Audit log</Link> : undefined} />
         {activity ? ((activity.data?.length ?? 0) === 0 ? <EmptyState icon={Activity} title="No activity yet" /> :
-          <ul className="divide-y divide-border text-sm">{activity.data!.map(a => <li key={a.id} className="flex items-center justify-between gap-2 px-4 py-2.5"><span className="truncate"><b className="capitalize">{a.action.toLowerCase()}</b> <span className="text-muted">{a.table_name.replace(/_/g, ' ')}</span></span><span className="shrink-0 text-xs text-muted">{a.created_at.slice(5, 16).replace('T', ' ')}</span></li>)}</ul>)
+          <ul className="divide-y divide-border text-sm">{activity.data!.map(a => <li key={a.id} className="flex items-center justify-between gap-2 px-4 py-2.5"><span className="min-w-0 truncate"><b>{TABLE_LABEL[a.table_name] ?? a.table_name.replace(/_/g, ' ')}</b> <span className="text-muted">{(ACTION_LABEL[a.action] ?? a.action).toLowerCase()} by {a.user_id ? who.get(a.user_id) ?? 'a former user' : 'the system'}</span></span><span className="shrink-0 text-xs text-muted">{new Date(a.created_at).toLocaleString('en-GB', { timeZone: c.company.timezone, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></li>)}</ul>)
           : <EmptyState title="Activity log is restricted" body="Only owners can see the audit trail." />}</Card>
       {docDates && <Card className="lg:col-span-3"><CardHeader title="Document expiries — next 6 months" /><div className="p-4"><ExpiryChart data={expiryData} /></div></Card>}
       {cs && <Card className="lg:col-span-2"><CardHeader title="Cheque commitments — next 6 months" sub="Open cheques by cheque date" /><div className="p-4"><ChequeChart data={chequeData} /></div></Card>}

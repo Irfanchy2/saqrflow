@@ -26,7 +26,10 @@ Architecture and decisions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Oper
 | Customer profile (documents, invoices, payments, cheques, projects) | ✅ |
 | **Vehicles & Assets**: vehicles (plate, Mulkiya, insurance) and equipment (asset ID, serial, warranty, maintenance), documents, automatic expiry reminders, search/filter, archive/restore | ✅ |
 | **Document numbering**: quotations as `AS0025180/2026` (prefix, start number and other document types configurable in Settings → Document numbering; never duplicates) | ✅ |
-| Weekly report, native XLSX export | ⏳ planned |
+| **Connected sales workflow**: customer → quotation (statuses, revisions, follow-ups, optional manager approval) → partial delivery notes → invoice → payments / cleared cheques / credit notes → customer ledger & statement (print + PDF). Autosave, unsaved-changes guard, double-submit protection, edit-conflict detection, integer-fils money maths, VAT categories and discounts | ✅ |
+| **Expenses** (with receipt OCR suggestions), **project profitability**, team, photos (thumbnails), **Products & Services** catalog, terms templates | ✅ |
+| **Trash & restore**, **audit log**, global search, notification centre, Excel/CSV import & export — see [`docs/BACKUP.md`](docs/BACKUP.md) for backups | ✅ |
+| Weekly report e-mail, public customer quotation link | ⏳ planned |
 | **Smart Document Inbox**: upload anything → classified (22 UAE doc types), matched to company/employee/customer/vehicle, duplicate & renewal detection, confirm-to-file, versions, auto reminders, timelines — see [`docs/SMART_INBOX.md`](docs/SMART_INBOX.md) | ✅ OCR provider chain (Google Cloud Vision → OCR.Space → local Tesseract) + Gemini classification with strict JSON and server-side validation — see [`docs/AI_DOCUMENT_READER.md`](docs/AI_DOCUMENT_READER.md) (needs your OCR / Gemini keys) |
 | AI Search (natural-language questions, permission-aware) | ✅ (rules without a key; Gemini understands free-form questions) |
 | Accounting-software sync | ⏳ planned |
@@ -38,7 +41,7 @@ Architecture and decisions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Oper
 ```bash
 cp .env.example .env.local           # fill in values (see below)
 npm install
-# 1. Create a Supabase project → SQL editor → run supabase/migrations/0001…0011 in order
+# 1. Create a Supabase project → SQL editor → run supabase/migrations/0001…0012 in order
 #    (or: supabase db push). 0004 creates the private "vault" bucket.
 npm run dev                          # http://localhost:3000 → Sign up → create company
 ```

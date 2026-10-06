@@ -24,13 +24,19 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
 
   const cmds = useMemo<Cmd[]>(() => {
     const go = (href: string) => () => { setOpen(false); router.push(href) }
-    const make = (t: 'quotation' | 'invoice' | 'delivery_note') => () => start(async () => { const r = await newSalesDoc(t); if (r?.error) toast(r.error, 'error'); setOpen(false) })
+    const make = (t: 'quotation' | 'invoice' | 'delivery_note') => () => { if (pending) return; start(async () => { const r = await newSalesDoc(t, { token: crypto.randomUUID() }); if (r?.error) toast(r.error, 'error'); setOpen(false) }) }
     return [
       ...(canSales ? [{ id: 'nq', label: 'New quotation', group: 'Create', run: make('quotation') }, { id: 'ni', label: 'New tax invoice', group: 'Create', run: make('invoice') }, { id: 'nd', label: 'New delivery note', group: 'Create', run: make('delivery_note') }] : []),
       { id: 'up', label: 'Upload documents to Smart Inbox', group: 'Create', run: go('/inbox') },
+      { id: 'nc', label: 'Add customer', group: 'Create', run: go('/parties?new=customer') },
+      { id: 'ne', label: 'Add employee', group: 'Create', run: go('/employees?new=employee') },
+      { id: 'nx', label: 'Add expense', group: 'Create', run: go('/expenses?new=expense') },
+      { id: 'np', label: 'New project', group: 'Create', run: go('/projects?new=project') },
+      { id: 'nd2', label: 'Add company document', group: 'Create', run: go('/documents?new=document') },
+      { id: 'sp', label: 'Search projects…', group: 'Go to', run: go('/projects'), hint: 'Projects' },
       ...links.map(l => ({ id: l.href, label: l.label, group: 'Go to', run: go(l.href), hint: l.group })),
     ]
-  }, [links, canSales, router])
+  }, [links, canSales, router, pending])
   const term = q.trim().toLowerCase()
   const list = term ? [...cmds.filter(c => c.label.toLowerCase().includes(term)), { id: 'search', label: `Search everything for “${q.trim()}”`, group: 'Search', run: () => { setOpen(false); router.push(`/search?q=${encodeURIComponent(q.trim())}`) } }] : cmds
   const onKey = (e: React.KeyboardEvent) => {

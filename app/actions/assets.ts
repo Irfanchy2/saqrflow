@@ -17,12 +17,18 @@ const schema = z.object({
   // vehicle
   plate_or_serial: t(60), plate_emirate: t(40), vehicle_type: t(40), make: t(60), model: t(60),
   model_year: z.coerce.number().int().min(1950).max(2100).optional(), mulkiya_no: t(60), insurance_provider: t(120),
-  registration_expiry: date.optional(), insurance_expiry: date.optional(),
+  registration_expiry: date.optional(), insurance_expiry: date.optional(), inspection_expiry: date.optional(),
   // asset
   category: t(80), asset_code: t(40), serial_no: t(80), purchase_date: date.optional(),
   purchase_price: z.coerce.number().min(0).max(1e10).optional(), supplier_name: t(200), location: t(200),
   warranty_expiry: date.optional(), next_service_date: date.optional(),
   assigned_to: z.string().uuid().optional(), notes: t(4000),
+  reminder_days: z.string().max(60).optional().transform((v, ctx) => {
+    if (!v) return undefined
+    const n = v.split(/[,\s]+/).filter(Boolean).map(Number)
+    if (n.some(x => !Number.isInteger(x) || x < 0 || x > 365)) { ctx.addIssue({ code: 'custom', message: 'Reminder days: whole numbers 0–365, e.g. 30, 7, 1' }); return z.NEVER }
+    return [...new Set(n)].sort((a, b) => b - a).slice(0, 8)
+  }),
 })
 const KEYS = Object.keys(schema.shape)
 const parse = (fd: FormData) => schema.parse(Object.fromEntries(KEYS.map(k => [k, str(fd, k)])))
@@ -96,5 +102,34 @@ export async function uploadAssetFiles(assetId: string, _: ActionState, fd: Form
     touch(assetId); revalidatePath('/vault')
     if (errors.length) return { error: `${files.length - errors.length} uploaded. Rejected — ${errors.join(' · ')}` }
     return { ok: true, message: `${files.length} file${files.length === 1 ? '' : 's'} uploaded${expiry ? ' — expiry reminders created' : ''}.` }
+  })
+}
+
+const maintSchema = z.object({
+  performed_on: date, kind: z.enum(['service', 'repair', 'inspection', 'other']), description: z.string().trim().min(1, 'Describe the work').max(1000),
+  cost: z.coerce.number({ message: 'Cost must be a number' }).min(0, 'Cost cannot be negative').max(1e9).default(0).transform(n => Math.round(n * 100) / 100),
+  vendor: t(200), odometer: z.coerce.number().int().min(0).max(5_000_000).optional(), employee_id: z.string().uuid().optional(), next_due: date.optional(),
+})
+/** Maintenance / repair / inspection record. The DB trigger updates the asset's last & next service (and inspection) dates → reminders follow. */
+export async function addMaintenance(assetId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'records.edit')
+    const r = maintSchema.safeParse(Object.fromEntries(['performed_on', 'kind', 'description', 'cost', 'vendor', 'odometer', 'employee_id', 'next_due'].map(k => [k, str(fd, k)])))
+    if (!r.success) return { error: r.error.issues[0].message, fieldErrors: Object.fromEntries(r.error.issues.map(i => [i.path.join('.'), i.message])) }
+    const v = r.data
+    if (v.performed_on > c.today) return { error: 'The date cannot be in the future.', fieldErrors: { performed_on: 'In the future' } }
+    if (v.next_due && v.next_due <= v.performed_on) return { error: 'The next due date must be after the work date.', fieldErrors: { next_due: 'Too early' } }
+    let documentId: string | null = null
+    const f = fd.get('file')
+    if (f instanceof File && f.size > 0 && c.can('documents.upload')) {
+      const { data: d, error: de } = await c.supabase.from('documents').insert({ company_id: c.company.id, owner_type: 'asset', owner_id: assetId, name: `${v.kind[0].toUpperCase()}${v.kind.slice(1)} — ${v.description}`.slice(0, 250), issue_date: v.performed_on, folder: 'Assets/Maintenance', reminders_active: false, created_by: c.userId }).select('id').single()
+      if (de) throw de
+      try { await saveVersion(c, d.id, f) } catch (e) { await c.supabase.from('documents').update({ deleted_at: new Date().toISOString() }).eq('id', d.id); return { error: `Not saved — the attachment was rejected: ${(e as Error).message}` } }
+      documentId = d.id
+    }
+    const { error } = await c.supabase.from('asset_maintenance').insert({ ...v, company_id: c.company.id, asset_id: assetId, document_id: documentId, created_by: c.userId })
+    if (error) throw error
+    if (v.kind === 'repair' || v.kind === 'service') await c.supabase.from('assets').update({ status: 'active' }).eq('id', assetId).eq('status', 'in_maintenance')
+    touch(assetId); return { ok: true, message: 'Maintenance recorded.' }
   })
 }

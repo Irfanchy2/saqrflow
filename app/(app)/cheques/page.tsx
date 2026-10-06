@@ -32,7 +32,9 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
   if (sp.from) q = q.gte('cheque_date', sp.from); if (sp.to) q = q.lte('cheque_date', sp.to)
   const sort = ['cheque_date', 'amount', 'party_name', 'status'].includes(sp.sort ?? '') ? sp.sort! : 'cheque_date'
   const { data: rows, count } = await q.order(sort, { ascending: sp.dir ? sp.dir === 'asc' : sort !== 'cheque_date' }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-  const [{ data: banks }, { data: cust }, { data: sup }] = await Promise.all([c.supabase.from('banks').select('name,account_display_name').order('name'), c.supabase.from('customers').select('name').order('name'), c.supabase.from('suppliers').select('name').order('name')])
+  const [{ data: banks }, { data: cust }, { data: sup }, { data: openInv }] = await Promise.all([c.supabase.from('banks').select('name,account_display_name').order('name'), c.supabase.from('customers').select('name').order('name').limit(2000), c.supabase.from('suppliers').select('name').order('name').limit(2000),
+    manage ? c.supabase.from('invoices').select('id,number,customer_name,total').eq('doc_type', 'invoice').in('status', ['sent', 'overdue', 'partially_paid']).order('issue_date', { ascending: false }).limit(300) : Promise.resolve({ data: [] as any[] })])
+  const invNo = new Map((openInv ?? []).map((i: any) => [i.id, i.number]))
   const view = sp.view === 'calendar' ? 'calendar' : 'list'
   const month = /^\d{4}-\d{2}$/.test(sp.m ?? '') ? sp.m! : c.today.slice(0, 7)
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
@@ -54,6 +56,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
               <Field label="Issue date"><Input name="issue_date" type="date" /></Field>
               <Field label="Planned deposit / presentation date"><Input name="deposit_date" type="date" /></Field>
               <Field label="Purpose" className="sm:col-span-2"><Input name="purpose" maxLength={300} placeholder="e.g. Progress payment – Project ABC" /></Field>
+              <Field label="Linked tax invoice (incoming)" hint="When you later confirm the cheque as Cleared, you can apply it to this invoice." className="sm:col-span-2"><Select name="invoice_id" defaultValue=""><option value="">— None —</option>{(openInv ?? []).map((i: any) => <option key={i.id} value={i.id}>{i.number} · {i.customer_name ?? '—'} · AED {Number(i.total).toFixed(2)}</option>)}</Select></Field>
               <Field label="Cheque image (optional)" className="sm:col-span-2"><input type="file" name="file" accept={ACCEPT_ATTR} className="text-sm" /></Field>
               <Field label="Notes" className="sm:col-span-2"><Textarea name="notes" /></Field></div></ActionForm></DialogButton>}</>} />
     <div className="mb-5"><Alert tone="amber"><b>Manual tracking only.</b> SaqrFlow does not connect to your bank, move money, check balances or detect clearance. “Cleared” is set by you after verifying with your bank.</Alert></div>
@@ -84,7 +87,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
           <TableWrap><thead className="border-b border-border bg-surface-2/60"><tr><SortTh label="Cheque date" col="cheque_date" params={sp} base="/cheques" /><Th>No.</Th><SortTh label="Party" col="party_name" params={sp} base="/cheques" /><Th>Bank</Th><SortTh label="Amount" col="amount" params={sp} base="/cheques" /><Th>Type</Th><SortTh label="Status" col="status" params={sp} base="/cheques" />{manage && <Th />}</tr></thead>
             <tbody className="divide-y divide-border">{rows.map(r => { const next = nextStatuses(r.direction as Direction, r.status as ChequeStatus); const late = ['received', 'issued', 'scheduled'].includes(r.status) && r.cheque_date < c.today
               return <tr key={r.id} className="hover:bg-surface-2/50"><Td className="tabular-nums">{r.cheque_date}{late && <Badge tone="red" className="ms-2">overdue</Badge>}</Td><Td className="font-mono text-xs">{r.cheque_no}</Td>
-                <Td><div className="font-medium">{r.party_name}</div><div className="text-xs text-muted">{r.purpose}</div></Td><Td className="text-muted">{r.bank_name}{r.account_display_name && <div className="text-xs">{r.account_display_name}</div>}</Td>
+                <Td><div className="font-medium">{r.party_name}</div><div className="text-xs text-muted">{r.purpose}</div>{r.invoice_id && <Link href={`/invoices/${r.invoice_id}`} className="text-xs text-primary hover:underline">Invoice {invNo.get(r.invoice_id) ?? ''}</Link>}</Td><Td className="text-muted">{r.bank_name}{r.account_display_name && <div className="text-xs">{r.account_display_name}</div>}</Td>
                 <Td className={`tabular-nums font-medium ${r.direction === 'incoming' ? 'text-success' : ''}`}>{r.direction === 'incoming' ? '+' : '−'}{formatAed(r.amount)}</Td>
                 <Td><span className="capitalize text-muted">{r.direction} · {r.kind === 'pdc' ? 'PDC' : r.kind}</span></Td><Td><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>{r.returned_reason && <div className="mt-1 text-xs text-danger">{r.returned_reason}</div>}</Td>
                 {manage && <Td>{next.length > 0 && <DialogButton size="sm" variant="secondary" label="Update" title={`Cheque ${r.cheque_no} – update status`}>
@@ -93,6 +96,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
                     <Field label="New status"><Select name="status" required defaultValue={next[0]}>{next.map(n => <option key={n} value={n}>{n}</option>)}</Select></Field>
                     <Field label="Deposit / presentation date" hint="Used when marking deposited or presented."><Input type="date" name="deposit_date" defaultValue={r.deposit_date ?? ''} /></Field>
                     <Field label="Reason (required if returned)"><Input name="reason" maxLength={300} placeholder="e.g. Insufficient funds" /></Field>
-                    <label className="flex items-start gap-2 rounded-md bg-surface-2 p-3 text-sm"><input type="checkbox" name="confirm" className="mt-0.5" /><span>For <b>Cleared</b>: I have verified with my bank (statement or confirmation) that this cheque has cleared.</span></label></ActionForm></DialogButton>}</Td>}</tr> })}</tbody></TableWrap>
+                    <label className="flex items-start gap-2 rounded-md bg-surface-2 p-3 text-sm"><input type="checkbox" name="confirm" className="mt-0.5" /><span>For <b>Cleared</b>: I have verified with my bank (statement or confirmation) that this cheque has cleared. A cheque date passing is not clearance.</span></label>
+                    {r.direction === 'incoming' && r.invoice_id && <label className="flex items-start gap-2 rounded-md bg-surface-2 p-3 text-sm"><input type="checkbox" name="apply_payment" defaultChecked className="mt-0.5" /><span>When cleared, record it as a payment on invoice <b>{invNo.get(r.invoice_id) ?? 'linked invoice'}</b> (updates the balance).</span></label>}</ActionForm></DialogButton>}</Td>}</tr> })}</tbody></TableWrap>
           <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/cheques" /></>}</Card></>}</>
 }

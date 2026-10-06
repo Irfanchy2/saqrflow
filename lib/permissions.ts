@@ -6,7 +6,7 @@ export type Role = (typeof ROLES)[number]
 export const PERMISSIONS = [
   'documents.view','documents.upload','records.edit','salary.view','finance.view','cheques.manage',
   'reminders.create','data.export','records.delete','users.manage','employees.view',
-  'employees.view_sensitive','audit.view','settings.manage',
+  'employees.view_sensitive','audit.view','settings.manage','sales.approve','records.purge',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 

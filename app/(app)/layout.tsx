@@ -30,11 +30,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { key: 'assets', group: 'Records', href: '/assets', status: 'live', show: c.can('documents.view') },
     { key: 'invoices', group: 'Finance & projects', href: '/invoices', status: 'live', show: c.can('finance.view') },
     { key: 'projects', group: 'Finance & projects', href: '/projects', status: 'live', show: c.can('documents.view') },
+    { key: 'expenses', group: 'Finance & projects', href: '/expenses', status: 'live', show: c.can('finance.view') },
     { key: 'cheques', group: 'Finance & projects', href: '/cheques', status: 'live', show: c.can('finance.view') },
     { key: 'parties', group: 'Finance & projects', href: '/parties', status: 'live', show: c.can('documents.view') },
+    { key: 'catalog', group: 'Finance & projects', href: '/catalog', status: 'live', show: c.can('finance.view') },
     { key: 'reports', group: 'Insights', href: '/reports', status: 'partial', show: c.can('data.export') },
     { key: 'assistant', group: 'Insights', href: '/assistant', status: 'live', show: true },
     { key: 'users', group: 'Admin', href: '/users', status: 'live', show: c.can('users.manage') },
+    { key: 'audit', group: 'Admin', href: '/audit', status: 'live', show: c.can('audit.view') },
+    { key: 'trash', group: 'Admin', href: '/trash', status: 'live', show: c.can('records.delete') },
     { key: 'settings', group: 'Admin', href: '/settings', status: 'live', show: true },
   ].map(i => ({ ...i, label: t(l, i.key as any) }) as NavItem & { show: boolean })
   const { data: notes } = await c.supabase.from('in_app_notifications').select('id,title,body,link,severity,read_at,created_at').order('created_at', { ascending: false }).limit(8)

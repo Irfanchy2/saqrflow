@@ -19,8 +19,8 @@ const button = cva('inline-flex items-center justify-center gap-2 rounded-md tex
 })
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & VariantProps<typeof button>
 export const Button = ({ className, variant, size, ...p }: BtnProps) => <button className={cn(button({ variant, size }), className)} {...p} />
-export const LinkButton = ({ href, className, variant, size, children }: { href: string; className?: string; children: ReactNode } & VariantProps<typeof button>) =>
-  <Link href={href} className={cn(button({ variant, size }), className)}>{children}</Link>
+export const LinkButton = ({ href, className, variant, size, children, target }: { href: string; className?: string; children: ReactNode; target?: '_blank' } & VariantProps<typeof button>) =>
+  <Link href={href} className={cn(button({ variant, size }), className)} target={target} rel={target ? 'noopener noreferrer' : undefined}>{children}</Link>
 
 const field = 'w-full rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted/70 transition-colors hover:border-muted/50 disabled:opacity-60'
 // dir="auto": typed text takes its own direction (English stays left-aligned inside the Arabic RTL UI and vice versa)
@@ -72,7 +72,7 @@ export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: R
   <div role={t === 'red' ? 'alert' : undefined} className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/30 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/30 bg-warning/10' : t === 'green' ? 'border-success/30 bg-success/5' : 'border-primary/20 bg-primary-soft')}>{children}</div>
 
 export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th className={cn('whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted', className)}>{children}</th>
-export const Td = ({ children, className, title }: { children?: ReactNode; className?: string; title?: string }) => <td title={title} className={cn('px-4 py-3 align-middle', className)}>{children}</td>
+export const Td = ({ children, className, title, colSpan }: { children?: ReactNode; className?: string; title?: string; colSpan?: number }) => <td title={title} colSpan={colSpan} className={cn('px-4 py-3 align-middle', className)}>{children}</td>
 export const TableWrap = ({ children }: { children: ReactNode }) => <div className="overflow-x-auto"><table className="w-full text-sm">{children}</table></div>
 
 /** Sortable column header: links to the same page with ?sort=&dir= preserved. */

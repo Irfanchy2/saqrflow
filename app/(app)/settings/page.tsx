@@ -10,6 +10,9 @@ import { LOCALE_NAMES, LOCALES } from '@/lib/i18n'
 import { BrandingSettings } from '@/components/sales/branding-settings'
 import { NumberingSettings } from '@/components/settings/numbering'
 import { AiAutomation } from '@/components/settings/ai-automation'
+import { TemplatesSettings } from '@/components/settings/templates'
+import { DataBackup } from '@/components/settings/data-backup'
+import Link from 'next/link'
 
 export const metadata = { title: 'Settings' }
 export default async function Settings() {
@@ -17,18 +20,26 @@ export default async function Settings() {
   const { data: st } = await c.supabase.from('app_settings').select('key,value'); const s = parseSettings(st ?? [])
   const wa = admin ? await whatsappStatus(c.company.id) : null
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
+  const sections: [string, string, boolean][] = [['company', 'Company profile', admin], ['branding', 'Document branding & tax', admin], ['numbering', 'Document numbering', admin], ['templates', 'Document templates', admin],
+    ['notifications', 'Notifications', admin], ['ai', 'AI & OCR', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['data', 'Data & backup', true], ['account', 'Account & appearance', true]]
   return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
-    <div className="grid gap-5 lg:grid-cols-2">
-      <Card><CardHeader title="Your account" /><div className="space-y-5 p-4 text-sm">
+    <nav aria-label="Settings sections" className="mb-5 flex flex-wrap gap-1.5">
+      {sections.filter(x => x[2]).map(([id, l]) => <a key={id} href={`#${id}`} className="rounded-full border border-border px-3 py-1 text-xs hover:bg-surface-2">{l}</a>)}
+      {c.can('users.manage') && <Link href="/users" className="rounded-full border border-border px-3 py-1 text-xs hover:bg-surface-2">Users & permissions →</Link>}
+      {c.can('records.delete') && <Link href="/trash" className="rounded-full border border-border px-3 py-1 text-xs hover:bg-surface-2">Trash →</Link>}
+      {c.can('audit.view') && <Link href="/audit" className="rounded-full border border-border px-3 py-1 text-xs hover:bg-surface-2">Audit log →</Link>}
+    </nav>
+    <div className="grid gap-5 lg:grid-cols-2 [&>*]:scroll-mt-20 [&>*]:min-w-0">
+      <Card id="account"><CardHeader title="Your account & appearance" sub="Language here; light / dark theme from the toolbar (printing always uses the white paper theme)" /><div className="space-y-5 p-4 text-sm">
         <div><div className="text-xs text-muted">Signed in as</div><div>{c.email} · <span className="capitalize">{c.profile.role.replace('_', ' ')}</span></div></div>
         <ActionForm action={setLocale} submit="Save language" resetOnSuccess={false}><Field label="Interface language" hint="Arabic (right-to-left) and Bengali currently translate navigation and chrome only; page content is English."><Select name="locale" defaultValue={c.profile.locale}>{LOCALES.map(l => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}</Select></Field></ActionForm>
         <div><h3 className="mb-2 font-medium">Two-step verification</h3><MfaSetup /></div></div></Card>
 
-      {admin && <Card><CardHeader title="Company" /><div className="p-4"><ActionForm action={saveCompany} resetOnSuccess={false}>
+      {admin && <Card id="company"><CardHeader title="Company profile" /><div className="p-4"><ActionForm action={saveCompany} resetOnSuccess={false}>
         <Field label="Company name"><Input name="name" defaultValue={c.company.name} required /></Field><Field label="Trade name"><Input name="trade_name" /></Field>
         <p className="text-xs text-muted">Time zone: {c.company.timezone} · Currency: {c.company.currency} (fixed in this version).</p></ActionForm></div></Card>}
 
-      {admin && <Card><CardHeader title="Reminder schedule" sub="Applies to every document, cheque and reminder unless overridden on the item or category." /><div className="p-4"><ActionForm action={saveReminderSettings} resetOnSuccess={false}>
+      {admin && <Card id="notifications"><CardHeader title="Notifications — reminder schedule" sub="Applies to every document, cheque and reminder unless overridden on the item or category." /><div className="p-4"><ActionForm action={saveReminderSettings} resetOnSuccess={false}>
         <Field label="Remind … days before" hint="Comma-separated. 0 = on the due date."><Input name="offsets" defaultValue={s.offsets!.join(', ')} /></Field>
         <div className="grid gap-4 sm:grid-cols-3"><Field label="Overdue: repeat every (days)"><Input type="number" name="overdue_every" min="0" max="90" defaultValue={s.overdueEveryDays} /></Field><Field label="Max overdue reminders"><Input type="number" name="overdue_max" min="0" max="52" defaultValue={s.overdueMax} /></Field><Field label="Daily summary hour"><Input type="number" name="digest_hour" min="0" max="23" defaultValue={s.digestHour} /></Field></div>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="digest" defaultChecked={s.digestEnabled} />Send the daily summary to recipients who opted in</label>
@@ -40,7 +51,11 @@ export default async function Settings() {
 
       {admin && <NumberingSettings c={c} />}
 
-      {admin && wa && <Card className="lg:col-span-2"><CardHeader title="WhatsApp Business Platform (Meta Cloud API)" action={<Badge tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.mode === 'live' ? 'Live' : 'Sandbox'}</Badge>} />
+      {admin && <TemplatesSettings c={c} />}
+
+      <DataBackup c={c} />
+
+      {admin && wa && <Card id="whatsapp" className="lg:col-span-2"><CardHeader title="WhatsApp Business Platform (Meta Cloud API)" action={<Badge tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.mode === 'live' ? 'Live' : 'Sandbox'}</Badge>} />
         <div className="grid gap-6 p-4 lg:grid-cols-2"><div className="space-y-4">
           <Alert tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.reason}</Alert>
           <ActionForm action={saveWhatsApp} resetOnSuccess={false}>

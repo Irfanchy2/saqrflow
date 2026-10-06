@@ -40,7 +40,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
 
   return <>
     <PageHeader title="Projects" sub="Fabrication & site progress, milestones, costs and billing for every job."
-      actions={c.can('records.edit') ? <DialogButton wide label="New project" title="New project" icon={<Plus size={15} />}><ActionForm action={createProject} submit="Create project"><ProjectFields customers={customers ?? []} /></ActionForm></DialogButton> : null} />
+      actions={c.can('records.edit') ? <DialogButton wide openParam="project" label="New project" title="New project" icon={<Plus size={15} />}><ActionForm action={createProject} submit="Create project"><ProjectFields customers={customers ?? []} /></ActionForm></DialogButton> : null} />
     <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard label="Active projects" value={active.length} hint={`${rows.length} shown`} icon={HardHat} tone="blue" />
       {fin && <StatCard label="Active contract value" value={formatAed(active.reduce((s, r) => s + Number(r.contract_value ?? 0), 0))} icon={Briefcase} />}

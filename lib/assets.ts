@@ -12,15 +12,17 @@ export const ASSET_CATEGORIES = ['Welding Machine', 'Generator', 'Drilling Machi
 export const VEHICLE_DOCS = { mulkiya: 'Mulkiya / Registration', insurance: 'Insurance', inspection: 'Inspection', maintenance: 'Maintenance', registration: 'Registration', other: 'Other' } as const
 export const ASSET_DOCS = { invoice: 'Purchase invoice', warranty: 'Warranty', maintenance: 'Maintenance', manual: 'Manual / certificate', other: 'Other' } as const
 
-export interface AssetDates { registration_expiry?: string | null; insurance_expiry?: string | null; warranty_expiry?: string | null; next_service_date?: string | null; kind?: string }
+export interface AssetDates { registration_expiry?: string | null; insurance_expiry?: string | null; inspection_expiry?: string | null; warranty_expiry?: string | null; next_service_date?: string | null; kind?: string }
 /** Upcoming / overdue dates for an asset, soonest first. These same dates feed the reminder engine (reminder_sources). */
 export function assetDeadlines(a: AssetDates, today: string) {
   const out: { key: string; label: string; date: string; days: number }[] = []
   const add = (key: string, label: string, date?: string | null) => { if (date) out.push({ key, label, date, days: daysBetween(today, date) }) }
   add('registration', a.kind === 'vehicle' ? 'Mulkiya / registration' : 'Registration', a.registration_expiry)
   add('insurance', 'Insurance', a.insurance_expiry)
+  add('inspection', 'Inspection', a.inspection_expiry)
   add('warranty', 'Warranty', a.warranty_expiry)
   add('service', 'Maintenance due', a.next_service_date)
   return out.sort((x, y) => x.days - y.days)
 }
+export const MAINT_KINDS: Record<string, string> = { service: 'Service', repair: 'Repair', inspection: 'Inspection', other: 'Other' }
 export const deadlineTone = (days: number) => (days < 0 ? 'red' : days <= 30 ? 'amber' : 'green') as 'red' | 'amber' | 'green'

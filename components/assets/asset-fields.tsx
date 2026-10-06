@@ -21,7 +21,9 @@ export function AssetFields({ kind, a = {}, employees, suppliers }: { kind: 'veh
       <Field label="Mulkiya expiry" hint="Reminders are sent before this date"><Input name="registration_expiry" type="date" defaultValue={a.registration_expiry ?? ''} /></Field>
       <Field label="Insurance provider"><Input name="insurance_provider" maxLength={120} defaultValue={a.insurance_provider ?? ''} /></Field>
       <Field label="Insurance expiry"><Input name="insurance_expiry" type="date" defaultValue={a.insurance_expiry ?? ''} /></Field>
+      <Field label="Inspection (RTA test) due"><Input name="inspection_expiry" type="date" defaultValue={a.inspection_expiry ?? ''} /></Field>
       <Field label="Next service"><Input name="next_service_date" type="date" defaultValue={a.next_service_date ?? ''} /></Field>
+      <Field label="Remind … days before" hint="e.g. 30, 15, 7, 1 — blank = company default"><Input name="reminder_days" defaultValue={(a.reminder_days ?? []).join(', ')} placeholder="30, 15, 7, 1" /></Field>
       {assigned}{status}
     </> : <>
       <Field label="Asset name *" className="sm:col-span-2"><Input name="name" required maxLength={200} defaultValue={a.name} placeholder="e.g. Lincoln MIG welding machine" /></Field>
@@ -35,6 +37,7 @@ export function AssetFields({ kind, a = {}, employees, suppliers }: { kind: 'veh
       <Field label="Location"><Input name="location" maxLength={200} defaultValue={a.location ?? ''} placeholder="e.g. Workshop – Musaffah" /></Field>
       <Field label="Warranty expiry"><Input name="warranty_expiry" type="date" defaultValue={a.warranty_expiry ?? ''} /></Field>
       <Field label="Maintenance due"><Input name="next_service_date" type="date" defaultValue={a.next_service_date ?? ''} /></Field>
+      <Field label="Remind … days before" hint="blank = company default"><Input name="reminder_days" defaultValue={(a.reminder_days ?? []).join(', ')} placeholder="30, 7, 1" /></Field>
       {assigned}{status}
     </>}
     <Field label="Notes" className="sm:col-span-2"><Textarea name="notes" maxLength={4000} defaultValue={a.notes ?? ''} /></Field>

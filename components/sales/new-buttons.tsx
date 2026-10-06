@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from 'react'
+import { useRef, useTransition } from 'react'
 import { Loader2, Receipt, ScrollText, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
@@ -12,7 +12,8 @@ const DEF: { t: SalesType; label: string; icon: typeof Receipt }[] = [
 /** "New quotation / invoice / delivery note" — creates a numbered draft and opens the builder. */
 export function NewSalesButtons({ customerId, projectId, only, size = 'md' }: { customerId?: string; projectId?: string; only?: SalesType[]; size?: 'sm' | 'md' }) {
   const [pending, start] = useTransition()
+  const tokens = useRef<Record<string, string>>({})     // a double click sends the same token → only one draft is created
   return <>{DEF.filter(d => !only || only.includes(d.t)).map((d, i) => <Button key={d.t} size={size} variant={i === 0 ? 'primary' : 'secondary'} disabled={pending}
-    onClick={() => start(async () => { const r = await newSalesDoc(d.t, { customerId, projectId }); if (r?.error) toast(r.error, 'error') })}>
+    onClick={() => start(async () => { const r = await newSalesDoc(d.t, { customerId, projectId, token: (tokens.current[d.t] ??= crypto.randomUUID()) }); if (r?.error) toast(r.error, 'error') })}>
     {pending ? <Loader2 size={14} className="animate-spin" /> : <d.icon size={14} />}New {d.label.toLowerCase()}</Button>)}</>
 }

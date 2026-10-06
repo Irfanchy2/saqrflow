@@ -41,7 +41,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     <Link href="/employees" className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Employees</Link>
     <div className="mb-5 flex items-center gap-4">
       <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-primary-soft text-primary">
-        {e.photo_path ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/api/employees/${id}/photo`} alt="" className="h-full w-full object-cover" /> : <UserRound size={28} />}</div>
+        {e.photo_path ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/api/employees/${id}/photo?w=160`} alt="" loading="lazy" className="h-full w-full object-cover" /> : <UserRound size={28} />}</div>
       <div><h1 className="text-xl font-semibold tracking-tight">{e.full_name}</h1>
         <p className="text-sm text-muted">{[e.designation, e.department].filter(Boolean).join(' · ') || 'No designation'} · <span className="font-mono">{e.employee_no}</span></p>
         <div className="mt-1 flex gap-2"><Badge tone={e.status === 'active' ? 'green' : 'amber'}>{e.status.replace('_', ' ')}</Badge>{canSens && <Badge tone={checklist.issues ? 'red' : 'green'}>{checklist.score}% documents complete</Badge>}</div></div></div>
