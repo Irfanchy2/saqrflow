@@ -17,8 +17,9 @@ export async function middleware(req: NextRequest) {
   const strict = (pathname === '/login' || pathname === '/signup') && req.method === 'POST'
   // In-app router requests (link prefetches from dense tables, tabs and drill-down cards, and client-side navigations) get their own
   // larger bucket, so an office sharing one public IP is not locked out by background prefetching. Full page loads, API calls and
-  // sign-ins keep their stricter limits. Next strips its router headers before middleware; the `_rsc` query parameter remains.
-  const rsc = req.nextUrl.searchParams.has('_rsc') || req.headers.get('rsc') === '1'
+  // sign-ins keep their stricter limits. Next hides its router headers and `_rsc` from middleware, so a router fetch is recognised
+  // as a GET that does not ask for an HTML document (browsers send Accept: text/html for real page loads). Still capped below.
+  const rsc = req.method === 'GET' && !(req.headers.get('accept') ?? '').includes('text/html')
   const bucket = strict ? 'auth' : pathname.startsWith('/api') ? 'api' : rsc ? 'rsc' : 'web'
   const max = { auth: 10, api: 120, rsc: 3000, web: 600 }[bucket]
   if (limited(`${bucket}:${ip}`, max, 60_000)) {
