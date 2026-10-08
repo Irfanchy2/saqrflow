@@ -22,16 +22,16 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 try {
   console.log('\n[S1] Login page & shell')
   await p.goto(`${BASE}/login`); await settle()
-  ok((await body()).includes('Run the workshop, the paperwork and the payments'), 'login: split layout with product hero')
-  await p.waitForSelector('section[aria-label="About SaqrFlow"] canvas', { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(1500)
-  ok(await p.locator('section[aria-label="About SaqrFlow"] canvas').count() === 1, 'login: 3D steel hero rendered (WebGL, lazy-loaded)'); await shot('29-login-3d')
+  ok((await body()).includes('Sales, people, documents and assets in one system.'), 'login: split layout with product hero')
+  await p.waitForSelector('section[aria-label="About Averiqo"] canvas', { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(1500)
+  ok(await p.locator('section[aria-label="About Averiqo"] canvas').count() === 1, 'login: 3D steel hero rendered (WebGL, lazy-loaded)'); await shot('29-login-3d')
   const m0 = await browser.newContext({ viewport: { width: 390, height: 844 } }); const mp0 = await m0.newPage(); await mp0.goto(`${BASE}/login`); await mp0.waitForTimeout(1500)
   ok(await mp0.locator('canvas').count() === 0 && await mp0.getByRole('button', { name: 'Sign in' }).isVisible(), 'login on a phone: no 3D (battery), form first'); await m0.close()
   await p.goto(`${BASE}/signup`); await p.getByLabel('Work email').fill('sales-owner@alsaqr.test'); await p.getByLabel('Password').fill('correct-horse-battery'); await p.getByRole('button', { name: 'Create account' }).click()
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('Al Saqr Al Ahmar Welding'); await p.getByLabel('Your full name').fill('Sales Owner'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`)
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email='sales-owner@alsaqr.test'`)).company_id
   ok(await p.getByRole('link', { name: 'Sales & Invoices' }).isVisible() && !(await p.getByRole('link', { name: /Projects/ }).innerText()).includes('Soon'), 'sidebar: Sales & Invoices and Projects are live (no “Soon”)')
-  ok((await body()).includes('FINANCE & PROJECTS') || (await body()).includes('Finance & projects'), 'sidebar is grouped into sections')
+  ok(/Operations[\s\S]*Finance[\s\S]*People & documents[\s\S]*Insights[\s\S]*System/.test(await p.locator('aside[data-collapsed]').innerText()), 'sidebar is grouped into sections (Operations, Finance, People & documents, Insights, System)')
   await p.keyboard.press('Control+k'); await p.waitForTimeout(300)
   ok(await p.getByRole('combobox', { name: 'Command' }).isVisible(), 'Ctrl+K opens the command palette')
   await p.keyboard.type('projects'); await p.keyboard.press('Enter'); await p.waitForURL('**/projects')
@@ -138,7 +138,7 @@ try {
   ok((await one(`select count(*)::int n from reminder_sources where company_id=$1 and source_type='milestone'`, [co])).n === 1, 'milestone feeds Smart Reminders')
   await shot('32-project')
   await p.goto(`${BASE}/`); await settle()
-  ok((await body()).includes('Sales & receivables') && (await body()).includes('Villa 22 staircase'), 'dashboard: receivables + active projects')
+  ok((await body()).includes('Outstanding receivables') && (await body()).includes('Villa 22 staircase'), 'dashboard: receivables + active projects')
 
   console.log('\n[S7] Local OCR of a photographed Emirates ID (AI off)')
   const ayub = (await one(`insert into employees(company_id,employee_no,full_name) values ($1,'S-201','Mohammed Ayub') returning id`, [co])).id

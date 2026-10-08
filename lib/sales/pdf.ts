@@ -12,7 +12,7 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   signatoryName?: string | null; signatoryTitle?: string | null; brandColor?: string | null; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null; companyWebsite?: string | null
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
-  pdf.setTitle(`${DOC_META[doc.doc_type].label} ${doc.number}`); pdf.setCreator('SaqrFlow'); pdf.setProducer('SaqrFlow')
+  pdf.setTitle(`${DOC_META[doc.doc_type].label} ${doc.number}`); pdf.setCreator('Averiqo'); pdf.setProducer('Averiqo')
   const font = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold), italic = await pdf.embedFont(StandardFonts.HelveticaBoldOblique)
   const img: Partial<Record<BrandKind, PDFImage>> = {}
   for (const [k, v] of Object.entries(opts.images)) { try { img[k as BrandKind] = v!.png ? await pdf.embedPng(v!.bytes) : await pdf.embedJpg(v!.bytes) } catch { /* unsupported image → skipped */ } }

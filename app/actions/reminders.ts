@@ -66,14 +66,14 @@ export async function sendTest(recipientId: string, channel: 'whatsapp' | 'email
     const c = await getCtx(); need(c, 'reminders.create')
     const { data: r } = await c.supabase.from('notification_recipients').select('id').eq('id', recipientId).maybeSingle(); if (!r) return { error: 'Recipient not found.' }
     const admin = createAdminClient(); const key = `test:${crypto.randomUUID()}`
-    const { data: log, error } = await admin.from('notification_logs').insert({ company_id: c.company.id, recipient_id: recipientId, channel, template: 'test_message', params: { note: `Test from ${c.profile.full_name}. No action needed.`, _link: '/reminders', _title: 'SaqrFlow test notification' }, dedupe_key: key, source_type: 'test' }).select('id').single()
+    const { data: log, error } = await admin.from('notification_logs').insert({ company_id: c.company.id, recipient_id: recipientId, channel, template: 'test_message', params: { note: `Test from ${c.profile.full_name}. No action needed.`, _link: '/reminders', _title: 'Averiqo test notification' }, dedupe_key: key, source_type: 'test' }).select('id').single()
     if (error) throw error
     await processBatch(supabaseStore(admin), makeSenders(admin), { tz: c.company.timezone, emailFallback: false })
     const { data: res } = await admin.from('notification_logs').select('status,last_error,sandbox').eq('id', log.id).single()
     revalidatePath('/reminders')
     const st = res?.status
-    if (st === 'sandbox') return { ok: true, message: 'SANDBOX: recorded in the log only — nothing was actually sent (credentials not configured or sandbox mode on).' }
-    if (st === 'sent') return { ok: true, message: 'Accepted by the provider. Delivery confirmation arrives via webhook — check the delivery log.' }
+    if (st === 'sandbox') return { ok: true, message: 'SANDBOX: recorded in the log only. Nothing was actually sent (credentials not configured or sandbox mode on).' }
+    if (st === 'sent') return { ok: true, message: 'Accepted by the provider. Delivery confirmation arrives via webhook. Check the delivery log.' }
     if (st === 'queued') return { ok: true, message: 'Held for quiet hours; it will be sent when they end.' }
     return { error: `Not sent (${st}): ${res?.last_error ?? 'unknown reason'}` }
   })
@@ -84,7 +84,7 @@ export async function runNow(): Promise<ActionState> {
     const r = await runReminderCycle(createAdminClient(), new Date(), { companyId: c.company.id })
     revalidatePath('/reminders', 'layout')
     const d = r.dispatch
-    return { ok: true, message: `Checked: ${r.inserted} new reminder(s) queued (${r.planned - r.inserted} already sent earlier). Dispatched — sent ${d.sent}, sandbox ${d.sandbox}, retrying ${d.retried}, failed ${d.failed}, skipped ${d.skipped}.` }
+    return { ok: true, message: `Checked: ${r.inserted} new reminder(s) queued (${r.planned - r.inserted} already sent earlier). Dispatched. Sent ${d.sent}, sandbox ${d.sandbox}, retrying ${d.retried}, failed ${d.failed}, skipped ${d.skipped}.` }
   })
 }
 export async function retryLog(id: string): Promise<ActionState> {

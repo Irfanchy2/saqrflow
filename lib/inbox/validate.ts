@@ -30,17 +30,17 @@ export function validateExtraction(x: Extraction, today: string): string[] {
   if (no) {
     if (x.docType === 'emirates_id' || (/^784/.test(digits(no.value)) && digits(no.value).length === 15)) {
       if (emiratesIdOk(no.value)) { raise(no); no.value = digits(no.value).replace(/^(\d{3})(\d{4})(\d{7})(\d)$/, '$1-$2-$3-$4') }
-      else { lower(no, 0.5); w.push('Emirates ID number fails its check digit — compare it with the card (a digit may be misread).') }
-    } else if (x.docType === 'passport' && !passportOk(no.value)) { lower(no, 0.55); w.push('Passport number has an unusual format — please check it.') }
+      else { lower(no, 0.5); w.push('Emirates ID number fails its check digit. Compare it with the card (a digit may be misread).') }
+    } else if (x.docType === 'passport' && !passportOk(no.value)) { lower(no, 0.55); w.push('Passport number has an unusual format. Please check it.') }
   }
   if (f.trn) {
     if (trnOk(f.trn.value)) { raise(f.trn); f.trn.value = digits(f.trn.value) }
-    else { lower(f.trn, 0.5); w.push('TRN should be 15 digits starting with 100 — please check it.') }
+    else { lower(f.trn, 0.5); w.push('TRN should be 15 digits starting with 100. Please check it.') }
   }
   const iss = f.issue_date?.value, exp = f.expiry_date?.value, dob = f.date_of_birth?.value
-  if (iss && exp && exp < iss) { lower(f.expiry_date, 0.4); lower(f.issue_date, 0.6); w.push('Expiry date is before the issue date — day and month may be swapped.') }
-  if (iss && iss > today) { lower(f.issue_date, 0.5); w.push('Issue date is in the future — please check it.') }
-  if (iss && exp && yearsBetween(iss, exp) > 11) { lower(f.expiry_date, 0.6); w.push('Validity longer than 10 years is unusual — check the expiry date.') }
+  if (iss && exp && exp < iss) { lower(f.expiry_date, 0.4); lower(f.issue_date, 0.6); w.push('Expiry date is before the issue date. Day and month may be swapped.') }
+  if (iss && iss > today) { lower(f.issue_date, 0.5); w.push('Issue date is in the future. Please check it.') }
+  if (iss && exp && yearsBetween(iss, exp) > 11) { lower(f.expiry_date, 0.6); w.push('Validity longer than 10 years is unusual. Check the expiry date.') }
   if (dob) {
     const age = yearsBetween(dob, today)
     if (age < 14 || age > 90) { lower(f.date_of_birth, 0.45); w.push('Date of birth looks wrong (age out of range).') }
@@ -62,16 +62,16 @@ export function mergeReadings(ai: Extraction, local: Extraction): { merged: Extr
     const a = ai.fields[k], l = local.fields[k]
     if (a && l) {
       if (norm(k, a.value) === norm(k, l.value)) fields[k] = { ...a, confidence: Math.min(0.99, Math.max(a.confidence, l.confidence) + 0.05) }
-      else { fields[k] = { ...a, confidence: Math.min(a.confidence, 0.6) }; w.push(`AI and text reading disagree on ${String(k).replace(/_/g, ' ')} (“${a.value}” vs “${l.value}”) — please confirm.`) }
+      else { fields[k] = { ...a, confidence: Math.min(a.confidence, 0.6) }; w.push(`AI and text reading disagree on ${String(k).replace(/_/g, ' ')} (“${a.value}” vs “${l.value}”). Please confirm.`) }
     } else if (a) fields[k] = a
     else if (l) fields[k] = { ...l, confidence: Math.min(l.confidence, 0.75) }
   }
   let docTypeConfidence = ai.docTypeConfidence
   if (ai.docType === 'unknown' && local.docType !== 'unknown' && local.docTypeConfidence >= 0.8) {
-    w.push(`AI could not identify the document; text rules suggest ${local.docType.replace(/_/g, ' ')} — please confirm the type.`)
+    w.push(`AI could not identify the document; text rules suggest ${local.docType.replace(/_/g, ' ')}. Please confirm the type.`)
     return { merged: { ...ai, docType: local.docType, docTypeConfidence: Math.min(local.docTypeConfidence, 0.75), fields, alternatives: local.alternatives }, warnings: w }
   }
   if (local.docType === ai.docType && local.docTypeConfidence >= 0.5) docTypeConfidence = Math.min(0.99, docTypeConfidence + 0.05)
-  else if (local.docTypeConfidence >= 0.8 && local.docType !== ai.docType) { docTypeConfidence = Math.min(docTypeConfidence, 0.65); w.push(`AI read this as ${ai.docType.replace(/_/g, ' ')}, the text rules as ${local.docType.replace(/_/g, ' ')} — please confirm the type.`) }
+  else if (local.docTypeConfidence >= 0.8 && local.docType !== ai.docType) { docTypeConfidence = Math.min(docTypeConfidence, 0.65); w.push(`AI read this as ${ai.docType.replace(/_/g, ' ')}, the text rules as ${local.docType.replace(/_/g, ' ')}. Please confirm the type.`) }
   return { merged: { ...ai, fields, docTypeConfidence, alternatives: local.alternatives }, warnings: w }
 }

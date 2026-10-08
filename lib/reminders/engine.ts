@@ -112,7 +112,7 @@ async function planDigest(admin: Admin, companyId: string, tz: string, now: Date
     admin.from('invoices').select('id', head).eq('company_id', companyId).eq('doc_type', 'invoice').in('status', ['sent', 'partially_paid', 'overdue']),
     admin.from('documents').select('id', head).eq('company_id', companyId).is('deleted_at', null).eq('status', 'renewal_in_progress'),
   ])
-  const params = { ...digestParams({ expiring: docs.count ?? 0, cheques: chq.count ?? 0, invoices: inv.count ?? 0, renewals: ren.count ?? 0 }), _link: '/', _severity: 'info', _title: 'SaqrFlow daily summary' }
+  const params = { ...digestParams({ expiring: docs.count ?? 0, cheques: chq.count ?? 0, invoices: inv.count ?? 0, renewals: ren.count ?? 0 }), _link: '/', _severity: 'info', _title: 'Averiqo daily summary' }
   const rows = targets.flatMap(r => r.channels.filter(ch => ch === 'in_app' ? !!r.user_id : ch === 'email' ? !!r.email : !!r.whatsapp_number && r.whatsapp_opt_in === 'opted_in')
     .map(ch => ({ company_id: companyId, recipient_id: r.id, channel: ch, template: 'daily_summary', params, dedupe_key: `digest:${today}:${ch}:${r.id}`, source_type: 'digest' })))
   if (!rows.length) return 0

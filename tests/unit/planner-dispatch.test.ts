@@ -12,12 +12,12 @@ const rcpt = (o: Partial<Recipient> = {}): Recipient => ({ id: 'r1', user_id: 'u
 describe('message content & privacy', () => {
   it('document reminder matches the specified wording', () => {
     const t = renderText('document_reminder', documentParams({ title: 'Employee Residence Visa', subject: 'Mohammed', expiry: '2026-10-20', daysRemaining: 16 }))
-    expect(t).toContain('SAQRFLOW REMINDER'); expect(t).toContain('Expiry Date: 20 October 2026'); expect(t).toContain('Days Remaining: 16')
-    expect(t).toContain('Status: Renewal Required'); expect(t).toContain('Please log in to SaqrFlow')
+    expect(t).toContain('AVERIQO REMINDER'); expect(t).toContain('Expiry Date: 20 October 2026'); expect(t).toContain('Days Remaining: 16')
+    expect(t).toContain('Status: Renewal Required'); expect(t).toContain('Please log in to Averiqo')
   })
   it('cheque alert matches the specified wording', () => {
     const t = renderText('payment_alert', paymentParams({ direction: 'outgoing', kind: 'Cheque', party: 'ABC Trading', amount: 15000, date: '2026-10-20', daysRemaining: 16 }))
-    expect(t).toContain('SAQRFLOW PAYMENT ALERT'); expect(t).toContain('Type: Outgoing Cheque'); expect(t).toContain('Amount: AED 15,000')
+    expect(t).toContain('AVERIQO PAYMENT ALERT'); expect(t).toContain('Type: Outgoing Cheque'); expect(t).toContain('Amount: AED 15,000')
     expect(t).toContain('Verify available funds and payment status')
   })
   it('long digit runs (ID / passport / account numbers) are masked', () => {

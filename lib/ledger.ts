@@ -24,13 +24,13 @@ export async function buildLedger(c: Ctx, customerId: string, f: { from?: string
   const raw: Omit<LedgerEntry, 'balance'>[] = []
   for (const d of docs ?? []) {
     if (!projOk(d.project_id)) continue
-    if (d.doc_type === 'invoice') raw.push({ date: d.issue_date, kind: 'invoice', ref: d.number, description: `Tax invoice${d.subject ? ' — ' + d.subject : ''}`, debit: Number(d.total), credit: 0, href: `/invoices/${d.id}`, projectId: d.project_id })
+    if (d.doc_type === 'invoice') raw.push({ date: d.issue_date, kind: 'invoice', ref: d.number, description: `Tax invoice${d.subject ? ': ' + d.subject : ''}`, debit: Number(d.total), credit: 0, href: `/invoices/${d.id}`, projectId: d.project_id })
     else raw.push({ date: d.issue_date, kind: 'credit_note', ref: d.number, description: 'Credit note', debit: 0, credit: Number(d.total), href: `/invoices/${d.id}`, projectId: d.project_id })
   }
   for (const p of pays ?? []) {
     const inv: any = p.invoice, chq: any = p.cheque
     if (!projOk(inv?.project_id)) continue
-    raw.push({ date: p.paid_on, kind: 'payment', ref: chq?.cheque_no ? `Chq ${chq.cheque_no}` : p.reference ?? '—', description: `${METHOD[p.method ?? 'other'] ?? 'Payment'} received${inv?.number ? ` — ${inv.number}` : ' — on account'}`, debit: 0, credit: Number(p.amount), href: p.invoice_id ? `/invoices/${p.invoice_id}` : undefined, projectId: inv?.project_id })
+    raw.push({ date: p.paid_on, kind: 'payment', ref: chq?.cheque_no ? `Chq ${chq.cheque_no}` : p.reference ?? '—', description: `${METHOD[p.method ?? 'other'] ?? 'Payment'} received${inv?.number ? `: ${inv.number}` : '. On account'}`, debit: 0, credit: Number(p.amount), href: p.invoice_id ? `/invoices/${p.invoice_id}` : undefined, projectId: inv?.project_id })
   }
   const order = { opening: 0, invoice: 1, credit_note: 2, payment: 3 }
   raw.sort((a, b) => a.date.localeCompare(b.date) || order[a.kind] - order[b.kind])

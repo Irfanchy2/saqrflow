@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, CalendarCheck, Camera, CheckCircle2, Circle, Clock, FileText, MapPin, Paperclip, Pencil, Plus, Receipt, Trash2, Upload, UserPlus, Users, Wallet } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
-import { Badge, Card, CardHeader, EmptyState, Field, Input, Select, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, EmptyState, Field, Input, Select, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { ProjectFields, Progress } from '@/components/projects/project-fields'
@@ -13,7 +13,7 @@ import { trashRecord } from '@/app/actions/trash'
 import { EXPENSE_CATS, PHOTO_CATS, PROJECT_STATUS, projectFinancials } from '@/lib/projects'
 import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
-import { formatAed } from '@/lib/time'
+import { formatAed, localDate } from '@/lib/time'
 import { ACCEPT_ATTR } from '@/lib/files'
 import { cn } from '@/lib/utils'
 import { flat } from '@/lib/queries'
@@ -60,10 +60,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const ev = [
     { at: p.created_at, text: 'Project created', icon: Clock },
     ...(sales ?? []).map((s: any) => ({ at: s.created_at, text: `${DOC_META[s.doc_type as SalesType]?.label ?? s.doc_type} ${s.number} (${statusLabel(s.doc_type, s.status).toLowerCase()})`, icon: Receipt, href: `/invoices/${s.id}` })),
-    ...(pays ?? []).map((x: any) => ({ at: x.created_at, text: `Payment AED ${fmtMoney(x.amount)} — ${x.invoice?.number ?? ''}`, icon: Wallet, href: x.invoice ? `/invoices/${x.invoice.id}` : undefined })),
+    ...(pays ?? []).map((x: any) => ({ at: x.created_at, text: `Payment AED ${fmtMoney(x.amount)}: ${x.invoice?.number ?? ''}`, icon: Wallet, href: x.invoice ? `/invoices/${x.invoice.id}` : undefined })),
     ...[...files.values()].map((d: any) => ({ at: d.created_at, text: `${d.role === 'lpo' || /LPO/.test(d.folder ?? '') ? 'PO / LPO' : 'File'}: ${d.name}`, icon: Paperclip, href: `/documents/${d.id}` })),
     ...(photos.length ? [{ at: photos[0].created_at, text: `${photos.length} photo${photos.length === 1 ? '' : 's'} (latest: ${PHOTO_CATS[photoCat(photos[0]) as keyof typeof PHOTO_CATS]})`, icon: Camera }] : []),
-    ...(exps ?? []).slice(0, 20).map((e: any) => ({ at: e.created_at, text: `Expense ${EXPENSE_CATS[e.category] ?? e.category}: AED ${fmtMoney(e.amount)} — ${e.description}`, icon: Wallet })),
+    ...(exps ?? []).slice(0, 20).map((e: any) => ({ at: e.created_at, text: `Expense ${EXPENSE_CATS[e.category] ?? e.category}: AED ${fmtMoney(e.amount)}: ${e.description}`, icon: Wallet })),
   ].sort((a: any, b: any) => b.at.localeCompare(a.at)).slice(0, 30) as { at: string; text: string; icon: typeof Clock; href?: string }[]
 
   return <>
@@ -87,7 +87,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     </div>
 
     {fin && <>
-      <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+      <Metrics className="mb-3" cols={4}>
         <StatCard label={f.contract ? 'Contract value' : f.quoted ? 'Accepted quotation (ex VAT)' : 'Contract value'} value={formatAed(f.value)} hint={!f.contract && !f.quoted ? 'Add a contract value' : undefined} />
         <StatCard label="Invoiced (ex VAT)" value={formatAed(f.invoicedNet)} hint={f.billedPct !== null ? `${f.billedPct}% of contract` : undefined} icon={Receipt} tone="blue" />
         <StatCard label="Payments received" value={formatAed(f.received)} hint={f.collectedPct !== null ? `${f.collectedPct}% collected` : undefined} icon={Wallet} tone="green" />
@@ -96,7 +96,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <StatCard label="Estimated profit" value={formatAed(f.profit)} hint={f.margin !== null ? `${f.margin}% margin on contract` : undefined} tone={f.profit < 0 ? 'red' : 'green'} />
         <StatCard label="Actual profit" value={formatAed(f.actualProfit)} hint={f.actualMargin !== null ? `${f.actualMargin}% of invoiced` : 'Nothing invoiced yet'} tone={f.actualProfit < 0 ? 'red' : 'neutral'} />
         <StatCard label="Labour cost" value={formatAed(f.byCategory.labour ?? 0)} hint="from recorded labour expenses" />
-      </div>
+      </Metrics>
       <p className="mb-5 text-xs text-muted">Profit uses only recorded figures: revenue excludes VAT; costs are the expenses entered for this project ({Object.entries(f.byCategory).map(([k, v]) => `${EXPENSE_CATS[k] ?? k} ${formatAed(v)}`).join(' · ') || 'none yet'}).</p>
     </>}
 
@@ -130,7 +130,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       </Card>
 
       {fin && <Card className="xl:col-span-2"><CardHeader title="Quotations, invoices, delivery notes & credit notes" />
-        {!(sales ?? []).length ? <EmptyState icon={Receipt} title="No sales documents yet" body="Create a quotation for this project — customer and site are filled in for you." action={edit ? <NewSalesButtons projectId={id} customerId={p.customer_id ?? undefined} only={['quotation']} /> : undefined} />
+        {!(sales ?? []).length ? <EmptyState icon={Receipt} title="No sales documents yet" body="Create a quotation for this project. Customer and site are filled in for you." action={edit ? <NewSalesButtons projectId={id} customerId={p.customer_id ?? undefined} only={['quotation']} /> : undefined} />
           : <TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Type</Th><Th>Date</Th><Th className="text-right">Total</Th><Th className="text-right">Paid</Th><Th>Status</Th></tr></thead>
             <tbody className="divide-y divide-border">{(sales ?? []).map((s: any) => <tr key={s.id} className="hover:bg-surface-2/50">
               <Td><Link href={`/invoices/${s.id}`} className="font-mono text-[13px] text-primary hover:underline">{s.number}</Link></Td><Td>{DOC_META[s.doc_type as SalesType]?.label}</Td><Td className="tabular-nums">{s.issue_date}</Td>
@@ -165,31 +165,31 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <ul className="space-y-0.5 text-xs">{materials.slice(0, 6).map((e: any) => <li key={e.id} className="truncate">{e.description}</li>)}</ul></div>}
       </Card>
 
-      <Card className="xl:col-span-3"><CardHeader title="Photos" sub="Before, fabrication, installation and completed — shown as small previews"
+      <Card className="xl:col-span-3"><CardHeader title="Photos" sub="Before, fabrication, installation and completed. Shown as small previews"
         action={c.can('documents.upload') ? <DialogButton size="sm" label="Add photos" title="Add project photos" icon={<Camera size={14} />}><ActionForm action={uploadProjectPhotos.bind(null, id)} submit="Upload photos">
           <div className="grid gap-4 sm:grid-cols-2"><Field label="Category"><Select name="category" defaultValue="progress">{Object.entries(PHOTO_CATS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
             <Field label="Date taken"><Input name="taken_on" type="date" defaultValue={c.today} max={c.today} /></Field></div>
           <Field label="Caption"><Input name="caption" maxLength={500} placeholder="e.g. Staircase stringers welded" /></Field>
-          <Field label="Photos *" hint="JPG, PNG, WEBP or HEIC — up to 30"><input type="file" name="file" multiple required accept="image/*" capture="environment" className="text-sm" /></Field></ActionForm></DialogButton> : null} />
+          <Field label="Photos *" hint="JPG, PNG, WEBP or HEIC. Up to 30"><input type="file" name="file" multiple required accept="image/*" capture="environment" className="text-sm" /></Field></ActionForm></DialogButton> : null} />
         {photos.length > 0 && <nav aria-label="Photo categories" className="flex flex-wrap gap-1.5 border-b border-border px-4 py-2 text-xs">
-          <Link href={`/projects/${id}`} className={cn('rounded-full border px-2.5 py-0.5', !sp.photos ? 'border-primary text-primary' : 'border-border')}>All ({photos.length})</Link>
-          {Object.entries(PHOTO_CATS).map(([k, l]) => { const n = photos.filter(d => photoCat(d) === k).length; return n ? <Link key={k} href={`/projects/${id}?photos=${k}`} className={cn('rounded-full border px-2.5 py-0.5', sp.photos === k ? 'border-primary text-primary' : 'border-border')}>{l} ({n})</Link> : null })}</nav>}
-        {!shownPhotos.length ? <EmptyState icon={Camera} title="No photos yet" body="Add before / progress / completed photos — they open full size from the Document Vault." />
+          <Link href={`/projects/${id}`} className={cn('rounded-md border px-2.5 py-0.5', !sp.photos ? 'border-primary text-primary' : 'border-border')}>All ({photos.length})</Link>
+          {Object.entries(PHOTO_CATS).map(([k, l]) => { const n = photos.filter(d => photoCat(d) === k).length; return n ? <Link key={k} href={`/projects/${id}?photos=${k}`} className={cn('rounded-md border px-2.5 py-0.5', sp.photos === k ? 'border-primary text-primary' : 'border-border')}>{l} ({n})</Link> : null })}</nav>}
+        {!shownPhotos.length ? <EmptyState icon={Camera} title="No photos yet" body="Add before / progress / completed photos. They open full size from the Document Vault." />
           : <ul className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6">{shownPhotos.slice(0, 60).map((d: any) => <li key={d.id}>
             <Link href={`/documents/${d.id}`} className="group block overflow-hidden rounded-lg border border-border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`/api/documents/${d.id}/thumb?w=320`} alt={d.notes ?? d.name} loading="lazy" decoding="async" width={320} height={240} className="aspect-[4/3] w-full bg-surface-2 object-cover transition-opacity group-hover:opacity-90" />
-              <div className="px-2 py-1.5 text-xs"><div className="truncate font-medium">{d.notes ?? d.name}</div><div className="text-muted">{PHOTO_CATS[photoCat(d) as keyof typeof PHOTO_CATS]} · {d.issue_date ?? d.created_at.slice(0, 10)}</div></div></Link></li>)}</ul>}
+              <div className="px-2 py-1.5 text-xs"><div className="truncate font-medium">{d.notes ?? d.name}</div><div className="text-muted">{PHOTO_CATS[photoCat(d) as keyof typeof PHOTO_CATS]} · {d.issue_date ?? localDate(d.created_at, c.company.timezone)}</div></div></Link></li>)}</ul>}
       </Card>
 
-      <Card className="xl:col-span-2"><CardHeader title="Project files" sub="Drawings, LPO / purchase orders, contracts, variation orders — private and versioned"
+      <Card className="xl:col-span-2"><CardHeader title="Project files" sub="Drawings, LPO / purchase orders, contracts, variation orders. Private and versioned"
         action={c.can('documents.upload') ? <DialogButton size="sm" label="Upload" title="Upload project files" icon={<Upload size={14} />}><ActionForm action={uploadProjectFiles.bind(null, id)} submit="Upload">
           <Field label="Type"><Select name="kind" defaultValue="drawing"><option value="drawing">Drawings</option><option value="lpo">LPO / purchase order</option><option value="contract">Contract</option><option value="variation">Variation order</option><option value="other">Other</option></Select></Field>
-          <Field label="Files *" hint="PDF, images or Office files — up to 20 at a time"><input type="file" name="file" multiple required accept={ACCEPT_ATTR} className="text-sm" /></Field></ActionForm></DialogButton> : null} />
+          <Field label="Files *" hint="PDF, images or Office files. Up to 20 at a time"><input type="file" name="file" multiple required accept={ACCEPT_ATTR} className="text-sm" /></Field></ActionForm></DialogButton> : null} />
         {!files.size ? <EmptyState icon={FileText} title="No files yet" body="Upload drawings and the customer’s LPO here, or file them from the Smart Inbox and link this project." />
           : <ul className="grid sm:grid-cols-2">{[...files.values()].map(d => <li key={d.id} className="border-b border-border">
             <Link href={`/documents/${d.id}`} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-surface-2/60"><FileText size={16} className="shrink-0 text-primary" aria-hidden />
-              <span className="min-w-0 flex-1"><span className="block truncate font-medium">{d.name}</span><span className="block truncate text-xs text-muted">{d.folder?.split('/').pop() ?? d.role ?? 'File'} · {d.created_at.slice(0, 10)}</span></span></Link></li>)}</ul>}
+              <span className="min-w-0 flex-1"><span className="block truncate font-medium">{d.name}</span><span className="block truncate text-xs text-muted">{d.folder?.split('/').pop() ?? d.role ?? 'File'} · {localDate(d.created_at, c.company.timezone)}</span></span></Link></li>)}</ul>}
       </Card>
 
       <Card><CardHeader title="Timeline" action={<Clock size={15} className="text-muted" aria-hidden />} />

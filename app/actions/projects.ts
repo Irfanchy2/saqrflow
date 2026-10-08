@@ -64,10 +64,10 @@ const expenseSchema = z.object({
   description: z.string().min(1, 'Describe the expense').max(500), amount: z.coerce.number({ message: 'Enter the amount' }).positive('Amount must be greater than zero').max(1e10).transform(n => Math.round(n * 100) / 100),
   vat_amount: z.coerce.number({ message: 'VAT must be a number' }).min(0, 'VAT cannot be negative').max(1e10).default(0).transform(n => Math.round(n * 100) / 100),
   reference: z.string().max(120).optional(), supplier_id: uuid.optional(), supplier_name: z.string().max(200).optional(),
-  payment_method: z.enum(['cash', 'bank_transfer', 'cheque', 'card', 'credit', 'other']).optional(), employee_id: uuid.optional(), project_id: uuid.optional(),
+  payment_method: z.enum(['cash', 'bank_transfer', 'cheque', 'card', 'credit', 'other']).optional(), employee_id: uuid.optional(), project_id: uuid.optional(), asset_id: uuid.optional(),
   notes: z.string().max(2000).optional(), idempotency_key: uuid.optional(),
-}).refine(v => v.vat_amount <= v.amount, { message: 'VAT looks larger than the amount — enter the amount before VAT', path: ['vat_amount'] })
-const EXP_KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_id', 'supplier_name', 'payment_method', 'employee_id', 'project_id', 'notes', 'idempotency_key']
+}).refine(v => v.vat_amount <= v.amount, { message: 'VAT looks larger than the amount. Enter the amount before VAT', path: ['vat_amount'] })
+const EXP_KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_id', 'supplier_name', 'payment_method', 'employee_id', 'project_id', 'asset_id', 'notes', 'idempotency_key']
 
 /** Expense with optional project and receipt file. Receipt OCR only pre-fills the form — this saves exactly what the user confirmed. */
 export async function saveExpense(id: string | null, fixedProject: string | null, _: ActionState, fd: FormData): Promise<ActionState> {
@@ -82,16 +82,16 @@ export async function saveExpense(id: string | null, fixedProject: string | null
     let receiptId: string | null = null
     const f = fd.get('file')
     if (f instanceof File && f.size > 0 && c.can('documents.upload')) {
-      const { data: d, error: de } = await c.supabase.from('documents').insert({ company_id: c.company.id, owner_type: projectId ? 'project' : 'vault', owner_id: projectId, name: `Receipt — ${v.supplier_name ?? v.description}`.slice(0, 250), reference_no: v.reference ?? null, issue_date: v.spent_on, folder: 'Expenses/Receipts', reminders_active: false, created_by: c.userId }).select('id').single()
+      const { data: d, error: de } = await c.supabase.from('documents').insert({ company_id: c.company.id, owner_type: projectId ? 'project' : v.asset_id ? 'asset' : 'vault', owner_id: projectId ?? v.asset_id ?? null, name: `Receipt: ${v.supplier_name ?? v.description}`.slice(0, 250), reference_no: v.reference ?? null, issue_date: v.spent_on, folder: 'Expenses/Receipts', reminders_active: false, created_by: c.userId }).select('id').single()
       if (de) throw de
-      try { await saveVersion(c, d.id, f) } catch (e) { await c.supabase.from('documents').update({ deleted_at: new Date().toISOString() }).eq('id', d.id); return { error: `Expense not saved — the receipt was rejected: ${(e as Error).message}` } }
+      try { await saveVersion(c, d.id, f) } catch (e) { await c.supabase.from('documents').update({ deleted_at: new Date().toISOString() }).eq('id', d.id); return { error: `Expense not saved. The receipt was rejected: ${(e as Error).message}` } }
       receiptId = d.id
     }
-    const row = { ...v, project_id: projectId, supplier_name: v.supplier_name ?? null, reference: v.reference ?? null, notes: v.notes ?? null, payment_method: v.payment_method ?? null, employee_id: v.employee_id ?? null, ...(receiptId ? { receipt_document_id: receiptId } : {}) }
+    const row = { ...v, project_id: projectId, supplier_name: v.supplier_name ?? null, reference: v.reference ?? null, notes: v.notes ?? null, payment_method: v.payment_method ?? null, employee_id: v.employee_id ?? null, asset_id: v.asset_id ?? null, ...(receiptId ? { receipt_document_id: receiptId } : {}) }
     const { error } = id ? await c.supabase.from('project_expenses').update({ ...row, idempotency_key: undefined }).eq('id', id)
       : await c.supabase.from('project_expenses').insert({ ...row, company_id: c.company.id, created_by: c.userId })
     if (error) { if (error.code === '23505') return { ok: true, message: 'Expense already saved.' }; throw error }
-    touch(projectId ?? undefined); revalidatePath('/expenses'); revalidatePath('/')
+    touch(projectId ?? undefined); revalidatePath('/expenses'); revalidatePath('/'); if (v.asset_id) revalidatePath(`/assets/${v.asset_id}`)
     return { ok: true, message: id ? 'Expense updated.' : 'Expense added.' }
   })
 }
@@ -112,7 +112,7 @@ export async function addMilestone(projectId: string, _: ActionState, fd: FormDa
     const v = z.object({ title: z.string().min(1, 'Enter a milestone').max(200), due_date: date }).parse({ title: str(fd, 'title'), due_date: str(fd, 'due_date') })
     const { error } = await c.supabase.from('project_milestones').insert({ ...v, project_id: projectId, company_id: c.company.id })
     if (error) throw error
-    touch(projectId); return { ok: true, message: 'Milestone added — it will appear in Smart Reminders.' }
+    touch(projectId); return { ok: true, message: 'Milestone added. It now appears in Reminders.' }
   })
 }
 export async function toggleMilestone(id: string, done: boolean): Promise<ActionState> {
@@ -161,7 +161,7 @@ export async function uploadProjectFiles(projectId: string, _: ActionState, fd: 
       ])
     }
     touch(projectId); revalidatePath('/vault')
-    if (errors.length) return { error: `${files.length - errors.length} uploaded. Rejected — ${errors.join(' · ')}` }
+    if (errors.length) return { error: `${files.length - errors.length} uploaded. Rejected: ${errors.join(' · ')}` }
     return { ok: true, message: `${files.length} file${files.length === 1 ? '' : 's'} uploaded.` }
   })
 }
@@ -206,7 +206,7 @@ export async function uploadProjectPhotos(projectId: string, _: ActionState, fd:
       await c.supabase.from('document_relationships').insert({ company_id: c.company.id, document_id: doc.id, related_type: 'project', related_id: projectId, role: `photo_${cat}`, created_by: c.userId })
     }
     touch(projectId)
-    if (errors.length) return { error: `${files.length - errors.length} added. Rejected — ${errors.join(' · ')}` }
+    if (errors.length) return { error: `${files.length - errors.length} added. Rejected: ${errors.join(' · ')}` }
     return { ok: true, message: `${files.length} photo${files.length === 1 ? '' : 's'} added.` }
   })
 }

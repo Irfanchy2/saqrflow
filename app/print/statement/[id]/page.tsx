@@ -25,7 +25,7 @@ export default async function PrintStatement({ params, searchParams }: { params:
   if (!cu) notFound()
   const [ledger, branding] = await Promise.all([buildLedger(c, id, f), brandingFor(c)])
   return <div className="print-sheet min-h-screen bg-neutral-200 py-8 print:py-0">
-    <div className="no-print mx-auto mb-4 flex max-w-[794px] items-center justify-between px-2 text-sm text-neutral-700"><span>Statement of account — {cu.name}. A4, no margins; turn on “Background graphics”.</span><PrintButton auto={sp.auto === '1'} /></div>
-    <StatementPaper customer={cu} ledger={ledger} branding={branding} from={f.from} to={f.to} today={c.today} className="shadow-xl print:shadow-none" />
+    <div className="no-print mx-auto mb-4 flex max-w-[794px] items-center justify-between px-2 text-sm text-neutral-700"><span>Statement of account: {cu.name}. A4, no margins; turn on “Background graphics”.</span><PrintButton auto={sp.auto === '1'} /></div>
+    <StatementPaper customer={cu} ledger={ledger} branding={branding} from={f.from} to={f.to} today={c.today} className="shadow-pop print:shadow-none" />
   </div>
 }

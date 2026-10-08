@@ -24,7 +24,7 @@ export default async function CompanyDocuments({ searchParams }: { searchParams:
   const showTimeline = sp.view === 'timeline'
   const events = showTimeline ? await documentTimeline(c, { type: 'company' }) : []
   return <>
-    <PageHeader title="Company Documents" sub="Licences, registrations, insurance, tenancy, permits and contracts — with expiry tracking and renewal history."
+    <PageHeader title="Company Documents" sub="Licences, registrations, insurance, tenancy, permits and contracts. With expiry tracking and renewal history."
       actions={<>
         <LinkButton href={showTimeline ? '/documents' : '/documents?view=timeline'} variant="secondary">{showTimeline ? 'List' : 'Timeline'}</LinkButton>
         {c.can('data.export') && <LinkButton href="/api/export/documents" variant="secondary">Export CSV</LinkButton>}

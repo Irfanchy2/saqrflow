@@ -43,7 +43,7 @@ export function geminiProvider(o: GeminiOptions): AIProvider {
     const msg = String(j?.error?.message ?? '').slice(0, 300)
     if (res.status === 429) {
       const delay = (j?.error?.details ?? []).find((d: any) => String(d?.['@type'] ?? '').endsWith('RetryInfo'))?.retryDelay as string | undefined
-      const err = fail('Gemini rate limit / quota reached — try again later', 'rate_limited') as AiError & { retryMs?: number }
+      const err = fail('Gemini rate limit / quota reached. Try again later', 'rate_limited') as AiError & { retryMs?: number }
       err.retryMs = delay && /^\d+(\.\d+)?s$/.test(delay) ? Math.ceil(parseFloat(delay) * 1000) + 250 : 5_000
       if (/per\s*day|PerDay/i.test(JSON.stringify(j?.error ?? ''))) err.retryMs = undefined                      // daily quota: waiting won't help
       throw err
@@ -77,7 +77,7 @@ export function geminiProvider(o: GeminiOptions): AIProvider {
       try {
         const r = await p.classifyDocument({ text: 'COMMERCIAL LICENSE\nLicense No: 123456\nTrade Name: SAMPLE TRADING LLC\nIssue Date: 13/05/2026\nExpiry Date: 12/05/2027' })
         const ok = r.extraction.docType === 'trade_license' && r.extraction.fields.expiry_date?.value === '2027-05-12'
-        return { ok, message: ok ? `Connected (${model}) — sample trade licence classified correctly` : `Connected (${model}), but the sample was read as ${r.extraction.docType}`, ms: Date.now() - t0 }
+        return { ok, message: ok ? `Connected (${model}). Sample trade licence classified correctly` : `Connected (${model}), but the sample was read as ${r.extraction.docType}`, ms: Date.now() - t0 }
       } catch (e) { return { ok: false, message: (e as Error).message, ms: Date.now() - t0 } }
     },
   }

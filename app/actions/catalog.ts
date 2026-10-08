@@ -29,7 +29,7 @@ export async function setCatalogActive(id: string, active: boolean): Promise<Act
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit')
     const { error } = await c.supabase.from('catalog_items').update({ active, updated_at: new Date().toISOString() }).eq('id', id); if (error) throw error
-    revalidatePath('/catalog'); return { ok: true, message: active ? 'Item restored.' : 'Item archived — no longer offered in the editor.' }
+    revalidatePath('/catalog'); return { ok: true, message: active ? 'Item restored.' : 'Item archived. No longer offered in the editor.' }
   })
 }
 /** Typical steel-fabrication services as a starting list — rate 0 until you set your own prices. */
@@ -40,7 +40,7 @@ export async function addStarterItems(): Promise<ActionState> {
       ['Staircase', 'Structures', 'Nos'], ['Gate', 'Gates & doors', 'Nos'], ['Shed', 'Structures', 'Sq.Mtr'], ['Sandwich Panel', 'Cladding', 'Sq.Mtr'], ['Structural Steel', 'Structures', 'Ton'], ['Maintenance', 'Services', 'Job'], ['Custom Fabrication', 'Fabrication', 'L.S']]
     const { error } = await c.supabase.from('catalog_items').upsert(names.map(([name, category, unit]) => ({ company_id: c.company.id, name, category, unit, rate: 0, created_by: c.userId })), { onConflict: 'company_id,name', ignoreDuplicates: true })
     if (error) throw error
-    revalidatePath('/catalog'); return { ok: true, message: 'Starter items added with rate 0 — edit each item to set your price.' }
+    revalidatePath('/catalog'); return { ok: true, message: 'Starter items added with rate 0. Edit each item to set your price.' }
   })
 }
 

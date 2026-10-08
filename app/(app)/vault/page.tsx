@@ -23,7 +23,7 @@ export default async function Vault({ searchParams }: { searchParams: Promise<Re
   ])
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
-    <PageHeader title="Document Vault" sub="Every file in one private place. Employee and cheque files stay linked to their record — no duplicates."
+    <PageHeader title="Document Vault" sub="Every file in one private place. Employee and cheque files stay linked to their record. No duplicates."
       actions={<>{c.can('data.export') && <LinkButton href="/api/export/documents" variant="secondary">Export list (CSV)</LinkButton>}
         {c.can('documents.upload') && <DialogButton wide label="Upload files" title="Upload to vault" icon={<Upload size={15} />}>
           <ActionForm action={bulkUpload} submit="Upload"><DropZone />
@@ -32,7 +32,7 @@ export default async function Vault({ searchParams }: { searchParams: Promise<Re
             <p className="text-xs text-muted">Files are stored privately and checked for type, size and content. Identical files already in the vault are flagged. Add expiry dates afterwards to activate reminders.</p></ActionForm></DialogButton>}</>} />
     {c.can('records.delete') && <div className="mb-4 flex gap-1 border-b border-border">{[['', 'Files'], ['1', 'Recycle bin']].map(([k, l]) => <Link key={k} href={k ? '/vault?bin=1' : '/vault'} className={cn('-mb-px border-b-2 px-4 py-2 text-sm', (k === '1') === bin ? 'border-primary font-medium text-primary' : 'border-transparent text-muted')}>{l}</Link>)}</div>}
     <Filters sp={sp} base="/vault" categories={cats ?? []} extra={<>
-      <select name="owner" defaultValue={sp.owner ?? ''} className={cls}><option value="">All records</option><option value="company">Company</option><option value="employee">Employees</option><option value="vault">Vault only</option><option value="cheque">Cheques</option></select>
+      <select name="owner" defaultValue={sp.owner ?? ''} className={cls}><option value="">All records</option><option value="company">Company</option><option value="employee">Employees</option><option value="vault">Vault only</option><option value="cheque">Cheques</option><option value="vehicle">Vehicles</option><option value="resource">Equipment & assets</option><option value="project">Projects</option></select>
       {!!emps?.length && <select name="employee" defaultValue={sp.employee ?? ''} className={cls}><option value="">Any employee</option>{emps.map((e: any) => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>}
       {bin && <input type="hidden" name="bin" value="1" />}</>} />
     <DocsTable showOwner rows={rows} total={total} page={page} today={c.today} base="/vault" sp={sp}

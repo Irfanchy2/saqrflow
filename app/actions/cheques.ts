@@ -74,7 +74,7 @@ export async function changeChequeStatus(id: string, _: ActionState, fd: FormDat
       if (amount > 0) {
         const { error: pe } = await c.supabase.from('payments').insert({ company_id: c.company.id, invoice_id: cur.invoice_id, cheque_id: id, amount, method: 'cheque', paid_on: c.today, reference: `Cheque ${cur.cheque_no}`, created_by: c.userId })
         if (pe && pe.code !== '23505') extra = ` The invoice could not be updated: ${pe.message}`
-        else if (!pe) { extra = ` AED ${amount.toFixed(2)} applied to the invoice.`; await c.supabase.from('sales_doc_events').insert({ company_id: c.company.id, invoice_id: cur.invoice_id, event: 'payment', detail: `Cheque ${cur.cheque_no} cleared — AED ${amount.toFixed(2)}`, user_id: c.userId }) }
+        else if (!pe) { extra = ` AED ${amount.toFixed(2)} applied to the invoice.`; await c.supabase.from('sales_doc_events').insert({ company_id: c.company.id, invoice_id: cur.invoice_id, event: 'payment', detail: `Cheque ${cur.cheque_no} cleared: AED ${amount.toFixed(2)}`, user_id: c.userId }) }
       } else extra = ' The linked invoice has no balance left, so no payment was added.'
     }
     revalidatePath('/', 'layout'); return { ok: true, message: `Status updated.${extra}` }

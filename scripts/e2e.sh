@@ -39,6 +39,6 @@ for i in $(seq 1 40); do curl -sf http://127.0.0.1:3100/api/health >/dev/null &&
 mkdir -p tests/e2e/shots
 if [ -n "${E2E_HOLD:-}" ]; then echo READY; sleep 3600; exit 0; fi   # keep the stack up for debugging
 if [ -n "${E2E_ONLY:-}" ]; then set +e; node "tests/e2e/$E2E_ONLY"; RC=$?; set -e; exit $RC; fi   # run a single suite
-set +e; node tests/e2e/smoke.mjs; RC=$?; node tests/e2e/inbox.mjs; RC2=$?; node tests/e2e/sales.mjs; RC3=$?; node tests/e2e/ai-reader.mjs; RC4=$?; node tests/e2e/print.mjs; RC5=$?; if [ $RC5 -ne 0 ]; then RC=$RC5; fi; node tests/e2e/erp.mjs; RC6=$?; if [ $RC6 -ne 0 ]; then RC=$RC6; fi; set -e; if [ $RC4 -ne 0 ]; then RC=$RC4; fi; if [ $RC2 -ne 0 ]; then RC=$RC2; fi; if [ $RC3 -ne 0 ]; then RC=$RC3; fi
+set +e; node tests/e2e/smoke.mjs; RC=$?; node tests/e2e/inbox.mjs; RC2=$?; node tests/e2e/sales.mjs; RC3=$?; node tests/e2e/ai-reader.mjs; RC4=$?; node tests/e2e/print.mjs; RC5=$?; if [ $RC5 -ne 0 ]; then RC=$RC5; fi; node tests/e2e/erp.mjs; RC6=$?; if [ $RC6 -ne 0 ]; then RC=$RC6; fi; node tests/e2e/averiqo.mjs; RC7=$?; if [ $RC7 -ne 0 ]; then RC=$RC7; fi; set -e; if [ $RC4 -ne 0 ]; then RC=$RC4; fi; if [ $RC2 -ne 0 ]; then RC=$RC2; fi; if [ $RC3 -ne 0 ]; then RC=$RC3; fi
 echo "--- logs: $WORK (next.log, pgrst.log) ---"; grep -iE "error|PGRST" "$WORK/next.log" | head -20 || true
 exit $RC

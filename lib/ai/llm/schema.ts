@@ -81,10 +81,10 @@ export function validateAiOutput(raw: unknown, ocrText: string, engine: Extracti
     if (v == null || !String(v).trim() || /REDACTED/i.test(v)) return
     let value = String(v).trim()
     if (k.endsWith('_date')) {
-      if (!iso.safeParse(value).success || Number.isNaN(Date.parse(value))) { warnings.push(`AI returned an invalid ${k.replace('_', ' ')} (“${value}”) — ignored`); return }
-      if (textDates.size && !textDates.has(value)) { warnings.push(`AI ${k.replace('_', ' ')} ${value} does not appear in the document — ignored`); return }
+      if (!iso.safeParse(value).success || Number.isNaN(Date.parse(value))) { warnings.push(`AI returned an invalid ${k.replace('_', ' ')} (“${value}”). Ignored`); return }
+      if (textDates.size && !textDates.has(value)) { warnings.push(`AI ${k.replace('_', ' ')} ${value} does not appear in the document. Ignored`); return }
     } else if (!presentIn(value, ocrText)) {
-      warnings.push(`AI value for ${k.replace(/_/g, ' ')} (“${value.slice(0, 40)}”) was not found in the document text — ignored`); return
+      warnings.push(`AI value for ${k.replace(/_/g, ' ')} (“${value.slice(0, 40)}”) was not found in the document text. Ignored`); return
     }
     if (k === 'amount') value = value.replace(/[^0-9.]/g, '')
     fields[k] = { value, confidence: clamp(c), source: 'ai' }

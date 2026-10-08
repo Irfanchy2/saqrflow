@@ -77,9 +77,9 @@ try {
   ok(st.includes('••••••••-key') && !st.includes('test-ocr-key') && !st.includes('test-gemini-key'), 'API keys are masked (••••••••-key), never displayed')
   ok(!(await p.content()).includes('test-gemini-key'), 'no secret anywhere in the page HTML')
   await p.locator('#ai li', { hasText: 'OCR.Space' }).getByRole('button', { name: 'Test connection' }).click(); await settle(1500)
-  ok(/OCR\.Space: Connected — test image read correctly/.test(await body()), 'Test connection: real request through the OCR.Space client succeeds')
+  ok(/OCR\.Space: Connected\. Test image read correctly/.test(await body()), 'Test connection: real request through the OCR.Space client succeeds')
   await p.locator('#ai li', { hasText: 'Google Gemini' }).getByRole('button', { name: 'Test AI' }).click(); await settle(1500)
-  ok(/sample trade licence classified correctly/.test(await body()), 'Test AI: Gemini structured output validated')
+  ok(/[Ss]ample trade licence classified correctly/.test(await body()), 'Test AI: Gemini structured output validated')
   await shot('40-settings-ai')
 
   console.log('\n[A3] Upload 13 documents (progress, OCR, Gemini)')

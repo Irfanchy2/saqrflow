@@ -522,3 +522,33 @@ describe('ERP workflow (0012)', () => {
     expect(r).toEqual({ l: '2026-09-01', n: '2026-12-01', i: '2027-09-01' })
   })
 })
+
+describe('Vehicles & Assets + Reports (0013)', () => {
+  it('assignment history: every change of assigned_to closes the open row and opens a new one', async () => {
+    const e1 = (await as(U.ownerA, `insert into employees(company_id,employee_no,full_name) values ($1,'AS-1','Driver One') returning id`, [A])).rows[0].id
+    const e2 = (await as(U.ownerA, `insert into employees(company_id,employee_no,full_name) values ($1,'AS-2','Driver Two') returning id`, [A])).rows[0].id
+    const a = (await as(U.ownerA, `insert into assets(company_id,kind,name,assigned_to) values ($1,'vehicle','Hilux',$2) returning id`, [A, e1])).rows[0].id
+    await as(U.ownerA, `update assets set assigned_to=$2 where id=$1`, [a, e2])
+    await as(U.ownerA, `update assets set location='Yard' where id=$1`, [a])   // not an assignment change
+    const rows = (await as(U.ownerA, `select employee_id, returned_on is null open from asset_assignments where asset_id=$1 order by created_at`, [a])).rows
+    expect(rows.map(r => [r.employee_id, r.open])).toEqual([[e1, false], [e2, true]])
+    await fails(as(U.ownerA, `insert into asset_assignments(company_id,asset_id,employee_id) values ($1,$2,$3)`, [A, a, e1]), /duplicate key/)   // one current assignment
+    expect((await as(U.ownerB, `select count(*)::int n from asset_assignments where asset_id=$1`, [a])).rows[0].n).toBe(0)   // other tenant sees nothing
+  })
+  it('odometer in a service record moves mileage forward and sets the next service km', async () => {
+    const a = (await as(U.ownerA, `insert into assets(company_id,kind,name,current_mileage,service_interval_km) values ($1,'vehicle','Navara',40000,10000) returning id`, [A])).rows[0].id
+    await as(U.ownerA, `insert into asset_maintenance(company_id,asset_id,performed_on,kind,description,odometer) values ($1,$2,'2026-10-01','service','Oil',41200)`, [A, a])
+    await as(U.ownerA, `insert into asset_maintenance(company_id,asset_id,performed_on,kind,description,odometer) values ($1,$2,'2026-09-01','repair','Old receipt',39000)`, [A, a])   // older reading never rolls back
+    expect((await as(U.ownerA, `select current_mileage, next_service_km from assets where id=$1`, [a])).rows[0]).toMatchObject({ current_mileage: 41200, next_service_km: 51200 })
+  })
+  it('report_summary: RLS-scoped, finance sections only with finance.view, money summed in the database', async () => {
+    await as(U.accA, `insert into invoices(company_id,doc_type,number,status,issue_date,subtotal,vat_amount,total) values ($1,'invoice','INV-REP-1','sent','2031-03-05',1000,50,1050),($1,'invoice','INV-REP-2','draft','2031-03-06',500,25,525)`, [A])
+    const r = (await as(U.accA, `select report_summary('2031-03-01','2031-03-31','2031-03-10') r`)).rows[0].r
+    expect(r.sales).toMatchObject({ count: 1, net: 1000, vat: 50, total: 1050 })   // draft excluded
+    const other = (await as(U.ownerB, `select report_summary('2031-03-01','2031-03-31','2031-03-10') r`)).rows[0].r
+    expect(other.sales.count).toBe(0)   // company B never sees company A's invoices
+    const viewer = (await as(U.viewerA, `select report_summary('2031-03-01','2031-03-31','2031-03-10') r`)).rows[0].r
+    expect(viewer.sales).toBeUndefined(); expect(viewer.receivables).toBeUndefined(); expect(viewer.documents).toBeDefined()
+    await fails(as(null, `select report_summary('2031-03-01','2031-03-31','2031-03-10')`, [], 'anon'), /permission denied/)
+  })
+})

@@ -12,7 +12,7 @@ import { createParty } from '@/app/actions/admin'
 import { importParties } from '@/app/actions/imports'
 import { cn } from '@/lib/utils'
 
-export const metadata = { title: 'Clients & Suppliers' }
+export const metadata = { title: 'Customers & Suppliers' }
 export default async function Parties({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const c = await getCtx(); if (!c.can('documents.view')) redirect('/'); const sp = await flat(searchParams)
   const kind = sp.tab === 'suppliers' ? 'suppliers' : 'customers', q = sanitizeQ(sp.q), page = pageOf(sp.page)
@@ -20,7 +20,7 @@ export default async function Parties({ searchParams }: { searchParams: Promise<
   if (q) query = query.or(`name.ilike.%${q}%,contact_person.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,trn.ilike.%${q}%`)
   const { data, count } = await query
   const isC = kind === 'customers', edit = c.can('records.edit')
-  return <><PageHeader title="Clients & Suppliers" sub="Directory used by cheques, quotations, invoices and projects. Open a client for their ledger, documents and timeline."
+  return <><PageHeader title="Customers & Suppliers" sub="Directory used by cheques, quotations, invoices and projects. Open a client for their ledger, documents and timeline."
     actions={<>
       {c.can('data.export') && <LinkButton href={`/api/export/${kind}`} variant="secondary"><Download size={14} />Export CSV</LinkButton>}
       {edit && <DialogButton wide variant="secondary" label="Import CSV" title={`Import ${isC ? 'clients' : 'suppliers'} from CSV`} icon={<Upload size={14} />}><ImportForm action={importParties.bind(null, kind)} columns="name, contact_person, phone, whatsapp, email, trn, address, notes" /></DialogButton>}

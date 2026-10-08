@@ -3,7 +3,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, us
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Loader2, Mail, MessageCircle,
+  ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle,
   MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X,
 } from 'lucide-react'
 import { SalesPaper, docDiscount, vatOn, type Branding, type PaperItem } from './paper'
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { APPROVAL_LABEL, APPROVAL_TONE, CONVERSIONS, DOC_META, STATUS_TONE, UNITS, isTaxDoc, manualStatuses, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { VAT_CATEGORIES, amountInWords, computeTotals, fmtMoney, lineAmount } from '@/lib/sales/money'
 import {
-  archivePdfToVault, convertSalesDoc, createDeliveryNote, deleteSalesDraft, duplicateSalesDoc, logSalesEvent, requestApproval, saveSalesDoc, setSalesStatus, type SalesDocInput,
+  archivePdfToVault, convertSalesDoc, createDeliveryNote, deleteSalesDraft, duplicateSalesDoc, logSalesEvent, renumberDraft, requestApproval, saveSalesDoc, setSalesStatus, type SalesDocInput,
 } from '@/app/actions/sales'
 import type { ActionState } from '@/lib/utils'
 
@@ -41,10 +41,10 @@ function ago(ts: number | null, now: number) {
   return s < 10 ? 'Saved just now' : s < 60 ? `Saved ${Math.floor(s / 5) * 5} seconds ago` : s < 3600 ? `Saved ${Math.floor(s / 60)} min ago` : 'Saved'
 }
 
-export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval }: {
+export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false }: {
   doc: Record<string, any>; items: (PaperItem & { id?: string })[]; branding: Branding; paid: number; customers: CustomerOpt[]; projects: ProjectOpt[]
   catalog: CatalogOpt[]; templates: TemplateOpt[]; salespeople: { id: string; full_name: string }[]; delivery: Record<string, { ordered: number; delivered: number }>
-  editable: boolean; lockedReason?: string | null; canStatus: boolean; canDelete: boolean; canVault: boolean; requireApproval: boolean
+  editable: boolean; lockedReason?: string | null; canStatus: boolean; canDelete: boolean; canVault: boolean; requireApproval: boolean; canRenumber?: boolean
 }) {
   const t = doc.doc_type as SalesType, meta = DOC_META[t], isTax = isTaxDoc(t), isInv = t === 'invoice', isQtn = t === 'quotation', isDn = t === 'delivery_note', isCn = t === 'credit_note'
   const draft = doc.status === 'draft'
@@ -69,6 +69,9 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const [fieldErr, setFieldErr] = useState<Record<string, string | undefined>>({})
   const [savedAt, setSavedAt] = useState<number | null>(null), [now, setNow] = useState(() => Date.now())
   const expected = useRef<string | null>(doc.updated_at ?? null)
+  // our own actions (status change, renumber, approval…) also move updated_at; take the fresh value from the server so the next
+  // save is not reported as someone else's change. Another user's edit still conflicts: it arrives without a refresh of this page.
+  useEffect(() => { if (doc.updated_at) expected.current = doc.updated_at }, [doc.updated_at])
   const version = useRef(0)                                   // bumps on every edit → a slow save never marks newer edits as saved
   const tokens = useRef<Record<string, string>>({})          // one idempotency token per action → double clicks create ONE document
   const tok = (k: string) => (tokens.current[k] ??= uuid())
@@ -106,7 +109,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
     startSave(async () => {
       let r: ActionState
       try { r = await saveSalesDoc(doc.id, payload(), { expected: expected.current, autosave: auto }) }
-      catch { r = { error: navigator.onLine ? 'Could not reach the server. Your changes are still on screen — save again in a moment.' : 'You are offline. Your changes are still on screen — save again when you are back online.' } }
+      catch { r = { error: navigator.onLine ? 'Could not reach the server. Your changes are still on screen. Save again in a moment.' : 'You are offline. Your changes are still on screen. Save again when you are back online.' } }
       if (r?.error) {
         setErrors(r.error); setFieldErr(r.fieldErrors ?? {})
         if (!auto || r.data?.conflict) toast(r.error, 'error')
@@ -181,10 +184,10 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   }
   const customer = customers.find(c => c.id === head.customer_id)
   const amountTxt = meta.priced ? ` for AED ${fmtMoney(tot.total)}` : ''
-  const mail = `mailto:${encodeURIComponent(head.customer_email || customer?.email || '')}?subject=${encodeURIComponent(`${meta.label} ${doc.number}${head.subject ? ' — ' + head.subject : ''}`)}&body=${encodeURIComponent(
+  const mail = `mailto:${encodeURIComponent(head.customer_email || customer?.email || '')}?subject=${encodeURIComponent(`${meta.label} ${doc.number}${head.subject ? ': ' + head.subject : ''}`)}&body=${encodeURIComponent(
     `Dear ${head.attention || 'Sir/Madam'},\n\nPlease find attached our ${meta.label.toLowerCase()} ${doc.number}${amountTxt}.\n\nKind regards,\n${branding.companyName}`)}`
   const waPhone = (head.customer_phone || customer?.phone || '').replace(/[^\d]/g, '').replace(/^00/, '').replace(/^0(5\d{8})$/, '971$1').replace(/^(5\d{8})$/, '971$1')
-  const wa = `https://wa.me/${waPhone}?text=${encodeURIComponent(`Dear ${head.attention || 'Sir/Madam'}, please find our ${meta.label.toLowerCase()} ${doc.number}${amountTxt}. The PDF follows in this chat. — ${branding.companyName}`)}`
+  const wa = `https://wa.me/${waPhone}?text=${encodeURIComponent(`Dear ${head.attention || 'Sir/Madam'}, please find our ${meta.label.toLowerCase()} ${doc.number}${amountTxt}. The PDF follows in this chat.\n\n${branding.companyName}`)}`
   const Icon = ICON[t] ?? FileText
   const statuses = canStatus ? manualStatuses(t, doc.status) : []
   const err = (k: string) => fieldErr[k] ? <span role="alert" className="text-[11px] text-danger">{fieldErr[k]}</span> : null
@@ -203,7 +206,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
       <div className="min-w-0 leading-tight">
         <div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-sm font-semibold">{meta.label} {doc.number}{doc.revision ? <span className="ms-1 text-muted">Rev.{doc.revision}</span> : null}</h1>
           <Badge tone={STATUS_TONE[doc.status]}>{statusLabel(t, doc.status)}</Badge>{approval && <Badge tone={APPROVAL_TONE[approval]}>{APPROVAL_LABEL[approval]}</Badge>}</div>
-        <div className={cn('text-[11px]', errors && editable ? 'text-danger' : 'text-muted')} aria-live="polite" data-testid="save-status">{errors && editable && !saving ? 'Not saved — see the message below' : status}</div>
+        <div className={cn('text-[11px]', errors && editable ? 'text-danger' : 'text-muted')} aria-live="polite" data-testid="save-status">{errors && editable && !saving ? 'Not saved. See the message below' : status}</div>
       </div>
       <div className="ms-auto flex flex-wrap items-center gap-1.5">
         <div className="flex rounded-md border border-border p-0.5 lg:hidden" role="tablist" aria-label="Editor view">
@@ -225,6 +228,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
           {statuses.map(s => <MenuItem key={s} icon={s === 'cancelled' ? X : CheckCircle2} danger={s === 'cancelled'}
             onClick={() => run(() => setSalesStatus(doc.id, s), { saveFirst: true, confirm: s === 'cancelled' ? `Cancel ${doc.number}? It stays on record but can no longer be edited.` : isCn && s === 'sent' ? `Issue credit note ${doc.number}? It reduces the invoice balance and can no longer be edited.` : undefined })}>
             {isTax && s === 'sent' ? `Issue ${meta.label.toLowerCase()}` : s === 'viewed' ? 'Mark as viewed (customer confirmed)' : `Mark as ${statusLabel(t, s).toLowerCase()}`}</MenuItem>)}
+          {canRenumber && <MenuItem icon={Hash} onClick={() => run(() => renumberDraft(doc.id), { saveFirst: true, confirm: `Give ${doc.number} the next number in your current format? The old number is not reused.` })}>Renumber to current format</MenuItem>}
           {canDelete && ['draft', 'cancelled'].includes(doc.status) && <><div className="my-1 border-t border-border" role="separator" />
             <MenuItem icon={Trash2} danger onClick={() => run(() => deleteSalesDraft(doc.id), { confirm: `Move ${doc.number} to the trash? An admin can restore it from Settings → Trash.` })}>Move to trash</MenuItem></>}
         </Menu>
@@ -250,9 +254,9 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
             </div>
             {customer && (customer.name !== head.customer_name || (customer.address ?? '') !== (head.customer_address ?? '') || (customer.trn ?? '') !== (head.customer_trn ?? '') || (customer.phone ?? '') !== (head.customer_phone ?? '') || (customer.email ?? '') !== (head.customer_email ?? '') || (customer.contact_person ?? '') !== (head.attention ?? '')) &&
               <label className="flex cursor-pointer items-start gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm"><input type="checkbox" checked={!!head.update_customer} onChange={e => set('update_customer', e.target.checked)} className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]" />
-                <span>These details differ from the saved customer. They are used for <b>this document only</b> — tick <b>Update customer profile</b> to also change “{customer.name}” in Clients.</span></label>}
+                <span>These details differ from the saved customer. They are used for <b>this document only</b>. Tick <b>Update customer profile</b> to also change “{customer.name}” in Clients.</span></label>}
             {!head.customer_id && head.customer_name && <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={!!head.new_customer} onChange={e => set('new_customer', e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" />Save “{head.customer_name}” as a customer</label>}
-            <F label="Address" hint="Use separate lines for building, street, area, city — they print the same way"><Textarea rows={3} className={GROW} value={head.customer_address ?? ''} onChange={e => set('customer_address', e.target.value)} placeholder={'e.g. Office 12, Al Saqr Building\nMusaffah M-44\nAbu Dhabi, UAE'} /></F>
+            <F label="Address" hint="One line each for building, street, area and city. Lines print exactly as typed."><Textarea rows={3} className={GROW} value={head.customer_address ?? ''} onChange={e => set('customer_address', e.target.value)} placeholder="Building, street, area, city" /></F>
             <div className="grid gap-3 sm:grid-cols-2">
               <F label="Customer TRN" hint={isQtn ? 'Optional on quotations · 15 digits' : '15 digits'} error={err('customer_trn')}><Input inputMode="numeric" value={head.customer_trn ?? ''} onChange={e => set('customer_trn', e.target.value)} placeholder="100xxxxxxxxxxxx" aria-invalid={!!fieldErr.customer_trn} /></F>
               <F label="Phone" error={err('customer_phone')}><Input type="tel" value={head.customer_phone ?? ''} onChange={e => set('customer_phone', e.target.value)} placeholder="+971 …" aria-invalid={!!fieldErr.customer_phone} /></F>
@@ -263,7 +267,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
 
           <Section icon={Icon} title={`${meta.label} details`} sub="Number, dates and references">
             <div className="grid gap-3 sm:grid-cols-2">
-              <F label={`${meta.label} no.`} hint="Assigned automatically — never duplicated"><Input value={`${doc.number}${doc.revision ? `  ·  Rev.${doc.revision}` : ''}`} readOnly className="bg-surface-2 font-mono" /></F>
+              <F label={`${meta.label} no.`} hint="Assigned automatically. Never duplicated"><Input value={`${doc.number}${doc.revision ? `  ·  Rev.${doc.revision}` : ''}`} readOnly className="bg-surface-2 font-mono" /></F>
               <F label="Date" error={err('issue_date')}><Input type="date" value={head.issue_date} onChange={e => set('issue_date', e.target.value)} required /></F>
               {isInv && <F label="Due date" error={err('due_date')}><Input type="date" value={head.due_date ?? ''} min={head.issue_date} onChange={e => set('due_date', e.target.value)} aria-invalid={!!fieldErr.due_date} /></F>}
               {isQtn && <F label="Valid until" error={err('valid_until')}><Input type="date" value={head.valid_until ?? ''} min={head.issue_date} onChange={e => set('valid_until', e.target.value)} aria-invalid={!!fieldErr.valid_until} /></F>}
@@ -280,7 +284,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
                   <option value="">—</option>{salespeople.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </Select>
               </F>
-              <F label="Subject" className="sm:col-span-2"><Input value={head.subject ?? ''} onChange={e => set('subject', e.target.value)} placeholder="e.g. Steel staircase — Villa 22" /></F>
+              <F label="Subject" className="sm:col-span-2"><Input value={head.subject ?? ''} onChange={e => set('subject', e.target.value)} placeholder="e.g. Steel staircase, Villa 22" /></F>
               {isDn && <><F label="Receiver name"><Input value={head.receiver_name ?? ''} onChange={e => set('receiver_name', e.target.value)} /></F>
                 <F label="Vehicle no."><Input value={head.vehicle_no ?? ''} onChange={e => set('vehicle_no', e.target.value)} /></F></>}
             </div>
@@ -290,7 +294,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
             <ol className="flex flex-col gap-3">
               {items.map((it, i) => <li key={it.key} className="rounded-lg border border-border bg-surface-2/40 p-3">
                 <div className="mb-2 flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-fg">{i + 1}</span>
+                  <span className="grid h-6 w-6 place-items-center rounded-md bg-surface-2 text-[11px] text-muted ring-1 ring-inset ring-border font-semibold">{i + 1}</span>
                   <span className="text-xs font-medium text-muted">{meta.priced && Number(it.unit_price) > 0 ? `AED ${fmtMoney(lineAmount(it))}` : 'Line ' + (i + 1)}</span>
                   {isQtn && it.id && (delivery[it.id]?.delivered ?? 0) > 0 && <Badge tone={delivery[it.id].delivered >= delivery[it.id].ordered ? 'green' : 'amber'}>Delivered {delivery[it.id].delivered} / {delivery[it.id].ordered}</Badge>}
                   {editable && <div className="ms-auto flex items-center gap-0.5">
@@ -343,7 +347,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
           {(isQtn || isInv) && <Section icon={ScrollText} title={isQtn ? 'Letter & terms' : 'Terms'} sub="Pick a template (Settings → Document templates) and edit it for this document" collapsed={!isQtn}>
             {isQtn && <F label="Opening"><Textarea rows={3} className={GROW} value={head.intro ?? ''} onChange={e => set('intro', e.target.value)} /></F>}
             {isQtn && <F label="Closing note"><Textarea rows={3} className={GROW} value={head.closing ?? ''} onChange={e => set('closing', e.target.value)} /></F>}
-            {isQtn && <F label="Terms and conditions" hint="One clause per line — they are numbered automatically">
+            {isQtn && <F label="Terms and conditions" hint="One clause per line. They are numbered automatically">
               {termsTpl.length > 0 && <Select aria-label="Terms template" value="" onChange={e => applyTemplate('terms', e.target.value)}><option value="">Insert a terms template…</option>{termsTpl.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>}
               <Textarea rows={3} className={GROW} value={head.termsText} onChange={e => set('termsText', e.target.value)} /></F>}
             <F label="Payment terms" hint="One per line">
@@ -377,7 +381,7 @@ function DeliveryDialog({ items, delivery, onClose, onCreate, busy }: { items: I
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { ref.current?.showModal() }, [])
   const bad = rows.find(r => Number(qty[r.id!]) > r.left + 1e-9 || Number(qty[r.id!]) < 0)
-  return <dialog ref={ref} onClose={onClose} aria-labelledby="dn-title" className="m-auto w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-border bg-surface p-0 text-fg shadow-2xl backdrop:bg-black/40">
+  return <dialog ref={ref} onClose={onClose} aria-labelledby="dn-title" className="m-auto w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-border bg-surface p-0 text-fg shadow-pop backdrop:bg-black/40">
     <div className="flex items-center justify-between border-b border-border px-5 py-3"><h2 id="dn-title" className="font-semibold">Create delivery note</h2><button type="button" onClick={() => ref.current?.close()} aria-label="Close" className="rounded p-1 text-muted hover:bg-surface-2"><X size={16} /></button></div>
     <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
       <p className="mb-3 text-sm text-muted">Enter the quantity delivered now. Remaining quantities stay open for the next delivery.</p>
@@ -386,7 +390,7 @@ function DeliveryDialog({ items, delivery, onClose, onCreate, busy }: { items: I
           <td className="max-w-[16rem] py-2 pe-2"><span className="line-clamp-2">{r.description}</span></td>
           <td className="px-2 text-right tabular-nums">{r.ordered} {r.unit}</td><td className="px-2 text-right tabular-nums">{r.delivered}</td><td className="px-2 text-right font-medium tabular-nums">{r.left}</td>
           <td className="ps-2"><Input type="number" min={0} max={r.left} step="any" inputMode="decimal" aria-label={`Deliver now: ${r.description.slice(0, 40)}`} value={qty[r.id!]} onChange={e => setQty(q => ({ ...q, [r.id!]: e.target.value }))} className="ms-auto w-24 text-right" aria-invalid={Number(qty[r.id!]) > r.left} /></td></tr>)}</tbody></table></div>
-      {!rows.length && <p className="text-sm text-muted">Save the quotation first — lines need to be saved before they can be delivered.</p>}
+      {!rows.length && <p className="text-sm text-muted">Save the quotation first. Lines need to be saved before they can be delivered.</p>}
       {bad && <p role="alert" className="mt-3 text-sm text-danger">“{bad.description.slice(0, 40)}”: you can deliver at most {bad.left}.</p>}
     </div>
     <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
@@ -428,7 +432,7 @@ function Menu({ label, children, busy }: { label: ReactNode; children: ReactNode
   }, [open])
   return <div ref={ref} className="relative" onClick={e => { if ((e.target as HTMLElement).closest('[role=menuitem]')) setOpen(false) }}>
     <Button size="sm" variant="secondary" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)} disabled={busy}>{busy ? <Loader2 size={14} className="animate-spin" /> : label}</Button>
-    {open && <div role="menu" className="toast-in absolute end-0 top-full z-30 mt-1 max-h-[70vh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-xl">{children}</div>}
+    {open && <div role="menu" className="toast-in absolute end-0 top-full z-30 mt-1 max-h-[70vh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-pop">{children}</div>}
   </div>
 }
 function MenuItem({ icon: Icon, children, onClick, href, danger, external }: { icon: typeof FileText; children: ReactNode; onClick?: () => void; href?: string; danger?: boolean; external?: boolean }) {

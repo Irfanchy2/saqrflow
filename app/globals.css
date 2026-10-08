@@ -1,33 +1,54 @@
 @tailwind base; @tailwind components; @tailwind utilities;
 
+/* ═════════ Averiqo design tokens ═════════
+   One cool-grey neutral family (hue 220) + one accent (calm blue). Status colours are used as subtle tint + readable text.
+   Radius system: controls 6px (md) · containers 8px (lg) · badges / chips 4px (sm). Elevation only for floating layers. */
 :root {
-  --bg: 220 20% 97%; --surface: 0 0% 100%; --surface-2: 220 20% 96%; --border: 220 14% 90%;
-  --fg: 222 30% 12%; --muted: 220 9% 46%;
-  --primary: 221 83% 53%; --primary-fg: 0 0% 100%; --primary-soft: 221 90% 96%;
-  --success: 152 60% 36%; --warning: 36 92% 44%; --danger: 0 72% 51%;
+  --bg: 220 16% 97.5%; --surface: 0 0% 100%; --surface-2: 220 16% 95.5%; --border: 220 13% 89%; --border-strong: 220 10% 80%;
+  --fg: 222 24% 12%; --muted: 220 9% 42%;
+  --primary: 221 68% 47%; --primary-fg: 0 0% 100%; --primary-soft: 221 75% 96%;
+  --success: 154 55% 30%; --warning: 31 88% 36%; --danger: 0 66% 45%;
+  --nav: 220 20% 98.5%;
+  /* chart series: validated categorical slots 1-3 (CVD ΔE ≥ 9 adjacent); dark mode uses its own steps */
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
 }
 .dark {
-  --bg: 224 24% 8%; --surface: 224 22% 11%; --surface-2: 224 20% 15%; --border: 224 16% 20%;
-  --fg: 220 20% 94%; --muted: 220 10% 62%;
-  --primary: 217 91% 63%; --primary-fg: 224 30% 8%; --primary-soft: 222 40% 18%;
-  --success: 152 55% 50%; --warning: 38 92% 56%; --danger: 0 80% 66%;
+  --bg: 222 18% 8%; --surface: 222 16% 11%; --surface-2: 222 14% 15%; --border: 222 12% 20%; --border-strong: 222 10% 30%;
+  --fg: 220 16% 93%; --muted: 220 9% 64%;
+  --primary: 218 80% 66%; --primary-fg: 222 30% 8%; --primary-soft: 220 35% 18%;
+  --success: 152 45% 55%; --warning: 36 85% 60%; --danger: 0 72% 68%;
+  --nav: 222 17% 9.5%;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
 }
-html { color-scheme: light; } html.dark { color-scheme: dark; }
-body { @apply bg-bg text-fg antialiased; font-feature-settings: 'cv11', 'ss01'; }
+html { color-scheme: light; -webkit-text-size-adjust: 100%; } html.dark { color-scheme: dark; }
+body { @apply bg-bg text-fg antialiased; font-size: 14px; line-height: 1.5; font-feature-settings: 'ss01' 0; }
 * { @apply border-border; }
-:focus-visible { @apply outline-none ring-2 ring-primary/60 ring-offset-1 ring-offset-bg; }
-[aria-invalid="true"] { border-color: hsl(var(--danger)) !important; box-shadow: 0 0 0 1px hsl(var(--danger) / 0.4); }
-::selection { background: hsl(var(--primary) / .2); }
-dialog::backdrop { background: hsl(220 30% 8% / .5); backdrop-filter: blur(2px); }
-dialog[open] { animation: pop .16s ease-out; }
-@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
-@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.toast-in { animation: toast-in .2s ease-out; }
+:focus-visible { @apply outline-none ring-2 ring-primary/50 ring-offset-1 ring-offset-bg; }
+[aria-invalid="true"] { border-color: hsl(var(--danger)) !important; box-shadow: 0 0 0 1px hsl(var(--danger) / 0.35); }
+::selection { background: hsl(var(--primary) / .18); }
+/* numbers line up in every table, total and KPI */
+table, .num { font-variant-numeric: tabular-nums; }
+h1, h2, h3 { text-wrap: balance; } p { text-wrap: pretty; }
+html:has(dialog[open]:modal) { overflow: hidden; }   /* the page behind a modal does not scroll */
+dialog::backdrop { background: hsl(222 30% 6% / .45); }
+dialog[open] { animation: pop .14s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.toast-in { animation: toast-in .16s ease-out; }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
 .skeleton { @apply relative overflow-hidden rounded-md bg-surface-2; }
-.skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .06), transparent); animation: shimmer 1.4s infinite; }
+.skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .05), transparent); animation: shimmer 1.4s infinite; }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
-@media print { aside, header, .no-print { display: none !important; } body { background: #fff; } main { padding: 0 !important; } }
+/* metrics inside a ruled strip: cells share hairlines instead of floating as separate cards */
+.metrics .stat { border-width: 0; border-bottom-width: 1px; border-inline-end-width: 1px; border-radius: 0; }
+.metrics a { border-radius: 0; }
+.print-only { display: none; }
+@media print {
+  aside, header, .no-print { display: none !important; } body { background: #fff; } main { padding: 0 !important; max-width: none !important; }
+  .print-only { display: block; }
+  .break-inside-avoid { break-inside: avoid; }
+  table thead { display: table-header-group; } tr { break-inside: avoid; }
+}
 /* ═════════ Sales documents (quotation / tax invoice / delivery note) — one layout for screen preview and print ═════════ */
 @page { size: A4 portrait; margin: 0; }
 .sales-paper {
@@ -54,6 +75,7 @@ dialog[open] { animation: pop .16s ease-out; }
 .paper-box--meta .paper-pair { grid-template-columns: 22mm minmax(0, 1fr); }
 .paper-pair dt { font-weight: 700; white-space: nowrap; }
 .paper-pair dd { margin: 0; }
+.sales-paper [dir=auto] { text-align: start; unicode-bidi: plaintext; }   /* per-line direction for mixed Arabic / English text */
 .paper-pair dd, .paper-text { white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; line-height: 1.45; }   /* keeps line breaks, wraps long words / URLs */
 .paper-items { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
 .paper-items th, .paper-items td { border: 1px solid var(--rule); padding: 1.2mm 1.5mm; vertical-align: middle; overflow-wrap: anywhere; }

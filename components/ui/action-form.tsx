@@ -14,7 +14,7 @@ function guard<A extends unknown[]>(fn: (...a: A) => Promise<ActionState>) {
   return async (...a: A): Promise<ActionState> => {
     try { return await fn(...a) } catch (e) {
       if (String((e as any)?.digest ?? (e as Error)?.message ?? '').includes('NEXT_REDIRECT')) throw e
-      return { error: typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Reconnect and try again — your entries are still here.' : 'The request did not complete (network or server problem). Please try again — your entries are still here.' }
+      return { error: typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Reconnect and try again. Your entries are still here.' : 'The request did not complete (network or server problem). Please try again. Your entries are still here.' }
     }
   }
 }

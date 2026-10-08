@@ -1,6 +1,6 @@
 # Backup & restore
 
-SaqrFlow keeps no data on the web server. Everything lives in your Supabase project.
+Averiqo keeps no data on the web server. Everything lives in your Supabase project.
 
 | What | Where | Backed up by |
 |---|---|---|

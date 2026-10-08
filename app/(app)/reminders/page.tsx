@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { BellRing, Play, Plus, Send, UserPlus } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { flat } from '@/lib/queries'
-import { Alert, Badge, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, Td, Th, TableWrap, Textarea, type Tone } from '@/components/ui/primitives'
+import { Alert, Badge, Card, CardHeader, EmptyState, Field, Input, Metrics, PageHeader, Select, StatCard, TableWrap, Td, Textarea, Th, type Tone } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { createReminder, toggleReminder, addRecipient, setOptIn, setRecipientActive, sendTest, runNow, retryLog } from '@/app/actions/reminders'
@@ -13,7 +13,7 @@ import { nextOccurrence, nextTriggerDate } from '@/lib/reminders/schedule'
 import { formatAed, formatLongDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
-export const metadata = { title: 'Smart Reminders' }
+export const metadata = { title: 'Reminders' }
 const TABS = [['upcoming', 'Upcoming'], ['custom', 'Custom reminders'], ['recipients', 'Recipients'], ['log', 'Delivery log']] as const
 const STATUS_TONE: Record<string, Tone> = { queued: 'neutral', sending: 'blue', retry: 'amber', sent: 'blue', delivered: 'green', read: 'green', failed: 'red', skipped: 'neutral', sandbox: 'amber' }
 
@@ -24,9 +24,9 @@ export default async function Reminders({ searchParams }: { searchParams: Promis
   const admin = c.can('settings.manage')
 
   return <>
-    <PageHeader title="Smart Reminders" sub="Automatic WhatsApp, email and in-app reminders for expiries, cheques and custom events."
+    <PageHeader title="Reminders" sub="Automatic WhatsApp, email and in-app reminders for expiries, cheques and custom events."
       actions={admin ? <ActionButton action={runNow} variant="secondary" size="md"><Play size={14} />Run reminder check now</ActionButton> : undefined} />
-    <div className="mb-5"><Alert tone={wa.mode === 'live' ? 'green' : 'amber'}><b>{wa.mode === 'live' ? 'WhatsApp: LIVE' : 'WhatsApp: SANDBOX'}</b> — {wa.reason}
+    <div className="mb-5"><Alert tone={wa.mode === 'live' ? 'green' : 'amber'}><b>{wa.mode === 'live' ? 'WhatsApp: LIVE' : 'WhatsApp: SANDBOX'}</b>: {wa.reason}
       {wa.mode === 'sandbox' && ' Messages are recorded in the log but never sent, and are never reported as delivered.'}
       {' '}Email: <b>{wa.emailLive ? 'live' : 'sandbox'}</b>. The scheduler runs automatically (see README → Scheduler); you do not need to open this page.</Alert></div>
     <div className="mb-5 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l]) => <Link key={k} href={`/reminders?tab=${k}`} className={cn('-mb-px border-b-2 px-4 py-2 text-sm', tab === k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</div>
@@ -96,7 +96,7 @@ async function Log({ c, sp }: { c: C; sp: Record<string, string | undefined> }) 
   const hasCost = (all ?? []).some(x => x.cost_estimate != null)
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
-    <div className="mb-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{[['Sandbox', by('sandbox')], ['Sent', by('sent')], ['Delivered', by('delivered') + by('read')], ['Failed', by('failed')], ['Retrying', by('retry')], ['Skipped', by('skipped')]].map(([l, n]) => <Card key={l as string} className="p-3"><div className="text-xs text-muted">{l} (this month)</div><div className="text-xl font-semibold tabular-nums">{n}</div></Card>)}</div>
+    <Metrics className="mb-4" cols={6}>{[['Sandbox', by('sandbox')], ['Sent', by('sent')], ['Delivered', by('delivered') + by('read')], ['Failed', by('failed')], ['Retrying', by('retry')], ['Skipped', by('skipped')]].map(([l, n]) => <StatCard key={l as string} label={`${l} this month`} value={n as number} tone={l === 'Failed' && n ? 'red' : 'neutral'} />)}</Metrics>
     {hasCost ? <p className="mb-3 text-sm text-muted">Estimated WhatsApp cost this month: <b>{formatAed(cost)}</b> (based on the per-message price in Settings; actual charges come from Meta).</p> : <p className="mb-3 text-xs text-muted">Add a per-message price in Settings to see estimated WhatsApp cost.</p>}
     <form className="mb-3 flex gap-2"><input type="hidden" name="tab" value="log" /><select name="channel" defaultValue={sp.channel ?? ''} className={cls}><option value="">All channels</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="in_app">In-app</option></select>
       <select name="status" defaultValue={sp.status ?? ''} className={cls}><option value="">All statuses</option>{Object.keys(STATUS_TONE).map(s => <option key={s}>{s}</option>)}</select><button className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-fg">Filter</button></form>

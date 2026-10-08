@@ -110,7 +110,7 @@ export function googleVisionProvider(o: GoogleVisionOptions): OCRProvider {
       const t0 = Date.now()
       try {
         const r = await provider.extractText(TEST_IMAGE)
-        return { ok: testPassed(r.text), message: testPassed(r.text) ? 'Connected — test image read correctly' : `Connected, but the test image read as “${r.text.slice(0, 60)}”`, ms: Date.now() - t0 }
+        return { ok: testPassed(r.text), message: testPassed(r.text) ? 'Connected. Test image read correctly' : `Connected, but the test image read as “${r.text.slice(0, 60)}”`, ms: Date.now() - t0 }
       } catch (e) { return { ok: false, message: (e as Error).message, ms: Date.now() - t0 } }
     },
   }

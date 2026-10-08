@@ -6,7 +6,7 @@ import { flat } from '@/lib/queries'
 import { buildLedger } from '@/lib/ledger'
 import { statementParams, statementQuery } from '@/lib/statement-params'
 import { fmtMoney } from '@/lib/sales/money'
-import { Badge, Card, CardHeader, EmptyState, Field, Input, LinkButton, PageHeader, Select, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, EmptyState, Field, Input, LinkButton, PageHeader, Select, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionForm } from '@/components/ui/action-form'
 import { recordPaymentOnAccount } from '@/app/actions/sales'
@@ -28,16 +28,16 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
   if (!cu) notFound()
   const l = await buildLedger(c, id, f)
   const qs = statementQuery(f)
-  const mail = `mailto:${encodeURIComponent(cu.email ?? '')}?subject=${encodeURIComponent(`Statement of account — ${cu.name}`)}&body=${encodeURIComponent(`Dear ${cu.contact_person || 'Sir/Madam'},\n\nPlease find attached your statement of account${f.to ? ` up to ${f.to}` : ''}. The balance due is AED ${fmtMoney(l.outstanding)}${l.overdue ? `, of which AED ${fmtMoney(l.overdue)} is overdue` : ''}.\n\nKind regards,\n${c.company.name}`)}`
+  const mail = `mailto:${encodeURIComponent(cu.email ?? '')}?subject=${encodeURIComponent(`Statement of account: ${cu.name}`)}&body=${encodeURIComponent(`Dear ${cu.contact_person || 'Sir/Madam'},\n\nPlease find attached your statement of account${f.to ? ` up to ${f.to}` : ''}. The balance due is AED ${fmtMoney(l.outstanding)}${l.overdue ? `, of which AED ${fmtMoney(l.overdue)} is overdue` : ''}.\n\nKind regards,\n${c.company.name}`)}`
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
     <Link href={`/parties/${id}`} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />{cu.name}</Link>
-    <PageHeader title="Customer ledger" sub={`${cu.name} — opening balance, invoices, payments, cheques and credit notes with a running balance.`}
+    <PageHeader title="Customer ledger" sub={`${cu.name}. Opening balance, invoices, payments, cheques and credit notes with a running balance.`}
       actions={<>
         <LinkButton href={`/print/statement/${id}?${qs}${qs ? '&' : ''}auto=1`} variant="secondary" target="_blank"><Printer size={14} />Print statement</LinkButton>
         <LinkButton href={`/api/statements/${id}?${qs}`} variant="secondary"><Download size={14} />Statement PDF</LinkButton>
         <LinkButton href={mail} variant="secondary"><Mail size={14} />Email</LinkButton>
-        {c.can('records.edit') && <DialogButton label="Payment on account" title={`Payment on account — ${cu.name}`} icon={<Plus size={14} />} wide><ActionForm action={recordPaymentOnAccount.bind(null, id)} submit="Save payment" idempotent>
+        {c.can('records.edit') && <DialogButton label="Payment on account" title={`Payment on account: ${cu.name}`} icon={<Plus size={14} />} wide><ActionForm action={recordPaymentOnAccount.bind(null, id)} submit="Save payment" idempotent>
           <p className="text-sm text-muted">For money not tied to one invoice (e.g. an opening balance). To pay an invoice, open the invoice and use “Record payment”.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Amount (AED) *"><Input name="amount" type="number" step="0.01" min="0.01" required inputMode="decimal" /></Field>
@@ -46,12 +46,12 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
             <Field label="Reference"><Input name="reference" maxLength={120} /></Field>
           </div></ActionForm></DialogButton>}
       </>} />
-    <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <Metrics className="mb-5" cols={4}>
       <StatCard label="Outstanding balance" value={formatAed(l.outstanding)} icon={Wallet} tone={l.outstanding > 0 ? 'amber' : 'neutral'} />
       <StatCard label="Overdue" value={formatAed(l.overdue)} tone={l.overdue > 0 ? 'red' : 'neutral'} />
       <StatCard label="Invoiced in period" value={formatAed(l.totalDebit)} tone="blue" />
       <StatCard label="Received / credited in period" value={formatAed(l.totalCredit)} tone="green" />
-    </div>
+    </Metrics>
     <Card>
       <form className="flex flex-wrap items-end gap-2 border-b border-border p-3">
         <label className="flex flex-col gap-1 text-xs text-muted">From<input type="date" name="from" defaultValue={f.from} className={cls} /></label>

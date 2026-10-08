@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, BookOpen, Clock, FileText, HardHat, Landmark, Mail, MapPin, MessageCircle, Pencil, Phone, Receipt, Target, Trash2, Wallet } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
-import { Badge, Card, CardHeader, EmptyState, LinkButton, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, EmptyState, LinkButton, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { NewSalesButtons } from '@/components/sales/new-buttons'
@@ -13,7 +13,7 @@ import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/
 import { fmtMoney } from '@/lib/sales/money'
 import { buildLedger } from '@/lib/ledger'
 import { PROJECT_STATUS } from '@/lib/projects'
-import { formatAed } from '@/lib/time'
+import { formatAed, localDate } from '@/lib/time'
 
 export const metadata = { title: 'Customer' }
 type Ev = { at: string; icon: typeof FileText; text: string; href?: string }
@@ -42,16 +42,16 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
   // timeline: what happened with this customer, newest first
   const ev: Ev[] = [
-    ...(sales ?? []).map((s: any) => ({ at: s.created_at, icon: s.doc_type === 'invoice' ? Receipt : FileText, text: `${DOC_META[s.doc_type as SalesType]?.label ?? s.doc_type} ${s.number} — ${statusLabel(s.doc_type, s.status).toLowerCase()}`, href: `/invoices/${s.id}` })),
+    ...(sales ?? []).map((s: any) => ({ at: s.created_at, icon: s.doc_type === 'invoice' ? Receipt : FileText, text: `${DOC_META[s.doc_type as SalesType]?.label ?? s.doc_type} ${s.number}: ${statusLabel(s.doc_type, s.status).toLowerCase()}`, href: `/invoices/${s.id}` })),
     ...(pays ?? []).map((p: any) => ({ at: p.created_at, icon: Wallet, text: `Payment received AED ${fmtMoney(p.amount)}${p.invoice ? ` for ${p.invoice.number}` : ' on account'}`, href: p.invoice ? `/invoices/${p.invoice.id}` : undefined })),
-    ...(cheques ?? []).map((q: any) => ({ at: q.created_at, icon: Landmark, text: `Cheque #${q.cheque_no} AED ${fmtMoney(q.amount)} — ${q.status}`, href: `/cheques?open=${q.id}` })),
+    ...(cheques ?? []).map((q: any) => ({ at: q.created_at, icon: Landmark, text: `Cheque #${q.cheque_no} AED ${fmtMoney(q.amount)}: ${q.status}`, href: `/cheques?open=${q.id}` })),
     ...(projects ?? []).map((p: any) => ({ at: p.created_at, icon: HardHat, text: `Project “${p.name}” created`, href: `/projects/${p.id}` })),
     ...docs.map((d: any) => ({ at: d.created_at, icon: FileText, text: `Document uploaded: ${d.name}`, href: `/documents/${d.id}` })),
   ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 25)
   const when = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { timeZone: c.company.timezone, day: '2-digit', month: 'short', year: 'numeric' })
 
   return <>
-    <Link href="/parties" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Clients & Suppliers</Link>
+    <Link href="/parties" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Customers & Suppliers</Link>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-3">
         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-primary-soft text-lg font-semibold text-primary" aria-hidden>{cu.name.slice(0, 1).toUpperCase()}</div>
@@ -74,16 +74,16 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       </div>
     </div>
 
-    {fin && ledger && <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {fin && ledger && <Metrics className="mb-5" cols={4}>
       <StatCard label="Outstanding" value={formatAed(ledger.outstanding)} hint={cu.opening_balance ? `incl. opening balance ${formatAed(cu.opening_balance)}` : `${ledger.invoices.filter(i => i.balance > 0.004).length} open invoice(s)`} icon={Wallet} tone={ledger.outstanding > 0 ? 'amber' : 'neutral'} href={`/parties/${id}/ledger`} />
       <StatCard label="Overdue" value={formatAed(ledger.overdue)} icon={Receipt} tone={ledger.overdue ? 'red' : 'neutral'} href={`/parties/${id}/ledger?status=overdue`} />
       <StatCard label="Received (all time)" value={formatAed(lifetime)} icon={Landmark} tone="green" />
       <StatCard label="Open quotations" value={formatAed(openQ.reduce((s: number, q: any) => s + Number(q.total), 0))} hint={decided.length ? `${Math.round((won / decided.length) * 100)}% win rate` : undefined} icon={Target} />
-    </div>}
+    </Metrics>}
 
     <div className="grid gap-5 xl:grid-cols-3 [&>*]:min-w-0">
       {fin && <Card className="xl:col-span-2"><CardHeader title="Quotations, invoices, delivery & credit notes" />
-        {!(sales ?? []).length ? <EmptyState icon={Receipt} title="No sales documents yet" body="Create a quotation — this customer’s details are filled in for you." action={edit ? <NewSalesButtons customerId={id} only={['quotation']} /> : undefined} />
+        {!(sales ?? []).length ? <EmptyState icon={Receipt} title="No sales documents yet" body="Create a quotation. This customer’s details are filled in for you." action={edit ? <NewSalesButtons customerId={id} only={['quotation']} /> : undefined} />
           : <TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Type</Th><Th>Date</Th><Th className="text-right">Total</Th><Th className="text-right">Balance</Th><Th>Status</Th></tr></thead>
             <tbody className="divide-y divide-border">{(sales ?? []).map((s: any) => { const b = ledger?.invoices.find(i => i.id === s.id)
               return <tr key={s.id} className="hover:bg-surface-2/50">
@@ -110,7 +110,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <Card><CardHeader title="Documents" />
         {!docs.length ? <p className="px-4 py-5 text-sm text-muted">No linked documents.</p> :
           <ul className="divide-y divide-border">{docs.map((d: any) => <li key={d.id}><Link href={`/documents/${d.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">
-            <FileText size={15} className="text-primary" aria-hidden /><span className="min-w-0 flex-1 truncate">{d.name}</span><span className="text-xs text-muted">{d.created_at.slice(0, 10)}</span></Link></li>)}</ul>}</Card>
+            <FileText size={15} className="text-primary" aria-hidden /><span className="min-w-0 flex-1 truncate">{d.name}</span><span className="text-xs text-muted">{localDate(d.created_at, c.company.timezone)}</span></Link></li>)}</ul>}</Card>
     </div>
   </>
 }

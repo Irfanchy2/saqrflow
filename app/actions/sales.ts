@@ -12,6 +12,7 @@ import { computeTotals } from '@/lib/sales/money'
 import { BRAND_KINDS, loadSalesDoc, salesSettings } from '@/lib/sales/data'
 import { buildSalesPdf } from '@/lib/sales/build'
 import { diffSnapshots, snapshotOf } from '@/lib/sales/revisions'
+import { matchesFormat } from '@/lib/numbering'
 import type { ActionState } from '@/lib/utils'
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a valid date')
@@ -132,7 +133,7 @@ export async function saveSalesDoc(id: string, input: SalesDocInput, opts: { exp
     if (!cur) return { error: 'This document no longer exists (it may have been moved to the trash).' }
     const t = cur.doc_type as SalesType
     if (cur.status === 'cancelled') return { error: 'A cancelled document cannot be edited. Duplicate it instead.' }
-    if (t === 'invoice' && !['draft', 'sent', 'overdue'].includes(cur.status)) return { error: 'This invoice already has payments or credits — issue a credit note instead of editing it.' }
+    if (t === 'invoice' && !['draft', 'sent', 'overdue'].includes(cur.status)) return { error: 'This invoice already has payments or credits. Issue a credit note instead of editing it.' }
     if (t === 'credit_note' && cur.status !== 'draft') return { error: 'An issued credit note cannot be edited. Cancel it and create a new one.' }
     if (opts.autosave && cur.status !== 'draft') return { error: 'Autosave only applies to drafts.' }
     if (cur.approval_status === 'pending' && !c.can('sales.approve')) return { error: 'This document is waiting for approval and is locked until a manager decides.' }
@@ -175,7 +176,7 @@ export async function saveSalesDoc(id: string, input: SalesDocInput, opts: { exp
     }
     const { data: ts, error } = await c.supabase.rpc('save_sales_doc', { p_id: id, p_head: head, p_items: lines, p_expected: opts.expected ?? null, p_revision: revision })
     if (error) {
-      if (/conflict/.test(error.message)) return { error: 'Someone else saved this document after you opened it. Reload to see their changes — your edits are still on screen.', data: { conflict: true } }
+      if (/conflict/.test(error.message)) return { error: 'Someone else saved this document after you opened it. Reload to see their changes. Your edits are still on screen.', data: { conflict: true } }
       throw error
     }
     if (revision) await logEvent(c, id, 'revised', `Revision ${cur.revision + 1}: ${revision.changes.slice(0, 4).join('; ')}`)
@@ -313,7 +314,7 @@ export async function createDeliveryNote(quotationId: string, lines: { item_id: 
     const qty = new Map<string, number>()
     for (const l of z.array(z.object({ item_id: z.string().uuid(), qty: z.coerce.number().min(0, 'Quantity cannot be negative').max(1e9) })).max(300).parse(lines)) {
       if (!left.has(l.item_id)) return { error: 'A line no longer exists on the quotation. Reload and try again.' }
-      if (l.qty > left.get(l.item_id)! + 1e-9) return { error: `Cannot deliver ${l.qty} — only ${left.get(l.item_id)} remain on that line.` }
+      if (l.qty > left.get(l.item_id)! + 1e-9) return { error: `Cannot deliver ${l.qty}. Only ${left.get(l.item_id)} remain on that line.` }
       if (l.qty > 0) qty.set(l.item_id, l.qty)
     }
     if (!qty.size) return { error: 'Enter a quantity to deliver on at least one line.' }
@@ -351,6 +352,31 @@ export async function deleteSalesDraft(id: string): Promise<ActionState> {
   return r
 }
 
+/**
+ * Re-number a draft that still carries a number from before the company's custom format was set up (e.g. QTN-2026-0004 →
+ * AS0025183/2026). Only drafts that were never sent; the new number comes from the database sequence (never a duplicate)
+ * and the change is written to the audit log by the invoices trigger.
+ */
+export async function renumberDraft(id: string): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'records.edit'); need(c, 'finance.view')
+    const { data: d } = await c.supabase.from('invoices').select('id,doc_type,number,status,sent_at,revision').eq('id', id).maybeSingle()
+    if (!d) return { error: 'Not found.' }
+    if (d.status !== 'draft' || d.sent_at || d.revision > 0) return { error: 'Only drafts that were never sent can be renumbered.' }
+    const { data: f } = await c.supabase.from('document_number_formats').select('prefix,fixed_digits,seq_pad,year_separator,include_year').eq('doc_type', d.doc_type).maybeSingle()
+    if (!f) return { error: 'No custom number format is set for this document type (Settings → Numbering).' }
+    if (matchesFormat(d.number, f)) return { error: `${d.number} already follows the current format.` }
+    const { data: num, error: ne } = await c.supabase.rpc('next_document_number', { p_doc_type: d.doc_type })
+    if (ne) throw ne
+    const { data: upd, error } = await c.supabase.from('invoices').update({ number: num, updated_at: new Date().toISOString() }).eq('id', id).eq('status', 'draft').select('id')
+    if (error) throw error
+    if (!upd?.length) return { error: 'The document changed. Reload and try again.' }
+    await c.supabase.from('sales_doc_events').insert({ company_id: c.company.id, invoice_id: id, event: 'revised', detail: `Renumbered ${d.number} → ${num}`, user_id: c.userId })
+    done(); revalidatePath(`/invoices/${id}`)
+    return { ok: true, message: `Renumbered to ${num}.` }
+  })
+}
+
 /** print / download / email / WhatsApp clicks — recorded so the document shows its send history */
 export async function logSalesEvent(id: string, event: 'printed' | 'downloaded' | 'emailed' | 'whatsapp'): Promise<ActionState> {
   return safe(async () => {
@@ -379,7 +405,7 @@ export async function decideApproval(id: string, _: ActionState, fd: FormData): 
     const { error } = await c.supabase.from('invoices').update({ approval_status: decision, approval_note: note, approved_by: c.userId, approved_at: new Date().toISOString() }).eq('id', id)
     if (error) throw error
     await logEvent(c, id, 'approval', `${decision.replace('_', ' ')}${note ? ': ' + note : ''}`); done(id)
-    return { ok: true, message: decision === 'approved' ? 'Approved — it can now be sent.' : 'Decision saved.' }
+    return { ok: true, message: decision === 'approved' ? 'Approved. It can now be sent.' : 'Decision saved.' }
   })
 }
 
@@ -433,7 +459,7 @@ export async function recordPayment(invoiceId: string, _: ActionState, fd: FormD
     if (f instanceof File && f.size > 0 && c.can('documents.upload')) {
       const { data: d, error: de } = await c.supabase.from('documents').insert({ company_id: c.company.id, owner_type: 'vault', name: `Payment receipt ${v.reference ?? v.paid_on}`.slice(0, 250), folder: 'Payments', reminders_active: false, created_by: c.userId }).select('id').single()
       if (de) throw de
-      try { await saveVersion(c, d.id, f) } catch (e) { await c.supabase.rpc('soft_delete', { p_entity: 'document', p_id: d.id }); return { error: `Payment not saved — the attachment was rejected: ${(e as Error).message}` } }
+      try { await saveVersion(c, d.id, f) } catch (e) { await c.supabase.rpc('soft_delete', { p_entity: 'document', p_id: d.id }); return { error: `Payment not saved. The attachment was rejected: ${(e as Error).message}` } }
       documentId = d.id
     }
     const { error } = await c.supabase.from('payments').insert({ ...v, company_id: c.company.id, invoice_id: invoiceId, created_by: c.userId, document_id: documentId })
@@ -486,9 +512,9 @@ export async function archivePdfToVault(id: string): Promise<ActionState> {
     if (!docId) {
       const folder = `Customers/${(doc.customer_name || 'Unassigned').replace(/[\\/]/g, '-').slice(0, 80)}/${meta.folder}`
       const { data: created, error } = await c.supabase.from('documents').insert({
-        company_id: c.company.id, owner_type: 'vault', name: `${meta.label} ${doc.number}${doc.customer_name ? ' — ' + doc.customer_name : ''}`.slice(0, 250),
+        company_id: c.company.id, owner_type: 'vault', name: `${meta.label} ${doc.number}${doc.customer_name ? ': ' + doc.customer_name : ''}`.slice(0, 250),
         reference_no: doc.number, issue_date: doc.issue_date, folder, category_id: await categoryId(c, meta.category), reminders_active: false, created_by: c.userId,
-        notes: 'Generated by SaqrFlow sales documents.',
+        notes: 'Generated by Averiqo sales documents.',
       }).select('id').single()
       if (error) throw error
       docId = created.id

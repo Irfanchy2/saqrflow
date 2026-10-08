@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, ScrollText, Target, Truck, Wallet } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
-import { Badge, Card, EmptyState, PageHeader, Pagination, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, EmptyState, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { NewSalesButtons } from '@/components/sales/new-buttons'
 import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
@@ -40,17 +40,17 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
     <PageHeader title="Sales & Invoices" sub="Quotations, tax invoices, delivery notes and the payments against them."
       actions={edit ? <NewSalesButtons /> : null} />
 
-    <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <Metrics className="mb-5" cols={4}>
       <StatCard label="Outstanding receivables" value={formatAed(k.outstanding)} hint={`${k.openCount} open invoice${k.openCount === 1 ? '' : 's'}`} icon={Wallet} tone="blue" href={tabHref('receivables')} />
       <StatCard label="Overdue" value={formatAed(k.overdue)} hint={k.overdueCount ? `${k.overdueCount} invoice${k.overdueCount === 1 ? '' : 's'} past due` : 'Nothing overdue'} icon={AlertTriangle} tone={k.overdueCount ? 'red' : 'neutral'} href={`${base}?tab=invoice&status=overdue`} />
       <StatCard label="Collected this month" value={formatAed(k.collectedThisMonth)} hint={`Invoiced ${formatAed(k.invoicedThisMonth)}`} icon={Banknote} tone="green" href={tabHref('payments')} />
       <StatCard label="Open quotations" value={formatAed(k.pipeline)} hint={`${k.pipelineCount} open${k.winRate !== null ? ` · ${k.winRate}% win rate` : ''}`} icon={Target} tone="amber" href={`${base}?tab=quotation&status=sent`} />
-    </div>
+    </Metrics>
 
     <nav aria-label="Sales sections" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
       {TABS.map(t => <Link key={t.k} href={tabHref(t.k)} aria-current={tab === t.k ? 'page' : undefined}
         className={cn('-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm transition-colors', tab === t.k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted hover:text-fg')}>
-        <t.icon size={14} aria-hidden />{t.label}{t.k in counts && <span className="rounded-full bg-surface-2 px-1.5 text-[11px] tabular-nums text-muted">{counts[t.k]}</span>}</Link>)}
+        <t.icon size={14} aria-hidden />{t.label}{t.k in counts && <span className="rounded-sm bg-surface-2 px-1.5 text-[11px] tabular-nums text-muted">{counts[t.k]}</span>}</Link>)}
     </nav>
 
     {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'followups' ? <FollowupsTab /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} /> : <DocsTab t={tab as SalesType} sp={sp} edit={edit} />}
@@ -63,6 +63,15 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
   let q = c.supabase.from('invoices').select('id,number,status,customer_name,subject,site,issue_date,due_date,valid_until,total,project:projects(name)', { count: 'exact' }).eq('doc_type', t)
   if (term) q = q.or(`number.ilike.%${term}%,customer_name.ilike.%${term}%,subject.ilike.%${term}%,site.ilike.%${term}%,lpo_ref.ilike.%${term}%`)
   if (sp.status && meta.statuses.includes(sp.status)) q = q.eq('status', sp.status)
+  // drill-down filters from Reports & the dashboard (same definitions as report_summary)
+  if (t === 'invoice' && sp.due === 'overdue') q = q.in('status', ['sent', 'viewed', 'partially_paid', 'overdue']).lt('due_date', c.today)
+  if (t === 'invoice' && sp.due === 'open') q = q.in('status', ['sent', 'viewed', 'partially_paid', 'overdue'])
+  if (sp.issued === '1') q = q.not('status', 'in', '(draft,cancelled)')
+  if (sp.won === '1') q = q.in('status', ['accepted', 'converted'])
+  if (/^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? '')) q = q.gte('issue_date', sp.from!)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? '')) q = q.lte('issue_date', sp.to!)
+  if (/^[0-9a-f-]{36}$/.test(sp.customer ?? '')) q = q.eq('customer_id', sp.customer!)
+  if (/^[0-9a-f-]{36}$/.test(sp.project ?? '')) q = q.eq('project_id', sp.project!)
   const { data, count } = await q.order('issue_date', { ascending: false }).order('number', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
   const ids = t === 'invoice' ? (data ?? []).map((r: any) => r.id) : []
   const { data: bals } = ids.length ? await c.supabase.from('invoice_balances').select('id,paid,credited').in('id', ids) : { data: [] as { id: string; paid: number; credited: number }[] }
@@ -74,8 +83,11 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
       <input name="q" type="search" defaultValue={sp.q} aria-label={`Search ${meta.plural.toLowerCase()}`} placeholder="Search number, customer, subject, site, LPO…" className={`${cls} min-w-52 flex-1`} />
       <select name="status" defaultValue={sp.status ?? ''} aria-label="Status" className={cls}><option value="">Any status</option>{meta.statuses.map(s => <option key={s} value={s}>{statusLabel(t, s)}</option>)}</select>
       <button className="h-9 cursor-pointer rounded-md border border-border px-3 text-sm hover:bg-surface-2">Filter</button></form>
+    {(sp.due || sp.issued || sp.won || sp.from || sp.to || sp.customer || sp.project) && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-primary-soft/50 px-4 py-2 text-sm">
+      <span>Filtered list{sp.due === 'overdue' ? ': overdue (past due date, not fully paid)' : sp.due === 'open' ? ': open invoices' : ''}{sp.won ? ': accepted or converted' : ''}{sp.from || sp.to ? ` · issued ${sp.from ?? '…'} to ${sp.to ?? '…'}` : ''}{sp.customer ? ' · one customer' : ''}{sp.project ? ' · one project' : ''}</span>
+      <Link href={`/invoices?tab=${t}`} className="text-xs font-medium text-primary hover:underline">Clear filter</Link></div>}
     {!data?.length ? <EmptyState icon={t === 'invoice' ? Receipt : t === 'quotation' ? ScrollText : t === 'credit_note' ? FileMinus : Truck} title={term || sp.status ? `No ${meta.plural.toLowerCase()} match` : `No ${meta.plural.toLowerCase()} yet`}
-      body={term || sp.status ? 'Try a different search or status.' : t === 'credit_note' ? 'Credit notes are created from an issued tax invoice (⋯ → Create credit note). They reduce the invoice balance.' : `Create your first ${meta.label.toLowerCase()} — it uses your letterhead, stamp and terms automatically.`}
+      body={term || sp.status ? 'Try a different search or status.' : t === 'credit_note' ? 'Credit notes are created from an issued tax invoice (⋯ → Create credit note). They reduce the invoice balance.' : `Create your first ${meta.label.toLowerCase()}. It uses your letterhead, stamp and terms automatically.`}
       action={edit && !term && !sp.status && t !== 'credit_note' ? <NewSalesButtons only={[t]} /> : undefined} />
       : <TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Customer</Th><Th>Subject / project</Th><Th>Date</Th>{t !== 'delivery_note' && <Th>{isInv ? 'Due' : 'Valid until'}</Th>}{meta.priced && <Th className="text-right">Total (AED)</Th>}{isInv && <Th className="text-right">Balance</Th>}<Th>Status</Th></tr></thead>
         <tbody className="divide-y divide-border">{data.map((r: any) => {

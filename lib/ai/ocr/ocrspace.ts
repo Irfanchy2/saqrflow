@@ -45,7 +45,7 @@ export function ocrSpaceProvider(o: OcrSpaceOptions): OCRProvider {
     let body: OcrSpaceResponse | null = null
     try { body = JSON.parse(raw) } catch { /* OCR.Space sometimes answers errors as plain text */ }
     const msg = (body ? [body.ErrorMessage].flat().filter(Boolean).join(' ') || body.ErrorDetails || '' : raw).toString().slice(0, 300)
-    if (res.status === 429 || /maximum \d+ number of times|rate limit|too many requests/i.test(msg)) throw fail('OCR.Space rate limit reached — try again later or switch provider', 'rate_limited')
+    if (res.status === 429 || /maximum \d+ number of times|rate limit|too many requests/i.test(msg)) throw fail('OCR.Space rate limit reached. Try again later or switch provider', 'rate_limited')
     if (res.status === 401 || res.status === 403 || /api ?key|unauthori[sz]ed|invalid key/i.test(msg)) throw fail('OCR.Space rejected the API key', 'auth')
     if (!res.ok) throw fail(`OCR.Space error ${res.status}${msg ? `: ${msg}` : ''}`, res.status === 413 ? 'too_large' : 'provider')
     if (!body) throw fail('OCR.Space returned an unreadable response', 'provider')
@@ -63,7 +63,7 @@ export function ocrSpaceProvider(o: OcrSpaceOptions): OCRProvider {
     async extractDocument(file: OcrFile): Promise<OcrDocument> {
       if (!o.apiKey) throw fail('OCR_SPACE_API_KEY is not configured', 'not_configured')
       if (!provider.supports(file.mime)) throw fail(`OCR.Space does not read ${file.mime}`, 'unsupported')
-      if (file.bytes.byteLength > maxBytes) throw fail(`File is ${(file.bytes.byteLength / 1048576).toFixed(1)} MB — OCR.Space accepts up to ${(maxBytes / 1048576).toFixed(1)} MB on this plan`, 'too_large')
+      if (file.bytes.byteLength > maxBytes) throw fail(`File is ${(file.bytes.byteLength / 1048576).toFixed(1)} MB: OCR.Space accepts up to ${(maxBytes / 1048576).toFixed(1)} MB on this plan`, 'too_large')
       const engine = o.engine ?? 2
       let r = await call(file, engine, engine === 1 ? 'eng' : 'auto')
       let text = r.texts.join('\n\n').trim(), ms = r.ms
@@ -81,7 +81,7 @@ export function ocrSpaceProvider(o: OcrSpaceOptions): OCRProvider {
       const t0 = Date.now()
       try {
         const r = await provider.extractText(TEST_IMAGE)
-        return { ok: testPassed(r.text), message: testPassed(r.text) ? 'Connected — test image read correctly' : `Connected, but the test image read as “${r.text.slice(0, 60)}”`, ms: Date.now() - t0 }
+        return { ok: testPassed(r.text), message: testPassed(r.text) ? 'Connected. Test image read correctly' : `Connected, but the test image read as “${r.text.slice(0, 60)}”`, ms: Date.now() - t0 }
       } catch (e) { return { ok: false, message: (e as Error).message, ms: Date.now() - t0 } }
     },
   }

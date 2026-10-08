@@ -30,7 +30,7 @@ async function readRows(fd: FormData): Promise<{ rows: Record<string, string>[] 
 const summary = (ok: number, skipped: string[], bad: string[]) => {
   const parts = [`${ok} imported`]
   if (skipped.length) parts.push(`${skipped.length} skipped (already exist: ${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '…' : ''})`)
-  if (bad.length) parts.push(`${bad.length} rejected — ${bad.slice(0, 6).join(' · ')}${bad.length > 6 ? ' …' : ''}`)
+  if (bad.length) parts.push(`${bad.length} rejected: ${bad.slice(0, 6).join(' · ')}${bad.length > 6 ? ' …' : ''}`)
   return parts.join('; ') + '.'
 }
 async function existingNames(c: Ctx, table: string, col = 'name') {

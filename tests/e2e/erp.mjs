@@ -280,14 +280,14 @@ try {
   const sj = await scan.json().catch(() => ({}))
   ok([200, 422].includes(scan.status()) && (sj.fields || sj.error) && (await one(`select count(*)::int n from project_expenses where company_id=$1`, [co])).n === 1, `receipt OCR endpoint answers safely (${scan.status()}${sj.error ? ': ' + sj.error.slice(0, 60) : ''}) — suggestions only, nothing saved`)
   const veh = (await one(`insert into assets(company_id,kind,name,plate_or_serial) values ($1,'vehicle','Nissan Navara','DXB 12345') returning id`, [co])).id
-  await p.goto(`${BASE}/assets/${veh}`); await settle()
+  await p.goto(`${BASE}/assets/${veh}?tab=maintenance`); await settle()
   await p.getByRole('button', { name: 'Add record' }).click(); await dlg().getByLabel('Work done *').fill('Oil + filter change'); await dlg().getByLabel('Cost (AED)').fill('350'); await dlg().getByLabel('Next due').fill(`${yr + 1}-03-01`)
   await dlg().getByRole('button', { name: 'Save record' }).click(); await settle(1000)
   const vs = await one(`select next_service_date::text n, last_service_date::text l from assets where id=$1`, [veh])
   ok(vs.n === `${yr + 1}-03-01` && vs.l !== null && (await body()).includes('Oil + filter change'), `maintenance recorded → next service ${vs.n} (feeds reminders)`)
   await p.goto(`${BASE}/`); await settle()
   const dt = await body()
-  ok(['Outstanding receivables', 'Monthly sales (ex VAT)', 'Monthly expenses', 'Estimated profit this month', 'Quotation follow-ups due', 'Active projects'].every(s => dt.includes(s)), 'dashboard: receivables, monthly sales / expenses / profit, follow-ups, active projects')
+  ok(['Outstanding receivables', 'Sales this month', 'Recorded expenses this month', 'Estimated margin', 'Quotation follow-ups due', 'Projects in progress'].every(s => dt.includes(s)), 'dashboard: receivables, monthly sales / expenses / margin, follow-ups, active projects')
   await shot('X-dashboard')
 } catch (e) { ok(false, `aborted: ${e.stack || e}`); await p.screenshot({ path: `${OUT}/abort.png`, fullPage: true }).catch(() => {}) }
 await browser.close(); await db.end()

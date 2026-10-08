@@ -6,6 +6,8 @@ const MS_DAY = 86_400_000
 export function todayInTz(now: Date = new Date(), tz: string = DEFAULT_TZ): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
 }
+/** Calendar date of a stored timestamp in the company zone. Never `ts.slice(0, 10)`: that is the UTC date, a day early 00:00-04:00 in Dubai. */
+export function localDate(ts: string, tz: string = DEFAULT_TZ): string { return todayInTz(new Date(ts), tz) }
 const toUtcMs = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y, m - 1, d) }
 export function daysBetween(fromIso: string, toIso: string): number { return Math.round((toUtcMs(toIso) - toUtcMs(fromIso)) / MS_DAY) }
 export function addDays(iso: string, n: number): string { return new Date(toUtcMs(iso) + n * MS_DAY).toISOString().slice(0, 10) }
@@ -16,8 +18,15 @@ export function startOfMonth(iso: string): string { return iso.slice(0, 7) + '-0
 export function formatLongDate(iso: string): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(toUtcMs(iso)))
 }
+/** "18 Oct 2026": table cells */
+export function formatShortDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(toUtcMs(iso)))
+}
+const AED = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/** "AED 1,250.00": one money format everywhere (rounded half away from zero on the cent, never "1,250.1") */
 export function formatAed(n: number | string): string {
-  return 'AED ' + new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(n))
+  const v = Number(n); const r = Math.sign(v) * Math.round(Math.abs(v) * 100 + 1e-9) / 100
+  return (r < 0 ? '-AED ' : 'AED ') + AED.format(Math.abs(r))
 }
 
 /** Local wall-clock time of `now` in tz, as "HH:MM". */

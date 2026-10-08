@@ -14,7 +14,7 @@ const preview = (f: { prefix: string; fixed_digits: string; seq_pad: number; nex
 export async function NumberingSettings({ c }: { c: Ctx }) {
   const { data } = await c.supabase.from('document_number_formats').select('*')
   const year = c.today.slice(0, 4)
-  return <Card className="lg:col-span-2" id="numbering">
+  return <Card id="numbering">
     <CardHeader title="Document numbering" sub="Format: prefix + fixed digits + running number + separator + year. The running number never repeats; existing numbers are never changed." action={<Hash size={15} className="text-muted" aria-hidden />} />
     <div className="divide-y divide-border">{TYPES.map(t => {
       const f = (data ?? []).find(r => r.doc_type === t)

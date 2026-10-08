@@ -22,7 +22,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const categories = [...new Set((cats ?? []).map(x => x.category as string))].sort()
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
-    <PageHeader title="Products & Services" sub="Reusable items for quotations and invoices. In the editor use “Add from catalog” — the rate and text stay editable per document."
+    <PageHeader title="Products & Services" sub="Reusable items for quotations and invoices. In the editor use “Add from catalog”. The rate and text stay editable per document."
       actions={<>
         {c.can('data.export') && <LinkButton href="/api/export/catalog?format=xlsx" variant="secondary"><Download size={14} />Excel</LinkButton>}
         {edit && <DialogButton wide variant="secondary" label="Import" title="Import products & services" icon={<Upload size={14} />}><ImportForm action={importCatalog} columns="name, description, unit, rate, vat_category, category, notes" /></DialogButton>}

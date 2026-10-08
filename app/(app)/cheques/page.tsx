@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CalendarClock, Hourglass, Landmark, Plus, Undo2 } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
-import { Alert, Badge, Card, EmptyState, Field, Input, LinkButton, PageHeader, Pagination, Select, SortTh, StatCard, Td, Th, TableWrap, Textarea, type Tone } from '@/components/ui/primitives'
+import { Alert, Badge, Card, EmptyState, Field, Input, LinkButton, PageHeader, Pagination, Select, SortTh, Metrics, StatCard, Td, Th, TableWrap, Textarea, type Tone } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionForm } from '@/components/ui/action-form'
 import { MonthGrid } from '@/components/ui/month-grid'
@@ -59,9 +59,9 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
               <Field label="Linked tax invoice (incoming)" hint="When you later confirm the cheque as Cleared, you can apply it to this invoice." className="sm:col-span-2"><Select name="invoice_id" defaultValue=""><option value="">— None —</option>{(openInv ?? []).map((i: any) => <option key={i.id} value={i.id}>{i.number} · {i.customer_name ?? '—'} · AED {Number(i.total).toFixed(2)}</option>)}</Select></Field>
               <Field label="Cheque image (optional)" className="sm:col-span-2"><input type="file" name="file" accept={ACCEPT_ATTR} className="text-sm" /></Field>
               <Field label="Notes" className="sm:col-span-2"><Textarea name="notes" /></Field></div></ActionForm></DialogButton>}</>} />
-    <div className="mb-5"><Alert tone="amber"><b>Manual tracking only.</b> SaqrFlow does not connect to your bank, move money, check balances or detect clearance. “Cleared” is set by you after verifying with your bank.</Alert></div>
+    <div className="mb-5"><Alert tone="amber"><b>Manual tracking only.</b> Averiqo does not connect to your bank, move money, check balances or detect clearance. “Cleared” is set by you after verifying with your bank.</Alert></div>
 
-    <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <Metrics className="mb-5" cols={4}>
       <StatCard label="Incoming (open)" value={formatAed(s.incomingTotal)} hint={`${s.incomingCount} cheque${s.incomingCount === 1 ? '' : 's'}`} icon={ArrowDownLeft} tone="green" />
       <StatCard label="Outgoing (open)" value={formatAed(s.outgoingTotal)} hint={`${s.outgoingCount} cheque${s.outgoingCount === 1 ? '' : 's'}`} icon={ArrowUpRight} tone="blue" />
       <StatCard label="Due this week" value={s.dueThisWeek.length} hint={formatAed(s.dueThisWeek.reduce((a, x) => a + Number(x.amount), 0))} icon={CalendarClock} tone="amber" href="/cheques?status=scheduled" />
@@ -70,7 +70,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
       <StatCard label="Awaiting clearance" value={s.awaitingClearance.length} hint="Confirm after checking your bank" icon={Hourglass} tone="amber" href="/cheques?status=deposited" />
       <StatCard label="Returned / bounced" value={s.returned.length} icon={Undo2} tone={s.returned.length ? 'red' : 'neutral'} href="/cheques?status=returned" />
       <StatCard label="Net open position" value={formatAed(s.netPosition)} hint="Incoming − outgoing" icon={Landmark} />
-    </div>
+    </Metrics>
 
     <div className="mb-4 flex gap-1 border-b border-border">{[['list', 'List'], ['calendar', 'Monthly calendar']].map(([k, l]) => <Link key={k} href={`/cheques?view=${k}`} className={`-mb-px border-b-2 px-4 py-2 text-sm ${view === k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted'}`}>{l}</Link>)}</div>
 

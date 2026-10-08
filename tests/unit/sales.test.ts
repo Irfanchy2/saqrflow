@@ -60,3 +60,35 @@ describe('PDF file names', () => {
     expect(safePart('../../etc/passwd')).toBe('etc-passwd')
   })
 })
+
+import { matchesFormat } from '@/lib/numbering'
+describe('document number formats', () => {
+  const as = { prefix: 'AS', fixed_digits: '00', seq_pad: 5, year_separator: '/', include_year: true }
+  it('recognises the configured AS format', () => {
+    expect(matchesFormat('AS0025180/2026', as)).toBe(true)
+    expect(matchesFormat('AS00251801/2027', as)).toBe(true)
+  })
+  it('flags legacy numbers that need renumbering', () => {
+    expect(matchesFormat('QTN-2026-0004', as)).toBe(false)
+    expect(matchesFormat('QTN/2026/004', as)).toBe(false)
+    expect(matchesFormat('AS0025180-2026', as)).toBe(false)
+  })
+  it('handles formats without a year', () => {
+    expect(matchesFormat('PRJ00042', { prefix: 'PRJ', fixed_digits: '', seq_pad: 5, year_separator: '/', include_year: false })).toBe(true)
+  })
+})
+
+import { resolvePeriod } from '@/lib/reports/period'
+describe('report periods (company-local dates, no UTC shift)', () => {
+  it('defaults to this calendar month', () => { expect(resolvePeriod({}, '2026-10-08')).toMatchObject({ key: 'month', from: '2026-10-01', to: '2026-10-31' }) })
+  it('weeks start on Monday', () => { expect(resolvePeriod({ period: 'week' }, '2026-10-08')).toMatchObject({ from: '2026-10-05', to: '2026-10-11' }); expect(resolvePeriod({ period: 'week' }, '2026-10-11')).toMatchObject({ from: '2026-10-05' }) })
+  it('quarters and years', () => {
+    expect(resolvePeriod({ period: 'quarter' }, '2026-11-30')).toMatchObject({ from: '2026-10-01', to: '2026-12-31' })
+    expect(resolvePeriod({ period: 'quarter' }, '2026-02-28')).toMatchObject({ from: '2026-01-01', to: '2026-03-31' })
+    expect(resolvePeriod({ period: 'year' }, '2026-06-01')).toMatchObject({ from: '2026-01-01', to: '2026-12-31' })
+  })
+  it('custom ranges are validated and ordered', () => {
+    expect(resolvePeriod({ from: '2026-09-30', to: '2026-09-01' }, '2026-10-08')).toMatchObject({ key: 'custom', from: '2026-09-01', to: '2026-09-30' })
+    expect(resolvePeriod({ period: 'custom', from: 'nonsense', to: '2026-13-45' }, '2026-10-08')).toMatchObject({ from: '2026-10-01', to: '2026-10-08' })
+  })
+})

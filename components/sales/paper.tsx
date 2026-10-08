@@ -88,7 +88,7 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
           </dl>
         </div>
 
-        {isQtn && doc.intro && <div className="paper-text mb-[1.5mm]">{doc.intro}</div>}
+        {isQtn && doc.intro && <div className="paper-text mb-[1.5mm]" dir="auto">{doc.intro}</div>}
         {doc.subject && <div className="paper-text mb-[1.5mm]"><b>Subject:</b> {doc.subject}</div>}
         {!isInv && <div className="paper-keep-next text-[14px] font-bold">The scope of works:-</div>}
 
@@ -109,8 +109,8 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
               const amt = lineAmount(it), vat = lineVat(it, doc.vat_rate)
               return <tr key={i}>
                 <td className="text-center font-bold">{String(i + 1).padStart(2, '0')}</td>
-                <td className="paper-desc">{it.description ? <div className="paper-text">{it.description}</div> : <span className="text-neutral-400">—</span>}
-                  {it.materials && <div className="paper-text mt-[0.5mm] text-[12px]"><b>Materials to be used:</b> {it.materials}</div>}
+                <td className="paper-desc">{it.description ? <div className="paper-text" dir="auto">{it.description}</div> : <span className="text-neutral-400">—</span>}
+                  {it.materials && <div className="paper-text mt-[0.5mm] text-[12px]" dir="auto"><b>Materials to be used:</b> {it.materials}</div>}
                   {!isDn && (Number(it.discount_pct) > 0 || (it.vat_category && it.vat_category !== 'standard')) && <div className="mt-[0.5mm] text-[11px] italic">
                     {Number(it.discount_pct) > 0 && <>Less {Number(it.discount_pct)}% discount{it.vat_category && it.vat_category !== 'standard' ? ' · ' : ''}</>}
                     {it.vat_category && it.vat_category !== 'standard' && VAT_CATEGORIES[it.vat_category as VatCategory]}</div>}</td>
@@ -191,10 +191,11 @@ export function TextHeader({ b }: { b: Branding }) {
     {b.companyTrn && <div className="text-[11px]">TRN {b.companyTrn}</div>}
   </div>
 }
-const Pair = ({ k, v }: { k: string; v: string }) => <div className="paper-pair"><dt>{k}</dt><dd>{v}</dd></div>
+// dd dir="auto": each value takes its own direction (Arabic names / address lines align right, English left) inside the LTR document
+const Pair = ({ k, v }: { k: string; v: string }) => <div className="paper-pair"><dt>{k}</dt><dd dir="auto">{v}</dd></div>
 function Clauses({ title, items }: { title: string; items: string[] }) {
   return <div className="paper-clauses">
     <div className="paper-keep-next mt-[1.5mm] text-[16px] font-bold underline">{title}</div>
-    <ol>{items.map((x, i) => <li key={i}><span>{i + 1}.</span><span className="paper-text">{x}</span></li>)}</ol>
+    <ol>{items.map((x, i) => <li key={i}><span>{i + 1}.</span><span className="paper-text" dir="auto">{x}</span></li>)}</ol>
   </div>
 }

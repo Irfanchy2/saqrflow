@@ -35,7 +35,7 @@ export function CustomerPicker({ customers, value, onPick, disabled }: { custome
       {current && !disabled && <span role="button" tabIndex={-1} aria-label="Clear customer" onClick={e => { e.stopPropagation(); choose(null) }} className="rounded p-0.5 text-muted hover:text-fg"><X size={14} /></span>}
       <ChevronsUpDown size={14} className="shrink-0 text-muted" aria-hidden />
     </button>
-    {open && <div className="toast-in absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+    {open && <div className="toast-in absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-pop">
       <div className="flex items-center gap-2 border-b border-border px-3"><Search size={14} className="text-muted" aria-hidden />
         <input ref={input} dir="auto" value={q} onChange={e => { setQ(e.target.value); setHi(0) }} onKeyDown={key} placeholder="Name, TRN, phone, contact…" aria-label="Search customers"
           role="combobox" aria-expanded aria-controls={listId} aria-activedescendant={`${listId}-${hi}`} className="h-10 flex-1 bg-transparent text-sm outline-none focus-visible:ring-0" /></div>

@@ -15,7 +15,7 @@ describe('timezone handling (Asia/Dubai, UTC+4, no DST)', () => {
     expect(addDays('2026-12-30', 3)).toBe('2027-01-02')
     expect(endOfMonth('2026-02-10')).toBe('2026-02-28'); expect(endOfMonth('2028-02-10')).toBe('2028-02-29')
   })
-  it('formats', () => { expect(formatLongDate('2026-10-20')).toBe('20 October 2026'); expect(formatAed(15000)).toBe('AED 15,000') })
+  it('formats', () => { expect(formatLongDate('2026-10-20')).toBe('20 October 2026'); expect(formatAed(15000)).toBe('AED 15,000.00'); expect(formatAed(1250.1)).toBe('AED 1,250.10'); expect(formatAed(-7.005)).toBe('-AED 7.01') })
   it('quiet hours, including windows that wrap midnight', () => {
     expect(inQuietHours('23:30', '22:00', '07:00')).toBe(true)
     expect(inQuietHours('06:59', '22:00', '07:00')).toBe(true)
@@ -82,5 +82,14 @@ describe('next trigger date & recurrence', () => {
     expect(advanceDue('2025-02-28', 'yearly', '2026-10-04')).toBe('2027-02-28')
     expect(advanceDue('2026-12-01', 'monthly', '2026-10-04')).toBe('2026-12-01')   // future: unchanged
     expect(advanceDue('2026-01-01', 'none', '2026-10-04')).toBe('2026-01-01')
+  })
+})
+
+import { localDate } from '@/lib/time'
+describe('timestamps → business dates', () => {
+  it('uses the Dubai calendar date, not the UTC one', () => {
+    expect(localDate('2026-10-07T21:30:00Z')).toBe('2026-10-08')   // 01:30 in Dubai
+    expect(localDate('2026-10-07T19:59:59Z')).toBe('2026-10-07')
+    expect(localDate('2026-12-31T20:00:00Z')).toBe('2027-01-01')
   })
 })

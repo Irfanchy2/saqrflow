@@ -112,7 +112,7 @@ export async function createParty(kind: 'customers' | 'suppliers', _: ActionStat
     const row: Record<string, unknown> = { ...v, company_id: c.company.id }
     if (table === 'suppliers') { delete row.credit_days; delete row.opening_balance; delete row.opening_balance_date } else row.created_by = c.userId
     const { data, error } = await c.supabase.from(table).insert(row).select('id').single()
-    if (error) { if (error.code === '23505') return { error: `A ${table === 'customers' ? 'customer' : 'supplier'} named “${v.name}” already exists (it may be in the trash — Settings → Trash).` }; throw error }
+    if (error) { if (error.code === '23505') return { error: `A ${table === 'customers' ? 'customer' : 'supplier'} named “${v.name}” already exists (it may be in the trash: Settings → Trash).` }; throw error }
     revalidatePath('/parties'); return { ok: true, message: 'Saved.', data: { id: data.id } }
   })
 }

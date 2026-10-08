@@ -10,7 +10,7 @@ export function NotificationBell({ items, unread }: { items: Notif[]; unread: nu
     <summary aria-label={`Notifications (${unread} unread)`} className="relative grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-fg [&::-webkit-details-marker]:hidden">
       <Bell size={17} />{unread > 0 && <span className="absolute end-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">{unread > 9 ? '9+' : unread}</span>}
     </summary>
-    <div className="absolute end-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+    <div className="absolute end-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border bg-surface shadow-pop">
       <div className="flex items-center justify-between border-b border-border px-3 py-2"><span className="text-sm font-semibold">Notifications</span>
         {unread > 0 && <ActionButton action={markAllRead} variant="ghost">Mark all read</ActionButton>}</div>
       <ul className="max-h-96 overflow-y-auto">

@@ -25,9 +25,9 @@ export default async function PrintSales({ params, searchParams }: { params: Pro
   const branding = await brandingFor(c)
   return <div className="print-sheet min-h-screen bg-neutral-200 py-8 print:py-0">
     <div className="no-print mx-auto mb-4 flex max-w-[794px] items-center justify-between px-2 text-sm text-neutral-700">
-      <span>{DOC_META[d.doc.doc_type].label} {d.doc.number} — A4, no margins. Turn on “Background graphics” for the shaded boxes.</span>
+      <span>{DOC_META[d.doc.doc_type].label} {d.doc.number}: A4, no margins. Turn on “Background graphics” for the shaded boxes.</span>
       <PrintButton auto={(await searchParams).auto === '1'} />
     </div>
-    <SalesPaper doc={d.doc} items={d.items} branding={branding} paid={d.paid + ((d as any).credited ?? 0)} className="shadow-xl print:shadow-none" />
+    <SalesPaper doc={d.doc} items={d.items} branding={branding} paid={d.paid + ((d as any).credited ?? 0)} className="shadow-pop print:shadow-none" />
   </div>
 }

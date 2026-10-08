@@ -52,7 +52,7 @@ export async function processBatch(store: Store, senders: Senders, opts: { now?:
       if (log.channel === 'in_app') { await store.createInApp(log, r); res = { ok: true, sandbox: false } }
       else if (log.channel === 'whatsapp') res = await senders.whatsapp(r.whatsapp_number!, log.template, log.params, log.company_id)
       else if (!r.email) res = { ok: false, retryable: false, error: 'Recipient has no email address' }
-      else res = await senders.email(r.email, log.template === 'daily_summary' ? 'SaqrFlow daily summary' : 'SaqrFlow reminder', renderText(log.template, log.params), log.company_id)
+      else res = await senders.email(r.email, log.template === 'daily_summary' ? 'Averiqo daily summary' : 'Averiqo reminder', renderText(log.template, log.params), log.company_id)
     } catch (e) { res = { ok: false, retryable: true, error: (e as Error).message } }
 
     const attempts = log.attempts + 1

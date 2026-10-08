@@ -26,7 +26,7 @@ export function CatalogPicker({ items, onPick, priced }: { items: CatalogOpt[]; 
       title={items.length ? undefined : 'Add products & services in Settings → Item catalog'}
       className="flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-surface px-3 text-sm font-medium text-muted transition-colors hover:border-primary/50 hover:text-fg disabled:cursor-not-allowed disabled:opacity-60">
       <PackagePlus size={15} aria-hidden />Add from catalog{items.length ? '' : ' (empty)'}</button>
-    {open && <div className="toast-in absolute inset-x-0 bottom-full z-30 mb-1 overflow-hidden rounded-lg border border-border bg-surface shadow-xl sm:bottom-auto sm:top-full sm:mt-1">
+    {open && <div className="toast-in absolute inset-x-0 bottom-full z-30 mb-1 overflow-hidden rounded-lg border border-border bg-surface shadow-pop sm:bottom-auto sm:top-full sm:mt-1">
       <div className="flex items-center gap-2 border-b border-border px-3"><Search size={14} className="text-muted" aria-hidden />
         <input ref={input} dir="auto" value={q} onChange={e => { setQ(e.target.value); setHi(0) }} placeholder="Search products & services…" aria-label="Search catalog"
           role="combobox" aria-expanded aria-controls={listId} aria-activedescendant={`${listId}-${hi}`}

@@ -12,7 +12,7 @@ export async function saveNumbering(docType: string, _: ActionState, fd: FormDat
     const c = await getCtx(); need(c, 'settings.manage')
     const t = z.enum(TYPES).parse(docType)
     if (fd.get('enabled') !== 'on') {
-      if (t === 'quotation') return { error: 'Quotations always use a custom format — change its fields instead.' }
+      if (t === 'quotation') return { error: 'Quotations always use a custom format. Change its fields instead.' }
       const { error } = await c.supabase.from('document_number_formats').delete().eq('doc_type', t)
       if (error) throw error
       revalidatePath('/settings'); return { ok: true, message: 'Back to the standard format.' }

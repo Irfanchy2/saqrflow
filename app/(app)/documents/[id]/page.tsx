@@ -9,7 +9,7 @@ import { DocFields } from '@/components/documents/doc-fields'
 import { StatusBadge } from '@/components/documents/status-badge'
 import { recordRenewal, replaceFile, setDeleted, updateDocument } from '@/app/actions/documents'
 import { ACCEPT_ATTR } from '@/lib/files'
-import { formatAed } from '@/lib/time'
+import { formatAed, localDate } from '@/lib/time'
 
 export const metadata = { title: 'Document' }
 const kb = (n: number) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
@@ -63,8 +63,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
         <Card><CardHeader title="Version history" sub="Old versions are never removed automatically." />
           {versions?.length ? <TableWrap><thead className="border-b border-border"><tr><Th>Ver.</Th><Th>File</Th><Th>Uploaded</Th><Th>Note</Th><Th /></tr></thead>
             <tbody className="divide-y divide-border">{versions.map((v: any) => <tr key={v.id}><Td>v{v.version_no}{v.id === doc.current_version_id && <Badge tone="blue" className="ms-2">current</Badge>}</Td>
-              <Td>{v.file_name}<div className="text-xs text-muted">{kb(v.size_bytes)}</div></Td><Td className="text-muted">{v.created_at.slice(0, 10)}<div className="text-xs">{v.uploader?.full_name}</div></Td>
-              <Td className="text-muted">{v.note ?? '—'}</Td><Td><Link className="text-primary hover:underline" href={`/api/documents/${id}/download?v=${v.id}`}>Download</Link></Td></tr>)}</tbody></TableWrap>
+              <Td>{v.file_name}<div className="text-xs text-muted">{kb(v.size_bytes)}</div></Td><Td className="text-muted">{localDate(v.created_at, c.company.timezone)}<div className="text-xs">{v.uploader?.full_name}</div></Td>
+              <Td className="text-muted">{v.note ?? '—'}</Td><Td><a className="text-primary hover:underline" href={`/api/documents/${id}/download?v=${v.id}`}>Download</a></Td></tr>)}</tbody></TableWrap>
             : <EmptyState title="No versions yet" />}</Card>
       </div>
       <div className="space-y-5 lg:col-span-2">

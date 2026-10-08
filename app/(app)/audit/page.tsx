@@ -28,7 +28,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const who = new Map((people ?? []).map(p => [p.id, p.full_name]))
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
-    <PageHeader title="Audit log" sub="Every create, edit, delete, restore, payment, status change, export and settings change — with the user and time. Passwords, API keys and confidential values are never logged." />
+    <PageHeader title="Audit log" sub="Every create, edit, delete, restore, payment, status change, export and settings change. With the user and time. Passwords, API keys and confidential values are never logged." />
     <Card>
       <form className="flex flex-wrap gap-2 border-b border-border p-3">
         <select name="table" defaultValue={sp.table ?? ''} aria-label="Record type" className={cls}><option value="">All records</option>{Object.entries(TABLE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>

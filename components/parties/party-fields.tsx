@@ -12,7 +12,7 @@ export function PartyFields({ p, customer = true, create = false }: { p?: Record
     <Field label="Address" className="sm:col-span-2"><Textarea name="address" rows={2} maxLength={500} defaultValue={p?.address ?? ''} /></Field>
     {customer && <>
       <Field label="Credit terms (days)" hint="Due date for new invoices"><Input name="credit_days" type="number" min={0} max={365} defaultValue={p?.credit_days ?? ''} placeholder="e.g. 30" /></Field>
-      <Field label="Opening balance (AED)" hint="Amount owed before using SaqrFlow"><Input name="opening_balance" type="number" step="0.01" defaultValue={p?.opening_balance ?? ''} /></Field>
+      <Field label="Opening balance (AED)" hint="Amount owed before using Averiqo"><Input name="opening_balance" type="number" step="0.01" defaultValue={p?.opening_balance ?? ''} /></Field>
       <Field label="Opening balance date"><Input name="opening_balance_date" type="date" defaultValue={p?.opening_balance_date ?? ''} /></Field>
     </>}
     <Field label="Notes" className="sm:col-span-2"><Textarea name="notes" maxLength={2000} defaultValue={p?.notes ?? ''} /></Field>

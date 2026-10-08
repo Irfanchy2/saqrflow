@@ -19,12 +19,12 @@ export function DialogButton({ label, title, children, icon, variant = 'primary'
   return <>
     <Button variant={variant} size={size} onClick={() => ref.current?.showModal()}>{icon}{label}</Button>
     <dialog ref={ref} onClick={e => { if (e.target === ref.current) ref.current?.close() }}
-      className={`m-auto w-[calc(100%-2rem)] ${wide ? 'max-w-2xl' : 'max-w-lg'} rounded-lg border border-border bg-surface p-0 text-fg shadow-2xl`}>
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-base font-semibold">{title}</h2>
-        <button aria-label="Close" className="rounded p-1 text-muted hover:bg-surface-2" onClick={() => ref.current?.close()}><X size={16} /></button>
+      className={`m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col ${wide ? 'max-w-2xl' : 'max-w-lg'} rounded-lg border border-border bg-surface p-0 text-fg shadow-pop open:flex`}>
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
+        <h2 className="text-[15px] font-semibold">{title}</h2>
+        <button type="button" aria-label="Close" className="grid h-8 w-8 cursor-pointer place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-fg" onClick={() => ref.current?.close()}><X size={16} /></button>
       </div>
-      <Ctx.Provider value={{ close: () => ref.current?.close() }}><div className="max-h-[75vh] overflow-y-auto p-5">{children}</div></Ctx.Provider>
+      <Ctx.Provider value={{ close: () => ref.current?.close() }}><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">{children}</div></Ctx.Provider>
     </dialog>
   </>
 }

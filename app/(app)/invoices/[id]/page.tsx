@@ -6,6 +6,7 @@ import { brandingFor, loadSalesDoc, salesSettings } from '@/lib/sales/data'
 import { APPROVAL_LABEL, DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
 import { SalesEditor } from '@/components/sales/editor'
+import { matchesFormat } from '@/lib/numbering'
 import { Badge, Card, CardHeader, Field, Input, Select, Td, Th, TableWrap, Textarea } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
@@ -43,7 +44,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const locked = d.doc.status === 'cancelled' ? 'This document is cancelled and kept for your records. Duplicate it to start again.'
     : isInv && ['partially_paid', 'paid'].includes(d.doc.status) ? 'This invoice has payments, so its lines are locked. Issue a credit note for corrections.'
     : t === 'credit_note' && d.doc.status !== 'draft' ? 'This credit note is issued and can no longer be edited.'
-    : pendingApproval && !c.can('sales.approve') ? 'Waiting for manager approval — editing is locked until a decision is made.' : null
+    : pendingApproval && !c.can('sales.approve') ? 'Waiting for manager approval. Editing is locked until a decision is made.' : null
   const credited = (d as any).credited as number
   const balance = Number(d.doc.total) - d.paid - credited
   const usedCheques = new Set(d.payments.map((p: any) => p.cheque_id).filter(Boolean))
@@ -55,21 +56,24 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const { data: payDocs } = isInv && d.payments.some((p: any) => p.document_id) ? await c.supabase.from('documents').select('id,name').in('id', d.payments.map((p: any) => p.document_id).filter(Boolean)) : { data: [] as any[] }
   const docName = new Map((payDocs ?? []).map((x: any) => [x.id, x.name]))
 
+  // a draft still carrying a number from before the custom format was configured (e.g. QTN-2026-0004) can take a new one
+  const { data: fmt } = edit && d.doc.status === 'draft' && !(d.doc as any).sent_at && !d.doc.revision ? await c.supabase.from('document_number_formats').select('prefix,fixed_digits,seq_pad,year_separator,include_year').eq('doc_type', d.doc.doc_type).maybeSingle() : { data: null }
+  const canRenumber = !!fmt && !matchesFormat(d.doc.number, fmt)
   return <>
     <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} customers={(customers ?? []) as any} projects={(projects ?? []) as any}
       catalog={(catalog ?? []).map((x: any) => ({ ...x, rate: Number(x.rate) }))} templates={(templates ?? []) as any} salespeople={people ?? []} delivery={delivery}
       editable={edit && !locked} lockedReason={!edit ? 'You can view this document but not change it.' : locked} requireApproval={settings.requireApproval}
-      canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} />
+      canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber} />
 
     <div className="no-print mt-2 grid gap-5 px-0 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
       {isQtn && pendingApproval && c.can('sales.approve') && <Card className="border-warning/40"><CardHeader title="Approval requested" sub="Review the quotation, then decide" action={<ShieldCheck size={16} className="text-warning" aria-hidden />} />
         <div className="p-4"><ActionForm action={decideApproval.bind(null, id)} submit="Save decision">
-          <Field label="Decision *"><Select name="decision" defaultValue="approved"><option value="approved">Approve — it can be sent</option><option value="changes_requested">Request changes</option><option value="rejected">Reject</option></Select></Field>
+          <Field label="Decision *"><Select name="decision" defaultValue="approved"><option value="approved">Approve. It can be sent</option><option value="changes_requested">Request changes</option><option value="rejected">Reject</option></Select></Field>
           <Field label="Note" hint="Required when requesting changes or rejecting"><Textarea name="note" maxLength={500} /></Field></ActionForm></div></Card>}
 
       {isInv && <Card className="lg:col-span-2 2xl:col-span-2">
         <CardHeader title="Payments" sub={`Invoice AED ${fmtMoney(d.doc.total)} · Paid AED ${fmtMoney(d.paid)}${credited ? ` · Credited AED ${fmtMoney(credited)}` : ''} · Balance AED ${fmtMoney(balance)}${d.doc.due_date && balance > 0 && d.doc.due_date < c.today ? ` · ${Math.round((Date.parse(c.today) - Date.parse(d.doc.due_date)) / 864e5)} days overdue` : ''}`}
-          action={edit && !['draft', 'cancelled', 'paid'].includes(d.doc.status) ? <DialogButton size="sm" label="Record payment" title={`Record payment — ${d.doc.number}`} icon={<Plus size={14} />} wide>
+          action={edit && !['draft', 'cancelled', 'paid'].includes(d.doc.status) ? <DialogButton size="sm" label="Record payment" title={`Record payment: ${d.doc.number}`} icon={<Plus size={14} />} wide>
             <ActionForm action={recordPayment.bind(null, id)} submit="Save payment" idempotent>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Amount (AED) *" hint={`Outstanding: AED ${fmtMoney(balance)}`}><Input name="amount" type="number" step="0.01" min="0.01" max={balance.toFixed(2)} defaultValue={balance.toFixed(2)} required inputMode="decimal" /></Field>

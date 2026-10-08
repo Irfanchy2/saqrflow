@@ -13,7 +13,7 @@ export async function renderStatementPdf(cu: StatementCustomer, l: Ledger, o: {
   from?: string; to?: string; today: string; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
-  pdf.setTitle(`Statement of account — ${cu.name}`); pdf.setCreator('SaqrFlow'); pdf.setProducer('SaqrFlow')
+  pdf.setTitle(`Statement of account: ${cu.name}`); pdf.setCreator('Averiqo'); pdf.setProducer('Averiqo')
   const font = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold), it = await pdf.embedFont(StandardFonts.HelveticaOblique)
   const img: Partial<Record<BrandKind, PDFImage>> = {}
   for (const [k, v] of Object.entries(o.images)) { try { img[k as BrandKind] = v!.png ? await pdf.embedPng(v!.bytes) : await pdf.embedJpg(v!.bytes) } catch { /* skip */ } }

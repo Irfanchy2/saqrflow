@@ -48,7 +48,7 @@ export async function fileInboxItem(c: Ctx, inboxId: string, input: FileInput): 
   if (def.owner === 'employee' && !v.owner_id && v.new_employee_name) {
     // only on an explicit reviewer choice — never automatically (avoids duplicate people)
     const { data: same } = await c.supabase.from('employees').select('id,full_name').ilike('full_name', v.new_employee_name).limit(1)
-    if (same?.length) throw new Error(`An employee named “${same[0].full_name}” already exists — choose them from the list instead.`)
+    if (same?.length) throw new Error(`An employee named “${same[0].full_name}” already exists. Choose them from the list instead.`)
     const { count } = await c.supabase.from('employees').select('id', { count: 'exact', head: true })
     let created: string | null = null
     for (let n = (count ?? 0) + 1; n < (count ?? 0) + 20 && !created; n++) {

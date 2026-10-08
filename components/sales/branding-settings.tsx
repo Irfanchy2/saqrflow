@@ -8,7 +8,7 @@ import { removeBranding, saveSalesSettings, uploadBranding } from '@/app/actions
 const KINDS = [
   { k: 'logo', label: 'Logo', hint: 'Used with the company details below when no letterhead image is uploaded' },
   { k: 'header', label: 'Letterhead (quotation & delivery note)', hint: 'Wide PNG/JPG, ~1600×250 px' },
-  { k: 'header_invoice', label: 'Letterhead (tax invoice)', hint: 'Optional — falls back to the letterhead above' },
+  { k: 'header_invoice', label: 'Letterhead (tax invoice)', hint: 'Optional. Falls back to the letterhead above' },
   { k: 'footer', label: 'Footer', hint: 'Contact strip printed at the bottom of every page' },
   { k: 'stamp', label: 'Company stamp', hint: 'Transparent PNG works best' },
   { k: 'signature', label: 'Authorised signature', hint: 'Transparent PNG works best' },
@@ -18,8 +18,8 @@ const KINDS = [
 export async function BrandingSettings({ c }: { c: Ctx }) {
   const [b, s] = await Promise.all([brandingFor(c), salesSettings(c)])
   const url: Record<string, string | null | undefined> = { logo: b.logo, header: b.header, header_invoice: b.headerInvoice, footer: b.footer, stamp: b.stamp, signature: b.signature }
-  return <Card className="lg:col-span-2" id="branding">
-    <CardHeader title="Document branding & sales defaults" sub="Letterhead, logo, stamp, signature, VAT and default wording — no code changes needed."
+  return <Card id="branding">
+    <CardHeader title="Document branding & sales defaults" sub="Letterhead, logo, stamp, signature, VAT and default wording. No code changes needed."
       action={<Badge tone={b.header ? 'green' : 'amber'}>{b.header ? 'Letterhead set' : 'No letterhead yet'}</Badge>} />
     <div className="grid gap-6 p-4 xl:grid-cols-2">
       <div className="space-y-3">
@@ -54,9 +54,9 @@ export async function BrandingSettings({ c }: { c: Ctx }) {
           <Field label="Brand colour" hint="Table header & title accent"><div className="flex items-center gap-2">{b.brandColor && <span className="h-7 w-7 shrink-0 rounded border border-border" style={{ background: b.brandColor }} aria-hidden />}<Input name="brand_color" placeholder="#B91C1C (empty = black & white)" defaultValue={b.brandColor ?? ''} maxLength={7} pattern="#[0-9a-fA-F]{6}" /></div></Field>
           <Field label="Logo / letterhead height (mm)" hint="0 = automatic"><Input name="logo_height" type="number" min={0} max={60} defaultValue={b.logoHeight ?? 0} /></Field>
           <Field label="Logo position"><Select name="logo_align" defaultValue={b.logoAlign ?? 'center'}><option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option></Select></Field>
-          <p className="text-xs text-muted sm:col-span-2">A brand colour is optional — documents stay black &amp; white (grayscale-safe) without it.</p>
+          <p className="text-xs text-muted sm:col-span-2">A brand colour is optional. Documents stay black &amp; white (grayscale-safe) without it.</p>
         </fieldset>
-        <Field label="Bank details on invoices" hint="Account name, bank, IBAN — printed on the invoice for customers to pay you"><Textarea name="bank_details" rows={3} defaultValue={b.bankDetails ?? ''} /></Field>
+        <Field label="Bank details on invoices" hint="Account name, bank, IBAN. Printed on the invoice for customers to pay you"><Textarea name="bank_details" rows={3} defaultValue={b.bankDetails ?? ''} /></Field>
         <Field label="Quotation opening"><Textarea name="intro" rows={2} defaultValue={s.intro} /></Field>
         <Field label="Quotation closing note"><Textarea name="closing" rows={2} defaultValue={s.closing} /></Field>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -66,7 +66,7 @@ export async function BrandingSettings({ c }: { c: Ctx }) {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_header_footer" defaultChecked={b.showHeaderFooter} />Print letterhead and footer (turn off for pre-printed paper)</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_stamp" defaultChecked={b.showStamp} />Add stamp and signature to quotations and delivery notes</label>
         <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2"><legend className="px-1 text-sm font-medium">Quotation workflow</legend>
-          <Field label="Follow-up reminders (days after sending)" hint="e.g. 3, 10 — created when a quotation is marked sent"><Input name="followup_days" defaultValue={s.followupDays.join(', ')} placeholder="3, 10" /></Field>
+          <Field label="Follow-up reminders (days after sending)" hint="e.g. 3, 10. Created when a quotation is marked sent"><Input name="followup_days" defaultValue={s.followupDays.join(', ')} placeholder="3, 10" /></Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="require_approval" defaultChecked={s.requireApproval} />Quotations need manager approval before they can be sent</label>
         </fieldset>
         <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-4"><legend className="px-1 text-sm font-medium">Seal &amp; signature on the document</legend>
