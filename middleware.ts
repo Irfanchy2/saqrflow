@@ -50,4 +50,4 @@ export async function middleware(req: NextRequest) {
   refreshed.forEach(({ name, value, options }) => res.cookies.set(name, value, options))
   return res
 }
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|ico|webp)$).*)'] }
+export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|ico|webp)$).*)'] }
