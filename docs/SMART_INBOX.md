@@ -1,6 +1,6 @@
 # Smart Document Inbox (Phase 1 of the document-automation update)
 
-Drop any document in **Smart Inbox** (sidebar). SaqrFlow reads it, works out what it is and who it belongs to, and proposes where to file it.
+Drop any document in **Smart Inbox** (sidebar). Averiqo reads it, works out what it is and who it belongs to, and proposes where to file it.
 **Nothing is filed until a person confirms**; uncertain results are labelled *Manual review required*.
 
 ## Flow

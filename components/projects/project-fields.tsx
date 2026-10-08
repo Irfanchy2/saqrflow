@@ -3,8 +3,8 @@ import { PROJECT_STATUS } from '@/lib/projects'
 
 export function ProjectFields({ customers, p = {} }: { customers: { id: string; name: string }[]; p?: Record<string, any> }) {
   return <div className="grid gap-4 sm:grid-cols-2">
-    <Field label="Project name *" className="sm:col-span-2"><Input name="name" required maxLength={200} defaultValue={p.name} placeholder="e.g. Steel staircase — Villa 22, Fujairah" /></Field>
-    <Field label="Project code" hint="Optional, e.g. PRJ-2026-014"><Input name="code" maxLength={40} defaultValue={p.code ?? ''} /></Field>
+    <Field label="Project name *" className="sm:col-span-2"><Input name="name" required maxLength={200} defaultValue={p.name} placeholder="e.g. Steel staircase, Villa 22, Fujairah" /></Field>
+    <Field label="Project code" hint="Leave blank to number it automatically"><Input name="code" maxLength={40} defaultValue={p.code ?? ''} /></Field>
     <Field label="Client"><Select name="customer_id" defaultValue={p.customer_id ?? ''}><option value="">— None —</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
     <Field label="Location / site"><Input name="location" maxLength={300} defaultValue={p.location ?? ''} /></Field>
     <Field label="Contract value (AED)"><Input name="contract_value" type="number" min={0} step="0.01" defaultValue={p.contract_value ?? ''} /></Field>

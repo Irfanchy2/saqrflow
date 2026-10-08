@@ -39,7 +39,7 @@ export async function saveAiSettings(_: ActionState, fd: FormData): Promise<Acti
       await saveSecret(c.company.id, name, v!.trim())
     }
     revalidatePath('/settings'); revalidatePath('/inbox')
-    return { ok: true, message: given.length ? `Saved. ${given.length} key(s) encrypted — they will never be displayed again.` : 'Saved.' }
+    return { ok: true, message: given.length ? `Saved. ${given.length} key(s) encrypted. They will never be displayed again.` : 'Saved.' }
   })
 }
 
@@ -86,15 +86,15 @@ export async function sendTestReminder(_: ActionState, fd: FormData): Promise<Ac
     const rid = z.string().uuid({ message: 'Choose a recipient' }).parse(str(fd, 'recipient_id'))
     const { data: r } = await c.supabase.from('notification_recipients').select('id,whatsapp_number,whatsapp_opt_in').eq('id', rid).maybeSingle()
     if (!r) return { error: 'Recipient not found.' }
-    if (!r.whatsapp_number || r.whatsapp_opt_in !== 'opted_in') return { error: 'This recipient has no WhatsApp number or has not opted in (Smart Reminders → Recipients).' }
+    if (!r.whatsapp_number || r.whatsapp_opt_in !== 'opted_in') return { error: 'This recipient has no WhatsApp number or has not opted in (Reminders → Recipients).' }
     const admin = createAdminClient()
-    const params = { ...documentParams({ title: 'Residence Visa (TEST)', subject: 'Sample Employee', expiry: addDays(c.today, 15), daysRemaining: 15 }), _link: '/reminders', _title: 'SaqrFlow test reminder' }
+    const params = { ...documentParams({ title: 'Residence Visa (TEST)', subject: 'Sample Employee', expiry: addDays(c.today, 15), daysRemaining: 15 }), _link: '/reminders', _title: 'Averiqo test reminder' }
     const { data: log, error } = await admin.from('notification_logs').insert({ company_id: c.company.id, recipient_id: rid, channel: 'whatsapp', template: 'document_reminder', params, dedupe_key: `test:${crypto.randomUUID()}`, source_type: 'test' }).select('id').single()
     if (error) throw error
     await processBatch(supabaseStore(admin), makeSenders(admin), { tz: c.company.timezone, emailFallback: false })
     const { data: res } = await admin.from('notification_logs').select('status,last_error').eq('id', log.id).single()
     revalidatePath('/reminders')
-    if (res?.status === 'sandbox') return { ok: true, message: 'SANDBOX: logged only — WhatsApp credentials are not configured (or sandbox mode is on).' }
+    if (res?.status === 'sandbox') return { ok: true, message: 'SANDBOX: logged only: WhatsApp credentials are not configured (or sandbox mode is on).' }
     if (res?.status === 'sent') return { ok: true, message: 'Accepted by WhatsApp. Delivery status will appear in the notification log.' }
     if (res?.status === 'queued') return { ok: true, message: 'Held for quiet hours; it will be sent when they end.' }
     return { error: `Not sent (${res?.status}): ${res?.last_error ?? 'unknown reason'}` }

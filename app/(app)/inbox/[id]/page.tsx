@@ -53,7 +53,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
       <div><h1 className="text-xl font-semibold tracking-tight">{item.file_name}</h1>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm"><StatusPill s={item.status} /><ConfidenceBand v={item.confidence} />{engineInfo && <span className="text-xs text-muted">{engineInfo}{item.processing_ms ? ` · ${(item.processing_ms / 1000).toFixed(1)}s` : ''}</span>}</div></div>
       <div className="flex flex-wrap gap-2">
-        <Link href={`/api/inbox/${id}/file?mode=download`} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium hover:bg-surface-2"><Download size={15} />Download</Link>
+        <a href={`/api/inbox/${id}/file?mode=download`} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium hover:bg-surface-2"><Download size={15} />Download</a>
         {!filed && <ActionForm action={reprocessInboxItem.bind(null, id)} hideSubmit resetOnSuccess={false} className="flex items-center gap-1.5">
           <select name="ocr" aria-label="OCR provider for reprocessing" defaultValue="" className="h-9 rounded-md border border-border bg-surface px-2 text-sm"><option value="">Default OCR</option>{OCR_MODES.map(m => <option key={m.id} value={m.id}>{m.id === 'auto' ? 'Auto' : m.label.replace(' (nothing leaves the server)', '')}</option>)}</select>
           <SubmitButton><RefreshCw size={14} />Reprocess</SubmitButton></ActionForm>}
@@ -66,7 +66,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
       <Card className="lg:col-span-2"><CardHeader title="Preview" />
         {isPdf ? <iframe title="Uploaded document" src={`/api/inbox/${id}/file`} className="h-[640px] w-full rounded-b-lg bg-surface-2" />
           : isImg ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/api/inbox/${id}/file`} alt="Uploaded document" className="w-full rounded-b-lg" />
-          : <p className="p-6 text-sm text-muted">No inline preview for this file type — use Download.</p>}</Card>
+          : <p className="p-6 text-sm text-muted">No inline preview for this file type. Use Download.</p>}</Card>
 
       <div className="space-y-5 lg:col-span-3">
         <Card><CardHeader title="Document detected" sub={s.label ? `${s.label}${item.confidence != null ? ` · ${Math.round(item.confidence * 100)}% confidence` : ''}` : undefined} action={<Badge tone="blue"><Sparkles size={12} />{x?.engine === 'gemini' ? 'Gemini' : x?.engine === 'claude' ? 'Claude' : 'Auto'}</Badge>} />
@@ -84,7 +84,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
             {(s.duplicates ?? []).length > 0 && <div className="rounded-md border border-danger/30 bg-danger/5 p-3"><div className="mb-2 font-medium text-danger">Possible duplicate detected</div>
               <ul className="space-y-1">{s.duplicates.map((dup: any) => <li key={dup.documentId} className="flex flex-wrap items-center justify-between gap-2"><span>{dup.name} <span className="text-xs text-muted">· {dup.kind === 'same_file' ? 'identical file' : dup.kind === 'same_number' ? 'same document number' : 'earlier version (renewal?)'}{dup.expiry ? ` · expires ${dup.expiry}` : ''}</span></span>
                 <Link className="text-xs font-medium text-primary hover:underline" href={`/documents/${dup.documentId}`} target="_blank">View existing</Link></li>)}</ul>
-              <p className="mt-2 text-xs text-muted">Below, choose <b>New version of existing</b> (old file stays in history), <b>Replace metadata</b>, <b>New document</b> to keep both — or <b>Delete upload</b> to cancel.</p></div>}
+              <p className="mt-2 text-xs text-muted">Below, choose <b>New version of existing</b> (old file stays in history), <b>Replace metadata</b>, <b>New document</b> to keep both. Or <b>Delete upload</b> to cancel.</p></div>}
           </div></Card>
 
         {!filed && item.status !== 'rejected' && <Card id="edit"><CardHeader title="Edit information & choose destination" sub="Nothing is saved until you press Confirm & File. Change anything first." />
@@ -93,7 +93,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
               <Field label="Document type *"><Select name="doc_type" defaultValue={d.doc_type} required><option value="" disabled>Choose…</option>
                 {(['company', 'employee', 'vehicle', 'customer', 'supplier', 'project'] as const).map(g => <optgroup key={g} label={{ company: 'Company', employee: 'Employee', vehicle: 'Vehicle', customer: 'Customer / sales', supplier: 'Supplier', project: 'Project' }[g]}>{DOC_TYPES.filter(t => t.owner === g).map(t => <option key={t.key} value={t.key}>{t.label}</option>)}</optgroup>)}</Select></Field>
               <Field label="Category (optional)" hint="Leave blank to use the standard category for this type."><Select name="category_id" defaultValue=""><option value="">Standard for this type</option>{cats?.map(k => <option key={k.id} value={k.id}>{k.name} ({k.scope})</option>)}</Select></Field>
-              {(def?.owner === 'employee' || !def) && <Field label="Employee" hint={candidates.length ? 'Confirm the suggested match, choose a different employee, or create a new one.' : 'No existing employee matched — choose one, or create a new employee.'}><Select name="owner_id" defaultValue={d.owner_id}><option value="">— choose employee —</option>
+              {(def?.owner === 'employee' || !def) && <Field label="Employee" hint={candidates.length ? 'Confirm the suggested match, choose a different employee, or create a new one.' : 'No existing employee matched. Choose one, or create a new employee.'}><Select name="owner_id" defaultValue={d.owner_id}><option value="">— choose employee —</option>
                 {candidates.length > 0 && <optgroup label="Possible match">{candidates.map(m => <option key={m.id} value={m.id}>{m.name} · {(emps ?? []).find(e => e.id === m.id)?.employee_no} · {Math.round(m.confidence * 100)}%</option>)}</optgroup>}
                 <optgroup label="All employees">{emps?.map(e => <option key={e.id} value={e.id}>{e.full_name} ({e.employee_no})</option>)}</optgroup>
                 <optgroup label="Not in the list"><option value="__new__">+ Create new employee…</option></optgroup></Select></Field>}
@@ -116,7 +116,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
             </div>
             <fieldset className="space-y-2 rounded-md border border-border p-3 text-sm"><legend className="px-1 font-medium">Save as</legend>
               <label className="flex items-center gap-2"><input type="radio" name="mode" value="new" defaultChecked={d.mode === 'new'} />New document</label>
-              <label className="flex items-start gap-2"><input type="radio" name="mode" value="version" defaultChecked={d.mode === 'version'} className="mt-0.5" /><span>New version of existing (renewal / replacement — previous file stays in version history)
+              <label className="flex items-start gap-2"><input type="radio" name="mode" value="version" defaultChecked={d.mode === 'version'} className="mt-0.5" /><span>New version of existing (renewal / replacement. Previous file stays in version history)
                 <Select name="target_document_id" defaultValue={d.target_document_id} className="mt-1"><option value="">— choose existing document —</option>{(s.duplicates ?? []).map((dup: any) => <option key={dup.documentId} value={dup.documentId}>{dup.name}{dup.expiry ? ` (expires ${dup.expiry})` : ''}</option>)}</Select></span></label>
               {(s.duplicates ?? []).length > 0 && <label className="flex items-center gap-2"><input type="radio" name="mode" value="metadata" />Replace metadata of the existing document (keep its file; use the details above)</label>}</fieldset>
             <label className="flex items-start gap-2 rounded-md bg-surface-2/60 p-3 text-sm"><input type="checkbox" name="reminders" defaultChecked={!!expiry} className="mt-0.5" /><span><b>Create expiry reminders</b> (uses your notification settings: WhatsApp / email / in-app)

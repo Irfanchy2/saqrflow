@@ -12,7 +12,7 @@ import { StatusBadge } from '@/components/documents/status-badge'
 import { addAdvance, addLeave, addSalaryPayment, setSalary, updateEmployee, uploadPhoto } from '@/app/actions/employees'
 import { createDocument } from '@/app/actions/documents'
 import { employeeChecklist } from '@/lib/compliance'
-import { daysBetween, formatAed } from '@/lib/time'
+import { daysBetween, formatAed, localDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { documentTimeline } from '@/lib/timeline'
 import { Timeline } from '@/components/timeline'
@@ -41,7 +41,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     <Link href="/employees" className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Employees</Link>
     <div className="mb-5 flex items-center gap-4">
       <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-primary-soft text-primary">
-        {e.photo_path ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/api/employees/${id}/photo`} alt="" className="h-full w-full object-cover" /> : <UserRound size={28} />}</div>
+        {e.photo_path ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/api/employees/${id}/photo?w=160`} alt="" loading="lazy" className="h-full w-full object-cover" /> : <UserRound size={28} />}</div>
       <div><h1 className="text-xl font-semibold tracking-tight">{e.full_name}</h1>
         <p className="text-sm text-muted">{[e.designation, e.department].filter(Boolean).join(' · ') || 'No designation'} · <span className="font-mono">{e.employee_no}</span></p>
         <div className="mt-1 flex gap-2"><Badge tone={e.status === 'active' ? 'green' : 'amber'}>{e.status.replace('_', ' ')}</Badge>{canSens && <Badge tone={checklist.issues ? 'red' : 'green'}>{checklist.score}% documents complete</Badge>}</div></div></div>
@@ -88,7 +88,7 @@ async function SalaryTab({ id, c }: { id: string; c: Awaited<ReturnType<typeof g
     <Card><CardHeader title="Monthly salary" /><div className="p-4"><div className="mb-3 text-2xl font-semibold tabular-nums">{comp ? formatAed(comp.monthly_salary) : 'Not set'}</div>
       <ActionForm action={setSalary.bind(null, id)} submit="Update" resetOnSuccess={false}><Field label="Monthly salary (AED)"><Input name="monthly_salary" type="number" step="0.01" min="0" defaultValue={comp?.monthly_salary} required /></Field></ActionForm>
       <p className="mt-3 text-xs text-muted">Visible only to roles with salary access. Changes are audit-logged (amounts are redacted in the log).</p>
-      <p className="mt-2 text-xs text-muted">WPS (SIF) export file generation is planned — the bank/agent specification must be confirmed first.</p></div></Card>
+      <p className="mt-2 text-xs text-muted">WPS (SIF) export file generation is planned. The bank/agent specification must be confirmed first.</p></div></Card>
     <Card className="lg:col-span-2"><CardHeader title="Salary payments" action={<DialogButton size="sm" label="Record payment" icon={<Plus size={14} />} title="Record salary payment">
       <ActionForm action={addSalaryPayment.bind(null, id)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Month *"><Input type="month" name="period" required /></Field><Field label="Amount (AED) *"><Input type="number" step="0.01" min="0" name="amount" defaultValue={comp?.monthly_salary} required /></Field>
         <Field label="Paid on"><Input type="date" name="paid_on" /></Field><Field label="Method"><Select name="method"><option value="">—</option><option value="wps">WPS</option><option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="cheque">Cheque</option></Select></Field></div><Field label="Notes"><Textarea name="notes" /></Field></ActionForm></DialogButton>} />
@@ -113,8 +113,8 @@ async function LeaveTab({ id, c }: { id: string; c: Awaited<ReturnType<typeof ge
 async function HistoryTab({ id, c, e }: { id: string; c: Awaited<ReturnType<typeof getCtx>>; e: any }) {
   const { data: logs } = c.can('audit.view') ? await c.supabase.from('audit_logs').select('id,action,table_name,created_at').eq('record_id', id).order('created_at', { ascending: false }).limit(30) : { data: [] as any[] }
   const events = await documentTimeline(c, { type: 'employee', id })
-  return <div className="grid gap-5 lg:grid-cols-2"><Card><CardHeader title="Document timeline" sub="Uploads, versions, renewals and reminders — previous documents stay in history" /><div className="p-4"><Timeline events={events} /></div></Card><Card><CardHeader title="Employment history" />
+  return <div className="grid gap-5 lg:grid-cols-2"><Card><CardHeader title="Document timeline" sub="Uploads, versions, renewals and reminders. Previous documents stay in history" /><div className="p-4"><Timeline events={events} /></div></Card><Card><CardHeader title="Employment history" />
     <ul className="divide-y divide-border text-sm"><li className="px-4 py-3">Joined <b>{e.joining_date ?? 'unknown date'}</b> · current status <b>{e.status.replace('_', ' ')}</b></li>
-      <li className="px-4 py-3 text-muted">Record created {e.created_at.slice(0, 10)}</li>
+      <li className="px-4 py-3 text-muted">Record created {localDate(e.created_at, c.company.timezone)}</li>
       {c.can('audit.view') && (logs ?? []).map((l: any) => <li key={l.id} className="flex justify-between px-4 py-2.5"><span><b className="capitalize">{l.action.toLowerCase()}</b> {l.table_name.replace('_', ' ')}</span><span className="text-xs text-muted">{l.created_at.slice(0, 16).replace('T', ' ')}</span></li>)}</ul></Card></div>
 }

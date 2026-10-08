@@ -36,3 +36,14 @@ describe('project financials', () => {
     expect(projectFinancials(null, [{ doc_type: 'invoice', status: 'sent', total: 1000 }], [{ amount: 1200 }])).toMatchObject({ profit: -200, margin: -20, billedPct: null })
   })
 })
+
+describe('project profitability (recorded data only)', () => {
+  it('revenue is ex-VAT, credit notes reduce it, accepted quotation is the fallback value', () => {
+    const f = projectFinancials(null, [
+      { doc_type: 'quotation', status: 'converted', total: 105000, vat_amount: 5000 },
+      { doc_type: 'invoice', status: 'sent', total: 52500, vat_amount: 2500, paid: 10000 },
+      { doc_type: 'credit_note', status: 'sent', total: 2100, vat_amount: 100 },
+    ], [{ amount: 30000, category: 'material' }, { amount: 5000, category: 'fuel' }])
+    expect(f).toMatchObject({ quoted: 100000, value: 100000, invoicedNet: 48000, invoiced: 50400, profit: 65000, margin: 65, actualProfit: 13000, byCategory: { material: 30000, fuel: 5000 } })
+  })
+})

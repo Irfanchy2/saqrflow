@@ -12,13 +12,22 @@ export async function listDocs(c: Ctx, sp: SP, opts: { ownerTypes?: string[]; de
   if (opts.ownerTypes) q = q.in('owner_type', opts.ownerTypes)
   const term = sanitizeQ(sp.q); if (term) q = q.or(`name.ilike.%${term}%,reference_no.ilike.%${term}%,issuing_authority.ilike.%${term}%`)
   if (sp.category) q = q.eq('category_id', sp.category)
-  if (sp.owner) q = q.eq('owner_type', sp.owner)
+  // owner=vehicle / owner=resource narrow asset documents by the asset's kind (reports split vehicles from equipment)
+  if (sp.owner === 'vehicle' || sp.owner === 'resource') {
+    const { data: ids } = await c.supabase.from('assets').select('id').eq('kind', 'vehicle').limit(5000)
+    q = q.eq('owner_type', 'asset'); const list = (ids ?? []).map(r => r.id)
+    q = sp.owner === 'vehicle' ? q.in('owner_id', list.length ? list : ['00000000-0000-0000-0000-000000000000']) : list.length ? q.not('owner_id', 'in', `(${list.join(',')})`) : q
+  } else if (sp.owner) q = q.eq('owner_type', sp.owner)
   if (sp.employee) q = q.eq('owner_type', 'employee').eq('owner_id', sp.employee)
   if (sp.folder) q = q.eq('folder', sp.folder)
+  // the same definitions as the dashboard counts and report_summary(): cancelled / archived papers never count as expiring
+  const live = () => q.not('status', 'in', '(cancelled,archived)')
+  const win = /^expiring(7|30|60|90)$/.exec(sp.status ?? '')
+  if (win) q = live().gte('expiry_date', c.today).lte('expiry_date', addDays(c.today, Number(win[1])))
   switch (sp.status) {
-    case 'expiring30': q = q.gte('expiry_date', c.today).lte('expiry_date', addDays(c.today, 30)); break
-    case 'expired': q = q.lt('expiry_date', c.today); break
-    case 'expiring': q = q.gte('expiry_date', c.today).lte('expiry_date', addDays(c.today, 60)); break
+    case 'expired': q = q.lt('expiry_date', c.today).not('status', 'in', '(cancelled,archived,renewal_in_progress)'); break
+    case 'renewal': q = q.eq('status', 'renewal_in_progress'); break
+    case 'expiring': q = live().gte('expiry_date', c.today).lte('expiry_date', addDays(c.today, 60)); break
     case 'valid': q = q.gt('expiry_date', addDays(c.today, 60)); break
     case 'none': q = q.is('expiry_date', null); break
   }

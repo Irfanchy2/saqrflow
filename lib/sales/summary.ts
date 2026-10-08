@@ -3,7 +3,7 @@ import { daysBetween } from '../time'
 
 export interface InvRow { id: string; doc_type: string; status: string; number: string; customer_name: string | null; customer_id: string | null; issue_date: string; due_date: string | null; total: number; paid: number }
 export const OPEN_INVOICE = ['sent', 'partially_paid', 'overdue']
-export const AGE_BUCKETS = ['Current', '1–30', '31–60', '61–90', '90+'] as const
+export const AGE_BUCKETS = ['Current', '1-30', '31-60', '61-90', '90+'] as const
 
 export function ageBucket(due: string | null, today: string): number {
   if (!due) return 0

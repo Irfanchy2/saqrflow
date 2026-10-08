@@ -1,4 +1,4 @@
-# SaqrFlow — Architecture & Implementation Plan
+# Averiqo — Architecture & Implementation Plan
 
 ## 1. Key decisions
 

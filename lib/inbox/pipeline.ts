@@ -75,9 +75,9 @@ export async function processInboxItem(c: Ctx, item: { id: string; sha256: strin
         const failed = attempts.filter(a => !a.ok)
         if (failed.length) warnings.push(`Read with ${label(result.provider)} after ${failed.map(f => `${label(f.provider)} failed (${f.error})`).join('; ')}`)
       } else if (attempts.length) {
-        reasons.push(`OCR failed: ${attempts.map(a => `${label(a.provider)} — ${a.error}`).join('; ')}`)
+        reasons.push(`OCR failed: ${attempts.map(a => `${label(a.provider)}: ${a.error}`).join('; ')}`)
       } else {
-        reasons.push(ocrMode === 'auto' ? 'No readable text found — no OCR service is configured for this file type. Add OCR.Space or Google Vision in Settings → AI & Automation, or enter the details manually'
+        reasons.push(ocrMode === 'auto' ? 'No readable text found. No OCR service is configured for this file type. Add OCR.Space or Google Vision in Settings → AI & Automation, or enter the details manually'
           : `${label(ocrMode)} is not configured or cannot read this file type`)
       }
     }
@@ -107,7 +107,7 @@ export async function processInboxItem(c: Ctx, item: { id: string; sha256: strin
       } catch (e) {
         const err = e instanceof AiError ? e : new AiError((e as Error).message, 'provider', p.id)
         await log(c, 'ai_processing_logs', { inbox_id: item.id, provider: p.id, model: p.model, purpose: 'classify', ok: false, input_chars: minimised.text.length, redacted: minimised.redacted, processing_ms: Date.now() - s, error: err.message.slice(0, 300) })
-        reasons.push(`AI classification failed (${err.message}) — local rules were used; please check every field`)
+        reasons.push(`AI classification failed (${err.message}). Local rules were used; please check every field`)
       }
     }
     warnings.push(...validateExtraction(x, c.today))
@@ -192,8 +192,8 @@ export async function processInboxItem(c: Ctx, item: { id: string; sha256: strin
     const decision = decide(x, { companyName: c.company.name, companyMatch, employees, customers, suppliers, projects, vehicles, duplicates, hasText: text.trim().length > 20 || x.engine === 'claude' })
     decision.suggestion.warnings.push(...warnings)
     for (const r of reasons) if (!decision.reasons.includes(r)) decision.reasons.push(r)
-    if (reasons.some(r => r.startsWith('No readable text') || r.startsWith('OCR failed'))) decision.reasons = decision.reasons.filter(r => !r.startsWith('No readable text found — upload'))
-    if (decision.confidence < 0.7 && def && !decision.reasons.some(r => /confidence/i.test(r))) decision.reasons.push(`Overall confidence ${Math.round(decision.confidence * 100)}% — manual review required`)
+    if (reasons.some(r => r.startsWith('No readable text') || r.startsWith('OCR failed'))) decision.reasons = decision.reasons.filter(r => !r.startsWith('No readable text found. Upload'))
+    if (decision.confidence < 0.7 && def && !decision.reasons.some(r => /confidence/i.test(r))) decision.reasons.push(`Overall confidence ${Math.round(decision.confidence * 100)}%. Manual review required`)
     const ocrFailed = !text.trim() && x.engine !== 'claude' && reasons.some(r => r.startsWith('OCR failed'))
     const status = ocrFailed ? 'failed' : decision.reasons.length && decision.status === 'ready' ? 'needs_review' : decision.status
     const sug = decision.suggestion as any

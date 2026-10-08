@@ -100,7 +100,7 @@ export async function reprocessInboxItem(inboxId: string, _?: ActionState, fd?: 
     await c.supabase.from('document_inbox').update({ status: 'processing' }).eq('id', inboxId)
     const d = await processInboxItem(c, it, new Uint8Array(await blob.arrayBuffer()), { force: true, ocr: isOcrMode(ocr) ? ocr : undefined })
     revalidatePath(`/inbox/${inboxId}`); revalidatePath('/inbox')
-    return d ? { ok: true, message: `Re-analysed: ${d.status === 'ready' ? 'ready for review' : d.status.replace('_', ' ')}.` } : { error: 'Analysis failed — see the error on the item.' }
+    return d ? { ok: true, message: `Re-analysed: ${d.status === 'ready' ? 'ready for review' : d.status.replace('_', ' ')}.` } : { error: 'Analysis failed. See the error on the item.' }
   })
 }
 
@@ -111,6 +111,6 @@ export async function setAiOcr(enabled: boolean): Promise<ActionState> {
     const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: 'ai.ocr_provider', value: enabled ? 'claude' : 'rules', updated_at: new Date().toISOString() })
     if (error) throw error
     revalidatePath('/settings'); revalidatePath('/inbox')
-    return { ok: true, message: enabled ? 'AI reading enabled.' : 'AI reading disabled — local rules only.' }
+    return { ok: true, message: enabled ? 'AI reading enabled.' : 'AI reading disabled. Local rules only.' }
   })
 }

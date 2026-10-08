@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { AlertTriangle, Briefcase, HardHat, MapPin, Plus, Wallet } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { flat, sanitizeQ } from '@/lib/queries'
-import { Badge, Card, EmptyState, PageHeader, StatCard } from '@/components/ui/primitives'
+import { Badge, Card, EmptyState, PageHeader, Metrics, StatCard } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionForm } from '@/components/ui/action-form'
 import { ProjectFields, Progress } from '@/components/projects/project-fields'
@@ -40,13 +40,13 @@ export default async function Projects({ searchParams }: { searchParams: Promise
 
   return <>
     <PageHeader title="Projects" sub="Fabrication & site progress, milestones, costs and billing for every job."
-      actions={c.can('records.edit') ? <DialogButton wide label="New project" title="New project" icon={<Plus size={15} />}><ActionForm action={createProject} submit="Create project"><ProjectFields customers={customers ?? []} /></ActionForm></DialogButton> : null} />
-    <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      actions={c.can('records.edit') ? <DialogButton wide openParam="project" label="New project" title="New project" icon={<Plus size={15} />}><ActionForm action={createProject} submit="Create project"><ProjectFields customers={customers ?? []} /></ActionForm></DialogButton> : null} />
+    <Metrics className="mb-5" cols={4}>
       <StatCard label="Active projects" value={active.length} hint={`${rows.length} shown`} icon={HardHat} tone="blue" />
       {fin && <StatCard label="Active contract value" value={formatAed(active.reduce((s, r) => s + Number(r.contract_value ?? 0), 0))} icon={Briefcase} />}
       {fin && <StatCard label="Outstanding on projects" value={formatAed(rows.reduce((s, r) => s + r.f.outstanding, 0))} icon={Wallet} tone="amber" href="/invoices?tab=receivables" />}
       <StatCard label="Overdue milestones" value={overdueMs} icon={AlertTriangle} tone={overdueMs ? 'red' : 'neutral'} href="/reminders" />
-    </div>
+    </Metrics>
     <form className="mb-4 flex flex-wrap gap-2"><input name="q" type="search" defaultValue={sp.q} aria-label="Search projects" placeholder="Search name, code, location…" className={`${cls} min-w-52 flex-1`} />
       <select name="status" defaultValue={sp.status ?? 'open'} aria-label="Status" className={cls}><option value="open">Open (planning, active, on hold)</option><option value="all">All</option>{Object.entries(PROJECT_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
       <button className="h-9 cursor-pointer rounded-md border border-border px-3 text-sm hover:bg-surface-2">Filter</button></form>
@@ -54,7 +54,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
       : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{rows.map(p => {
         const st = PROJECT_STATUS[p.status], late = p.next && p.next.due_date < c.today
         return <Link key={p.id} href={`/projects/${p.id}`} className="group">
-          <Card className="flex h-full flex-col gap-3 p-4 transition-all group-hover:border-primary/40 group-hover:shadow-md">
+          <Card className="flex h-full flex-col gap-3 p-4 transition-colors group-hover:border-border-strong">
             <div className="flex items-start gap-3"><div className="min-w-0 flex-1">
               <div className="text-xs text-muted">{p.code ?? 'Project'}{p.customer ? ` · ${p.customer.name}` : ''}</div>
               <h3 className="truncate font-semibold group-hover:text-primary">{p.name}</h3>

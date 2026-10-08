@@ -35,7 +35,7 @@ export async function AiAutomation({ c, wa }: { c: Ctx; wa: WaStatus | null }) {
     </div>
   }
 
-  return <Card className="lg:col-span-2" id="ai">
+  return <Card id="ai">
     <CardHeader title="AI & Automation" sub="How uploaded documents are read (OCR) and classified (AI). Keys stay on the server and are never shown again." action={<Badge tone="blue">{OCR_MODES.find(m => m.id === s.ocr)?.label.split(' (')[0]} · {AI_MODES.find(m => m.id === s.ai)?.label.split(' (')[0]}</Badge>} />
     <div className="grid gap-6 p-4 xl:grid-cols-2">
       <ActionForm action={saveAiSettings} resetOnSuccess={false} submit="Save AI settings">
@@ -43,7 +43,7 @@ export async function AiAutomation({ c, wa }: { c: Ctx; wa: WaStatus | null }) {
           <Field label="OCR provider"><Select name="ocr_provider" defaultValue={s.ocr}>{OCR_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</Select></Field>
           <Field label="AI classification"><Select name="ai_provider" defaultValue={s.ai}>{AI_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</Select></Field>
         </div>
-        <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="redact" defaultChecked={s.redact} className="mt-0.5" /><span><b>Remove ID numbers before AI</b> (recommended) — Emirates ID, passport MRZ, IBAN and card numbers are replaced with placeholders before text is sent to Gemini; SaqrFlow reads and checks those numbers itself.</span></label>
+        <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="redact" defaultChecked={s.redact} className="mt-0.5" /><span><b>Remove ID numbers before AI</b> (recommended): Emirates ID, passport MRZ, IBAN and card numbers are replaced with placeholders before text is sent to Gemini; Averiqo reads and checks those numbers itself.</span></label>
         {!encOk && <Alert tone="amber">Keys typed here need <code>SETTINGS_ENCRYPTION_KEY</code> on the server. Without it, set them as environment variables instead.</Alert>}
         <KeyRow name="ocr_space_api_key" hint="OCR.Space API key (K…)" />
         <KeyRow name="gemini_api_key" hint="Gemini API key (AIza…)" />
@@ -70,10 +70,10 @@ export async function AiAutomation({ c, wa }: { c: Ctx; wa: WaStatus | null }) {
           <div className="space-y-2 px-3 py-2"><p className="text-xs text-muted">{wa?.reason}</p>
             {(recips ?? []).length ? <ActionForm action={sendTestReminder} submit="Send test reminder" variant="secondary" resetOnSuccess={false} className="flex flex-wrap items-end gap-2">
               <Field label="Recipient" className="min-w-48 flex-1"><Select name="recipient_id">{(recips ?? []).map(r => <option key={r.id} value={r.id}>{r.name}{r.whatsapp_opt_in !== 'opted_in' ? ' (not opted in)' : ''}</option>)}</Select></Field></ActionForm>
-              : <p className="text-xs text-muted">Add a WhatsApp recipient under Smart Reminders to send a test.</p>}</div>
+              : <p className="text-xs text-muted">Add a WhatsApp recipient under Reminders to send a test.</p>}</div>
         </div>
         <div className="rounded-lg border border-border">
-          <div className="border-b border-border px-3 py-2 font-medium">Usage — last 30 days <span className="text-xs font-normal text-muted">(cost control)</span></div>
+          <div className="border-b border-border px-3 py-2 font-medium">Usage, last 30 days <span className="text-xs font-normal text-muted">(cost control)</span></div>
           <dl className="grid grid-cols-2 gap-px bg-border text-xs sm:grid-cols-4">{[
             ['Documents processed', String(docs ?? 0)],
             ['OCR calls', `${sum('ocr').calls}${sum('ocr').failures ? ` · ${sum('ocr').failures} failed` : ''}`],

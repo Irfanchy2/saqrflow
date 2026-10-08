@@ -90,7 +90,7 @@ async function execute(c: Ctx, it: SearchIntent): Promise<{ summary: string; res
     if (it.customer) q = q.ilike('customer_name', `%${it.customer.replace(/[%_,()]/g, ' ').trim()}%`)
     if (it.expired) q = q.eq('status', 'overdue')
     const { data } = await q
-    for (const r of data ?? []) results.push({ title: `${r.number} — ${r.customer_name ?? 'No customer'}`, sub: `${r.issue_date}${r.due_date ? ` · due ${r.due_date}` : ''} · AED ${Number(r.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, href: `/invoices/${r.id}`, badge: r.status.replace('_', ' '), tone: r.status === 'overdue' ? 'red' : r.status === 'paid' ? 'green' : 'blue' })
+    for (const r of data ?? []) results.push({ title: `${r.number}: ${r.customer_name ?? 'No customer'}`, sub: `${r.issue_date}${r.due_date ? ` · due ${r.due_date}` : ''} · AED ${Number(r.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, href: `/invoices/${r.id}`, badge: r.status.replace('_', ' '), tone: r.status === 'overdue' ? 'red' : r.status === 'paid' ? 'green' : 'blue' })
     return { summary: `${results.length} ${it.entity}${it.customer ? ` for “${it.customer}”` : ''}`, results }
   }
 

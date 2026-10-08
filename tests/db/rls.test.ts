@@ -431,3 +431,179 @@ describe('AI document reader logs (0009)', () => {
     await as(U.hrA, `insert into document_relationships(company_id,document_id,related_type,related_id) values ($1,$2,'payment',gen_random_uuid())`, [A, docCompany])
   })
 })
+
+describe('ERP workflow (0012)', () => {
+  it('concurrent numbering from two sessions never duplicates (Test C)', async () => {
+    const nums = await Promise.all(Array.from({ length: 12 }, (_, i) => as(i % 2 ? U.accA : U.ownerA, `select next_document_number('quotation') n`).then(r => r.rows[0].n as string)))
+    expect(new Set(nums).size).toBe(12)
+    for (const n of nums) expect(n).toMatch(/^AS00\d{5}\/\d{4}$/)
+  })
+  it('project references and optional year', async () => {
+    expect((await as(U.accA, `select next_document_number('project') n`)).rows[0].n).toMatch(/^PRJ-\d{4}-0001$/)
+    expect((await sup(`select format_document_number('P','',4,12,'/',null) n`)).rows[0].n).toBe('P0012')
+  })
+  it('one idempotency key → one invoice / one payment (double-click protection, Test D)', async () => {
+    const tok = uuid()
+    await as(U.accA, `insert into invoices(company_id,doc_type,number,client_token) values ($1,'quotation','QT-IDEM-1',$2)`, [A, tok])
+    await fails(as(U.accA, `insert into invoices(company_id,doc_type,number,client_token) values ($1,'quotation','QT-IDEM-2',$2)`, [A, tok]), /duplicate key/)
+    const i = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status,due_date) values ($1,'invoice','INV-IDEM',500,'sent','2099-01-01') returning id`, [A])).rows[0].id
+    const k = uuid()
+    await as(U.accA, `insert into payments(company_id,invoice_id,amount,idempotency_key) values ($1,$2,100,$3)`, [A, i, k])
+    await fails(as(U.accA, `insert into payments(company_id,invoice_id,amount,idempotency_key) values ($1,$2,100,$3)`, [A, i, k]), /duplicate key/)
+    expect((await as(U.accA, `select paid from invoice_balances where id=$1`, [i])).rows[0].paid).toBe('100.00')
+  })
+  it('credit notes reduce the balance, never exceed it, and drive the status', async () => {
+    const i = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status,due_date) values ($1,'invoice','INV-CN',1000,'sent','2099-01-01') returning id`, [A])).rows[0].id
+    await as(U.accA, `insert into payments(company_id,invoice_id,amount) values ($1,$2,600)`, [A, i])
+    const cn = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status,source_invoice_id) values ($1,'credit_note','CN-1',500,'draft',$2) returning id`, [A, i])).rows[0].id
+    await fails(as(U.accA, `update invoices set status='sent' where id=$1`, [cn]), /exceeds the invoice balance/)
+    await as(U.accA, `update invoices set total=400, status='sent' where id=$1`, [cn])
+    const b = (await as(U.accA, `select i.status, b.balance, b.credited from invoices i join invoice_balances b on b.id=i.id where i.id=$1`, [i])).rows[0]
+    expect(b).toMatchObject({ status: 'paid', balance: '0.00', credited: '400.00' })
+    await fails(as(U.accA, `insert into payments(company_id,invoice_id,amount) values ($1,$2,1)`, [A, i]), /exceeds/)
+    await as(U.accA, `update invoices set status='cancelled' where id=$1`, [cn])
+    expect((await as(U.accA, `select status from invoices where id=$1`, [i])).rows[0].status).toBe('partially_paid')
+  })
+  it('a cheque settles an invoice only once', async () => {
+    const i = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status,due_date) values ($1,'invoice','INV-CHQ',1000,'sent','2099-01-01') returning id`, [A])).rows[0].id
+    const q = (await as(U.accA, `insert into cheques(company_id,cheque_no,direction,party_name,bank_name,amount,cheque_date,status,invoice_id) values ($1,'777','incoming','Client','ENBD',400,'2026-10-20','received',$2) returning id`, [A, i])).rows[0].id
+    await as(U.accA, `insert into payments(company_id,invoice_id,amount,cheque_id,method) values ($1,$2,400,$3,'cheque')`, [A, i, q])
+    await fails(as(U.accA, `insert into payments(company_id,invoice_id,amount,cheque_id,method) values ($1,$2,400,$3,'cheque')`, [A, i, q]), /duplicate key/)
+  })
+  it('trash: soft-deleted rows disappear everywhere, restore brings them back, purge is owner-only', async () => {
+    const cu = (await as(U.accA, `insert into customers(company_id,name) values ($1,'Trash Test LLC') returning id`, [A])).rows[0].id
+    await fails(as(U.accA, `select soft_delete('customer',$1)`, [cu]), /insufficient privilege/)   // accountant has no records.delete
+    await as(U.ownerA, `select soft_delete('customer',$1)`, [cu])
+    expect((await as(U.ownerA, `select count(*)::int n from customers where id=$1`, [cu])).rows[0].n).toBe(0)
+    expect((await as(U.ownerA, `select entity from trash_list() where id=$1`, [cu])).rows[0].entity).toBe('customer')
+    await fails(as(U.accA, `select * from trash_list()`), /insufficient privilege/)
+    await as(U.ownerA, `select restore_deleted('customer',$1)`, [cu])
+    expect((await as(U.accA, `select name from customers where id=$1`, [cu])).rows[0].name).toBe('Trash Test LLC')
+    await fails(as(U.ownerA, `select purge_deleted('customer',$1)`, [cu]), /not found in trash/)   // must be in trash first
+    await as(U.ownerA, `select soft_delete('customer',$1)`, [cu])
+    await as(U.ownerA, `select purge_deleted('customer',$1)`, [cu])
+    expect((await sup(`select count(*)::int n from customers where id=$1`, [cu])).rows[0].n).toBe(0)
+    const actions = (await sup(`select action from audit_logs where record_id=$1 and action in ('TRASH','RESTORE','PURGE') order by id`, [cu])).rows.map(r => r.action)
+    expect(actions).toEqual(['TRASH', 'RESTORE', 'TRASH', 'PURGE'])
+  })
+  it('issued invoices with payments cannot be trashed; drafts can', async () => {
+    const d = (await as(U.accA, `insert into invoices(company_id,doc_type,number) values ($1,'invoice','INV-DRAFT-T') returning id`, [A])).rows[0].id
+    const s = (await as(U.accA, `insert into invoices(company_id,doc_type,number,status,total) values ($1,'invoice','INV-SENT-T','sent',10) returning id`, [A])).rows[0].id
+    await fails(as(U.ownerA, `select soft_delete('invoice',$1)`, [s]), /only draft or cancelled/)
+    await as(U.ownerA, `select soft_delete('invoice',$1)`, [d])
+    expect((await as(U.accA, `select count(*)::int n from invoices where id=$1`, [d])).rows[0].n).toBe(0)
+  })
+  it('partial delivery: delivered quantity per quotation line, cancelled DNs excluded', async () => {
+    const q = (await as(U.accA, `insert into invoices(company_id,doc_type,number,status) values ($1,'quotation','QT-DLV','accepted') returning id`, [A])).rows[0].id
+    const li = (await as(U.accA, `insert into invoice_items(company_id,invoice_id,description,quantity,unit_price) values ($1,$2,'Pipe',100,10) returning id`, [A, q])).rows[0].id
+    const dn1 = (await as(U.accA, `insert into invoices(company_id,doc_type,number,status,quotation_id) values ($1,'delivery_note','DN-1','delivered',$2) returning id`, [A, q])).rows[0].id
+    await as(U.accA, `insert into invoice_items(company_id,invoice_id,description,quantity,source_item_id) values ($1,$2,'Pipe',60,$3)`, [A, dn1, li])
+    const dn2 = (await as(U.accA, `insert into invoices(company_id,doc_type,number,status,quotation_id) values ($1,'delivery_note','DN-2','cancelled',$2) returning id`, [A, q])).rows[0].id
+    await as(U.accA, `insert into invoice_items(company_id,invoice_id,description,quantity,source_item_id) values ($1,$2,'Pipe',30,$3)`, [A, dn2, li])
+    expect((await as(U.accA, `select ordered, delivered from quotation_delivery where item_id=$1`, [li])).rows[0]).toMatchObject({ ordered: '100.000', delivered: '60.000' })
+  })
+  it('revisions are immutable; follow-ups feed reminders; viewers see no sales data', async () => {
+    const q = (await as(U.accA, `insert into invoices(company_id,doc_type,number,status,total) values ($1,'quotation','QT-REV','sent',99) returning id`, [A])).rows[0].id
+    const r = (await as(U.accA, `insert into sales_doc_revisions(company_id,invoice_id,revision,snapshot) values ($1,$2,0,'{}') returning id`, [A, q])).rows[0].id
+    const upd = await as(U.ownerA, `update sales_doc_revisions set revision=5 where id=$1`, [r]); expect(upd.rowCount).toBe(0)
+    const del = await as(U.ownerA, `delete from sales_doc_revisions where id=$1`, [r]); expect(del.rowCount).toBe(0)
+    await as(U.accA, `insert into sales_followups(company_id,invoice_id,due_date) values ($1,$2,'2026-01-01')`, [A, q])
+    expect((await as(U.accA, `select count(*)::int n from reminder_sources where source_type='followup' and link=$1`, [`/invoices/${q}`])).rows[0].n).toBe(1)
+    for (const t of ['sales_doc_revisions', 'sales_followups', 'catalog_items', 'sales_doc_events'])
+      expect((await as(U.viewerA, `select count(*)::int n from ${t}`)).rows[0].n, t).toBe(0)
+    await fails(as(U.viewerA, `insert into sales_doc_events(company_id,invoice_id,event) values ($1,$2,'printed')`, [A, q]))
+    await as(U.accA, `insert into sales_doc_events(company_id,invoice_id,event) values ($1,$2,'printed')`, [A, q])
+  })
+  it('asset maintenance updates last/next service and inspection dates', async () => {
+    const a = (await as(U.ownerA, `insert into assets(company_id,kind,name) values ($1,'vehicle','Pickup 1') returning id`, [A])).rows[0].id
+    await as(U.ownerA, `insert into asset_maintenance(company_id,asset_id,performed_on,kind,description,cost,next_due) values ($1,$2,'2026-09-01','service','Oil change',250,'2026-12-01')`, [A, a])
+    await as(U.ownerA, `insert into asset_maintenance(company_id,asset_id,performed_on,kind,description,next_due) values ($1,$2,'2026-09-02','inspection','RTA test','2027-09-01')`, [A, a])
+    const r = (await as(U.ownerA, `select last_service_date::text l, next_service_date::text n, inspection_expiry::text i from assets where id=$1`, [a])).rows[0]
+    expect(r).toEqual({ l: '2026-09-01', n: '2026-12-01', i: '2027-09-01' })
+  })
+})
+
+describe('Vehicles & Assets + Reports (0013)', () => {
+  it('assignment history: every change of assigned_to closes the open row and opens a new one', async () => {
+    const e1 = (await as(U.ownerA, `insert into employees(company_id,employee_no,full_name) values ($1,'AS-1','Driver One') returning id`, [A])).rows[0].id
+    const e2 = (await as(U.ownerA, `insert into employees(company_id,employee_no,full_name) values ($1,'AS-2','Driver Two') returning id`, [A])).rows[0].id
+    const a = (await as(U.ownerA, `insert into assets(company_id,kind,name,assigned_to) values ($1,'vehicle','Hilux',$2) returning id`, [A, e1])).rows[0].id
+    await as(U.ownerA, `update assets set assigned_to=$2 where id=$1`, [a, e2])
+    await as(U.ownerA, `update assets set location='Yard' where id=$1`, [a])   // not an assignment change
+    const rows = (await as(U.ownerA, `select employee_id, returned_on is null open from asset_assignments where asset_id=$1 order by created_at`, [a])).rows
+    expect(rows.map(r => [r.employee_id, r.open])).toEqual([[e1, false], [e2, true]])
+    await fails(as(U.ownerA, `insert into asset_assignments(company_id,asset_id,employee_id) values ($1,$2,$3)`, [A, a, e1]), /duplicate key/)   // one current assignment
+    expect((await as(U.ownerB, `select count(*)::int n from asset_assignments where asset_id=$1`, [a])).rows[0].n).toBe(0)   // other tenant sees nothing
+  })
+  it('odometer in a service record moves mileage forward and sets the next service km', async () => {
+    const a = (await as(U.ownerA, `insert into assets(company_id,kind,name,current_mileage,service_interval_km) values ($1,'vehicle','Navara',40000,10000) returning id`, [A])).rows[0].id
+    await as(U.ownerA, `insert into asset_maintenance(company_id,asset_id,performed_on,kind,description,odometer) values ($1,$2,'2026-10-01','service','Oil',41200)`, [A, a])
+    await as(U.ownerA, `insert into asset_maintenance(company_id,asset_id,performed_on,kind,description,odometer) values ($1,$2,'2026-09-01','repair','Old receipt',39000)`, [A, a])   // older reading never rolls back
+    expect((await as(U.ownerA, `select current_mileage, next_service_km from assets where id=$1`, [a])).rows[0]).toMatchObject({ current_mileage: 41200, next_service_km: 51200 })
+  })
+  it('report_summary: RLS-scoped, finance sections only with finance.view, money summed in the database', async () => {
+    await as(U.accA, `insert into invoices(company_id,doc_type,number,status,issue_date,subtotal,vat_amount,total) values ($1,'invoice','INV-REP-1','sent','2031-03-05',1000,50,1050),($1,'invoice','INV-REP-2','draft','2031-03-06',500,25,525)`, [A])
+    const r = (await as(U.accA, `select report_summary('2031-03-01','2031-03-31','2031-03-10') r`)).rows[0].r
+    expect(r.sales).toMatchObject({ count: 1, net: 1000, vat: 50, total: 1050 })   // draft excluded
+    const other = (await as(U.ownerB, `select report_summary('2031-03-01','2031-03-31','2031-03-10') r`)).rows[0].r
+    expect(other.sales.count).toBe(0)   // company B never sees company A's invoices
+    const viewer = (await as(U.viewerA, `select report_summary('2031-03-01','2031-03-31','2031-03-10') r`)).rows[0].r
+    expect(viewer.sales).toBeUndefined(); expect(viewer.receivables).toBeUndefined(); expect(viewer.documents).toBeDefined()
+    await fails(as(null, `select report_summary('2031-03-01','2031-03-31','2031-03-10')`, [], 'anon'), /permission denied/)
+  })
+})
+
+describe('Phase 1 operations (0014)', () => {
+  it('leads: numbered, stage changes logged with won / lost stamps; CRM hidden from roles without crm.view', async () => {
+    const no = (await as(U.ownerA, `select next_document_number('lead') n`)).rows[0].n
+    expect(no).toMatch(/^LD-\d{4}-\d{4}$/)
+    const l = (await as(U.pmA, `insert into leads(company_id,number,company_name,source,estimated_value) values ($1,$2,'Villa 22 Owner','instagram',48000) returning id`, [A, no])).rows[0].id
+    await as(U.pmA, `update leads set stage='quotation_sent' where id=$1`, [l])
+    await as(U.pmA, `update leads set stage='won' where id=$1`, [l])
+    const acts = (await as(U.pmA, `select from_stage,to_stage from lead_activities where lead_id=$1 and kind='stage' order by id`, [l])).rows
+    expect(acts.map(a => `${a.from_stage}>${a.to_stage}`)).toEqual(['new>quotation_sent', 'quotation_sent>won'])
+    expect((await as(U.pmA, `select won_at is not null w from leads where id=$1`, [l])).rows[0].w).toBe(true)
+    expect((await as(U.hrA, `select count(*)::int n from leads`)).rows[0].n).toBe(0)       // HR has no crm.view
+    expect((await as(U.empA, `select count(*)::int n from leads`)).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, `select count(*)::int n from leads where company_id=$1`, [A])).rows[0].n).toBe(0)
+    await fails(as(U.viewerA, `update leads set stage='lost' where id=$1 returning id`, [l]).then(r => { if (!r.rowCount) throw new Error('no rows') }))   // viewer is read-only
+    await fails(as(U.pmA, `delete from lead_activities where lead_id=$1 returning id`, [l]).then(r => { if (!r.rowCount) throw new Error('immutable') }), /immutable/)
+  })
+  it('tasks: completion stamps 100%; an assignee without other rights sees and updates only their own task', async () => {
+    const mine = (await as(U.ownerA, `insert into tasks(company_id,title,owner_id,due_date) values ($1,'Weld stringers',$2,'2026-10-10') returning id`, [A, U.empA])).rows[0].id
+    await as(U.ownerA, `insert into tasks(company_id,title,owner_id) values ($1,'Office task',$2)`, [A, U.accA])
+    expect((await as(U.empA, `select title from tasks`)).rows.map(r => r.title)).toEqual(['Weld stringers'])
+    await as(U.empA, `update tasks set status='completed' where id=$1`, [mine])
+    expect((await as(U.ownerA, `select completion, completed_at is not null done from tasks where id=$1`, [mine])).rows[0]).toMatchObject({ completion: 100, done: true })
+    await fails(as(U.empA, `update tasks set owner_id=$2 where id=$1`, [mine, U.accA]), /row-level security/)   // cannot hand it to someone else
+  })
+  it('site visits need a lead, customer or project; soft-deleted records disappear and restore through the trash RPCs', async () => {
+    await fails(as(U.ownerA, `insert into site_visits(company_id,number,scheduled_date) values ($1,'SV-X','2026-10-12')`, [A]), /check constraint/)
+    const p = (await as(U.ownerA, `insert into projects(company_id,name) values ($1,'Staircase job') returning id`, [A])).rows[0].id
+    const v = (await as(U.ownerA, `insert into site_visits(company_id,number,scheduled_date,project_id) values ($1,'SV-1','2026-10-12',$2) returning id`, [A, p])).rows[0].id
+    await as(U.ownerA, `select soft_delete('site_visit',$1)`, [v])
+    expect((await as(U.ownerA, `select count(*)::int n from site_visits where id=$1`, [v])).rows[0].n).toBe(0)
+    expect((await as(U.ownerA, `select count(*)::int n from trash_list() where entity='site_visit'`)).rows[0].n).toBe(1)
+    await as(U.ownerA, `select restore_deleted('site_visit',$1)`, [v])
+    expect((await as(U.ownerA, `select count(*)::int n from site_visits where id=$1`, [v])).rows[0].n).toBe(1)
+  })
+  it('reminder_sources includes lead follow-ups, visits, open tasks and work-order targets only while they are open', async () => {
+    const r = (await as(U.ownerA, `select source_type, count(*)::int n from reminder_sources where source_type in ('lead_followup','site_visit','task','work_order') group by 1`)).rows
+    const m = Object.fromEntries(r.map(x => [x.source_type, x.n]))
+    expect(m.site_visit).toBeGreaterThanOrEqual(1)
+    expect(m.task ?? 0).toBe(0)   // the only dated task is completed
+    const l = (await as(U.ownerA, `insert into leads(company_id,number,company_name,next_followup) values ($1,'LD-T','Follow me','2026-10-15') returning id`, [A])).rows[0].id
+    expect((await as(U.ownerA, `select count(*)::int n from reminder_sources where source_type='lead_followup' and source_id=$1`, [l])).rows[0].n).toBe(1)
+    await as(U.ownerA, `update leads set stage='lost', lost_reason='price' where id=$1`, [l])
+    expect((await as(U.ownerA, `select count(*)::int n from reminder_sources where source_type='lead_followup' and source_id=$1`, [l])).rows[0].n).toBe(0)
+  })
+  it('project budgets need finance.view to read; crew rows are removable with edit rights', async () => {
+    const p = (await as(U.ownerA, `insert into projects(company_id,name) values ($1,'Budget job') returning id`, [A])).rows[0].id
+    await as(U.accA, `insert into project_budgets(company_id,project_id,category,amount) values ($1,$2,'material',12000)`, [A, p])
+    expect((await as(U.pmA, `select count(*)::int n from project_budgets where project_id=$1`, [p])).rows[0].n).toBe(0)
+    expect((await as(U.accA, `select count(*)::int n from project_budgets where project_id=$1`, [p])).rows[0].n).toBe(1)
+    const w = (await as(U.pmA, `insert into work_orders(company_id,number,title,project_id) values ($1,'WO-1','Fabricate',$2) returning id`, [A, p])).rows[0].id
+    await as(U.pmA, `insert into work_order_members(company_id,work_order_id,employee_id) values ($1,$2,$3)`, [A, w, empRecA2])
+    expect((await as(U.pmA, `delete from work_order_members where work_order_id=$1 returning employee_id`, [w])).rowCount).toBe(1)
+  })
+})

@@ -17,10 +17,10 @@ export const TEMPLATE_META: Record<TemplateName, { metaName: string; language: s
 export type Params = Record<string, string>
 
 const BODY: Record<TemplateName, string> = {
-  document_reminder: 'SAQRFLOW REMINDER\nDocument: {{1}}\nSubject: {{2}}\nExpiry Date: {{3}}\nDays Remaining: {{4}}\nStatus: {{5}}\nPlease log in to SaqrFlow to review this document.',
-  payment_alert: 'SAQRFLOW PAYMENT ALERT\nType: {{1}}\nParty: {{2}}\nAmount: {{3}}\nDate: {{4}}\nAction Required: {{5}}',
-  daily_summary: 'Good Morning.\nSaqrFlow Daily Summary\nDocuments expiring within 30 days: {{1}}\nCheques due this week: {{2}}\nInvoices awaiting payment: {{3}}\nPending renewal tasks: {{4}}\nOpen SaqrFlow to review.',
-  test_message: 'SAQRFLOW TEST\n{{1}}',
+  document_reminder: 'AVERIQO REMINDER\nDocument: {{1}}\nSubject: {{2}}\nExpiry Date: {{3}}\nDays Remaining: {{4}}\nStatus: {{5}}\nPlease log in to Averiqo to review this document.',
+  payment_alert: 'AVERIQO PAYMENT ALERT\nType: {{1}}\nParty: {{2}}\nAmount: {{3}}\nDate: {{4}}\nAction Required: {{5}}',
+  daily_summary: 'Good Morning.\nAveriqo Daily Summary\nDocuments expiring within 30 days: {{1}}\nCheques due this week: {{2}}\nInvoices awaiting payment: {{3}}\nPending renewal tasks: {{4}}\nOpen Averiqo to review.',
+  test_message: 'AVERIQO TEST\n{{1}}',
 }
 export const templateBody = (t: TemplateName) => BODY[t]
 

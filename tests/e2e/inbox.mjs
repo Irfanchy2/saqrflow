@@ -31,7 +31,7 @@ try {
   // this suite covers the private, local-only path (the AI / OCR.Space path is covered by ai-reader.mjs)
   await db.query(`insert into app_settings(company_id,key,value) values ($1,'ai.provider','"rules"'),($1,'ocr.provider','"tesseract"')`, [co])
   ok(await p.getByRole('link', { name: 'Smart Inbox' }).first().isVisible(), 'sidebar shows “Smart Inbox”')
-  ok((await body()).includes('Smart Document Center'), 'dashboard shows the Smart Document Center widget')
+  ok((await body()).includes('Smart Inbox') && (await body()).includes('Waiting for your review'), 'dashboard shows the Smart Inbox panel')
 
   console.log('\n[I2] Upload 10 documents at once')
   const ten = ['trade-license.pdf', 'emirates-id-mohammed.pdf', 'emirates-id-rahim.pdf', 'visa-mohammed.pdf', 'visa-rahim.pdf', 'tenancy-contract.pdf', 'insurance.pdf', 'invoice-abc.pdf', 'delivery-note-abc.pdf', 'vehicle-registration.pdf']

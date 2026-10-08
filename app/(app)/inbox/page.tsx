@@ -41,12 +41,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const ai = st.ai === 'rules' ? null : pickAi(st.ai, aiP, true)
 
   return <>
-    <PageHeader title="Smart Document Inbox" sub="Drop any document. SaqrFlow works out what it is, who it belongs to and where it goes — you confirm before anything is filed."
+    <PageHeader title="Smart Document Inbox" sub="Drop any document. Averiqo works out what it is, who it belongs to and where it goes. You confirm before anything is filed."
       actions={<>{n('ready') > 0 && <ActionButton action={confirmAllReady} variant="secondary" size="md" confirm={`File all ${n('ready')} high-confidence document(s) to their suggested destinations?`}><CheckCheck size={15} />Confirm all suggested ({n('ready')})</ActionButton>}
         <DialogButton wide label="Upload documents" title="Upload to Smart Inbox" icon={<Upload size={15} />}><UploadPanel /></DialogButton></>} />
-    <div className="mb-5"><Alert tone={ai ? 'green' : 'blue'}>{ai ? <><Sparkles size={14} className="me-1 inline" /><b>AI classification: {ai.label}</b>{ai.id === 'gemini' ? ` (${ai.model}) — only the OCR text is sent${st.redact ? ', with ID numbers removed' : ''}` : ' — reads the file itself'}.</> : <><b>Local reading mode</b> — no AI service is used.</>}
+    <div className="mb-5"><Alert tone={ai ? 'green' : 'blue'}>{ai ? <><Sparkles size={14} className="me-1 inline" /><b>AI classification: {ai.label}</b>{ai.id === 'gemini' ? ` (${ai.model}). Only the OCR text is sent${st.redact ? ', with ID numbers removed' : ''}` : '. Reads the file itself'}.</> : <><b>Local reading mode</b>. No AI service is used.</>}
       {' '}OCR: {ocrNames.length ? ocrNames.join(' → ') : 'none configured'} (digital PDFs are read directly on the server). {c.can('settings.manage') && <Link href="/settings#ai" className="font-medium text-primary hover:underline">Settings → AI & Automation</Link>}</Alert></div>
-    <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Today</h2>
+    <h2 className="mb-2 text-xs font-medium text-muted">Today</h2>
     <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
       <StatCard label="Documents uploaded" value={todayRows.length} icon={UploadCloud} tone="blue" />
       <StatCard label="Successfully classified" value={t(s => ['ready', 'filed'].includes(s))} icon={CheckCheck} tone="green" />
@@ -57,7 +57,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     {sp.warn && <div className="mb-4"><Alert tone="amber">{sp.warn}</Alert></div>}
     {tab === 'batch' ? <h2 className="mb-3 text-sm font-semibold">{rows?.length ?? 0} document{rows?.length === 1 ? '' : 's'} processed <Link href="/inbox" className="ms-2 font-normal text-primary hover:underline">Back to inbox</Link></h2>
       : <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l]) => <Link key={k} href={`/inbox?tab=${k}`} className={cn('-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm', tab === k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted hover:text-fg')}>{l}{k !== 'recent' && n(k) > 0 && <span className="ms-1.5 text-xs text-muted">{n(k)}</span>}</Link>)}</div>}
-    <Card className="overflow-hidden">{!rows?.length ? <EmptyState icon={Inbox} title="Nothing here" body={tab === 'recent' ? 'Upload a trade licence, Emirates ID, visa, tenancy contract, invoice… and SaqrFlow will suggest where it belongs.' : 'No documents in this list.'} /> :
+    <Card className="overflow-hidden">{!rows?.length ? <EmptyState icon={Inbox} title="Nothing here" body={tab === 'recent' ? 'Upload a trade licence, Emirates ID, visa, tenancy contract, invoice… and Averiqo will suggest where it belongs.' : 'No documents in this list.'} /> :
       <TableWrap><thead className="border-b border-border bg-surface-2/60"><tr><Th>File</Th><Th>Detected</Th><Th>Destination</Th><Th>Status</Th><Th /></tr></thead>
         <tbody className="divide-y divide-border">{rows.map((r: any) => <tr key={r.id} className="hover:bg-surface-2/50">
           <Td><div className="max-w-[220px] truncate font-medium" title={r.file_name}>{r.file_name}</div><div className="text-xs text-muted">{new Date(r.created_at).toLocaleString('en-GB', { timeZone: c.company.timezone, dateStyle: 'medium', timeStyle: 'short' })}</div></Td>

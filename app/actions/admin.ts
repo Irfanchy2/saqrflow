@@ -10,6 +10,7 @@ import { parseOffsets } from '@/lib/reminders/schedule'
 import { ROLES, type Role } from '@/lib/permissions'
 import { LOCALES } from '@/lib/i18n'
 import type { ActionState } from '@/lib/utils'
+import { findDuplicates, readParty } from '@/lib/parties'
 
 async function setting(c: Awaited<ReturnType<typeof getCtx>>, key: string, value: unknown) {
   const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key, value, updated_at: new Date().toISOString() }); if (error) throw error
@@ -99,9 +100,19 @@ export async function setUserActive(id: string, active: boolean): Promise<Action
 export async function createParty(kind: 'customers' | 'suppliers', _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit')
-    const v = z.object({ name: z.string().min(2, 'Name is required').max(200), contact_person: z.string().max(120).optional(), phone: z.string().max(40).optional(), email: z.string().email('Enter a valid email').optional(), trn: z.string().max(30).optional(), address: z.string().max(400).optional(), notes: z.string().max(2000).optional() })
-      .parse(Object.fromEntries(['name', 'contact_person', 'phone', 'email', 'trn', 'address', 'notes'].map(k => [k, str(fd, k)])))
-    const { error } = await c.supabase.from(kind).insert({ ...v, company_id: c.company.id }); if (error) throw error
-    revalidatePath('/parties'); return { ok: true, message: 'Saved.' }
+    const table = z.enum(['customers', 'suppliers']).parse(kind)
+    const r = readParty(fd)
+    if (!r.success) return { error: r.error.issues[0].message, fieldErrors: Object.fromEntries(r.error.issues.map(i => [i.path.join('.'), i.message])) }
+    const v = r.data
+    // possible duplicates are shown, never silently blocked — the user confirms a legitimately different customer
+    if (fd.get('confirm_duplicate') !== 'on') {
+      const dups = await findDuplicates(c, table, v)
+      if (dups.length) return { error: `Possible duplicate: ${dups.map(d => `“${d.name}” (${d.why.join(', ')})`).join('; ')}. Open the existing record, or tick “This is a different ${table === 'customers' ? 'customer' : 'supplier'}” and save again.`, data: { duplicates: dups } }
+    }
+    const row: Record<string, unknown> = { ...v, company_id: c.company.id }
+    if (table === 'suppliers') { delete row.credit_days; delete row.opening_balance; delete row.opening_balance_date } else row.created_by = c.userId
+    const { data, error } = await c.supabase.from(table).insert(row).select('id').single()
+    if (error) { if (error.code === '23505') return { error: `A ${table === 'customers' ? 'customer' : 'supplier'} named “${v.name}” already exists (it may be in the trash: Settings → Trash).` }; throw error }
+    revalidatePath('/parties'); return { ok: true, message: 'Saved.', data: { id: data.id } }
   })
 }

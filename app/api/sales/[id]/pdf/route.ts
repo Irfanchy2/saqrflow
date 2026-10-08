@@ -12,6 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const built = await buildSalesPdf(c, id)
   if (!built) return new NextResponse('Not found', { status: 404 })
   const inline = req.nextUrl.searchParams.get('inline') === '1'
+  await c.supabase.from('sales_doc_events').insert({ company_id: c.company.id, invoice_id: id, event: 'downloaded', user_id: c.userId })
   return new NextResponse(built.bytes as BodyInit, {
     headers: {
       'Content-Type': 'application/pdf', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',

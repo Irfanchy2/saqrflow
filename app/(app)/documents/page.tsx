@@ -24,7 +24,7 @@ export default async function CompanyDocuments({ searchParams }: { searchParams:
   const showTimeline = sp.view === 'timeline'
   const events = showTimeline ? await documentTimeline(c, { type: 'company' }) : []
   return <>
-    <PageHeader title="Company Documents" sub="Licences, registrations, insurance, tenancy, permits and contracts — with expiry tracking and renewal history."
+    <PageHeader title="Company Documents" sub="Licences, registrations, insurance, tenancy, permits and contracts. With expiry tracking and renewal history."
       actions={<>
         <LinkButton href={showTimeline ? '/documents' : '/documents?view=timeline'} variant="secondary">{showTimeline ? 'List' : 'Timeline'}</LinkButton>
         {c.can('data.export') && <LinkButton href="/api/export/documents" variant="secondary">Export CSV</LinkButton>}
@@ -33,7 +33,7 @@ export default async function CompanyDocuments({ searchParams }: { searchParams:
             <Field label="Name"><Input name="name" required maxLength={120} placeholder="e.g. Civil Defence Certificate" /></Field>
             <Field label="Type"><Select name="scope" defaultValue="company"><option value="company">Company document</option><option value="other">Other</option></Select></Field>
             <Field label="Default reminder days (optional)" hint="Comma-separated, e.g. 120, 60, 30, 7"><Input name="reminder_days" /></Field></ActionForm></DialogButton>}
-        {c.can('documents.upload') && <DialogButton wide label="Add document" title="Add company document" icon={<Plus size={15} />}>
+        {c.can('documents.upload') && <DialogButton wide openParam="document" label="Add document" title="Add company document" icon={<Plus size={15} />}>
           <ActionForm action={createDocument} submit="Save document"><input type="hidden" name="owner_type" value="company" />
             <DocFields categories={categories} people={people ?? []} company={c.company.name} /></ActionForm></DialogButton>}
       </>} />

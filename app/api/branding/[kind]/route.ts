@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const KINDS = ['header', 'header_invoice', 'footer', 'stamp', 'signature']
+const KINDS = ['header', 'header_invoice', 'footer', 'stamp', 'signature', 'logo']
 /** Company letterhead / footer / stamp / signature — signed-in members of the company only (stamp & signature are sensitive). */
 export async function GET(_: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params

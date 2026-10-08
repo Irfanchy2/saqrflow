@@ -36,7 +36,7 @@ export default async function Employees({ searchParams }: { searchParams: Promis
   return <>
     <PageHeader title="Employees & Labour" sub={`${activeCount ?? 0} active employee${activeCount === 1 ? '' : 's'}`}
       actions={<>{c.can('data.export') && c.can('employees.view_sensitive') && <LinkButton href="/api/export/employees" variant="secondary">Export CSV</LinkButton>}
-        {c.can('records.edit') && c.can('employees.view_sensitive') && <DialogButton wide label="Add employee" title="Add employee" icon={<Plus size={15} />}>
+        {c.can('records.edit') && c.can('employees.view_sensitive') && <DialogButton wide openParam="employee" label="Add employee" title="Add employee" icon={<Plus size={15} />}>
           <ActionForm action={createEmployee} submit="Create employee"><EmployeeFields withSalary={c.can('salary.view')} /></ActionForm></DialogButton>}</>} />
     <form className="mb-4 flex flex-wrap gap-2"><input name="q" defaultValue={sp.q} placeholder="Search name, ID, designation…" className={`${cls} min-w-52 flex-1`} />
       <select name="status" defaultValue={sp.status ?? ''} className={cls}><option value="">Current staff</option>{EMP_STATUS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select>

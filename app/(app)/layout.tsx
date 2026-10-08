@@ -19,39 +19,49 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!supabaseConfigured()) return <SetupRequired />
   const c = await getCtx()
   const l = c.profile.locale
+  // grouped by job; the first group needs no label. Every entry is enforced again on the server (pages + RLS), hiding is only convenience.
   const items: (NavItem & { show: boolean })[] = [
-    { key: 'overview', group: 'Workspace', href: '/', status: 'live', show: true },
-    { key: 'inbox', group: 'Workspace', href: '/inbox', status: 'live', show: c.can('documents.upload') || c.can('employees.view_sensitive') },
-    { key: 'reminders', group: 'Workspace', href: '/reminders', status: 'live', show: c.can('reminders.create') },
-    { key: 'calendar', group: 'Workspace', href: '/calendar', status: 'live', show: c.can('documents.view') },
-    { key: 'documents', group: 'Records', href: '/documents', status: 'live', show: c.can('documents.view') },
-    { key: 'employees', group: 'Records', href: '/employees', status: 'live', show: true },
-    { key: 'vault', group: 'Records', href: '/vault', status: 'live', show: c.can('documents.view') },
-    { key: 'assets', group: 'Records', href: '/assets', status: 'live', show: c.can('documents.view') },
-    { key: 'invoices', group: 'Finance & projects', href: '/invoices', status: 'live', show: c.can('finance.view') },
-    { key: 'projects', group: 'Finance & projects', href: '/projects', status: 'live', show: c.can('documents.view') },
-    { key: 'cheques', group: 'Finance & projects', href: '/cheques', status: 'live', show: c.can('finance.view') },
-    { key: 'parties', group: 'Finance & projects', href: '/parties', status: 'live', show: c.can('documents.view') },
-    { key: 'reports', group: 'Insights', href: '/reports', status: 'partial', show: c.can('data.export') },
-    { key: 'assistant', group: 'Insights', href: '/assistant', status: 'live', show: true },
-    { key: 'users', group: 'Admin', href: '/users', status: 'live', show: c.can('users.manage') },
-    { key: 'settings', group: 'Admin', href: '/settings', status: 'live', show: true },
+    { key: 'overview', group: '', href: '/', show: true },
+    { key: 'inbox', group: '', href: '/inbox', show: c.can('documents.upload') || c.can('employees.view_sensitive') },
+    { key: 'tasks', group: '', href: '/tasks', show: true },
+    { key: 'reminders', group: '', href: '/reminders', show: c.can('reminders.create') },
+    { key: 'calendar', group: '', href: '/calendar', show: c.can('documents.view') },
+    { key: 'leads', group: 'Sales & CRM', href: '/leads', show: c.can('crm.view') },
+    { key: 'site_visits', group: 'Sales & CRM', href: '/site-visits', show: c.can('documents.view') },
+    { key: 'invoices', group: 'Sales & CRM', href: '/invoices', show: c.can('finance.view') },
+    { key: 'parties', group: 'Sales & CRM', href: '/parties', show: c.can('documents.view') },
+    { key: 'catalog', group: 'Sales & CRM', href: '/catalog', show: c.can('finance.view') },
+    { key: 'projects', group: 'Projects & site', href: '/projects', show: c.can('documents.view') },
+    { key: 'work_orders', group: 'Projects & site', href: '/work-orders', show: c.can('documents.view') },
+    { key: 'site_reports', group: 'Projects & site', href: '/site-reports', show: c.can('documents.view') },
+    { key: 'assets', group: 'Projects & site', href: '/assets', show: c.can('documents.view') },
+    { key: 'cheques', group: 'Finance', href: '/cheques', show: c.can('finance.view') },
+    { key: 'expenses', group: 'Finance', href: '/expenses', show: c.can('finance.view') },
+    { key: 'employees', group: 'People & documents', href: '/employees', show: true },
+    { key: 'documents', group: 'People & documents', href: '/documents', show: c.can('documents.view') },
+    { key: 'vault', group: 'People & documents', href: '/vault', show: c.can('documents.view') },
+    { key: 'reports', group: 'Insights', href: '/reports', show: c.can('finance.view') || c.can('documents.view') || c.can('employees.view') },
+    { key: 'assistant', group: 'Insights', href: '/assistant', show: true },
+    { key: 'users', group: 'System', href: '/users', show: c.can('users.manage') },
+    { key: 'audit', group: 'System', href: '/audit', show: c.can('audit.view') },
+    { key: 'trash', group: 'System', href: '/trash', show: c.can('records.delete') },
+    { key: 'settings', group: 'System', href: '/settings', show: true },
   ].map(i => ({ ...i, label: t(l, i.key as any) }) as NavItem & { show: boolean })
   const { data: notes } = await c.supabase.from('in_app_notifications').select('id,title,body,link,severity,read_at,created_at').order('created_at', { ascending: false }).limit(8)
   const { count: unread } = await c.supabase.from('in_app_notifications').select('id', { count: 'exact', head: true }).is('read_at', null)
 
   const visible = items.filter(i => i.show)
   return <div className="flex min-h-screen">
-    <a href="#main" className="sr-only z-[70] rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
+    <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
     <Sidebar items={visible} company={c.company.name} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} />
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
-      <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur ps-14 lg:ps-6">
+      <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-bg/90 px-4 backdrop-blur-sm ps-14 lg:ps-6">
         <form action="/search" className="relative max-w-md flex-1"><Search size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-9 w-full rounded-md border border-border bg-bg ps-9 pe-3 text-sm placeholder:text-muted/70" /></form>
+          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-9 w-full rounded-md border border-border bg-surface ps-9 pe-3 text-sm placeholder:text-muted/60 hover:border-border-strong" /></form>
         <PaletteHint />
         <div className="ms-auto flex items-center gap-1">
           <ThemeToggle /><NotificationBell items={notes ?? []} unread={unread ?? 0} />
-          <div className="mx-2 hidden text-end leading-tight sm:block"><div className="text-sm font-medium">{c.profile.full_name}</div><div className="text-[11px] capitalize text-muted">{c.profile.role.replace('_', ' ')}</div></div>
+          <div className="mx-2 hidden text-end leading-tight sm:block"><div className="text-sm font-medium">{c.profile.full_name}</div><div className="text-2xs capitalize text-muted">{c.profile.role.replace(/_/g, ' ')}</div></div>
           <form action={signOut}><Button variant="ghost" size="icon" aria-label={t(l, 'signout')} title={t(l, 'signout')}><LogOut size={16} /></Button></form>
         </div></header>
       <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1760px] flex-1 overflow-x-clip p-4 sm:p-6">{children}</main>

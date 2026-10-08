@@ -21,7 +21,7 @@ export interface DecideCtx { companyName: string; companyMatch: number; employee
 export function decide(x: Extraction, ctx: DecideCtx): Decision {
   const def = typeDef(x.docType)
   const reasons: string[] = [], warnings: string[] = []
-  if (!ctx.hasText && x.engine === 'rules') reasons.push('No readable text found — upload a sharper scan, enable AI reading in Settings, or enter the details manually')
+  if (!ctx.hasText && x.engine === 'rules') reasons.push('No readable text found. Upload a sharper scan, enable AI reading in Settings, or enter the details manually')
   if (!def || x.docType === UNKNOWN_TYPE) reasons.push('Document type not recognised')
   else if (x.docTypeConfidence < AUTO_SUGGEST_THRESHOLD) reasons.push(`Document type uncertain (${Math.round(x.docTypeConfidence * 100)}%)`)
 
@@ -35,7 +35,7 @@ export function decide(x: Extraction, ctx: DecideCtx): Decision {
     candidates = ctx.employees
     const [a, b] = ctx.employees
     if (a && a.confidence >= OWNER_THRESHOLD && (!b || a.confidence - b.confidence >= 0.1)) owner = { id: a.id, name: a.name, confidence: a.confidence, reason: a.reason }
-    else reasons.push(a ? 'Employee match not certain — please confirm who this belongs to' : 'No matching employee found')
+    else reasons.push(a ? 'Employee match not certain. Please confirm who this belongs to' : 'No matching employee found')
   } else if (def?.owner === 'customer') {
     candidates = ctx.customers
     const [a] = ctx.customers
@@ -50,7 +50,7 @@ export function decide(x: Extraction, ctx: DecideCtx): Decision {
     candidates = ctx.projects ?? []
     const [a] = candidates
     if (a && a.confidence >= OWNER_THRESHOLD) owner = { id: a.id, name: a.name, confidence: a.confidence, reason: a.reason }
-    else reasons.push('Project not identified — choose the project')
+    else reasons.push('Project not identified. Choose the project')
   } else if (def?.owner === 'vehicle') {
     const plate = x.fields.plate_number?.value
     candidates = ctx.vehicles ?? []

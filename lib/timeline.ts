@@ -1,4 +1,5 @@
 import 'server-only'
+import { localDate } from './time'
 import type { Ctx } from './auth'
 
 export interface TimelineEvent { date: string; title: string; detail?: string; href?: string; kind: 'issued' | 'uploaded' | 'version' | 'renewed' | 'reminder' }
@@ -19,10 +20,10 @@ export async function documentTimeline(c: Ctx, owner: { type: 'employee' | 'comp
   const ev: TimelineEvent[] = []
   for (const d of docs ?? []) {
     if (d.issue_date) ev.push({ date: d.issue_date, title: `${d.name} issued`, href: `/documents/${d.id}`, kind: 'issued' })
-    ev.push({ date: d.created_at.slice(0, 10), title: `${d.name} uploaded`, detail: (d as any).category?.name, href: `/documents/${d.id}`, kind: 'uploaded' })
+    ev.push({ date: localDate(d.created_at, c.company.timezone), title: `${d.name} uploaded`, detail: (d as any).category?.name, href: `/documents/${d.id}`, kind: 'uploaded' })
   }
-  for (const v of vers ?? []) ev.push({ date: v.created_at.slice(0, 10), title: `${name(v.document_id)} — version ${v.version_no} added`, detail: v.note ?? undefined, href: `/documents/${v.document_id}`, kind: 'version' })
+  for (const v of vers ?? []) ev.push({ date: localDate(v.created_at, c.company.timezone), title: `${name(v.document_id)}. Version ${v.version_no} added`, detail: v.note ?? undefined, href: `/documents/${v.document_id}`, kind: 'version' })
   for (const r of ren ?? []) ev.push({ date: r.renewed_at, title: `${name(r.document_id)} renewed`, detail: `${r.previous_expiry ?? '—'} → ${r.new_expiry}`, href: `/documents/${r.document_id}`, kind: 'renewed' })
-  for (const l of logs ?? []) ev.push({ date: l.created_at.slice(0, 10), title: `Renewal reminder sent — ${name(l.source_id)}`, href: `/documents/${l.source_id}`, kind: 'reminder' })
+  for (const l of logs ?? []) ev.push({ date: localDate(l.created_at, c.company.timezone), title: `Renewal reminder sent: ${name(l.source_id)}`, href: `/documents/${l.source_id}`, kind: 'reminder' })
   return ev.sort((a, b) => b.date.localeCompare(a.date))
 }

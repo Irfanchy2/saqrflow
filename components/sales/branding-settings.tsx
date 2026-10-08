@@ -6,8 +6,9 @@ import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { removeBranding, saveSalesSettings, uploadBranding } from '@/app/actions/sales'
 
 const KINDS = [
+  { k: 'logo', label: 'Logo', hint: 'Used with the company details below when no letterhead image is uploaded' },
   { k: 'header', label: 'Letterhead (quotation & delivery note)', hint: 'Wide PNG/JPG, ~1600×250 px' },
-  { k: 'header_invoice', label: 'Letterhead (tax invoice)', hint: 'Optional — falls back to the letterhead above' },
+  { k: 'header_invoice', label: 'Letterhead (tax invoice)', hint: 'Optional. Falls back to the letterhead above' },
   { k: 'footer', label: 'Footer', hint: 'Contact strip printed at the bottom of every page' },
   { k: 'stamp', label: 'Company stamp', hint: 'Transparent PNG works best' },
   { k: 'signature', label: 'Authorised signature', hint: 'Transparent PNG works best' },
@@ -16,9 +17,9 @@ const KINDS = [
 /** Settings → Branding & documents. Images live in private storage and are only served to signed-in staff. */
 export async function BrandingSettings({ c }: { c: Ctx }) {
   const [b, s] = await Promise.all([brandingFor(c), salesSettings(c)])
-  const url: Record<string, string | null | undefined> = { header: b.header, header_invoice: b.headerInvoice, footer: b.footer, stamp: b.stamp, signature: b.signature }
-  return <Card className="lg:col-span-2">
-    <CardHeader title="Branding & sales documents" sub="Letterhead, stamp, signature and default wording for quotations, tax invoices and delivery notes."
+  const url: Record<string, string | null | undefined> = { logo: b.logo, header: b.header, header_invoice: b.headerInvoice, footer: b.footer, stamp: b.stamp, signature: b.signature }
+  return <Card id="branding">
+    <CardHeader title="Document branding & sales defaults" sub="Letterhead, logo, stamp, signature, VAT and default wording. No code changes needed."
       action={<Badge tone={b.header ? 'green' : 'amber'}>{b.header ? 'Letterhead set' : 'No letterhead yet'}</Badge>} />
     <div className="grid gap-6 p-4 xl:grid-cols-2">
       <div className="space-y-3">
@@ -41,8 +42,21 @@ export async function BrandingSettings({ c }: { c: Ctx }) {
           <Field label="Invoice due (days)"><Input name="due_days" type="number" min={0} max={365} defaultValue={s.dueDays} required /></Field>
           <Field label="Quote valid (days)"><Input name="validity_days" type="number" min={1} max={365} defaultValue={s.validityDays} required /></Field>
         </div>
-        <Field label="Company TRN" hint="Printed on tax invoices (15 digits)"><Input name="company_trn" inputMode="numeric" defaultValue={b.companyTrn ?? ''} /></Field>
-        <Field label="Bank details on invoices" hint="Account name, bank, IBAN — printed on the invoice for customers to pay you"><Textarea name="bank_details" rows={3} defaultValue={b.bankDetails ?? ''} /></Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Company TRN" hint="Printed on tax invoices (15 digits)"><Input name="company_trn" inputMode="numeric" defaultValue={b.companyTrn ?? ''} /></Field>
+          <Field label="Quotation VAT display" hint="Default for new quotations; changeable per quotation"><Select name="quote_vat" defaultValue={s.quoteVat}><option value="note">Note only (“VAT 5% will be applied”)</option><option value="add">Add VAT and show the grand total</option></Select></Field>
+        </div>
+        <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2"><legend className="px-1 text-sm font-medium">Company details (text letterhead)</legend>
+          <Field label="Address" className="sm:col-span-2"><Input name="company_address" maxLength={500} defaultValue={b.companyAddress ?? ''} placeholder="P.O. Box 37542, Musaffah M-44, Abu Dhabi, UAE" /></Field>
+          <Field label="Phone"><Input name="company_phone" maxLength={80} defaultValue={b.companyPhone ?? ''} /></Field>
+          <Field label="Email"><Input name="company_email" type="email" maxLength={120} defaultValue={b.companyEmail ?? ''} /></Field>
+          <Field label="Website"><Input name="company_website" maxLength={120} defaultValue={b.companyWebsite ?? ''} /></Field>
+          <Field label="Brand colour" hint="Table header & title accent"><div className="flex items-center gap-2">{b.brandColor && <span className="h-7 w-7 shrink-0 rounded border border-border" style={{ background: b.brandColor }} aria-hidden />}<Input name="brand_color" placeholder="#B91C1C (empty = black & white)" defaultValue={b.brandColor ?? ''} maxLength={7} pattern="#[0-9a-fA-F]{6}" /></div></Field>
+          <Field label="Logo / letterhead height (mm)" hint="0 = automatic"><Input name="logo_height" type="number" min={0} max={60} defaultValue={b.logoHeight ?? 0} /></Field>
+          <Field label="Logo position"><Select name="logo_align" defaultValue={b.logoAlign ?? 'center'}><option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option></Select></Field>
+          <p className="text-xs text-muted sm:col-span-2">A brand colour is optional. Documents stay black &amp; white (grayscale-safe) without it.</p>
+        </fieldset>
+        <Field label="Bank details on invoices" hint="Account name, bank, IBAN. Printed on the invoice for customers to pay you"><Textarea name="bank_details" rows={3} defaultValue={b.bankDetails ?? ''} /></Field>
         <Field label="Quotation opening"><Textarea name="intro" rows={2} defaultValue={s.intro} /></Field>
         <Field label="Quotation closing note"><Textarea name="closing" rows={2} defaultValue={s.closing} /></Field>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -51,11 +65,17 @@ export async function BrandingSettings({ c }: { c: Ctx }) {
         </div>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_header_footer" defaultChecked={b.showHeaderFooter} />Print letterhead and footer (turn off for pre-printed paper)</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_stamp" defaultChecked={b.showStamp} />Add stamp and signature to quotations and delivery notes</label>
+        <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2"><legend className="px-1 text-sm font-medium">Quotation workflow</legend>
+          <Field label="Follow-up reminders (days after sending)" hint="e.g. 3, 10. Created when a quotation is marked sent"><Input name="followup_days" defaultValue={s.followupDays.join(', ')} placeholder="3, 10" /></Field>
+          <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="require_approval" defaultChecked={s.requireApproval} />Quotations need manager approval before they can be sent</label>
+        </fieldset>
         <fieldset className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-4"><legend className="px-1 text-sm font-medium">Seal &amp; signature on the document</legend>
           <Field label="Seal size (px)" hint="70–220 · 140 ≈ 37 mm"><Input name="seal_size" type="number" min={70} max={220} defaultValue={b.sealSize} required /></Field>
           <Field label="Signature width (px)" hint="80–260 · 160 ≈ 42 mm"><Input name="signature_width" type="number" min={80} max={260} defaultValue={b.signatureWidth} required /></Field>
           <Field label="Horizontal alignment"><Select name="sign_align" defaultValue={b.signAlign}><option value="right">Right</option><option value="center">Centre</option><option value="left">Left</option></Select></Field>
           <Field label="Space above (px)" hint="0–80"><Input name="sign_spacing" type="number" min={0} max={80} defaultValue={b.signSpacing} required /></Field>
+          <Field label="Signatory name" className="sm:col-span-2"><Input name="signatory_name" maxLength={120} defaultValue={b.signatoryName ?? ''} placeholder="e.g. Mohammed Al Saqr" /></Field>
+          <Field label="Designation" className="sm:col-span-2"><Input name="signatory_title" maxLength={120} defaultValue={b.signatoryTitle ?? ''} placeholder="e.g. General Manager" /></Field>
           <p className="text-xs text-muted sm:col-span-4">Images keep their proportions (never stretched). The preview, print view and PDF all use these sizes.</p>
         </fieldset>
       </ActionForm>

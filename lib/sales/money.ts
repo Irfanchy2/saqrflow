@@ -1,18 +1,48 @@
-// Money maths for sales documents. Amounts are AED with 2 decimals; rounding is done per line then summed
-// (the way the original Al Saqr template and most UAE invoices present VAT).
-export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+// Money maths for sales documents. All arithmetic is done in integer fils (1/100 AED) with BigInt, so totals never drift
+// (no 1249.999999). The same functions run in the editor, on the server (stored totals), in the paper and in the PDF,
+// so every screen shows the same numbers. Lines are rounded to fils first, then summed (UAE invoice convention).
+export type VatCategory = 'standard' | 'zero' | 'exempt' | 'out_of_scope'
+export const VAT_CATEGORIES: Record<VatCategory, string> = { standard: 'Standard rate', zero: 'Zero-rated (0%)', exempt: 'Exempt', out_of_scope: 'Out of scope / no VAT' }
+export type DiscountType = 'amount' | 'percent'
 
-export interface LineInput { quantity: number | string; unit_price: number | string }
-export const lineAmount = (l: LineInput) => r2(Number(l.quantity || 0) * Number(l.unit_price || 0))
-export const lineVat = (l: LineInput, rate: number) => r2(lineAmount(l) * rate / 100)
+const big = (n: number | string | null | undefined, scale: number) => BigInt(Math.round((Number(n) || 0) * scale))
+/** a·b / c rounded half-up, for non-negative integers */
+const mulDiv = (a: bigint, b: bigint, c: bigint) => (a * b * 2n + c) / (2n * c)
+const aed = (fils: bigint) => Number(fils) / 100
 
-export interface Totals { subtotal: number; discount: number; taxable: number; vat: number; total: number }
-export function computeTotals(lines: LineInput[], vatRate: number, discount = 0, applyVat = true): Totals {
-  const subtotal = r2(lines.reduce((s, l) => s + lineAmount(l), 0))
-  const d = r2(Math.min(Math.max(0, Number(discount) || 0), subtotal))
-  const taxable = r2(subtotal - d)
-  const vat = applyVat ? r2(taxable * vatRate / 100) : 0
-  return { subtotal, discount: d, taxable, vat, total: r2(taxable + vat) }
+/** Rounds an AED amount to 2 decimals (half-up, float-safe). */
+export const r2 = (n: number) => Math.sign(n) * aed(BigInt(Math.round(Math.abs(n) * 100 + 1e-7)))
+
+export interface LineInput { quantity: number | string; unit_price: number | string; discount_pct?: number | string | null; vat_category?: string | null }
+const lineFils = (l: LineInput) => {
+  const gross = mulDiv(big(l.quantity, 1000), big(l.unit_price, 100), 1000n)          // qty (3 dp) × rate (fils)
+  const disc = mulDiv(gross, big(Math.min(100, Math.max(0, Number(l.discount_pct) || 0)), 100), 10000n)
+  return gross - disc
+}
+const catOf = (l: LineInput): VatCategory => (l.vat_category && l.vat_category in VAT_CATEGORIES ? l.vat_category as VatCategory : 'standard')
+/** Line amount after any line discount, before VAT. */
+export const lineAmount = (l: LineInput) => aed(lineFils(l))
+/** VAT on one line (0 for zero-rated / exempt / out-of-scope lines). */
+export const lineVat = (l: LineInput, rate: number) => (catOf(l) === 'standard' ? aed(mulDiv(lineFils(l), big(rate, 100), 10000n)) : 0)
+
+export interface Totals { subtotal: number; discount: number; taxable: number; vat: number; total: number; standardBase: number; zeroBase: number; exemptBase: number }
+/**
+ * @param discount  AED amount, or { type: 'percent', value: 10 } for 10 %
+ * @param applyVat  false for quotations that only *note* VAT (the original Al Saqr template)
+ * The document discount is spread across lines in proportion to their value, so VAT is charged on the discounted standard-rated amount.
+ */
+export function computeTotals(lines: LineInput[], vatRate: number, discount: number | { type: DiscountType; value: number | string } = 0, applyVat = true): Totals {
+  const nets = lines.map(l => ({ fils: lineFils(l), cat: catOf(l) }))
+  const subtotal = nets.reduce((s, x) => s + x.fils, 0n)
+  const d = typeof discount === 'object' && discount
+    ? (discount.type === 'percent' ? mulDiv(subtotal, big(Math.min(100, Math.max(0, Number(discount.value) || 0)), 100), 10000n) : big(Math.max(0, Number(discount.value) || 0), 100))
+    : big(Math.max(0, Number(discount) || 0), 100)
+  const disc = d > subtotal ? subtotal : d
+  const base = (cat: VatCategory) => { const b = nets.filter(x => x.cat === cat).reduce((s, x) => s + x.fils, 0n); return subtotal ? b - mulDiv(disc, b, subtotal) : 0n }
+  const std = base('standard')
+  const vat = applyVat ? mulDiv(std, big(vatRate, 100), 10000n) : 0n
+  const taxable = subtotal - disc
+  return { subtotal: aed(subtotal), discount: aed(disc), taxable: aed(taxable), vat: aed(vat), total: aed(taxable + vat), standardBase: aed(std), zeroBase: aed(base('zero')), exemptBase: aed(base('exempt') + base('out_of_scope')) }
 }
 
 export const fmtMoney = (n: number | string | null | undefined) =>
