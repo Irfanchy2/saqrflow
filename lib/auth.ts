@@ -1,5 +1,7 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+import { VERIFIED_EMAIL, VERIFIED_SIG, VERIFIED_UID, verifiedToken } from './verified-user'
 import { cache } from 'react'
 import { createClient } from './supabase/server'
 import { can, ForbiddenError, type Permission, type Role } from './permissions'
@@ -14,17 +16,29 @@ export interface Ctx {
   can: (p: Permission) => boolean
 }
 
-/** Loads the signed-in user, profile, company. Redirects to login/onboarding as needed. Cached per request. */
+/**
+ * Loads the signed-in user, profile, company. Redirects to login/onboarding as needed. Cached per request.
+ * The middleware has already verified the session with the auth server and passes the user id on (it strips any
+ * client-sent copy), so a normal request needs one database round trip here instead of three.
+ */
 export const getCtx = cache(async (): Promise<Ctx> => {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: profile } = await supabase.from('profiles').select('id, company_id, full_name, role, locale').eq('id', user.id).maybeSingle()
-  if (!profile) redirect('/onboarding')
-  const { data: company } = await supabase.from('companies').select('id, name, timezone, currency, locale').eq('id', profile.company_id).single()
+  const h = await headers()
+  const token = await verifiedToken()
+  const trusted = !!token && h.get(VERIFIED_SIG) === token   // only our middleware knows the token; a forged header is ignored
+  let userId = trusted ? h.get(VERIFIED_UID) : null, email = trusted ? decodeURIComponent(h.get(VERIFIED_EMAIL) ?? '') : ''
+  if (!userId) {   // middleware did not vouch for this request (static-looking path, tests): verify with the auth server here
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) redirect('/login')
+    userId = user.id; email = user.email ?? ''
+  }
+  const { data: row } = await supabase.from('profiles').select('id, company_id, full_name, role, locale, company:companies(id, name, timezone, currency, locale)').eq('id', userId).maybeSingle()
+  if (!row) redirect('/onboarding')
+  const company = (Array.isArray(row.company) ? row.company[0] : row.company) as Ctx['company'] | null
   if (!company) redirect('/onboarding')
-  const role = profile.role as Role
-  return { supabase, userId: user.id, email: user.email ?? '', profile: { ...profile, role }, company, today: todayInTz(new Date(), company.timezone), can: p => can(role, p) }
+  const role = row.role as Role
+  const profile = { id: row.id, company_id: row.company_id, full_name: row.full_name, role, locale: row.locale }
+  return { supabase, userId, email, profile, company, today: todayInTz(new Date(), company.timezone), can: p => can(role, p) }
 })
 
 /** Server-action guard: throws (turned into a friendly message by `safe`) when the role lacks the permission. The DB re-checks via RLS. */

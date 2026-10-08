@@ -45,8 +45,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   ] : []
   const total = groups.reduce((s, [, h]) => s + h.length, 0)
   return <><PageHeader title="Search" sub={run ? `${total} result${total === 1 ? '' : 's'} for “${q}”` : 'Search leads, customers, quotations (e.g. AS0025180), invoices, projects, work orders, tasks, people, documents, vehicles and cheques.'} />
-    <form className="mb-4 flex max-w-xl gap-2"><input name="q" type="search" defaultValue={sp.q} autoFocus aria-label="Search everything" placeholder="e.g. AS0025180, Mohammed, ABC Contracting, Villa Fujairah, INV-102" className="h-10 flex-1 rounded-md border border-border bg-surface px-3 text-sm" />
-      <button className="h-10 cursor-pointer rounded-md bg-primary px-4 text-sm font-medium text-primary-fg">Search</button></form>
+    <form className="mb-4 flex max-w-xl gap-2"><input name="q" type="search" defaultValue={sp.q} autoFocus aria-label="Search everything" placeholder="e.g. AS0025180, Mohammed, ABC Contracting, Villa Fujairah, INV-102" className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm" />
+      
+      <button className="h-10 shrink-0 cursor-pointer rounded-md bg-primary px-4 text-sm font-medium text-primary-fg">Search</button></form>
     {run && <Link href={`/assistant?q=${encodeURIComponent(sp.q ?? '')}`} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"><Sparkles size={14} />Ask Averiqo AI: “{sp.q}”</Link>}
     {run && total === 0 ? <Card><EmptyState icon={Search} title="No results" body="Try a different spelling, or part of a name, number or reference." /></Card> :
       <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">{groups.filter(([, h]) => h.length).map(([title, hits]) => <Card key={title}><CardHeader title={title} />

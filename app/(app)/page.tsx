@@ -25,6 +25,13 @@ export default async function Dashboard() {
   const canDocs = c.can('documents.view') || c.can('employees.view_sensitive'), canFin = c.can('finance.view')
   const in30 = addDays(c.today, 30), month = c.today.slice(0, 7) + '-01', week = addDays(c.today, 7)
 
+  // field operations: my open tasks due today / overdue, lead follow-ups due, visits today
+  const head1 = { count: 'exact' as const, head: true }
+  const opsCounts = Promise.all([
+    c.supabase.from('tasks').select('id', head1).eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).lte('due_date', c.today),
+    c.can('crm.view') ? c.supabase.from('leads').select('id', head1).lte('next_followup', c.today).not('stage', 'in', '(won,lost,on_hold)') : Promise.resolve({ count: undefined }),
+    c.can('documents.view') ? c.supabase.from('site_visits').select('id', head1).in('status', ['scheduled', 'rescheduled']).eq('scheduled_date', c.today) : Promise.resolve({ count: undefined }),
+  ])
   const [sources, cheques, activity, salesData, monthInv, monthExp, dueSoon, followDue, activeProjects, activeCount, exp30, expired, visas, vehicles, emp, docsAny, people] = await Promise.all([
     sb.from('reminder_sources').select('source_type,source_id,title,subject,owner_type,due_date,amount,direction,link').lte('due_date', in30).order('due_date').limit(60),
     canFin ? sb.from('cheques').select('direction,status,amount,cheque_date').in('status', ['received', 'issued', 'scheduled', 'deposited', 'presented']).limit(5000) : null,
@@ -57,13 +64,7 @@ export default async function Dashboard() {
   const date = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: c.company.timezone }).format(new Date())
 
   // operations / compliance counts: one compact list, zero values stay quiet
-  // field operations: my open tasks due today / overdue, lead follow-ups due, visits today
-  const head1 = { count: 'exact' as const, head: true }
-  const [myDue, leadDue, visitsToday] = await Promise.all([
-    c.supabase.from('tasks').select('id', head1).eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).lte('due_date', c.today),
-    c.can('crm.view') ? c.supabase.from('leads').select('id', head1).lte('next_followup', c.today).not('stage', 'in', '(won,lost,on_hold)') : Promise.resolve({ count: undefined }),
-    c.can('documents.view') ? c.supabase.from('site_visits').select('id', head1).in('status', ['scheduled', 'rescheduled']).eq('scheduled_date', c.today) : Promise.resolve({ count: undefined }),
-  ])
+  const [myDue, leadDue, visitsToday] = await opsCounts
   const ops: { l: string; v: number | null | undefined; href: string; bad?: boolean; warn?: boolean }[] = [
     { l: 'My tasks due today or overdue', v: myDue.count, href: '/tasks?view=mine', warn: true },
     { l: 'Lead follow-ups due', v: leadDue.count, href: '/leads?view=list&due=1', warn: true },

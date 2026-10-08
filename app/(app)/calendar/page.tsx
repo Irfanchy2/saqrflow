@@ -16,6 +16,6 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
     label: r.source_type === 'cheque' ? `${r.direction === 'incoming' ? '↓' : '↑'} ${formatAed(r.amount)} ${r.subject ?? ''}` : r.subject ? `${r.title} · ${r.subject}` : r.title,
     tone: (daysBetween(c.today, r.due_date) < 0 ? 'red' : r.source_type === 'cheque' ? 'blue' : r.source_type === 'document' ? (r.owner_type === 'employee' ? 'amber' : 'blue') : 'neutral') as any,
   }))
-  return <><PageHeader title="Calendar" sub="Every expiry, cheque date and custom reminder in one place." actions={<div className="flex gap-2 text-xs"><Badge tone="amber">Employee documents</Badge><Badge tone="blue">Company / cheques</Badge><Badge tone="red">Overdue</Badge></div>} />
+  return <><PageHeader title="Calendar" sub="Every expiry, cheque date and custom reminder in one place." actions={<div className="flex flex-wrap gap-2 text-xs"><Badge tone="amber">Employee documents</Badge><Badge tone="blue">Company / cheques</Badge><Badge tone="red">Overdue</Badge></div>} />
     <MonthGrid month={month} today={c.today} items={items} base="/calendar" /></>
 }

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: 'Averiqo runs quotations, invoices, projects, documents, employees, vehicles and renewals for UAE businesses.',
   applicationName: 'Averiqo',
 }
-export const viewport: Viewport = { themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f7f8fa' }, { media: '(prefers-color-scheme: dark)', color: '#111318' }], width: 'device-width', initialScale: 1 }
+export const viewport: Viewport = { themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f7f8fa' }, { media: '(prefers-color-scheme: dark)', color: '#111318' }], width: 'device-width', initialScale: 1, viewportFit: 'cover' }
 
 const themeScript = `try{var t=localStorage.getItem('sf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`
 

@@ -40,6 +40,20 @@ if (!process.env.AUDIT_EMPTY) {
   }
   await q(`insert into assets(company_id,name,kind,plate_or_serial,assigned_to,registration_expiry,insurance_expiry,status) values
     ($1,'Toyota Hilux pickup','vehicle','AD 5 41827',$2,$3,$4,'active'),($1,'Lincoln Electric welding machine','equipment','LE-PW455-0912',$5,null,null,'active')`, [co, emp[1].id, d(18), d(64), emp[0].id]).catch(e => console.log('assets seed:', e.message))
+  // Phase 1: leads in several stages, a visit, a work order with tasks, a daily report
+  await q(`insert into leads(company_id,number,company_name,contact_person,phone,service,source,estimated_value,stage,next_followup) values
+    ($1,'LD-2026-0001','Al Noor Villas LLC','Mr. Khalid','+971 50 765 4321','Steel staircase with glass balustrade','instagram',48000,'site_visit_required',$2),
+    ($1,'LD-2026-0002','Gulf Pergola Co','Ahmed','+971 55 100 2233','Pergola 6 x 4 m','google',12000,'negotiation',$3),
+    ($1,'LD-2026-0003','Mussafah Warehouse 12','Ravi','+971 52 220 1188','Mezzanine floor 120 m²','referral',96000,'quotation_sent',null),
+    ($1,'LD-2026-0004','Villa 9 Khalifa City','Sara','+971 50 998 7766','Main gate and fence','walk_in',18500,'new',$2)`, [co, d(0), d(-2)])
+  const [lead] = await q(`select id from leads where company_id=$1 and number='LD-2026-0001'`, [co])
+  await q(`insert into site_visits(company_id,number,lead_id,location,scheduled_date,scheduled_time,status,requirements,measurements) values ($1,'SV-2026-0001',$2,'Al Barsha 2, Villa 22, Dubai',$3,'10:30','scheduled','Straight staircase, 17 risers','Width 1,100 mm')`, [co, lead.id, d(1)])
+  const [wo] = await q(`insert into work_orders(company_id,number,title,project_id,customer_id,status,priority,start_date,target_date,site_location,scope) values ($1,'WO-2026-0001','Fabricate and install villa staircase',$2,$3,'in_fabrication','high',$4,$5,'Villa 214, Khalifa City','• Stringers\n• Treads\n• Handrail') returning id`, [co, proj[0].id, cust[0].id, d(-5), d(12)])
+  await q(`insert into tasks(company_id,title,work_order_id,project_id,due_date,status,employee_id) values ($1,'Cut and weld stringers',$2,$3,$4,'completed',$6),($1,'Prime and paint',$2,$3,$5,'in_progress',$6),($1,'Install treads and balustrade',$2,$3,$5,'todo',$6)`, [co, wo.id, proj[0].id, d(-1), d(3), emp[2].id])
+  await q(`insert into employee_compensation(employee_id,company_id,monthly_salary) values ($2,$1,4500)`, [co, emp[0].id])
+  await q(`insert into salary_payments(company_id,employee_id,period,amount,paid_on,method,notes) values ($1,$2,$3,4500,$4,'wps','September salary via WPS, Emirates NBD'),($1,$2,$5,4200,$6,'bank_transfer',null)`, [co, emp[0].id, d(-40).slice(0, 8) + '01', d(-35), d(-70).slice(0, 8) + '01', d(-65)])
+  await q(`insert into employee_advances(company_id,employee_id,kind,amount,given_on,monthly_recovery) values ($1,$2,'advance',2000,$3,500),($1,$2,'deduction',150,$4,null)`, [co, emp[0].id, d(-20), d(-10)])
+  await q(`insert into daily_site_reports(company_id,number,project_id,work_order_id,report_date,work_done,progress,issues) values ($1,'DSR-2026-0001',$2,$3,$4,'Stringers welded and primed. Treads cut to size.',40,'Glass delivery delayed')`, [co, proj[0].id, wo.id, d(0)])
 }
 
 const pages = ['/', '/invoices', '/parties', '/documents', '/employees', '/projects', '/assets', '/cheques', '/reports', '/settings', '/reminders', '/search?q=ABC']
@@ -49,7 +63,35 @@ for (const path of pages) {
 }
 const inv = await q(`select id from invoices where company_id=$1 and doc_type='quotation' order by number limit 1`, [co])
 if (inv[0]) { await p.goto(`${BASE}/invoices/${inv[0].id}`); await p.waitForTimeout(1200); await p.screenshot({ path: `${OUT}/d_editor.png` }) }
-const m = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() }); const mp = await m.newPage()
-for (const path of ['/', '/invoices', '/assets', '/reports']) { await mp.goto(BASE + path); await mp.waitForLoadState('networkidle').catch(() => {}); await mp.screenshot({ path: `${OUT}/m${path.replace(/[/?=]/g, '_') || '_home'}.png`, fullPage: true }) }
+// a real phone: touch, device pixels, the page's own viewport meta (isMobile)
+const m = await browser.newContext({ viewport: { width: +(process.env.AUDIT_W || 390), height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, storageState: await ctx.storageState() }); const mp = await m.newPage()
+const one = async sql => (await q(sql, [co]))[0]?.id
+const ids = { lead: await one(`select id from leads where company_id=$1 limit 1`), wo: await one(`select id from work_orders where company_id=$1 limit 1`), proj: await one(`select id from projects where company_id=$1 limit 1`),
+  emp: await one(`select id from employees where company_id=$1 limit 1`), asset: await one(`select id from assets where company_id=$1 limit 1`), cust: await one(`select id from customers where company_id=$1 limit 1`), inv: inv[0]?.id,
+  sv: await one(`select id from site_visits where company_id=$1 limit 1`), dsr: await one(`select id from daily_site_reports where company_id=$1 limit 1`) }
+const mpages = (process.env.AUDIT_PAGES ?? '/,/inbox,/tasks,/leads,/leads?view=list,/site-visits,/invoices,/parties,/catalog,/projects,/work-orders,/site-reports,/assets,/cheques,/expenses,/employees,/documents,/vault,/reports,/reminders,/calendar,/settings,/search?q=ABC').split(',')
+  .concat(Object.entries({ lead: '/leads/', wo: '/work-orders/', proj: '/projects/', emp: '/employees/', asset: '/assets/', cust: '/parties/', inv: '/invoices/', sv: '/site-visits/', dsr: '/site-reports/' }).filter(([k]) => ids[k]).map(([k, base]) => base + ids[k]))
+  .concat(ids.emp ? ['documents', 'salary', 'leave', 'history'].map(t => `/employees/${ids.emp}?tab=${t}`) : [])
+const report = []
+for (const path of mpages) {
+  const t0 = Date.now(); await mp.goto(BASE + path); await mp.waitForLoadState('networkidle').catch(() => {}); const ms = Date.now() - t0
+  const info = await mp.evaluate(() => {
+    const over = document.documentElement.scrollWidth - innerWidth
+    const small = [...document.querySelectorAll('a,button,select,input:not([type=hidden]),[role=tab]')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.height < 32 || r.width < 32) && getComputedStyle(e).visibility !== 'hidden' }).length
+    const tinyText = [...document.querySelectorAll('main *')].filter(e => e.childElementCount === 0 && e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 11).length
+    const inputs = [...document.querySelectorAll('input,select,textarea')].filter(e => e.getBoundingClientRect().width > 0 && parseFloat(getComputedStyle(e).fontSize) < 16).length
+    // content cut off by main's overflow clip: right edge past main's (clipping) box or the screen, not inside a horizontal scroller
+    const main = document.querySelector('main'), edge = Math.min(innerWidth, main ? main.getBoundingClientRect().right : innerWidth) + 1
+    const scrolls = e => { for (let a = e.parentElement; a && a !== main; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if (o === 'auto' || o === 'scroll') return true } return false }
+    const clipped = main ? [...main.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.right > edge && !scrolls(e) }) : []
+    const leaf = clipped.filter(e => !clipped.some(o => o !== e && e.contains(o)))
+    const desc = e => e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).slice(0, 4).join('.') : '') + ' "' + (e.textContent || '').trim().slice(0, 30) + '" +' + Math.round(e.getBoundingClientRect().right - edge)
+    return { over, clip: leaf.length, clipEx: leaf.slice(0, 4).map(desc), small, tinyText, inputs, h: document.documentElement.scrollHeight }
+  })
+  report.push({ path: path.replace(/[0-9a-f-]{36}/, ':id'), ms, ...info })
+  await mp.screenshot({ path: `${OUT}/m${path.replace(/[0-9a-f-]{36}/, 'id').replace(/[/?=&]/g, '_') || '_home'}.png`, fullPage: true })
+}
+console.table(report.map(({ clipEx, ...r }) => r)); for (const r of report) if (r.clip) console.log(r.path, r.clipEx)
+fs.writeFileSync(`${OUT}/mobile-report.json`, JSON.stringify(report, null, 1))
 console.log('audit shots →', OUT, errors.length ? '\nJS errors:\n' + errors.join('\n') : '(no JS errors)')
 await browser.close(); await db.end()
