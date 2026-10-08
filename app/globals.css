@@ -57,6 +57,13 @@ html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
   input[type=checkbox], input[type=radio] { width: 20px; height: 20px; }
 }
 /* phone tables become stacked cards; labels come from the header row (components/ui/primitives TableWrap) */
+/* Grid items default to min-width:auto, so one wide child (a tab strip, a date/file input, a long word) widens the
+   whole single-column mobile layout past the screen, where main's overflow clip hides it. Let tracks shrink instead. */
+main .grid > * { min-width: 0; }
+main input, main select, main textarea { max-width: 100%; }
+main input[type=file] { width: 100%; font-size: 14px; }
+main :where(p, dd, li, h1, h2, h3, label) { overflow-wrap: break-word; }
+
 @media (max-width: 639px) {
   .rtable thead { display: none; }
   .rtable, .rtable tbody { display: block; width: 100%; }

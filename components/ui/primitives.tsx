@@ -57,7 +57,7 @@ export function FormSection({ title, sub, children, className }: { title: string
 
 export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('rounded-lg border border-border bg-surface', className)} {...p} />
 export const CardHeader = ({ title, action, sub }: { title: string; action?: ReactNode; sub?: string }) =>
-  <div className="flex min-h-[48px] items-center justify-between gap-3 border-b border-border px-4 py-2.5"><div className="min-w-0"><h3 className="text-sm font-semibold">{title}</h3>{sub && <p className="text-xs text-muted">{sub}</p>}</div>{action}</div>
+  <div className="flex min-h-[48px] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border px-4 py-2.5"><div className="min-w-0 flex-1 basis-48"><h3 className="text-sm font-semibold">{title}</h3>{sub && <p className="text-xs text-muted">{sub}</p>}</div>{action}</div>
 
 // one status palette for the whole product: subtle tint + readable text, never a saturated fill
 const tone = {
