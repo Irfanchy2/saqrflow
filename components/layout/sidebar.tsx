@@ -2,9 +2,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { Inbox, LayoutDashboard, FileText, Users, Vault, Landmark, Receipt, HardHat, Handshake, Truck, BellRing, CalendarDays, BarChart3, Sparkles, ShieldCheck, Settings, PanelLeftClose, PanelLeftOpen, Menu, X, Wallet, Package, History, Trash2, Target, MapPinned, ClipboardList, ListTodo, ClipboardCheck } from 'lucide-react'
+import { Inbox, LayoutDashboard, FileText, Users, Vault, Landmark, Receipt, HardHat, Handshake, Truck, BellRing, CalendarDays, BarChart3, Sparkles, ShieldCheck, Settings, PanelLeftClose, PanelLeftOpen, Menu, X, LogOut, Wallet, Package, History, Trash2, Target, MapPinned, ClipboardList, ListTodo, ClipboardCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AveriqoWordmark } from '@/components/brand/logo'
+import { ThemeToggle } from './theme-toggle'
+import { signOut } from '@/app/actions/auth'
 
 const ICONS = { inbox: Inbox, overview: LayoutDashboard, documents: FileText, employees: Users, vault: Vault, cheques: Landmark, invoices: Receipt, projects: HardHat, parties: Handshake, assets: Truck, reminders: BellRing, calendar: CalendarDays, reports: BarChart3, assistant: Sparkles, users: ShieldCheck, settings: Settings, expenses: Wallet, catalog: Package, audit: History, trash: Trash2, leads: Target, site_visits: MapPinned, work_orders: ClipboardList, tasks: ListTodo, site_reports: ClipboardCheck }
 export interface NavItem { key: keyof typeof ICONS; href: string; label: string; group: string }
@@ -14,12 +16,13 @@ import { SIDEBAR_COOKIE } from '@/lib/ui-prefs'
  * Desktop: collapsible rail (icons only + tooltips). The choice is stored in a cookie so the server renders the right width
  * on the next load (no flash). Mobile: slide-in drawer. Ctrl+\ toggles.
  */
-export function Sidebar({ items, company, rtl, initialCollapsed = false }: { items: NavItem[]; company: string; rtl: boolean; initialCollapsed?: boolean }) {
+export function Sidebar({ items, company, rtl, initialCollapsed = false, user = '' }: { items: NavItem[]; company: string; rtl: boolean; initialCollapsed?: boolean; user?: string }) {
   const path = usePathname()
   const [collapsed, setCollapsed] = useState(initialCollapsed)
   const [open, setOpen] = useState(false)
   const [tip, setTip] = useState<{ label: string; top: number } | null>(null)
   useEffect(() => setOpen(false), [path])
+  useEffect(() => { const o = () => setOpen(true); addEventListener('averiqo:menu', o); return () => removeEventListener('averiqo:menu', o) }, [])
   // mobile drawer: Escape closes it, the page behind does not scroll
   useEffect(() => {
     if (!open) return
@@ -47,7 +50,7 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false }: { ite
       <Link href={i.href} aria-label={full ? undefined : i.label} aria-current={on ? 'page' : undefined}
         onMouseEnter={e => { if (!full) showTip(i.label, e.currentTarget) }} onMouseLeave={() => setTip(null)}
         onFocus={e => { if (!full) showTip(i.label, e.currentTarget) }} onBlur={() => setTip(null)}
-        className={cn('relative flex h-8 items-center gap-2.5 rounded-md text-[13.5px] transition-colors', full ? 'px-2.5' : 'justify-center px-0',
+        className={cn('relative flex h-11 items-center gap-2.5 rounded-md text-[15px] transition-colors lg:h-8 lg:text-[13.5px]', full ? 'px-2.5' : 'justify-center px-0',
           on ? 'bg-surface-2 font-medium text-fg' : 'text-muted hover:bg-surface-2/70 hover:text-fg')}>
         {on && <span aria-hidden className="absolute inset-y-1.5 start-0 w-[2px] rounded-full bg-primary" />}
         <Icon size={16} strokeWidth={1.75} className={cn('shrink-0', on && 'text-primary')} aria-hidden />
@@ -57,12 +60,16 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false }: { ite
   const brand = <AveriqoWordmark sub={company} className="flex-1" />
 
   return <>
-    <button aria-label="Open menu" className="fixed start-3 top-2.5 z-nav grid h-9 w-9 place-items-center rounded-md border border-border bg-surface lg:hidden" onClick={() => setOpen(true)}><Menu size={18} /></button>
+    <button aria-label="Open menu" className="fixed start-2 top-2 z-nav grid h-10 w-10 place-items-center rounded-md text-muted hover:bg-surface-2 lg:hidden" onClick={() => setOpen(true)}><Menu size={20} /></button>
     {open && <div className="fixed inset-0 z-40 bg-[hsl(222_30%_6%/.45)] lg:hidden" onClick={() => setOpen(false)} aria-hidden />}
     <aside aria-label="Navigation" aria-hidden={!open} inert={!open} className={cn('fixed inset-y-0 start-0 z-drawer flex w-72 max-w-[85vw] flex-col border-e border-border bg-nav shadow-pop transition-transform duration-200 ease-out lg:hidden', open ? 'translate-x-0' : rtl ? 'translate-x-full' : '-translate-x-full')}>
       <div className="flex h-14 items-center gap-2.5 border-b border-border ps-4 pe-2">{brand}
-        <button aria-label="Close menu" className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-surface-2" onClick={() => setOpen(false)}><X size={16} /></button></div>
-      {nav(true)}</aside>
+        <button aria-label="Close menu" className="grid h-10 w-10 place-items-center rounded-md text-muted hover:bg-surface-2" onClick={() => setOpen(false)}><X size={18} /></button></div>
+      {nav(true)}
+      <div className="flex items-center gap-2 border-t border-border px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <ThemeToggle /><span className="flex-1 truncate text-xs text-muted">{user}</span>
+        <form action={signOut}><button className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg"><LogOut size={16} />Sign out</button></form>
+      </div></aside>
 
     <aside aria-label="Navigation" data-collapsed={collapsed} className={cn('sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-e border-border bg-nav transition-[width] duration-200 ease-out lg:flex', collapsed ? 'w-[60px]' : 'w-60')}>
       <div className={cn('flex h-14 items-center border-b border-border', collapsed ? 'flex-col justify-center gap-0 px-2' : 'gap-2.5 ps-4 pe-2')}>

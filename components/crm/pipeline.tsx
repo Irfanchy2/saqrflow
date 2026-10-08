@@ -40,7 +40,7 @@ export function PipelineBoard({ leads, today, canEdit, hideClosed }: { leads: Bo
         return <section key={s.key} role="listitem" aria-label={`${s.label}: ${list.length} leads`}
           onDragOver={e => { if (canEdit && drag.current) { e.preventDefault(); setOver(s.key) } }} onDragLeave={() => setOver(o => o === s.key ? null : o)}
           onDrop={e => { e.preventDefault(); setOver(null); const l = items.find(x => x.id === drag.current); drag.current = null; if (l) apply(l, s.key) }}
-          className={cn('flex w-[272px] shrink-0 snap-start flex-col rounded-lg border bg-surface-2/40 transition-colors', over === s.key ? 'border-primary bg-primary-soft/40' : 'border-border')}>
+          className={cn('flex w-[82vw] max-w-[300px] shrink-0 snap-start flex-col sm:w-[272px] rounded-lg border bg-surface-2/40 transition-colors', over === s.key ? 'border-primary bg-primary-soft/40' : 'border-border')}>
           <header className="flex items-baseline justify-between gap-2 border-b border-border px-3 py-2">
             <h3 className="truncate text-[13px] font-semibold">{s.label} <span className="font-normal text-muted tabular-nums">{list.length}</span></h3>
             <span className="text-xs tabular-nums text-muted" title={`AED ${total.toLocaleString('en-US')}`}>{total ? `AED ${money(total)}` : ''}</span>

@@ -19,7 +19,7 @@ const button = cva('inline-flex cursor-pointer items-center justify-center gap-2
       ghost: 'text-muted hover:bg-surface-2 hover:text-fg',
       danger: 'bg-danger text-white hover:bg-danger/90',
     },
-    size: { sm: 'h-8 px-3', md: 'h-9 px-3.5', icon: 'h-9 w-9' },
+    size: { sm: 'h-10 px-3 sm:h-8', md: 'h-11 px-4 sm:h-9 sm:px-3.5', icon: 'h-11 w-11 sm:h-9 sm:w-9' },
   },
   defaultVariants: { variant: 'primary', size: 'md' },
 })
@@ -36,8 +36,8 @@ const field = 'w-full rounded-md border border-border bg-surface px-3 text-sm te
 // Arabic UI, an Arabic address line aligns right inside the English UI) instead of inheriting the page direction.
 const TEXTUAL = new Set([undefined, 'text', 'search', 'email', 'tel', 'url', 'password'])
 export const Input = ({ className, dir, type, ...p }: InputHTMLAttributes<HTMLInputElement>) =>
-  <input type={type} dir={dir ?? (TEXTUAL.has(type) ? 'auto' : undefined)} className={cn(field, 'h-9 text-start', className)} {...p} />
-export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'h-9 cursor-pointer pe-8', className)} {...p} />
+  <input type={type} dir={dir ?? (TEXTUAL.has(type) ? 'auto' : undefined)} className={cn(field, 'h-11 text-start sm:h-9', className)} {...p} />
+export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'h-11 cursor-pointer pe-8 sm:h-9', className)} {...p} />
 export const Textarea = ({ className, dir, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) =>
   <textarea dir={dir ?? 'auto'} className={cn(field, 'min-h-[84px] resize-y px-3 py-2 text-start leading-[1.55] [overflow-wrap:anywhere] [unicode-bidi:plaintext] whitespace-pre-wrap', className)} {...p} />
 
@@ -75,9 +75,9 @@ const valueTone: Partial<Record<Tone, string>> = { red: 'text-danger' }
  * compatibility but not drawn: a label already says what the number is. Place several inside <Metrics> for a ruled strip.
  */
 export function StatCard({ label, value, hint, href, tone: t = 'neutral' }: { label: string; value: ReactNode; hint?: string; icon?: LucideIcon; href?: string; tone?: Tone }) {
-  const inner = <div className={cn('stat h-full rounded-lg border border-border bg-surface px-4 py-3.5', href && 'transition-colors hover:border-border-strong hover:bg-surface-2/40')}>
+  const inner = <div className={cn('stat h-full rounded-lg border border-border bg-surface px-3.5 py-3 sm:px-4 sm:py-3.5', href && 'transition-colors hover:border-border-strong hover:bg-surface-2/40')}>
     <div className="text-xs font-medium text-muted">{label}</div>
-    <div className={cn('mt-1 text-xl font-semibold tabular-nums tracking-[-0.01em]', valueTone[t])}>{value}</div>
+    <div className={cn('mt-1 break-words text-lg font-semibold leading-tight tabular-nums tracking-[-0.01em] sm:text-xl', valueTone[t])}>{value}</div>
     {hint && <div className="mt-0.5 truncate text-xs text-muted" title={hint}>{hint}</div>}
   </div>
   return href ? <Link href={href} className="block h-full rounded-lg focus-visible:ring-offset-0">{inner}</Link> : inner
@@ -107,7 +107,7 @@ export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: R
 export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('whitespace-nowrap border-b border-border bg-surface-2/60 px-3 py-2 text-start text-xs font-medium text-muted first:ps-4 last:pe-4', className)}>{children}</th>
 export const Td = ({ children, className, title, colSpan }: { children?: ReactNode; className?: string; title?: string; colSpan?: number }) => <td title={title} colSpan={colSpan} className={cn('px-3 py-2.5 align-middle first:ps-4 last:pe-4', className)}>{children}</td>
 // relative: the scroll box is the containing block, so absolutely positioned children (sr-only labels) cannot widen the page
-export const TableWrap = ({ children }: { children: ReactNode }) => <div className="relative overflow-x-auto"><table className="w-full text-sm tabular-nums">{children}</table></div>
+export { TableWrap } from './table-wrap'
 
 /** Sortable column header: links to the same page with ?sort=&dir= preserved. */
 export function SortTh({ label, col, params, base }: { label: string; col: string; params: Record<string, string | undefined>; base: string }) {

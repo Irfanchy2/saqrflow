@@ -26,7 +26,7 @@ export function Toaster() {
     window.addEventListener(EVT, on)
     return () => window.removeEventListener(EVT, on)
   }, [])
-  return <div className="no-print pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:end-4 sm:items-end">
+  return <div className="no-print pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:end-4 sm:items-end lg:bottom-4">
     <div aria-live="polite" className="sr-only">{items.filter(t => t.tone !== 'error').map(t => t.msg).join('. ')}</div>
     <div aria-live="assertive" className="sr-only">{items.filter(t => t.tone === 'error').map(t => t.msg).join('. ')}</div>
     {items.map(t => {
