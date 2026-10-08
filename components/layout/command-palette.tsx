@@ -27,6 +27,11 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
     const make = (t: 'quotation' | 'invoice' | 'delivery_note') => () => { if (pending) return; start(async () => { const r = await newSalesDoc(t, { token: crypto.randomUUID() }); if (r?.error) toast(r.error, 'error'); setOpen(false) }) }
     return [
       ...(canSales ? [{ id: 'nq', label: 'New quotation', group: 'Create', run: make('quotation') }, { id: 'ni', label: 'New tax invoice', group: 'Create', run: make('invoice') }, { id: 'nd', label: 'New delivery note', group: 'Create', run: make('delivery_note') }] : []),
+      { id: 'nl', label: 'New lead', group: 'Create', run: go('/leads?new=lead') },
+      { id: 'nt', label: 'New task', group: 'Create', run: go('/tasks?new=task') },
+      { id: 'nsv', label: 'Schedule site visit', group: 'Create', run: go('/site-visits?new=site_visit') },
+      { id: 'nwo', label: 'New work order', group: 'Create', run: go('/work-orders?new=work_order') },
+      { id: 'ndsr', label: 'New daily site report', group: 'Create', run: go('/site-reports?new=site_report') },
       { id: 'up', label: 'Upload documents to Smart Inbox', group: 'Create', run: go('/inbox') },
       { id: 'nc', label: 'Add customer', group: 'Create', run: go('/parties?new=customer') },
       { id: 'ne', label: 'Add employee', group: 'Create', run: go('/employees?new=employee') },

@@ -552,3 +552,58 @@ describe('Vehicles & Assets + Reports (0013)', () => {
     await fails(as(null, `select report_summary('2031-03-01','2031-03-31','2031-03-10')`, [], 'anon'), /permission denied/)
   })
 })
+
+describe('Phase 1 operations (0014)', () => {
+  it('leads: numbered, stage changes logged with won / lost stamps; CRM hidden from roles without crm.view', async () => {
+    const no = (await as(U.ownerA, `select next_document_number('lead') n`)).rows[0].n
+    expect(no).toMatch(/^LD-\d{4}-\d{4}$/)
+    const l = (await as(U.pmA, `insert into leads(company_id,number,company_name,source,estimated_value) values ($1,$2,'Villa 22 Owner','instagram',48000) returning id`, [A, no])).rows[0].id
+    await as(U.pmA, `update leads set stage='quotation_sent' where id=$1`, [l])
+    await as(U.pmA, `update leads set stage='won' where id=$1`, [l])
+    const acts = (await as(U.pmA, `select from_stage,to_stage from lead_activities where lead_id=$1 and kind='stage' order by id`, [l])).rows
+    expect(acts.map(a => `${a.from_stage}>${a.to_stage}`)).toEqual(['new>quotation_sent', 'quotation_sent>won'])
+    expect((await as(U.pmA, `select won_at is not null w from leads where id=$1`, [l])).rows[0].w).toBe(true)
+    expect((await as(U.hrA, `select count(*)::int n from leads`)).rows[0].n).toBe(0)       // HR has no crm.view
+    expect((await as(U.empA, `select count(*)::int n from leads`)).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, `select count(*)::int n from leads where company_id=$1`, [A])).rows[0].n).toBe(0)
+    await fails(as(U.viewerA, `update leads set stage='lost' where id=$1 returning id`, [l]).then(r => { if (!r.rowCount) throw new Error('no rows') }))   // viewer is read-only
+    await fails(as(U.pmA, `delete from lead_activities where lead_id=$1 returning id`, [l]).then(r => { if (!r.rowCount) throw new Error('immutable') }), /immutable/)
+  })
+  it('tasks: completion stamps 100%; an assignee without other rights sees and updates only their own task', async () => {
+    const mine = (await as(U.ownerA, `insert into tasks(company_id,title,owner_id,due_date) values ($1,'Weld stringers',$2,'2026-10-10') returning id`, [A, U.empA])).rows[0].id
+    await as(U.ownerA, `insert into tasks(company_id,title,owner_id) values ($1,'Office task',$2)`, [A, U.accA])
+    expect((await as(U.empA, `select title from tasks`)).rows.map(r => r.title)).toEqual(['Weld stringers'])
+    await as(U.empA, `update tasks set status='completed' where id=$1`, [mine])
+    expect((await as(U.ownerA, `select completion, completed_at is not null done from tasks where id=$1`, [mine])).rows[0]).toMatchObject({ completion: 100, done: true })
+    await fails(as(U.empA, `update tasks set owner_id=$2 where id=$1`, [mine, U.accA]), /row-level security/)   // cannot hand it to someone else
+  })
+  it('site visits need a lead, customer or project; soft-deleted records disappear and restore through the trash RPCs', async () => {
+    await fails(as(U.ownerA, `insert into site_visits(company_id,number,scheduled_date) values ($1,'SV-X','2026-10-12')`, [A]), /check constraint/)
+    const p = (await as(U.ownerA, `insert into projects(company_id,name) values ($1,'Staircase job') returning id`, [A])).rows[0].id
+    const v = (await as(U.ownerA, `insert into site_visits(company_id,number,scheduled_date,project_id) values ($1,'SV-1','2026-10-12',$2) returning id`, [A, p])).rows[0].id
+    await as(U.ownerA, `select soft_delete('site_visit',$1)`, [v])
+    expect((await as(U.ownerA, `select count(*)::int n from site_visits where id=$1`, [v])).rows[0].n).toBe(0)
+    expect((await as(U.ownerA, `select count(*)::int n from trash_list() where entity='site_visit'`)).rows[0].n).toBe(1)
+    await as(U.ownerA, `select restore_deleted('site_visit',$1)`, [v])
+    expect((await as(U.ownerA, `select count(*)::int n from site_visits where id=$1`, [v])).rows[0].n).toBe(1)
+  })
+  it('reminder_sources includes lead follow-ups, visits, open tasks and work-order targets only while they are open', async () => {
+    const r = (await as(U.ownerA, `select source_type, count(*)::int n from reminder_sources where source_type in ('lead_followup','site_visit','task','work_order') group by 1`)).rows
+    const m = Object.fromEntries(r.map(x => [x.source_type, x.n]))
+    expect(m.site_visit).toBeGreaterThanOrEqual(1)
+    expect(m.task ?? 0).toBe(0)   // the only dated task is completed
+    const l = (await as(U.ownerA, `insert into leads(company_id,number,company_name,next_followup) values ($1,'LD-T','Follow me','2026-10-15') returning id`, [A])).rows[0].id
+    expect((await as(U.ownerA, `select count(*)::int n from reminder_sources where source_type='lead_followup' and source_id=$1`, [l])).rows[0].n).toBe(1)
+    await as(U.ownerA, `update leads set stage='lost', lost_reason='price' where id=$1`, [l])
+    expect((await as(U.ownerA, `select count(*)::int n from reminder_sources where source_type='lead_followup' and source_id=$1`, [l])).rows[0].n).toBe(0)
+  })
+  it('project budgets need finance.view to read; crew rows are removable with edit rights', async () => {
+    const p = (await as(U.ownerA, `insert into projects(company_id,name) values ($1,'Budget job') returning id`, [A])).rows[0].id
+    await as(U.accA, `insert into project_budgets(company_id,project_id,category,amount) values ($1,$2,'material',12000)`, [A, p])
+    expect((await as(U.pmA, `select count(*)::int n from project_budgets where project_id=$1`, [p])).rows[0].n).toBe(0)
+    expect((await as(U.accA, `select count(*)::int n from project_budgets where project_id=$1`, [p])).rows[0].n).toBe(1)
+    const w = (await as(U.pmA, `insert into work_orders(company_id,number,title,project_id) values ($1,'WO-1','Fabricate',$2) returning id`, [A, p])).rows[0].id
+    await as(U.pmA, `insert into work_order_members(company_id,work_order_id,employee_id) values ($1,$2,$3)`, [A, w, empRecA2])
+    expect((await as(U.pmA, `delete from work_order_members where work_order_id=$1 returning employee_id`, [w])).rowCount).toBe(1)
+  })
+})

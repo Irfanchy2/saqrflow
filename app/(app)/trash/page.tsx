@@ -6,7 +6,7 @@ import { ActionButton } from '@/components/ui/action-form'
 import { purgeRecord, restoreRecord } from '@/app/actions/trash'
 
 export const metadata = { title: 'Trash' }
-const LABEL: Record<string, string> = { customer: 'Customer', supplier: 'Supplier', project: 'Project', invoice: 'Sales document', employee: 'Employee', asset: 'Vehicle / asset', document: 'Document' }
+const LABEL: Record<string, string> = { customer: 'Customer', supplier: 'Supplier', project: 'Project', invoice: 'Sales document', employee: 'Employee', asset: 'Vehicle / asset', document: 'Document', lead: 'Lead', site_visit: 'Site visit', work_order: 'Work order', task: 'Task', site_report: 'Daily site report' }
 
 export default async function TrashPage() {
   const c = await getCtx(); if (!c.can('records.delete')) redirect('/')

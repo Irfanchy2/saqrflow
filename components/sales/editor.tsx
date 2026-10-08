@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle,
-  MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X,
+  MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, HardHat,
 } from 'lucide-react'
 import { SalesPaper, docDiscount, vatOn, type Branding, type PaperItem } from './paper'
 import { FitPaper } from './preview'
@@ -19,6 +19,7 @@ import {
   archivePdfToVault, convertSalesDoc, createDeliveryNote, deleteSalesDraft, duplicateSalesDoc, logSalesEvent, renumberDraft, requestApproval, saveSalesDoc, setSalesStatus, type SalesDocInput,
 } from '@/app/actions/sales'
 import type { ActionState } from '@/lib/utils'
+import { createProjectFromQuotation, createWorkOrderFromQuotation } from '@/app/actions/operations'
 
 export type { CustomerOpt, CatalogOpt }
 export interface ProjectOpt { id: string; name: string; code: string | null; customer_id: string | null; location: string | null }
@@ -223,6 +224,9 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
           {canDeliver && <MenuItem icon={Truck} onClick={() => (dirty ? save(() => setShowDelivery(true)) : setShowDelivery(true))}>Create delivery note (choose quantities)…</MenuItem>}
           {canStatus && (CONVERSIONS[t] ?? []).filter(to => !(isQtn && to === 'delivery_note')).filter(to => to !== 'credit_note' || !draft).map(to => <MenuItem key={to} icon={to === 'credit_note' ? FileMinus : Repeat}
             onClick={() => run(() => convertSalesDoc(doc.id, to, tok(`convert-${to}`)), { saveFirst: true })}>{isQtn && to === 'invoice' ? 'Convert to invoice' : `Create ${DOC_META[to].label.toLowerCase()}`}</MenuItem>)}
+          {isQtn && canStatus && ['accepted', 'converted'].includes(doc.status) && <>
+            <MenuItem icon={ClipboardList} onClick={() => run(() => createWorkOrderFromQuotation(doc.id, tok('work-order')), { saveFirst: true })}>Create work order (and project)</MenuItem>
+            {!doc.project_id && <MenuItem icon={HardHat} onClick={() => run(() => createProjectFromQuotation(doc.id), { saveFirst: true })}>Create project</MenuItem>}</>}
           {canStatus && !isCn && <MenuItem icon={Copy} onClick={() => run(() => duplicateSalesDoc(doc.id, tok('duplicate')), { saveFirst: true })}>Duplicate</MenuItem>}
           {statuses.length > 0 && <div className="my-1 border-t border-border" role="separator" />}
           {statuses.map(s => <MenuItem key={s} icon={s === 'cancelled' ? X : CheckCircle2} danger={s === 'cancelled'}

@@ -78,7 +78,7 @@ async function existingByToken(c: Ctx, tok?: string) {
 }
 
 /** Creates a new draft (numbered immediately so the paper shows the real number) and opens the editor. */
-export async function newSalesDoc(type: string, opts: { customerId?: string; projectId?: string; token?: string } = {}): Promise<ActionState> {
+export async function newSalesDoc(type: string, opts: { customerId?: string; projectId?: string; leadId?: string; siteVisitId?: string; token?: string } = {}): Promise<ActionState> {
   let id: string | null = null
   const r = await safe(async () => {
     const c = await getCtx(); need(c, 'records.edit')
@@ -96,6 +96,20 @@ export async function newSalesDoc(type: string, opts: { customerId?: string; pro
       project = (await c.supabase.from('projects').select('id,name,location,customer_id').eq('id', opts.projectId).maybeSingle()).data
       if (project?.customer_id && !customer) customer = (await c.supabase.from('customers').select('id,name,address,trn,phone,contact_person,email,credit_days').eq('id', project.customer_id).maybeSingle()).data
     }
+    // Lead / site visit → quotation: the enquiry's details are copied, nothing is typed twice
+    let lead: any = null, visit: any = null
+    if (opts.siteVisitId) {
+      visit = (await c.supabase.from('site_visits').select('id,number,lead_id,customer_id,project_id,location,requirements,measurements,recommendations,contact_person').eq('id', opts.siteVisitId).maybeSingle()).data
+      if (!visit) return { error: 'Site visit not found.' }
+      if (visit.customer_id && !customer) customer = (await c.supabase.from('customers').select('id,name,address,trn,phone,contact_person,email,credit_days').eq('id', visit.customer_id).maybeSingle()).data
+      if (visit.project_id && !project) project = (await c.supabase.from('projects').select('id,name,location,customer_id').eq('id', visit.project_id).maybeSingle()).data
+    }
+    const leadId = opts.leadId ?? visit?.lead_id
+    if (leadId) {
+      lead = (await c.supabase.from('leads').select('id,number,company_name,contact_person,phone,email,location,address,trn,service,notes,salesperson_id,customer_id').eq('id', leadId).maybeSingle()).data
+      if (!lead) return { error: 'Lead not found.' }
+      if (lead.customer_id && !customer) customer = (await c.supabase.from('customers').select('id,name,address,trn,phone,contact_person,email,credit_days').eq('id', lead.customer_id).maybeSingle()).data
+    }
     const number = await nextNumber(c, t)
     const { data, error } = await c.supabase.from('invoices').insert({
       company_id: c.company.id, doc_type: t, number, status: 'draft', issue_date: c.today, created_by: c.userId, salesperson_id: c.userId, client_token: tok ?? null,
@@ -106,13 +120,27 @@ export async function newSalesDoc(type: string, opts: { customerId?: string; pro
       customer_id: customer?.id ?? null, customer_name: customer?.name ?? null, customer_address: customer?.address ?? null, customer_trn: customer?.trn ?? null,
       customer_phone: customer?.phone ?? null, customer_email: customer?.email ?? null, attention: customer?.contact_person ?? null,
       project_id: project?.id ?? null, site: project?.location ?? null,
+      ...(lead || visit ? {
+        lead_id: lead?.id ?? null, reference: [lead?.number, visit?.number].filter(Boolean).join(' / ') || null,
+        customer_name: customer?.name ?? lead?.company_name ?? null, customer_address: customer?.address ?? lead?.address ?? null,
+        customer_trn: customer?.trn ?? lead?.trn ?? null, customer_phone: customer?.phone ?? lead?.phone ?? null,
+        customer_email: customer?.email ?? lead?.email ?? null, attention: visit?.contact_person ?? lead?.contact_person ?? customer?.contact_person ?? null,
+        site: visit?.location ?? lead?.location ?? project?.location ?? null, subject: lead?.service ?? null,
+        notes: [visit?.requirements && `Requirements: ${visit.requirements}`, visit?.measurements && `Measurements: ${visit.measurements}`].filter(Boolean).join('\n\n').slice(0, 4000) || lead?.notes || null,
+        salesperson_id: lead?.salesperson_id ?? c.userId,
+      } : {}),
     }).select('id').single()
     if (error) {
       if (error.code === '23505' && (id = await existingByToken(c, tok))) return   // the other request won the race — open that one
       throw error
     }
     id = data.id
-    await logEvent(c, data.id, 'created')
+    await logEvent(c, data.id, 'created', lead ? `from lead ${lead.number}` : undefined)
+    if (lead) {
+      await c.supabase.from('lead_activities').insert({ company_id: c.company.id, lead_id: lead.id, kind: 'quotation', body: `Quotation ${number} created`, user_id: c.userId })
+      await c.supabase.from('leads').update({ stage: 'quotation_preparation' }).eq('id', lead.id).in('stage', ['new', 'contacted', 'site_visit_required', 'site_visit_completed'])
+      revalidatePath(`/leads/${lead.id}`); revalidatePath('/leads')
+    }
   })
   if (id) redirect(`/invoices/${id}`)
   return r
@@ -139,7 +167,7 @@ export async function saveSalesDoc(id: string, input: SalesDocInput, opts: { exp
     if (cur.approval_status === 'pending' && !c.can('sales.approve')) return { error: 'This document is waiting for approval and is locked until a manager decides.' }
 
     let customerId = v.customer_id ?? null
-    if (!customerId && v.new_customer && v.customer_name) {
+    if (!customerId && (v.new_customer || cur.lead_id) && v.customer_name) {   // a quotation from a lead creates (or finds) its customer on first save
       const { data: existing } = await c.supabase.from('customers').select('id').ilike('name', v.customer_name).maybeSingle()
       if (existing) customerId = existing.id
       else {
@@ -179,6 +207,8 @@ export async function saveSalesDoc(id: string, input: SalesDocInput, opts: { exp
       if (/conflict/.test(error.message)) return { error: 'Someone else saved this document after you opened it. Reload to see their changes. Your edits are still on screen.', data: { conflict: true } }
       throw error
     }
+    // a quotation from a lead that created / picked the customer links the lead to it (Lead → Customer without re-entry)
+    if (customerId && cur.lead_id) await c.supabase.from('leads').update({ customer_id: customerId }).eq('id', cur.lead_id).is('customer_id', null)
     if (revision) await logEvent(c, id, 'revised', `Revision ${cur.revision + 1}: ${revision.changes.slice(0, 4).join('; ')}`)
     const { data: ids } = await c.supabase.from('invoice_items').select('id').eq('invoice_id', id).order('position')
     done(id)
@@ -189,7 +219,7 @@ export async function saveSalesDoc(id: string, input: SalesDocInput, opts: { exp
 export async function setSalesStatus(id: string, status: string): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit')
-    const { data: cur } = await c.supabase.from('invoices').select('id,doc_type,status,total,sent_at,approval_status').eq('id', id).maybeSingle()
+    const { data: cur } = await c.supabase.from('invoices').select('id,doc_type,number,status,total,sent_at,approval_status,lead_id').eq('id', id).maybeSingle()
     if (!cur) return { error: 'Document not found.' }
     const t = cur.doc_type as SalesType
     if (!manualStatuses(t, cur.status).includes(status)) return { error: `Cannot change from “${cur.status}” to “${status}”.` }
@@ -222,9 +252,20 @@ export async function setSalesStatus(id: string, status: string): Promise<Action
     }
     if (['accepted', 'rejected', 'cancelled', 'expired'].includes(status)) await c.supabase.from('sales_followups').update({ done_at: new Date().toISOString(), done_by: c.userId, outcome: `Quotation ${status}` }).eq('invoice_id', id).is('done_at', null)
     await logEvent(c, id, 'status', `${cur.status} → ${status}`)
+    if (t === 'quotation' && cur.lead_id) await syncLeadFromQuotation(c, cur.lead_id, cur.number, status)
     done(id)
     return { ok: true, message: 'Status updated.' }
   })
+}
+
+/** The lead pipeline follows its quotation: sent → Quotation sent, accepted → Won. A rejection is logged; the salesperson decides whether the lead is lost. */
+async function syncLeadFromQuotation(c: Ctx, leadId: string, number: string, status: string) {
+  const early = ['new', 'contacted', 'site_visit_required', 'site_visit_completed', 'quotation_preparation']
+  if (status === 'sent') await c.supabase.from('leads').update({ stage: 'quotation_sent' }).eq('id', leadId).in('stage', early)
+  else if (status === 'accepted') await c.supabase.from('leads').update({ stage: 'won' }).eq('id', leadId).neq('stage', 'won')
+  if (['sent', 'accepted', 'rejected', 'expired'].includes(status))
+    await c.supabase.from('lead_activities').insert({ company_id: c.company.id, lead_id: leadId, kind: 'quotation', body: `Quotation ${number} ${status === 'sent' ? 'sent' : status}`, user_id: c.userId })
+  revalidatePath('/leads'); revalidatePath(`/leads/${leadId}`)
 }
 
 /** Copies a document into a NEW numbered document of another type; the source document's content is never modified. */

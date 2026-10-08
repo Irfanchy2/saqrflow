@@ -57,7 +57,17 @@ export default async function Dashboard() {
   const date = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: c.company.timezone }).format(new Date())
 
   // operations / compliance counts: one compact list, zero values stay quiet
+  // field operations: my open tasks due today / overdue, lead follow-ups due, visits today
+  const head1 = { count: 'exact' as const, head: true }
+  const [myDue, leadDue, visitsToday] = await Promise.all([
+    c.supabase.from('tasks').select('id', head1).eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).lte('due_date', c.today),
+    c.can('crm.view') ? c.supabase.from('leads').select('id', head1).lte('next_followup', c.today).not('stage', 'in', '(won,lost,on_hold)') : Promise.resolve({ count: undefined }),
+    c.can('documents.view') ? c.supabase.from('site_visits').select('id', head1).in('status', ['scheduled', 'rescheduled']).eq('scheduled_date', c.today) : Promise.resolve({ count: undefined }),
+  ])
   const ops: { l: string; v: number | null | undefined; href: string; bad?: boolean; warn?: boolean }[] = [
+    { l: 'My tasks due today or overdue', v: myDue.count, href: '/tasks?view=mine', warn: true },
+    { l: 'Lead follow-ups due', v: leadDue.count, href: '/leads?view=list&due=1', warn: true },
+    { l: 'Site visits today', v: visitsToday.count, href: '/site-visits' },
     { l: 'Quotation follow-ups due', v: followDue?.count, href: '/invoices?tab=followups', warn: true },
     { l: 'Invoices due in 7 days', v: dueSoon?.count, href: '/invoices?tab=invoice&status=sent', warn: true },
     { l: 'Documents expiring in 30 days', v: exp30?.count, href: '/vault?status=expiring30', warn: true },

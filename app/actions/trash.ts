@@ -6,8 +6,8 @@ import { getCtx, need } from '@/lib/auth'
 import { safe } from '@/lib/action'
 import type { ActionState } from '@/lib/utils'
 
-const entity = z.enum(['customer', 'supplier', 'project', 'invoice', 'employee', 'asset', 'document'])
-const LIST: Record<string, string> = { customer: '/parties', supplier: '/parties?tab=suppliers', project: '/projects', invoice: '/invoices', employee: '/employees', asset: '/assets', document: '/documents' }
+const entity = z.enum(['customer', 'supplier', 'project', 'invoice', 'employee', 'asset', 'document', 'lead', 'site_visit', 'work_order', 'task', 'site_report'])
+const LIST: Record<string, string> = { customer: '/parties', supplier: '/parties?tab=suppliers', project: '/projects', invoice: '/invoices', employee: '/employees', asset: '/assets', document: '/documents', lead: '/leads', site_visit: '/site-visits', work_order: '/work-orders', task: '/tasks', site_report: '/site-reports' }
 const friendly = (m: string) =>
   /insufficient privilege/.test(m) ? 'You are not allowed to do that.' : /only draft or cancelled/.test(m) ? 'Only draft or cancelled sales documents can go to the trash.'
   : /has payments/.test(m) ? 'This document has payments and cannot be deleted.' : /not found/.test(m) ? 'Record not found (it may already be restored or deleted).'
