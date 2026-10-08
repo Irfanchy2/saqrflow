@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { Inbox, LayoutDashboard, FileText, Users, Vault, Landmark, Receipt, HardHat, Handshake, Truck, BellRing, CalendarDays, BarChart3, Sparkles, ShieldCheck, Settings, PanelLeftClose, PanelLeftOpen, Menu, X, LogOut, Wallet, Package, History, Trash2, Target, MapPinned, ClipboardList, ListTodo, ClipboardCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { AveriqoWordmark } from '@/components/brand/logo'
+import { AveriqoMark, AveriqoWordmark } from '@/components/brand/logo'
 import { ThemeToggle } from './theme-toggle'
 import { signOut } from '@/app/actions/auth'
 
@@ -73,10 +73,12 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false, user = 
 
     <aside aria-label="Navigation" data-collapsed={collapsed} className={cn('sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-e border-border bg-nav transition-[width] duration-200 ease-out lg:flex', collapsed ? 'w-[60px]' : 'w-60')}>
       <div className={cn('flex h-14 items-center border-b border-border', collapsed ? 'flex-col justify-center gap-0 px-2' : 'gap-2.5 ps-4 pe-2')}>
-        {!collapsed ? brand : <span className="sr-only">Averiqo</span>}
+        {!collapsed && brand}
         <button type="button" onClick={() => { toggle(); setTip(null) }} aria-expanded={!collapsed} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (Ctrl+\\)`}
-          className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg">
-          {collapsed ? <Expand size={17} /> : <Collapse size={17} />}</button>
+          className={cn('group grid shrink-0 cursor-pointer place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg', collapsed ? 'h-10 w-10' : 'h-8 w-8')}>
+          {collapsed
+            ? <><AveriqoMark size={30} className="col-start-1 row-start-1 transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0" /><Expand size={17} className="col-start-1 row-start-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" /></>
+            : <Collapse size={17} />}</button>
       </div>
       {nav(!collapsed)}
     </aside>
