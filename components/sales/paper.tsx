@@ -4,6 +4,7 @@
 import { memo } from 'react'
 import { amountInWords, computeTotals, fmtMoney, lineAmount, lineVat, VAT_CATEGORIES, type VatCategory } from '@/lib/sales/money'
 import { DOC_META, isTaxDoc, type SalesType } from '@/lib/sales/docs'
+import { resolveTemplate, templateKind, type TemplateKind } from '@/lib/sales/template'
 
 export interface PaperItem { description: string; materials?: string | null; quantity: number | string; unit?: string | null; unit_price: number | string; vat_category?: string | null; discount_pct?: number | string | null }
 export interface PaperDoc {
@@ -21,6 +22,8 @@ export interface Branding {
   /** text branding: used when no letterhead image is uploaded */
   logo?: string | null; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null; companyWebsite?: string | null
   signatoryName?: string | null; signatoryTitle?: string | null; brandColor?: string | null; logoHeight?: number; logoAlign?: 'left' | 'center' | 'right'
+  /** Settings → Template builder (stored per type; missing = standard layout) */
+  templates?: Partial<Record<TemplateKind, unknown>>
 }
 /** the discount the document stores, as computeTotals expects it */
 export const docDiscount = (d: Pick<PaperDoc, 'discount' | 'discount_type' | 'discount_value'>) =>
@@ -28,11 +31,14 @@ export const docDiscount = (d: Pick<PaperDoc, 'discount' | 'discount_type' | 'di
 export const vatOn = (d: Pick<PaperDoc, 'doc_type' | 'apply_vat'>) => isTaxDoc(d.doc_type) || (d.doc_type === 'quotation' && d.apply_vat === true)
 export const SIGN_DEFAULTS = { sealSize: 140, signatureWidth: 160, signAlign: 'right' as const, signSpacing: 8 }
 
+/** "Unit price (dhs)" → two lines on paper, as in the standard template */
+const headLabel = (s: string) => { const m = /^(.*\S)\s+(\(.+\))$/.exec(s); return m ? <>{m[1]}<br />{m[2]}</> : s }
 const fmtDate = (iso?: string | null) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : '—')
 const dash = (s?: string | null) => (s && s.trim() ? s : '—')
 
 function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = false }: { doc: PaperDoc; items: PaperItem[]; branding: Branding; paid?: number; className?: string; pageGuides?: boolean }) {
   const meta = DOC_META[doc.doc_type]
+  const tp = resolveTemplate(doc.doc_type, branding.templates?.[templateKind(doc.doc_type) as TemplateKind]), f = tp.fields
   const isTax = isTaxDoc(doc.doc_type), isCn = doc.doc_type === 'credit_note'
   const isInv = isTax, isDn = doc.doc_type === 'delivery_note', isQtn = doc.doc_type === 'quotation'
   const qVat = isQtn && doc.apply_vat === true
@@ -43,7 +49,7 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
   const pad = Math.max(0, (isInv ? 3 : 1) - rows.length + 1)
   const seal = branding.sealSize ?? SIGN_DEFAULTS.sealSize, sigW = branding.signatureWidth ?? SIGN_DEFAULTS.signatureWidth
   const align = branding.signAlign ?? SIGN_DEFAULTS.signAlign, spacing = branding.signSpacing ?? SIGN_DEFAULTS.signSpacing
-  const showSign = branding.showStamp && !isInv && !!(branding.stamp || branding.signature || branding.signatoryName)
+  const showSign = branding.showStamp && tp.showSignature && !!(branding.stamp || branding.signature || branding.signatoryName)
   const footer = branding.showHeaderFooter ? branding.footer : null
   const cols = isInv ? 7 : 5
 
@@ -60,7 +66,7 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
             : <TextHeader b={branding} />}
         </div>}
         <div className="paper-title">
-          <h1 className={isInv ? 'underline' : ''}>{meta.paperTitle}</h1>
+          <h1 className={isInv ? 'underline' : ''}>{tp.title || meta.paperTitle}</h1>
           {isInv && branding.companyTrn && <div className="text-[12px] font-bold">TRN: {branding.companyTrn}</div>}
           {isCn && doc.against_number && <div className="text-[12px] font-bold">Against Tax Invoice {doc.against_number}</div>}
         </div>
@@ -68,29 +74,29 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
         {/* party + reference boxes */}
         <div className="paper-boxes">
           <dl className="paper-box">
-            {isQtn && <Pair k="Attention:" v={dash(doc.attention)} />}
+            {f.attention && <Pair k="Attention:" v={dash(doc.attention)} />}
             <Pair k="Company Name:" v={dash(doc.customer_name)} />
-            {!isQtn && <Pair k="TRN:" v={dash(doc.customer_trn)} />}
-            {doc.customer_phone && <Pair k="Tel:" v={doc.customer_phone} />}
-            {doc.customer_email && <Pair k="Email:" v={doc.customer_email} />}
+            {f.customer_trn && <Pair k="TRN:" v={dash(doc.customer_trn)} />}
+            {f.phone && doc.customer_phone && <Pair k="Tel:" v={doc.customer_phone} />}
+            {f.email && doc.customer_email && <Pair k="Email:" v={doc.customer_email} />}
             <Pair k="Address:" v={dash(doc.customer_address)} />
-            {doc.site && <Pair k={isDn ? 'Delivery to:' : 'Site:'} v={doc.site} />}
-            {doc.project_name && <Pair k="Project:" v={doc.project_name} />}
+            {f.site && doc.site && <Pair k={isDn ? 'Delivery to:' : 'Site:'} v={doc.site} />}
+            {f.project && doc.project_name && <Pair k="Project:" v={doc.project_name} />}
           </dl>
           <dl className="paper-box paper-box--meta">
             <Pair k={isDn ? 'Delivery No.' : isCn ? 'Credit Note No.' : isInv ? 'Invoice No.' : 'Ref No.'} v={`${dash(doc.number)}${doc.revision ? ` Rev.${doc.revision}` : ''}`} />
             <Pair k="Date:" v={fmtDate(doc.issue_date)} />
-            {!isQtn && <Pair k="L.P.O:" v={dash(doc.lpo_ref)} />}
-            {isInv && !isCn && <Pair k="DEL NO:" v={dash(doc.del_no)} />}
-            {doc.reference && <Pair k="Your Ref:" v={doc.reference} />}
-            {isInv && doc.due_date && <Pair k="Due:" v={fmtDate(doc.due_date)} />}
-            {isQtn && doc.valid_until && <Pair k="Valid till:" v={fmtDate(doc.valid_until)} />}
+            {f.lpo && <Pair k="L.P.O:" v={dash(doc.lpo_ref)} />}
+            {f.del_no && !isCn && <Pair k="DEL NO:" v={dash(doc.del_no)} />}
+            {f.reference && doc.reference && <Pair k="Your Ref:" v={doc.reference} />}
+            {f.due_date && doc.due_date && <Pair k="Due:" v={fmtDate(doc.due_date)} />}
+            {f.valid_until && doc.valid_until && <Pair k="Valid till:" v={fmtDate(doc.valid_until)} />}
           </dl>
         </div>
 
         {isQtn && doc.intro && <div className="paper-text mb-[1.5mm]" dir="auto">{doc.intro}</div>}
         {doc.subject && <div className="paper-text mb-[1.5mm]"><b>Subject:</b> {doc.subject}</div>}
-        {!isInv && <div className="paper-keep-next text-[14px] font-bold">The scope of works:-</div>}
+        {tp.scopeHeading && <div className="paper-keep-next text-[14px] font-bold">{tp.scopeHeading}</div>}
 
         {/* items — fixed table layout: the description column absorbs the width, nothing can widen the table */}
         <table className="paper-items">
@@ -100,9 +106,9 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
               : <><col style={{ width: '20mm' }} /><col style={{ width: '27mm' }} /><col style={{ width: '29mm' }} /></>}
           </colgroup>
           <thead><tr>
-            <th>SR<br />NO</th><th className="text-left">DESCRIPTION</th><th>QTY.</th>
-            {isInv ? <><th>Rate</th><th>Amount</th><th>VAT {doc.vat_rate}%</th><th>Amount With Vat</th></>
-              : <><th>Unit price<br />(dhs)</th><th>Total Price<br />(dhs)</th></>}
+            <th>SR<br />NO</th><th className="text-left">{tp.labels.description}</th><th>{tp.labels.qty}</th>
+            {isInv ? <><th>{tp.labels.rate}</th><th>{tp.labels.total}</th><th>VAT {doc.vat_rate}%</th><th>Amount With Vat</th></>
+              : <><th>{headLabel(tp.labels.rate)}</th><th>{headLabel(tp.labels.total)}</th></>}
           </tr></thead>
           <tbody>
             {rows.map((it, i) => {
@@ -133,11 +139,11 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
         </table>
 
         {isInv && !isCn && <table className="paper-items paper-keep mt-0 text-[14px]"><colgroup><col /><col style={{ width: '36mm' }} /><col style={{ width: '30mm' }} /></colgroup><tbody><tr>
-          <td className="px-[3mm] font-bold" rowSpan={2}>Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</td>
+          <td className="px-[3mm] font-bold" rowSpan={2}>{tp.showWords && <>Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</>}</td>
           <td className="text-center font-bold">Paid Amount</td><td className="text-right font-bold">{fmtMoney(paid)}</td></tr>
           <tr><td className="text-center font-bold">Total Balance</td><td className="text-right font-bold">{fmtMoney(t.total - paid)}</td></tr></tbody></table>}
 
-        {isCn && <div className="paper-keep mt-[2mm] text-[14px] font-bold">Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</div>}
+        {isCn && tp.showWords && <div className="paper-keep mt-[2mm] text-[14px] font-bold">Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</div>}
         {isQtn && doc.closing && <div className="paper-keep mt-[3mm] text-[14px]">{doc.closing.split('\n').map((l, i) => <div key={i} className={`paper-text ${i === 0 ? 'font-bold' : ''}`}>{l}</div>)}</div>}
 
         {/* terms / bank / delivery lines + seal & signature */}
@@ -154,11 +160,12 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
               {doc.terms.length > 0 && <Clauses title="Terms and Conditions: -" items={doc.terms} />}
               {doc.payment_terms.length > 0 && <Clauses title="Payment Terms: -" items={doc.payment_terms} />}
             </>}
+            {tp.showBank && branding.bankDetails && <div className="paper-keep"><div className="mt-[1mm] text-[15px] font-bold">Bank Details: -</div><div className="paper-text text-[13px]">{branding.bankDetails}</div></div>}
             {isInv && <>
-              {branding.bankDetails && <div className="paper-keep"><div className="mt-[1mm] text-[15px] font-bold">Bank Details: -</div><div className="paper-text text-[13px]">{branding.bankDetails}</div></div>}
               {doc.payment_terms.length > 0 && <div className="paper-text mt-[2mm] text-[13px]"><b>Payment terms:</b> {doc.payment_terms.join(' · ')}</div>}
-              <div className="mt-[3mm] text-center text-[12px] font-bold italic paper-red">This is a computer-generated report.</div>
+              {tp.showComputerLine && <div className="mt-[3mm] text-center text-[12px] font-bold italic paper-red">This is a computer-generated report.</div>}
             </>}
+            {tp.footerNote && <div className="paper-keep paper-text mt-[3mm] text-[13px]" dir="auto" data-footer-note>{tp.footerNote}</div>}
             {isDn && <div className="paper-keep mt-[12mm] space-y-[6mm] text-[14px] paper-red">
               <div>Delivered By: <span className="inline-block w-[50mm] border-b border-current align-bottom" />{doc.vehicle_no && <span className="ms-2 text-black">Vehicle: {doc.vehicle_no}</span>}</div>
               <div>Received By: <span className="inline-block w-[50mm] border-b border-current align-bottom" />{doc.receiver_name && <span className="ms-2 text-black">{doc.receiver_name}</span>}</div>

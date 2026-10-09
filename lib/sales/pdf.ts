@@ -4,12 +4,14 @@ import { amountInWords, computeTotals, fmtMoney, lineAmount, lineVat, VAT_CATEGO
 import { DOC_META, isTaxDoc } from './docs'
 import { docDiscount, vatOn, type PaperDoc, type PaperItem } from '@/components/sales/paper'
 import type { BrandKind } from './data'
+import { resolveTemplate, templateKind, type TemplateKind } from './template'
 
 /** A4 PDF in the Al Saqr template layout. Arabic text in images (letterhead/stamp) is preserved; typed text uses Helvetica. */
 export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   companyName: string; images: Partial<Record<BrandKind, { bytes: Uint8Array; png: boolean }>>; showHeaderFooter: boolean; showStamp: boolean; bankDetails?: string | null; paid?: number
   companyTrn?: string | null; sealSize?: number; signatureWidth?: number; signAlign?: 'left' | 'center' | 'right'; signSpacing?: number
   signatoryName?: string | null; signatoryTitle?: string | null; brandColor?: string | null; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null; companyWebsite?: string | null
+  templates?: Partial<Record<TemplateKind, unknown>>
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
   pdf.setTitle(`${DOC_META[doc.doc_type].label} ${doc.number}`); pdf.setCreator('Averiqo'); pdf.setProducer('Averiqo')
@@ -20,6 +22,7 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   const W = 595.28, H = 841.89, M = 28, CW = W - 2 * M
   const isInv = isTaxDoc(doc.doc_type), isCn = doc.doc_type === 'credit_note', isDn = doc.doc_type === 'delivery_note', isQtn = doc.doc_type === 'quotation'
   const qVat = isQtn && doc.apply_vat === true
+  const tp = resolveTemplate(doc.doc_type, opts.templates?.[templateKind(doc.doc_type) as TemplateKind]), f = tp.fields
   const hex = opts.brandColor && /^#[0-9a-f]{6}$/i.test(opts.brandColor) ? opts.brandColor : null
   const accent = hex ? rgb(parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255) : null
   const black = rgb(0, 0, 0), grey = rgb(0.45, 0.45, 0.45), boxBg = rgb(0.953, 0.941, 0.918), red = rgb(0.72, 0.11, 0.11), hatch = rgb(0.95, 0.93, 0.89)
@@ -68,7 +71,7 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
       page.drawLine({ start: { x: M, y: y - 4 }, end: { x: W - M, y: y - 4 }, thickness: 1.2, color: accent ?? black }); y -= 12
     }
   }
-  const title = DOC_META[doc.doc_type].paperTitle
+  const title = tp.title || DOC_META[doc.doc_type].paperTitle
   center(title, W / 2, y - 12, isInv ? 14 : 13, bold)
   if (isInv) { const tw = bold.widthOfTextAtSize(title, 14); page.drawLine({ start: { x: W / 2 - tw / 2, y: y - 14 }, end: { x: W / 2 + tw / 2, y: y - 14 }, thickness: 0.8 }) }
   y -= 24
@@ -78,15 +81,13 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   // party + reference boxes
   const dash = (s?: string | null) => (s && s.trim() ? s : '-')
   const fd = (d?: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}` : '-')
-  const left: [string, string][] = [...(isQtn ? [['Attention:', dash(doc.attention)] as [string, string]] : []), ['Company Name:', dash(doc.customer_name)],
-    ...(!isQtn ? [['TRN:', dash(doc.customer_trn)] as [string, string]] : []), ...(!isQtn && doc.customer_phone ? [['Tel:', doc.customer_phone] as [string, string]] : []),
-    ...(isQtn && doc.customer_phone ? [['Tel:', doc.customer_phone] as [string, string]] : []), ...(doc.customer_email ? [['Email:', doc.customer_email] as [string, string]] : []),
-    ['Address:', dash(doc.customer_address)], ...(doc.site ? [[isDn ? 'Delivery to:' : 'Site:', doc.site] as [string, string]] : []),
-    ...(doc.project_name ? [['Project:', doc.project_name] as [string, string]] : [])]
+  const row = (on: unknown, k: string, v: string): [string, string][] => (on ? [[k, v]] : [])
+  const left: [string, string][] = [...row(f.attention, 'Attention:', dash(doc.attention)), ['Company Name:', dash(doc.customer_name)],
+    ...row(f.customer_trn, 'TRN:', dash(doc.customer_trn)), ...row(f.phone && doc.customer_phone, 'Tel:', doc.customer_phone ?? ''), ...row(f.email && doc.customer_email, 'Email:', doc.customer_email ?? ''),
+    ['Address:', dash(doc.customer_address)], ...row(f.site && doc.site, isDn ? 'Delivery to:' : 'Site:', doc.site ?? ''), ...row(f.project && doc.project_name, 'Project:', doc.project_name ?? '')]
   const rightRows: [string, string][] = [[isDn ? 'Delivery No.' : isCn ? 'Credit Note No.' : isInv ? 'Invoice No.' : 'Ref No.', `${dash(doc.number)}${doc.revision ? ` Rev.${doc.revision}` : ''}`], ['Date:', fd(doc.issue_date)],
-    ...(!isQtn ? [['L.P.O:', dash(doc.lpo_ref)] as [string, string]] : []), ...(isInv && !isCn ? [['DEL NO:', dash(doc.del_no)] as [string, string]] : []),
-    ...(doc.reference ? [['Your Ref:', doc.reference] as [string, string]] : []), ...(isInv && doc.due_date ? [['Due:', fd(doc.due_date)] as [string, string]] : []),
-    ...(isQtn && doc.valid_until ? [['Valid till:', fd(doc.valid_until)] as [string, string]] : [])]
+    ...row(f.lpo, 'L.P.O:', dash(doc.lpo_ref)), ...row(f.del_no && !isCn, 'DEL NO:', dash(doc.del_no)), ...row(f.reference && doc.reference, 'Your Ref:', doc.reference ?? ''),
+    ...row(f.due_date && doc.due_date, 'Due:', fd(doc.due_date)), ...row(f.valid_until && doc.valid_until, 'Valid till:', fd(doc.valid_until))]
   const lw = CW - 160, lab = 82, fs = 9.5, lh = 13
   const leftLines = left.map(([k, v]) => [k, wrap(v, font, fs, lw - lab - 16)] as const)
   const rightLines = rightRows.map(([k, v]) => [k, wrap(v, font, fs, CW - lw - 10 - 78)] as const)
@@ -100,12 +101,12 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
 
   if (isQtn && doc.intro) for (const l of wrap(doc.intro, font, 9.5, CW)) { text(l, M, y - 9, 9.5); y -= 12 }
   if (doc.subject) { text('Subject:', M, y - 9, 9.5, bold); text(doc.subject, M + 44, y - 9, 9.5); y -= 13 }
-  if (!isInv) { text('The scope of works:-', M, y - 10, 10, bold); y -= 14 }
+  if (tp.scopeHeading) { text(tp.scopeHeading, M, y - 10, 10, bold); y -= 14 }
 
   // items table
   const cols: { h: string; w: number; a: 'c' | 'l' | 'r' }[] = isInv
-    ? [{ h: 'SR NO', w: 30, a: 'c' }, { h: 'DESCRIPTION', w: CW - 30 - 38 - 62 - 70 - 58 - 80, a: 'l' }, { h: 'QTY.', w: 38, a: 'c' }, { h: 'Rate', w: 62, a: 'r' }, { h: 'Amount', w: 70, a: 'r' }, { h: `VAT ${doc.vat_rate}%`, w: 58, a: 'r' }, { h: 'Amount With Vat', w: 80, a: 'r' }]
-    : [{ h: 'SR NO', w: 34, a: 'c' }, { h: 'DESCRIPTION', w: CW - 34 - 46 - 80 - 80, a: 'l' }, { h: 'QTY.', w: 46, a: 'c' }, { h: 'Unit price (dhs)', w: 80, a: 'c' }, { h: 'Total Price (dhs)', w: 80, a: 'c' }]
+    ? [{ h: 'SR NO', w: 30, a: 'c' }, { h: tp.labels.description, w: CW - 30 - 38 - 62 - 70 - 58 - 80, a: 'l' }, { h: tp.labels.qty, w: 38, a: 'c' }, { h: tp.labels.rate, w: 62, a: 'r' }, { h: tp.labels.total, w: 70, a: 'r' }, { h: `VAT ${doc.vat_rate}%`, w: 58, a: 'r' }, { h: 'Amount With Vat', w: 80, a: 'r' }]
+    : [{ h: 'SR NO', w: 34, a: 'c' }, { h: tp.labels.description, w: CW - 34 - 46 - 80 - 80, a: 'l' }, { h: tp.labels.qty, w: 46, a: 'c' }, { h: tp.labels.rate, w: 80, a: 'c' }, { h: tp.labels.total, w: 80, a: 'c' }]
   const tableHeader = () => {
     const hh = 26; let x = M
     for (const c of cols) {
@@ -161,12 +162,12 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
     cols.slice(2).forEach((c, i) => { rect(x, y - rh, c.w, rh); if (tv[i]) right(tv[i], x + c.w - 4, y - 14, 9.5, bold); x += c.w })
     y -= rh
     if (t.zeroBase > 0 || t.exemptBase > 0) { rect(M, y - 16, CW, 16); text(`VAT summary: standard-rated ${fmtMoney(t.standardBase)}${t.zeroBase ? ` · zero-rated ${fmtMoney(t.zeroBase)}` : ''}${t.exemptBase ? ` · exempt / out of scope ${fmtMoney(t.exemptBase)}` : ''}`, M + 4, y - 11, 8); y -= 16 }
-    if (isCn) { y -= 4; for (const l of wrap(`Amount in Words: - ${amountInWords(t.total).replace(/^UAE Dirhams /, '')}`, bold, 10, CW)) { text(l, M, y - 10, 10, bold); y -= 13 }; y -= 6 }
+    if (isCn && tp.showWords) { y -= 4; for (const l of wrap(`Amount in Words: - ${amountInWords(t.total).replace(/^UAE Dirhams /, '')}`, bold, 10, CW)) { text(l, M, y - 10, 10, bold); y -= 13 }; y -= 6 }
   }
   if (isInv && !isCn) {
     if (y - 46 < bottom) newPage()
     const pw = 100, vw = 80, ww = CW - pw - vw, paid = opts.paid ?? 0
-    rect(M, y - 44, ww, 44); const words = wrap(`Amount in Words: - ${amountInWords(t.total).replace(/^UAE Dirhams /, '')}`, bold, 10, ww - 12)
+    rect(M, y - 44, ww, 44); const words = tp.showWords ? wrap(`Amount in Words: - ${amountInWords(t.total).replace(/^UAE Dirhams /, '')}`, bold, 10, ww - 12) : []
     words.slice(0, 3).forEach((l, i) => text(l, M + 6, y - 16 - i * 12 + (words.length > 2 ? 6 : 0), 10, bold))
     rect(M + ww, y - 22, pw, 22); center('Paid Amount', M + ww + pw / 2, y - 15, 10, bold); rect(M + ww + pw, y - 22, vw, 22); right(fmtMoney(paid), M + CW - 4, y - 15, 10, bold)
     rect(M + ww, y - 44, pw, 22); center('Total Balance', M + ww + pw / 2, y - 37, 10, bold); rect(M + ww + pw, y - 44, vw, 22); right(fmtMoney(t.total - paid), M + CW - 4, y - 37, 10, bold)
@@ -177,7 +178,7 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   const ensure = (h: number) => { if (y - h < bottom) newPage() }
   if (isQtn && doc.closing) { y -= 6; doc.closing.split('\n').forEach((l, i) => { for (const w of wrap(l, i === 0 ? bold : font, 9.5, CW)) { ensure(12); text(w, M, y - 9, 9.5, i === 0 ? bold : font); y -= 12 } }) }
   // seal + signature sit beside the terms (as on screen); sizes come from Settings (px at 96 dpi → pt × 0.75)
-  const showSign = opts.showStamp && !isInv && !!(img.stamp || img.signature || opts.signatoryName)
+  const showSign = opts.showStamp && tp.showSignature && !!(img.stamp || img.signature || opts.signatoryName)
   const sealPt = (opts.sealSize ?? 140) * 0.75, sigWPt = (opts.signatureWidth ?? 160) * 0.75, sigHPt = sigWPt * 0.75
   const overlap = img.stamp && img.signature ? sealPt * 0.18 : 0
   const signW0 = showSign ? (img.stamp ? sealPt : 0) + (img.signature ? sigWPt - overlap : 0) : 0
@@ -200,11 +201,12 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
     })
   }
   if (isQtn) { list('Terms and Conditions: -', doc.terms); list('Payment Terms: -', doc.payment_terms) }
+  if (tp.showBank && opts.bankDetails) { ensure(30); text('Bank Details: -', M, y - 10, 10.5, bold); y -= 15; for (const l of wrap(opts.bankDetails, font, 9, CW)) { ensure(12); text(l, M, y - 8, 9); y -= 11.5 } }
   if (isInv) {
-    if (opts.bankDetails) { ensure(30); text('Bank Details: -', M, y - 10, 10.5, bold); y -= 15; for (const l of wrap(opts.bankDetails, font, 9, CW)) { ensure(12); text(l, M, y - 8, 9); y -= 11.5 } }
     if (doc.payment_terms.length) { y -= 4; for (const l of wrap(`Payment terms: ${doc.payment_terms.join(' · ')}`, font, 9, CW)) { ensure(12); text(l, M, y - 8, 9); y -= 11.5 } }
-    ensure(20); y -= 8; center('This is a computer-generated report.', W / 2, y - 8, 9, italic); text('', 0, 0); y -= 14
+    if (tp.showComputerLine) { ensure(20); y -= 8; center('This is a computer-generated report.', W / 2, y - 8, 9, italic); y -= 14 }
   }
+  if (tp.footerNote) { y -= 6; for (const l of wrap(tp.footerNote, font, 9.5, CW)) { ensure(12); text(l, M, y - 9, 9.5); y -= 12 } }
   if (isDn) {
     ensure(70); y -= 34
     text('Delivered By:', M, y, 10, font, red); page.drawLine({ start: { x: M + 68, y: y - 2 }, end: { x: M + 210, y: y - 2 }, thickness: 0.7, color: red }); if (doc.vehicle_no) text(`Vehicle: ${doc.vehicle_no}`, M + 218, y, 9)

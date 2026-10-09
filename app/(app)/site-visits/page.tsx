@@ -43,7 +43,7 @@ export default async function SiteVisitsPage({ searchParams }: { searchParams: P
   const [leads, customers, projects, employees] = opts ? opts.map(r => r.data ?? []) : [[], [], [], []]
   const form = <VisitFields v={{ scheduled_date: c.today }} leads={leads.map((l: any) => ({ id: l.id, name: `${l.company_name} (${l.number})` }))} customers={customers.map((x: any) => ({ id: x.id, name: x.name }))}
     projects={projects.map((x: any) => ({ id: x.id, name: x.name }))} employees={employees.map((e: any) => ({ id: e.id, name: e.full_name }))} />
-  const add = <DialogButton wide label="Schedule visit" title="Schedule site visit" icon={<Plus size={15} />} openParam="site_visit"><ActionForm action={createSiteVisit} submit="Schedule visit" idempotent>{form}</ActionForm></DialogButton>
+  const add = <DialogButton wide label="Schedule visit" title="Schedule site visit" icon={<Plus size={15} />} openParam="site_visit"><ActionForm draftKey="site-visit:new" action={createSiteVisit} submit="Schedule visit" idempotent>{form}</ActionForm></DialogButton>
 
   return <>
     <PageHeader title="Site Visits" sub="Measurement and survey visits before quotation, with a printable visit report." actions={<><SavedViews page="/site-visits" />{edit && add}</>} />

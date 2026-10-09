@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CornerDownLeft, Loader2, Plus, Search } from 'lucide-react'
 import { newSalesDoc } from '@/app/actions/sales'
+import { paletteSearch, type PaletteHit } from '@/app/actions/palette'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
@@ -13,6 +14,14 @@ type Cmd = { id: string; label: string; group: string; run: () => void; hint?: s
 export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canSales: boolean }) {
   const [open, setOpen] = useState(false), [q, setQ] = useState(''), [sel, setSel] = useState(0)
   const [pending, start] = useTransition()
+  const [hits, setHits] = useState<PaletteHit[]>([]), [looking, setLooking] = useState(false)
+  // live record results while typing (debounced; a newer query wins over a slower older one)
+  useEffect(() => {
+    const term = q.trim(); if (term.length < 2) { setHits([]); setLooking(false); return }
+    let live = true; setLooking(true)
+    const h = setTimeout(async () => { const r = await paletteSearch(term).catch(() => []); if (live) { setHits(r); setLooking(false); setSel(0) } }, 200)
+    return () => { live = false; clearTimeout(h) }
+  }, [q])
   const router = useRouter(), dlg = useRef<HTMLDialogElement>(null), input = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const on = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setOpen(o => !o) } }
@@ -50,7 +59,10 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
     ]
   }, [links, canSales, router, pending])
   const term = q.trim().toLowerCase()
-  const list = term ? [...cmds.filter(c => c.label.toLowerCase().includes(term)), { id: 'search', label: `Search everything for “${q.trim()}”`, group: 'Search', run: () => { setOpen(false); router.push(`/search?q=${encodeURIComponent(q.trim())}`) } }] : cmds
+  const go2 = (href: string) => () => { setOpen(false); router.push(href) }
+  const list = term ? [...hits.map(h => ({ id: `r:${h.href}`, label: h.label, group: 'Records', run: go2(h.href), hint: h.hint })), ...cmds.filter(c => c.label.toLowerCase().includes(term)),
+    { id: 'search', label: `Search everything for “${q.trim()}”`, group: 'Search', run: go2(`/search?q=${encodeURIComponent(q.trim())}`) },
+    { id: 'ask', label: `Ask Averiqo AI: “${q.trim()}”`, group: 'Search', run: go2(`/assistant?q=${encodeURIComponent(q.trim())}`) }] : cmds
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(list.length - 1, s + 1)) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)) }
@@ -60,8 +72,8 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
   return <dialog ref={dlg} onClose={() => setOpen(false)} onClick={e => { if (e.target === dlg.current) setOpen(false) }} aria-label="Command palette"
     className="m-auto mt-[12vh] w-[calc(100%-2rem)] max-w-xl rounded-lg border border-border bg-surface p-0 text-fg shadow-pop">
     <div className="flex items-center gap-2 border-b border-border px-4">
-      {pending ? <Loader2 size={16} className="animate-spin text-muted" /> : <Search size={16} className="text-muted" aria-hidden />}
-      <input ref={input} value={q} onChange={e => { setQ(e.target.value); setSel(0) }} onKeyDown={onKey} placeholder="Type a command or search…" aria-label="Command" role="combobox" aria-expanded aria-controls="palette-list" aria-activedescendant={list[sel] ? `cmd-${list[sel].id}` : undefined}
+      {pending || looking ? <Loader2 size={16} className="animate-spin text-muted" /> : <Search size={16} className="text-muted" aria-hidden />}
+      <input ref={input} value={q} onChange={e => { setQ(e.target.value); setSel(0) }} onKeyDown={onKey} placeholder="Type a command, a name or a number…" aria-label="Command" role="combobox" aria-expanded aria-controls="palette-list" aria-activedescendant={list[sel] ? `cmd-${list[sel].id}` : undefined}
         className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted/70 focus-visible:ring-0" />
       <kbd className="rounded border border-border px-1.5 text-[10px] text-muted">Esc</kbd>
     </div>

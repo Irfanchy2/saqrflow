@@ -36,7 +36,7 @@ export default async function SiteReportsPage({ searchParams }: { searchParams: 
   ])
   const [wos, employees] = opts ? opts.map(r => r.data ?? []) : [[], []]
   const projOpts = (projects ?? []).map((p: any) => ({ id: p.id, name: p.name }))
-  const add = <DialogButton wide label="New daily report" title="Daily site report" icon={<Plus size={15} />} openParam="site_report"><ActionForm action={createSiteReport} submit="Save report" idempotent>
+  const add = <DialogButton wide label="New daily report" title="Daily site report" icon={<Plus size={15} />} openParam="site_report"><ActionForm draftKey="site-report:new" action={createSiteReport} submit="Save report" idempotent>
     <SiteReportFields projects={projOpts} workOrders={wos.map((w: any) => ({ id: w.id, name: `${w.number}: ${w.title}` }))} employees={employees.map((e: any) => ({ id: e.id, name: e.full_name }))} today={c.today} r={{ project_id: sp.project }} /></ActionForm></DialogButton>
   const filtered = !!(term || sp.project || sp.from || sp.to)
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'

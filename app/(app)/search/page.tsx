@@ -16,7 +16,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const c = await getCtx(); const sp = await flat(searchParams); const q = sanitizeQ(sp.q)
   const run = q.length >= 2, fin = c.can('finance.view'), like = `%${q}%`
   const none = Promise.resolve({ data: [] as any[] })
-  const [cust, sup, proj, sales, emps, docs, assets, chq, leads, wos, tasks, visits, tickets, warranties, kb] = run ? await Promise.all([
+  const [cust, sup, proj, sales, emps, docs, assets, chq, leads, wos, tasks, visits, tickets, warranties, kb, exps, reports, products] = run ? await Promise.all([
     c.can('documents.view') ? c.supabase.from('customers').select('id,name,contact_person,phone,trn').or(`name.ilike.${like},contact_person.ilike.${like},phone.ilike.${like},email.ilike.${like},trn.ilike.${like}`).limit(8) : none,
     c.can('documents.view') ? c.supabase.from('suppliers').select('id,name,contact_person,phone').or(`name.ilike.${like},contact_person.ilike.${like},phone.ilike.${like},trn.ilike.${like}`).limit(6) : none,
     c.can('documents.view') ? c.supabase.from('projects').select('id,name,code,location,status').or(`name.ilike.${like},code.ilike.${like},location.ilike.${like},description.ilike.${like}`).limit(8) : none,
@@ -32,6 +32,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     c.supabase.from('service_tickets').select('id,number,title,status,contact_name').or(`number.ilike.${like},title.ilike.${like},contact_name.ilike.${like},contact_phone.ilike.${like},site_location.ilike.${like}`).limit(8),
     c.can('documents.view') ? c.supabase.from('warranties').select('id,number,title,end_date').or(`number.ilike.${like},title.ilike.${like}`).limit(6) : none,
     c.supabase.from('kb_articles').select('id,title,category').or(`title.ilike.${like},body.ilike.${like}`).limit(6),
+    fin ? c.supabase.from('project_expenses').select('id,description,supplier_name,amount,spent_on,reference').or(`description.ilike.${like},supplier_name.ilike.${like},reference.ilike.${like}`).order('spent_on', { ascending: false }).limit(6) : none,
+    c.can('documents.view') ? c.supabase.from('daily_site_reports').select('id,number,report_date,site,project:projects(name)').is('deleted_at', null).or(`number.ilike.${like},site.ilike.${like},work_done.ilike.${like},issues.ilike.${like}`).order('report_date', { ascending: false }).limit(6) : none,
+    !fin ? none : c.supabase.from('catalog_items').select('id,name,unit,rate,category').eq('active', true).or(`name.ilike.${like},description.ilike.${like},category.ilike.${like}`).limit(6),
   ]) : []
   const groups: [string, Hit[]][] = run ? [
     ['Quotations, invoices & delivery notes', (sales!.data ?? []).map((s: any) => ({ href: `/invoices/${s.id}`, title: `${s.number} · ${s.customer_name ?? '—'}`, sub: [DOC_META[s.doc_type as SalesType]?.label, s.subject ?? s.site, DOC_META[s.doc_type as SalesType]?.priced ? `AED ${fmtMoney(s.total)}` : null].filter(Boolean).join(' · '), badge: <Badge tone={STATUS_TONE[s.status]}>{statusLabel(s.doc_type, s.status)}</Badge> }))],
@@ -48,10 +51,13 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     ['Documents', (docs!.data ?? []).map((x: any) => ({ href: `/documents/${x.id}`, title: x.name, sub: [x.reference_no, x.expiry_date && `expires ${x.expiry_date}`].filter(Boolean).join(' · ') }))],
     ['Vehicles & assets', (assets!.data ?? []).map((x: any) => ({ href: `/assets/${x.id}`, title: x.name, sub: [x.plate_or_serial ?? x.asset_code, x.make, x.model].filter(Boolean).join(' · ') }))],
     ['Cheques', (chq!.data ?? []).map((x: any) => ({ href: `/cheques?open=${x.id}`, title: `#${x.cheque_no} · ${x.party_name}`, sub: `AED ${fmtMoney(x.amount)} · ${x.cheque_date} · ${x.status}` }))],
+    ['Expenses', (exps!.data ?? []).map((x: any) => ({ href: `/expenses?q=${encodeURIComponent(x.reference ?? x.description)}`, title: x.description, sub: [x.supplier_name, `AED ${fmtMoney(x.amount)}`, x.spent_on].filter(Boolean).join(' · ') }))],
+    ['Daily site reports', (reports!.data ?? []).map((x: any) => ({ href: `/site-reports/${x.id}`, title: `${x.number} · ${x.project?.name ?? ''}`, sub: [x.report_date, x.site].filter(Boolean).join(' · ') }))],
+    ['Products & services', (products!.data ?? []).map((x: any) => ({ href: `/catalog?q=${encodeURIComponent(x.name)}`, title: x.name, sub: [x.category, `AED ${fmtMoney(x.rate)} / ${x.unit}`].filter(Boolean).join(' · ') }))],
     ['Suppliers', (sup!.data ?? []).map((x: any) => ({ href: `/parties?tab=suppliers&q=${encodeURIComponent(x.name)}`, title: x.name, sub: [x.contact_person, x.phone].filter(Boolean).join(' · ') }))],
   ] : []
   const total = groups.reduce((s, [, h]) => s + h.length, 0)
-  return <><PageHeader title="Search" sub={run ? `${total} result${total === 1 ? '' : 's'} for “${q}”` : 'Search leads, customers, quotations (e.g. AS0025180), invoices, projects, work orders, tasks, people, documents, vehicles, cheques, service tickets, warranties and knowledge base articles.'} />
+  return <><PageHeader title="Search" sub={run ? `${total} result${total === 1 ? '' : 's'} for “${q}”` : 'Search leads, customers, quotations (e.g. AS0025180), invoices, projects, work orders, tasks, people, documents, vehicles, cheques, service tickets, warranties, knowledge base articles, expenses, site reports and products.'} />
     <form className="mb-4 flex max-w-xl gap-2"><input name="q" type="search" defaultValue={sp.q} autoFocus aria-label="Search everything" placeholder="e.g. AS0025180, Mohammed, ABC Contracting, Villa Fujairah, INV-102" className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm" />
       
       <button className="h-10 shrink-0 cursor-pointer rounded-md bg-primary px-4 text-sm font-medium text-primary-fg">Search</button></form>

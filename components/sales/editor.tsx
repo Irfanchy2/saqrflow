@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { clearDraft, draftAge, readDraft, writeDraft } from '@/lib/drafts'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -79,6 +80,24 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const [showDelivery, setShowDelivery] = useState(false)
 
   const touch = () => { version.current++; setDirty(true) }
+
+  // ── offline drafts: unsaved edits are kept on this device until the server has them ──
+  const draftKey = `sales:${doc.id}`
+  const [restore, setRestore] = useState<{ at: number; head: Head; items: Item[]; base: string | null } | null>(null)
+  useEffect(() => {
+    const d = readDraft<{ head: Head; items: Item[]; base: string | null }>(draftKey)
+    if (d && editable) setRestore({ at: d.at, ...d.data }); else if (d) clearDraft(draftKey)
+  }, [draftKey, editable])
+  useEffect(() => {
+    if (!dirty || !editable) return
+    const h = setTimeout(() => writeDraft(draftKey, { head, items, base: doc.updated_at ?? null }), 600)
+    return () => clearTimeout(h)
+  }, [dirty, editable, head, items, draftKey, doc.updated_at])
+  // back online: retry the autosave that failed, or remind to save a sent document
+  useEffect(() => {
+    const on = () => { if (!dirty) return; if (draft) setErrors(null); else toast('Back online. Save to keep your changes.') }
+    window.addEventListener('online', on); return () => window.removeEventListener('online', on)
+  }, [dirty, draft])
   const set = <K extends keyof Head>(k: K, v: Head[K]) => { setHead(h => ({ ...h, [k]: v })); touch() }
   const setItem = (i: number, patch: Partial<Item>) => { setItems(xs => xs.map((x, j) => (j === i ? { ...x, ...patch } : x))); touch() }
   const move = (i: number, d: -1 | 1) => { setItems(xs => { const n = [...xs]; const j = i + d; if (j < 0 || j >= n.length) return xs; [n[i], n[j]] = [n[j], n[i]]; return n }); touch() }
@@ -120,7 +139,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
       if (r?.data?.updatedAt) expected.current = r.data.updatedAt
       // new lines get their database ids, so the next save updates them in place (delivery notes stay linked)
       if (Array.isArray(r?.data?.itemIds)) { const ids = r!.data!.itemIds as string[]; setItems(xs => xs.map(x => { const j = sentKeys.indexOf(x.key); return j >= 0 && ids[j] ? { ...x, id: ids[j] } : x })) }
-      if (version.current === v) setDirty(false)              // edits made while saving stay "unsaved"
+      if (version.current === v) { setDirty(false); clearDraft(draftKey) }   // edits made while saving stay "unsaved"; saved → device copy no longer needed
       setSavedAt(Date.now())
       if (!auto) toast(r?.message === 'Saved.' ? `${meta.label} ${doc.number} saved` : r?.message ?? 'Saved')
       if (r?.data?.customerId) setHead(h => ({ ...h, new_customer: false, customer_id: r.data!.customerId }))
@@ -244,6 +263,10 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
     <div className="grid gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(380px,520px)_1fr]">
       {/* ── editor ── */}
       <div className={cn('flex min-w-0 flex-col gap-4', view === 'preview' && 'hidden lg:flex')}>
+        {restore && <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm" data-draft-restore>
+          <span className="min-w-0 flex-1">Unsaved changes from this device ({draftAge(restore.at)}){restore.base !== (doc.updated_at ?? null) ? '. The document was saved since then; restoring replaces those changes on screen.' : '.'}</span>
+          <Button size="sm" onClick={() => { setHead(restore.head); setItems(restore.items.map(i => ({ ...i, key: i.key ?? key() }))); setRestore(null); touch() }}>Restore</Button>
+          <Button size="sm" variant="ghost" onClick={() => { clearDraft(draftKey); setRestore(null) }}>Discard</Button></div>}
         {errors && <div role="alert" className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{errors}</div>}
         {!editable && lockedReason && <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm">{lockedReason}</div>}
         {approval && doc.approval_note && <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm"><b>{APPROVAL_LABEL[approval]}:</b> {doc.approval_note}</div>}

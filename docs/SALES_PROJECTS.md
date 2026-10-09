@@ -31,3 +31,42 @@
 1. Apply `supabase/migrations/0008_sales_projects.sql`.
 2. Settings → Branding: upload letterhead (and optional invoice letterhead), footer, stamp, signature; set TRN, bank details, VAT %, default terms.
 3. Optional: `ANTHROPIC_API_KEY` for AI reading of scanned PDFs.
+
+## Template builder (Settings → Template builder)
+
+Each of quotation, tax invoice and delivery note has its own template, stored in `app_settings` as `template.<type>`.
+- **What you can change:**
+  - the title;
+  - the heading above the items;
+  - which optional details print (attention, customer TRN, phone, email, site, project, LPO, DEL NO, reference, due date, valid till);
+  - the column names;
+  - the seal / signature block, bank details, amount in words and the "computer-generated" line;
+  - a footer note.
+- **One definition, two renderers:** `lib/sales/template.ts` is shared by the A4 paper (`components/sales/paper.tsx`: editor preview and print view) and the PDF (`lib/sales/pdf.ts`), so they always match.
+- **Defaults:** they reproduce the standard Al Saqr layout exactly. "Standard layout" stores `false`.
+- **Not switchable on a tax invoice** (UAE requirements): the company TRN, the VAT columns and the totals.
+- **Credit notes:** they keep their own title.
+- **Layout only:** saving never changes document content.
+
+## Offline drafts and the installed app
+
+- **Service worker** (`public/sw.js`):
+  - caches only content-hashed build files and the `/offline` page;
+  - pages and data always come from the network;
+  - without a connection, `/offline` is shown instead of a browser error.
+- **Drafts on the device** (`lib/drafts.ts`, keys `avq-draft:*`, kept 14 days):
+  - **Sales editor:** unsaved edits are kept while offline. Reopening offers *Restore* or *Discard*; once restored they autosave when the connection returns.
+  - **Forms with `draftKey`:** new ticket, ticket note, KB article, lead, lead activity, task, site visit, daily site report, expense and customer/supplier keep what was typed, and it is restored next time the form opens.
+  - **Clearing:** a draft is removed once its form is saved. Every draft is removed on sign-out (shared devices).
+
+## Averiqo AI business questions (`lib/ai/business.ts`)
+
+- **Built-in rules (no AI key needed):**
+  - money owed and overdue invoices, with balances after payments and credits;
+  - project status and late projects;
+  - everything expiring, including vehicle and equipment dates;
+  - cheques due;
+  - open service tickets;
+  - the sales pipeline.
+- **With Gemini configured:** only the question is sent, to understand it.
+- **Permissions:** every query runs with the user's own session.

@@ -33,7 +33,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
   const fieldOpts = { customers: opt(customers.data, r => r.name), projects: opt(projects.data, r => r.code ? `${r.code} · ${r.name}` : r.name), assets: opt(assets.data, r => [r.name, r.plate_or_serial].filter(Boolean).join(' · ')),
     users: opt(users.data, r => r.full_name), employees: opt(employees.data, r => r.full_name), warranties: opt(warrantiesOpt.data, r => `${r.number} · ${r.title}`) }
   const qs = (x: Record<string, string>) => `/tickets?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp).filter(([k, v]) => v && !['page'].includes(k))) as Record<string, string>, ...x })}`
-  const addTicket = <DialogButton wide label="New ticket" title="New service ticket" icon={<Plus size={15} />} openParam="ticket"><ActionForm action={createTicket} submit="Open ticket" idempotent><TicketFields {...fieldOpts} /></ActionForm></DialogButton>
+  const addTicket = <DialogButton wide label="New ticket" title="New service ticket" icon={<Plus size={15} />} openParam="ticket"><ActionForm draftKey="ticket:new" action={createTicket} submit="Open ticket" idempotent><TicketFields {...fieldOpts} /></ActionForm></DialogButton>
   const addWarranty = <DialogButton wide variant="secondary" label="Record warranty" title="Record a warranty" icon={<ShieldCheck size={15} />} openParam="warranty"><ActionForm action={saveWarranty.bind(null, null)} submit="Save warranty">
     <WarrantyFields customers={fieldOpts.customers} projects={fieldOpts.projects} invoices={opt(invoices.data, r => `${r.number}${r.customer_name ? ` · ${r.customer_name}` : ''}`)} w={{ start_date: c.today }} /></ActionForm></DialogButton>
 

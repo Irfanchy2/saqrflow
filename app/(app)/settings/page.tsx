@@ -11,6 +11,7 @@ import { BrandingSettings } from '@/components/sales/branding-settings'
 import { NumberingSettings } from '@/components/settings/numbering'
 import { AiAutomation } from '@/components/settings/ai-automation'
 import { TemplatesSettings } from '@/components/settings/templates'
+import { TemplateBuilderSection } from '@/components/settings/templates-section'
 import { DataBackup } from '@/components/settings/data-backup'
 import { ApprovalRules } from '@/components/settings/approval-rules'
 import { CustomFieldsSettings } from '@/components/settings/custom-fields'
@@ -28,7 +29,7 @@ export default async function Settings() {
   const wa = admin ? await whatsappStatus(c.company.id) : null
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
   // order follows how a business sets Averiqo up: who we are → how documents look → how they are numbered → who gets told → integrations → data
-  const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['templates', 'Document templates', admin], ['numbering', 'Numbering', admin], ['approvals', 'Approvals', admin], ['custom', 'Custom fields & statuses', admin], ['forms', 'Public forms', admin],
+  const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['builder', 'Template builder', admin], ['templates', 'Terms templates', admin], ['numbering', 'Numbering', admin], ['approvals', 'Approvals', admin], ['custom', 'Custom fields & statuses', admin], ['forms', 'Public forms', admin],
     ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['ai', 'AI & OCR', admin],
     ['integrations', 'API & webhooks', admin], ['account', 'Account & security', true], ['data', 'Data & backup', true]]
   return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
@@ -52,6 +53,7 @@ export default async function Settings() {
 
       {admin && <BrandingSettings c={c} />}
 
+      {admin && <TemplateBuilderSection c={c} />}
       {admin && <TemplatesSettings c={c} />}
 
       {admin && <NumberingSettings c={c} />}

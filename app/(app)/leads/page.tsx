@@ -52,7 +52,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const userOpts = (users ?? []).map((u: any) => ({ id: u.id, name: u.full_name }))
   const filtered = !!(term || sp.source || sp.owner || sp.due || sp.stage)
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm hover:border-border-strong'
-  const add = <DialogButton wide label="New lead" title="New lead" icon={<Plus size={15} />} openParam="lead"><ActionForm action={createLead} submit="Save lead" idempotent><LeadFields users={userOpts} /></ActionForm></DialogButton>
+  const add = <DialogButton wide label="New lead" title="New lead" icon={<Plus size={15} />} openParam="lead"><ActionForm draftKey="lead:new" action={createLead} submit="Save lead" idempotent><LeadFields users={userOpts} /></ActionForm></DialogButton>
   const qs = (o: Record<string, string>) => `/leads?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp).filter(([k, v]) => v && k !== 'page')) as Record<string, string>, ...o })}`
   const maxLeads = Math.max(1, ...src.map(s => s.leads))
 
