@@ -15,10 +15,10 @@ const verify = t => { try { const [h, p, s] = t.split('.'); if (crypto.createHma
 const pool = new pg.Pool({ connectionString: DATABASE_URL })
 const passwords = new Map(), refresh = new Map(), objects = new Map(), tokens = new Map()
 const now = () => Math.floor(Date.now() / 1000)
-const session = u => {
+const session = (u, sid = crypto.randomUUID()) => {   // like GoTrue, a refresh keeps the session id
   const exp = now() + 3600
-  const access_token = sign({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', aal: 'aal1', exp, session_id: crypto.randomUUID() })
-  const refresh_token = crypto.randomUUID(); refresh.set(refresh_token, u.id)
+  const access_token = sign({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', aal: 'aal1', exp, session_id: sid })
+  const refresh_token = crypto.randomUUID(); refresh.set(refresh_token, { id: u.id, sid })
   return { access_token, token_type: 'bearer', expires_in: 3600, expires_at: exp, refresh_token, user: user(u) }
 }
 const user = u => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, email_confirmed_at: new Date().toISOString(), app_metadata: {}, user_metadata: {}, factors: [], created_at: new Date().toISOString() })
@@ -43,7 +43,7 @@ http.createServer(async (req, res) => {
     if (path === '/auth/v1/token' && req.method === 'POST') {
       const grant = url.searchParams.get('grant_type'); const b = JSON.parse((await body(req)).toString())
       if (grant === 'password') { const { rows } = await pool.query('select id,email from auth.users where email=$1', [b.email]); if (!rows[0] || passwords.get(b.email) !== b.password) return json(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' }); return json(res, 200, session(rows[0])) }
-      if (grant === 'refresh_token') { const id = refresh.get(b.refresh_token); if (!id) return json(res, 400, { error: 'invalid_grant' }); const { rows } = await pool.query('select id,email from auth.users where id=$1', [id]); return json(res, 200, session(rows[0])) }
+      if (grant === 'refresh_token') { const r = refresh.get(b.refresh_token); if (!r) return json(res, 400, { error: 'invalid_grant' }); const { rows } = await pool.query('select id,email from auth.users where id=$1', [r.id]); return json(res, 200, session(rows[0], r.sid)) }
     }
     if (path === '/auth/v1/user') {
       const c = verify((req.headers.authorization ?? '').replace(/^Bearer /, '')); if (!c || c.role !== 'authenticated') return json(res, 401, { code: 401, msg: 'invalid JWT' })

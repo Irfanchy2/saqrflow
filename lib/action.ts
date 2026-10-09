@@ -2,12 +2,14 @@ import 'server-only'
 import { ZodError } from 'zod'
 import { ForbiddenError } from './permissions'
 import type { ActionState } from './utils'
+import { scheduleEventWork } from './event-kick'
 
 /** Wraps a server action body: converts validation / permission / DB errors into friendly messages. */
 export async function safe(fn: () => Promise<ActionState | void>): Promise<ActionState> {
-  try { return (await fn()) ?? { ok: true } }
+  try { const r = (await fn()) ?? { ok: true }; if (!r?.error) scheduleEventWork(); return r }
   catch (e) {
     const digest: string = (e as any)?.digest ?? ''
+    if (digest.startsWith('NEXT_REDIRECT') && !digest.includes(';/login;')) scheduleEventWork()   // a save that ends in a redirect succeeded
     // an expired session inside an action must not navigate away (unsaved work on screen would be lost)
     if (digest.startsWith('NEXT_REDIRECT') && digest.includes(';/login;')) return { error: 'Your session has expired. Sign in again in a new tab, then retry. Your changes are still on this screen.', data: { auth: true } }
     if (digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_NOT_FOUND')) throw e

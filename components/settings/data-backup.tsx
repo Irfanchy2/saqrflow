@@ -9,7 +9,7 @@ const EXPORTS: [string, string][] = [['customers', 'Customers'], ['suppliers', '
 /** Settings → Data & backup. Shows how the data is actually protected — no fake "backup" button. */
 export function DataBackup({ c }: { c: Ctx }) {
   const ref = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1]
-  return <Card id="data"><CardHeader title="Data & backup" sub="Where your data lives, how it is backed up and how to take your own copy" action={<DatabaseBackup size={16} className="text-muted" aria-hidden />} />
+  return <Card id="data"><CardHeader title="Data & backup" sub="Where your data lives, how it is backed up and how to take your own copy" action={<div className="flex flex-wrap gap-3 text-sm">{c.can('records.edit') && <Link href="/import" className="text-primary hover:underline">Import wizard</Link>}<Link href="/backup" className="inline-flex items-center gap-1 text-primary hover:underline"><DatabaseBackup size={14} aria-hidden />Backup status</Link></div>} />
     <div className="grid gap-5 p-4 text-sm lg:grid-cols-3">
       <div className="space-y-2"><h3 className="font-medium">Database backups</h3>
         <p className="text-muted">Records are stored in a managed Supabase Postgres database. Supabase takes the database backups; how many days are kept (and whether point-in-time recovery is on) depends on your Supabase plan. Check it on the project’s Backups page.</p>
