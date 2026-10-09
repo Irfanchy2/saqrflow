@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { Download, Paperclip, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
-import { Card, EmptyState, LinkButton, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, EmptyState, LinkButton, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { ExpenseFields } from '@/components/expenses/expense-fields'
@@ -11,6 +11,7 @@ import { deleteExpense, saveExpense } from '@/app/actions/projects'
 import { EXPENSE_CATS, PAYMENT_METHODS } from '@/lib/projects'
 import { fmtMoney } from '@/lib/sales/money'
 import { formatAed } from '@/lib/time'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Expenses' }
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -39,7 +40,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
     <PageHeader title="Expenses" sub="Materials, labour, fuel, transport and other costs. Per project or general. Receipts are stored privately; OCR only suggests the details."
-      actions={<>{c.can('data.export') && <LinkButton href="/api/export/expenses?format=xlsx" variant="secondary"><Download size={14} />Excel</LinkButton>}
+      actions={<><SavedViews page="/expenses" />{c.can('data.export') && <LinkButton href="/api/export/expenses?format=xlsx" variant="secondary"><Download size={14} />Excel</LinkButton>}
         {edit && <DialogButton wide openParam="expense" label="Add expense" title="Add expense" icon={<Plus size={15} />}><ActionForm action={saveExpense.bind(null, null, null)} submit="Save expense" idempotent><ExpenseFields today={c.today} projects={projs} assets={assetOpts} employees={emps} suppliers={sups} /></ActionForm></DialogButton>}</>} />
     <Metrics className="mb-5" cols={4}>
       <StatCard label="This month (excl. VAT)" value={formatAed(mTotal)} icon={Wallet} tone="blue" />
@@ -59,7 +60,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Description</Th><Th>Category</Th><Th>Project</Th><Th>Payment</Th><Th className="text-right">Amount</Th><Th className="text-right">VAT</Th>{edit && <Th />}</tr></thead>
           <tbody className="divide-y divide-border">{data.map((e: any) => <tr key={e.id} className="hover:bg-surface-2/50">
             <Td className="whitespace-nowrap tabular-nums">{e.spent_on}</Td>
-            <Td><div className="max-w-[320px] truncate font-medium">{e.description}</div><div className="text-xs text-muted">{[e.supplier_name, e.reference, e.employee?.full_name].filter(Boolean).join(' · ') || '—'}
+            <Td><div className="max-w-[320px] truncate font-medium">{e.description}{e.approval_status && e.approval_status !== 'approved' && <Badge tone={e.approval_status === 'pending' ? 'amber' : 'red'} className="ms-2">{e.approval_status === 'pending' ? 'Awaiting approval' : e.approval_status === 'rejected' ? 'Rejected' : 'Changes requested'}</Badge>}</div><div className="text-xs text-muted">{[e.supplier_name, e.reference, e.employee?.full_name].filter(Boolean).join(' · ') || '—'}
               {e.receipt_document_id && <Link href={`/documents/${e.receipt_document_id}`} className="ms-2 inline-flex items-center gap-0.5 text-primary hover:underline"><Paperclip size={11} />receipt</Link>}</div></Td>
             <Td>{EXPENSE_CATS[e.category] ?? e.category}</Td><Td className="max-w-[180px] truncate">{e.project ? <Link href={`/projects/${e.project.id}`} className="text-primary hover:underline">{e.project.name}</Link> : <span className="text-muted">General</span>}</Td>
             <Td className="text-muted">{e.payment_method ? PAYMENT_METHODS[e.payment_method] : '—'}</Td>

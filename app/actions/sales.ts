@@ -227,6 +227,7 @@ export async function setSalesStatus(id: string, status: string): Promise<Action
       const s = await salesSettings(c)
       if (s.requireApproval && cur.approval_status !== 'approved') return { error: 'Approval is required before this quotation can be sent. Use “Request approval”.' }
     }
+    if (status === 'sent' && t === 'purchase_order' && cur.approval_status && cur.approval_status !== 'approved') return { error: 'This purchase order is waiting for approval (Approvals) and cannot be sent yet.' }
     if ((t === 'invoice' || t === 'credit_note') && status === 'sent') {
       const { count } = await c.supabase.from('invoice_items').select('id', { count: 'exact', head: true }).eq('invoice_id', id)
       if (!count) return { error: `Add at least one line before issuing the ${DOC_META[t].label.toLowerCase()}.` }
@@ -431,7 +432,7 @@ export async function logSalesEvent(id: string, event: 'printed' | 'downloaded' 
 export async function requestApproval(id: string): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit')
-    const { error } = await c.supabase.from('invoices').update({ approval_status: 'pending', approval_note: null, approved_by: null, approved_at: null }).eq('id', id).eq('doc_type', 'quotation')
+    const { error } = await c.supabase.from('invoices').update({ approval_status: 'pending', approval_note: null, approved_by: null, approved_at: null }).eq('id', id).in('doc_type', ['quotation', 'purchase_order'])
     if (error) throw error
     await logEvent(c, id, 'approval', 'Approval requested'); done(id)
     return { ok: true, message: 'Sent for approval.' }

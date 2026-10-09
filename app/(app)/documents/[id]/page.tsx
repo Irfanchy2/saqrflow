@@ -10,6 +10,8 @@ import { StatusBadge } from '@/components/documents/status-badge'
 import { recordRenewal, replaceFile, setDeleted, updateDocument } from '@/app/actions/documents'
 import { ACCEPT_ATTR } from '@/lib/files'
 import { formatAed, localDate } from '@/lib/time'
+import { RecordActivity } from '@/components/record-activity'
+import { RecordTasks } from '@/components/record-tasks'
 
 export const metadata = { title: 'Document' }
 const kb = (n: number) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
@@ -79,5 +81,6 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             <div className="text-xs text-muted">Recorded {r.renewed_at}{r.fee != null && ` · ${formatAed(r.fee)}`}{r.notes && ` · ${r.notes}`}</div></li>)}</ul> : <EmptyState title="No renewals recorded" />}</Card>
         {c.can('audit.view') && <Card><CardHeader title="Access history" action={<History size={15} className="text-muted" />} />
           {access.data?.length ? <ul className="max-h-64 divide-y divide-border overflow-y-auto text-sm">{access.data.map((a: any) => <li key={a.id} className="flex justify-between px-4 py-2"><span><b className="capitalize">{a.action}</b> · {a.user?.full_name ?? 'System'}</span><span className="text-xs text-muted">{a.created_at.slice(0, 16).replace('T', ' ')}</span></li>)}</ul> : <EmptyState title="No access recorded" />}</Card>}
-      </div></div></>
+      </div></div>
+    <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><RecordTasks c={c} type="document" id={id} title={`Renew ${doc.name}`} /><RecordActivity c={c} table="documents" id={id} /></div></>
 }

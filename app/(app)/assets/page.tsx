@@ -11,6 +11,7 @@ import { createAsset } from '@/app/actions/assets'
 import { ASSET_STATUS, CONDITIONS, EQUIPMENT_KINDS, VEHICLE_TYPES, deadlineTone, kmToService } from '@/lib/assets'
 import { addDays, daysBetween, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Vehicles & Assets' }
 const TABS = [['vehicles', 'Vehicles', CarFront], ['assets', 'Equipment & assets', Wrench], ['archived', 'Archived', Archive]] as const
@@ -60,7 +61,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
 
   return <>
     <PageHeader title="Vehicles & Assets" sub="Company vehicles and equipment with registration, insurance, maintenance and assignment history."
-      actions={<>{c.can('data.export') && tab !== 'archived' && <><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}`}><Download size={15} />CSV</LinkButton><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}?format=xlsx`}><Download size={15} />Excel</LinkButton></>}
+      actions={<><SavedViews page="/assets" />{c.can('data.export') && tab !== 'archived' && <><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}`}><Download size={15} />CSV</LinkButton><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}?format=xlsx`}><Download size={15} />Excel</LinkButton></>}
         {edit && tab !== 'archived' && <>{addVehicle}{addAsset}</>}</>} />
     <Metrics className="mb-5" cols={5}>
       <StatCard label="Vehicles" value={nV} href="/assets?tab=vehicles" />

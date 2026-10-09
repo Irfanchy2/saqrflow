@@ -11,6 +11,7 @@ import { createDocument, createCategory } from '@/app/actions/documents'
 import { LinkButton, Card, CardHeader } from '@/components/ui/primitives'
 import { documentTimeline } from '@/lib/timeline'
 import { Timeline } from '@/components/timeline'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Company Documents' }
 export default async function CompanyDocuments({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -25,7 +26,7 @@ export default async function CompanyDocuments({ searchParams }: { searchParams:
   const events = showTimeline ? await documentTimeline(c, { type: 'company' }) : []
   return <>
     <PageHeader title="Company Documents" sub="Licences, registrations, insurance, tenancy, permits and contracts. With expiry tracking and renewal history."
-      actions={<>
+      actions={<><SavedViews page="/documents" />
         <LinkButton href={showTimeline ? '/documents' : '/documents?view=timeline'} variant="secondary">{showTimeline ? 'List' : 'Timeline'}</LinkButton>
         {c.can('data.export') && <LinkButton href="/api/export/documents" variant="secondary">Export CSV</LinkButton>}
         {c.can('records.edit') && <DialogButton variant="secondary" label="Categories" title="Add custom category" icon={<Tags size={15} />}>

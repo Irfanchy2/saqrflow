@@ -12,6 +12,8 @@ import { NumberingSettings } from '@/components/settings/numbering'
 import { AiAutomation } from '@/components/settings/ai-automation'
 import { TemplatesSettings } from '@/components/settings/templates'
 import { DataBackup } from '@/components/settings/data-backup'
+import { ApprovalRules } from '@/components/settings/approval-rules'
+import { CustomFieldsSettings } from '@/components/settings/custom-fields'
 import Link from 'next/link'
 
 export const metadata = { title: 'Settings' }
@@ -21,7 +23,7 @@ export default async function Settings() {
   const wa = admin ? await whatsappStatus(c.company.id) : null
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
   // order follows how a business sets Averiqo up: who we are → how documents look → how they are numbered → who gets told → integrations → data
-  const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['templates', 'Document templates', admin], ['numbering', 'Numbering', admin],
+  const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['templates', 'Document templates', admin], ['numbering', 'Numbering', admin], ['approvals', 'Approvals', admin], ['custom', 'Custom fields & statuses', admin],
     ['notifications', 'Notifications', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['ai', 'AI & OCR', admin], ['account', 'Account & appearance', true], ['data', 'Data & backup', true]]
   return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
     <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -47,6 +49,8 @@ export default async function Settings() {
       {admin && <TemplatesSettings c={c} />}
 
       {admin && <NumberingSettings c={c} />}
+      {admin && <ApprovalRules c={c} />}
+      {admin && <CustomFieldsSettings c={c} />}
 
       {admin && <Card id="notifications"><CardHeader title="Notifications and reminder schedule" sub="Applies to every document, cheque and reminder unless overridden on the item or category." /><div className="p-4"><ActionForm action={saveReminderSettings} resetOnSuccess={false}>
         <Field label="Remind … days before" hint="Comma-separated. 0 = on the due date."><Input name="offsets" defaultValue={s.offsets!.join(', ')} /></Field>

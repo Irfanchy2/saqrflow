@@ -29,6 +29,7 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
       ...(canSales ? [{ id: 'nq', label: 'New quotation', group: 'Create', run: make('quotation') }, { id: 'ni', label: 'New tax invoice', group: 'Create', run: make('invoice') }, { id: 'nd', label: 'New delivery note', group: 'Create', run: make('delivery_note') }] : []),
       { id: 'nl', label: 'New lead', group: 'Create', run: go('/leads?new=lead') },
       { id: 'nt', label: 'New task', group: 'Create', run: go('/tasks?new=task') },
+      { id: 'nar', label: 'New approval request', group: 'Create', run: go('/approvals?new=approval') },
       { id: 'nsv', label: 'Schedule site visit', group: 'Create', run: go('/site-visits?new=site_visit') },
       { id: 'nwo', label: 'New work order', group: 'Create', run: go('/work-orders?new=work_order') },
       { id: 'ndsr', label: 'New daily site report', group: 'Create', run: go('/site-reports?new=site_report') },

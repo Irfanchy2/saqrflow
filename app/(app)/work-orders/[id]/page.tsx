@@ -14,6 +14,8 @@ import { PRIORITY, TASK_STATUS, WO_STATUS, isOverdue, tasksCompletion } from '@/
 import { opsFiles } from '@/lib/ops'
 import { formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { RecordActivity } from '@/components/record-activity'
+import { CustomFieldsCard } from '@/components/custom-fields-card'
 
 export const metadata = { title: 'Work order' }
 const FLOW = ['pending', 'approved', 'scheduled', 'in_fabrication', 'ready_for_site', 'installation', 'inspection', 'completed']
@@ -127,5 +129,6 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
 
       <OpsMedia kind="work_order" id={id} photos={media.photos} files={media.files} canUpload={c.can('documents.upload')} tz={c.company.timezone} className="xl:col-span-3" />
     </div>
+    <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="work_order" recordId={id} customStatusId={w.custom_status_id} /><RecordActivity c={c} table="work_orders" id={id} /></div>
   </>
 }

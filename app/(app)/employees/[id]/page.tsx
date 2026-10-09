@@ -16,6 +16,9 @@ import { daysBetween, formatAed, localDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { documentTimeline } from '@/lib/timeline'
 import { Timeline } from '@/components/timeline'
+import { RecordActivity } from '@/components/record-activity'
+import { RecordTasks } from '@/components/record-tasks'
+import { CustomFieldsCard } from '@/components/custom-fields-card'
 
 export const metadata = { title: 'Employee' }
 const TABS = [['personal', 'Personal'], ['documents', 'Documents'], ['salary', 'Salary'], ['leave', 'Leave'], ['history', 'History']] as const
@@ -71,6 +74,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           <span className="flex items-center gap-2">{i.state === 'missing' || i.state === 'expired' ? <AlertTriangle size={15} className="text-danger" /> : i.state === 'expiring_soon' ? <CircleDashed size={15} className="text-warning" /> : <CheckCircle2 size={15} className="text-success" />}{i.name}</span>
           <Badge tone={stateTone[i.state]}>{i.state === 'missing' ? 'Missing' : i.state.replace(/_/g, ' ')}</Badge></li>)}</ul></Card></div>}
 
+    {tab === 'personal' && <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="employee" recordId={id} /><RecordTasks c={c} type="employee" id={id} /></div>}
+    {tab === 'history' && canSens && <RecordActivity c={c} table="employees" id={id} className="mb-5" />}
     {tab === 'salary' && canSalary && <SalaryTab id={id} c={c} />}
     {tab === 'leave' && canSens && <LeaveTab id={id} c={c} />}
     {tab === 'history' && canSens && <HistoryTab id={id} c={c} e={e} />}

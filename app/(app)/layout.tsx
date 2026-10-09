@@ -26,7 +26,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const items: (NavItem & { show: boolean })[] = [
     { key: 'overview', group: '', href: '/', show: true },
     { key: 'inbox', group: '', href: '/inbox', show: c.can('documents.upload') || c.can('employees.view_sensitive') },
+    { key: 'brief', group: '', href: '/brief', show: true },
     { key: 'tasks', group: '', href: '/tasks', show: true },
+    { key: 'approvals', group: '', href: '/approvals', show: c.can('records.edit') || c.can('approvals.decide') || c.can('sales.approve') || c.can('finance.view') },
     { key: 'reminders', group: '', href: '/reminders', show: c.can('reminders.create') },
     { key: 'calendar', group: '', href: '/calendar', show: c.can('documents.view') },
     { key: 'leads', group: 'Sales & CRM', href: '/leads', show: c.can('crm.view') },

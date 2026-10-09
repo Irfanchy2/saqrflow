@@ -20,6 +20,8 @@ import { formatAed, formatShortDate, localDate } from '@/lib/time'
 import { ACCEPT_ATTR } from '@/lib/files'
 import { cn } from '@/lib/utils'
 import { flat } from '@/lib/queries'
+import { RecordActivity } from '@/components/record-activity'
+import { CustomFieldsCard } from '@/components/custom-fields-card'
 
 export const metadata = { title: 'Project' }
 
@@ -270,5 +272,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           {e.href ? <Link href={e.href} className="flex gap-3 px-4 py-2.5 hover:bg-surface-2/60"><e.icon size={14} className="mt-0.5 shrink-0 text-muted" aria-hidden /><span className="min-w-0 flex-1">{e.text}<span className="block text-xs text-muted">{when(e.at)}</span></span></Link>
             : <div className="flex gap-3 px-4 py-2.5"><e.icon size={14} className="mt-0.5 shrink-0 text-muted" aria-hidden /><span className="min-w-0 flex-1">{e.text}<span className="block text-xs text-muted">{when(e.at)}</span></span></div>}</li>)}</ol></Card>
     </div>
+    <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="project" recordId={id} customStatusId={p.custom_status_id} /><RecordActivity c={c} table="projects" id={id} /></div>
   </>
 }

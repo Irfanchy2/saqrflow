@@ -13,6 +13,8 @@ import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { addFollowup, completeFollowup, decideApproval, deletePayment, recordPayment } from '@/app/actions/sales'
 import { ACCEPT_ATTR } from '@/lib/files'
 import { formatLongDate } from '@/lib/time'
+import { RecordActivity } from '@/components/record-activity'
+import { RecordTasks } from '@/components/record-tasks'
 
 export const metadata = { title: 'Sales document' }
 const METHOD: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank transfer', cheque: 'Cheque', pdc: 'PDC cheque', card: 'Card', other: 'Other' }
@@ -150,6 +152,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
         {d.doc.approval_status && <p className="border-t border-border px-4 py-2 text-xs text-muted">Approval: {APPROVAL_LABEL[d.doc.approval_status]}{d.doc.approved_by ? ` by ${names.get(d.doc.approved_by) ?? '—'}` : ''}</p>}
       </Card>
     </div>
+    <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0">{(d.doc.doc_type === 'quotation' || d.doc.doc_type === 'invoice') && <RecordTasks c={c} type={d.doc.doc_type} id={id} title={`Follow up ${d.doc.number}`} />}<RecordActivity c={c} table="invoices" id={id} /></div>
   </>
 }
 function Linked({ icon: Icon, href, label, value }: { icon: typeof Link2; href: string; label: string; value: React.ReactNode }) {
