@@ -12,7 +12,7 @@ export async function PublicFormsSettings({ c }: { c: Ctx }) {
   ])
   const n = new Map<string, number>(); for (const s of subs ?? []) n.set(s.form_id, (n.get(s.form_id) ?? 0) + 1)
   const base = await baseUrl()
-  return <Card id="forms"><CardHeader title="Public forms" sub="Enquiry and service-request forms for your website, WhatsApp bio or QR code. Each submission becomes a lead (source: Website)." />
+  return <Card id="forms"><CardHeader title="Public forms" sub="Enquiry and service-request forms for your website, WhatsApp bio or QR code. Enquiries become leads (source: Website); service requests become service tickets." />
     <div className="space-y-4 p-4">
       {(forms ?? []).length > 0 && <ul className="divide-y divide-border rounded-md border border-border text-sm">{(forms ?? []).map((f: any) => <li key={f.id} className="space-y-1.5 px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2"><span className="min-w-0 flex-1 font-medium">{f.title}</span><Badge tone={f.enabled ? 'green' : 'neutral'}>{f.enabled ? 'Live' : 'Off'}</Badge>
@@ -26,7 +26,7 @@ export async function PublicFormsSettings({ c }: { c: Ctx }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Title *"><Input name="title" required maxLength={120} placeholder="Request a quotation" /></Field>
           <Field label="Web address *" hint={`${base}/f/…`}><Input name="slug" required pattern="[a-z0-9][a-z0-9\-]{2,39}" maxLength={40} placeholder="alsaqr-quote" /></Field>
-          <Field label="Type"><Select name="kind" defaultValue="enquiry"><option value="enquiry">Enquiry (new work)</option><option value="service_request">Service request (repair / maintenance)</option></Select></Field>
+          <Field label="Type"><Select name="kind" defaultValue="enquiry"><option value="enquiry">Enquiry (new work → lead)</option><option value="service_request">Service request (repair / maintenance → service ticket)</option></Select></Field>
           <Field label="Intro text" hint="optional"><Input name="intro" maxLength={1000} /></Field>
         </div></ActionForm>
       <p className="text-xs text-muted">Spam protection: hidden trap field, minimum fill time, 5 submissions per visitor per hour and 200 per form per day.</p>

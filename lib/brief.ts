@@ -15,6 +15,7 @@ export interface Brief {
   projects: { id: string; name: string; reason: string }[] | null
   approvals: { id: string; title: string; amount: number | null; entity_type: string }[] | null
   followups: number | null
+  tickets: { id: string; number: string; title: string; due_date: string; priority: string }[]
 }
 
 /**
@@ -24,7 +25,7 @@ export interface Brief {
 export async function loadBrief(c: Ctx): Promise<Brief> {
   const fin = c.can('finance.view'), docs = c.can('documents.view') || c.can('employees.view_sensitive'), week = addDays(c.today, 7), in30 = addDays(c.today, 30)
   const OPEN = ['todo', 'in_progress', 'waiting']
-  const [chq, sales, src, mine, team, projects, approvals, follow] = await Promise.all([
+  const [chq, sales, src, mine, team, projects, approvals, follow, tickets] = await Promise.all([
     fin ? c.supabase.from('cheques').select('id,cheque_no,party_name,amount,cheque_date,direction,status').in('status', ['received', 'issued', 'scheduled', 'deposited', 'presented']).lte('cheque_date', week).order('cheque_date').limit(500) : null,
     fin ? loadSalesKpis(c) : null,
     docs ? c.supabase.from('reminder_sources').select('source_type,source_id,title,subject,owner_type,due_date,amount,direction,link').lte('due_date', in30).order('due_date').limit(200) : null,
@@ -33,6 +34,7 @@ export async function loadBrief(c: Ctx): Promise<Brief> {
     c.can('documents.view') ? c.supabase.from('projects').select('id,name,status,expected_completion,contract_value').in('status', ['active', 'planning']).limit(300) : null,
     c.supabase.from('approval_requests').select('id,title,amount,entity_type').eq('status', 'pending').order('requested_at').limit(50),
     c.can('crm.view') ? c.supabase.from('leads').select('id', { count: 'exact', head: true }).lte('next_followup', c.today).not('stage', 'in', '(won,lost,on_hold)') : null,
+    c.supabase.from('service_tickets').select('id,number,title,due_date,priority').in('status', ['open', 'scheduled', 'in_progress', 'waiting_customer']).lte('due_date', c.today).order('due_date').limit(30),
   ])
 
   const rows = (chq?.data ?? []).map(r => ({ ...r, amount: Number(r.amount) })) as BriefCheque[]
@@ -65,5 +67,6 @@ export async function loadBrief(c: Ctx): Promise<Brief> {
     projects: projAlerts,
     approvals: (approvals.data ?? []).some(a => canDecide(a.entity_type, c.can)) ? (approvals.data ?? []).filter(a => canDecide(a.entity_type, c.can)) as any : null,
     followups: follow ? follow.count ?? 0 : null,
+    tickets: (tickets.data ?? []) as any,
   }
 }
