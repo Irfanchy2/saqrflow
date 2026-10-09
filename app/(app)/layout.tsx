@@ -81,6 +81,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       { href: '/', label: 'Home', icon: 'home' as const }, { href: '/tasks', label: 'Tasks', icon: 'tasks' as const },
       c.can('crm.view') ? { href: '/leads', label: 'Leads', icon: 'leads' as const } : c.can('finance.view') ? { href: '/invoices', label: 'Sales', icon: 'sales' as const } : null,
       c.can('documents.view') ? { href: '/projects', label: 'Projects', icon: 'projects' as const } : null,
-    ].filter(x => !!x)} /><Suspense><NavProgress /></Suspense><Toaster /><CommandPalette links={visible.map(i => ({ label: i.label, href: i.href, group: i.group }))} canSales={c.can('records.edit') && c.can('finance.view')} /></div>
+    ].filter(x => !!x)} /><Suspense><NavProgress /></Suspense><Toaster /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
+      ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
+      ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
+      ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings#integrations', group: 'Settings' }] : []),
+      ...(c.can('users.manage') ? [{ label: 'Sign-in activity', href: '/users/activity', group: 'Security' }] : []),
+      { label: 'My devices & sign-in history', href: '/settings#account', group: 'Security' }]} canSales={c.can('records.edit') && c.can('finance.view')} /></div>
 }
 

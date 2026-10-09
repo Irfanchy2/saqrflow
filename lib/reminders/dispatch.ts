@@ -24,6 +24,10 @@ export interface Senders {
   email(to: string, subject: string, text: string, companyId: string): Promise<SendResult>
 }
 
+const SUBJECT: Partial<Record<TemplateName, string>> = { daily_summary: 'Averiqo daily summary', event_alert: 'Averiqo alert', scheduled_report: 'Averiqo report' }
+/** `_subject` / `_text` (set by scheduled reports and rules) give email a fuller message than the fixed WhatsApp template. */
+const emailSubject = (log: LogRow) => (log.params._subject || SUBJECT[log.template] || 'Averiqo reminder').slice(0, 150)
+
 const BASE_MS = 60_000, CAP_MS = 6 * 3600_000
 /** attempt 1 → 1 min, 2 → 2, 3 → 4, 4 → 8 … capped at 6 h. */
 export const backoffMs = (attempt: number) => Math.min(BASE_MS * 2 ** Math.max(0, attempt - 1), CAP_MS)
@@ -52,7 +56,7 @@ export async function processBatch(store: Store, senders: Senders, opts: { now?:
       if (log.channel === 'in_app') { await store.createInApp(log, r); res = { ok: true, sandbox: false } }
       else if (log.channel === 'whatsapp') res = await senders.whatsapp(r.whatsapp_number!, log.template, log.params, log.company_id)
       else if (!r.email) res = { ok: false, retryable: false, error: 'Recipient has no email address' }
-      else res = await senders.email(r.email, log.template === 'daily_summary' ? 'Averiqo daily summary' : 'Averiqo reminder', renderText(log.template, log.params), log.company_id)
+      else res = await senders.email(r.email, emailSubject(log), log.params._text || renderText(log.template, log.params), log.company_id)
     } catch (e) { res = { ok: false, retryable: true, error: (e as Error).message } }
 
     const attempts = log.attempts + 1

@@ -15,6 +15,10 @@ import { DataBackup } from '@/components/settings/data-backup'
 import { ApprovalRules } from '@/components/settings/approval-rules'
 import { CustomFieldsSettings } from '@/components/settings/custom-fields'
 import { PublicFormsSettings } from '@/components/settings/public-forms'
+import { NotificationRules } from '@/components/settings/notification-rules'
+import { ScheduledReports } from '@/components/settings/scheduled-reports'
+import { Integrations } from '@/components/settings/integrations'
+import { MySessions } from '@/components/settings/sessions'
 import Link from 'next/link'
 
 export const metadata = { title: 'Settings' }
@@ -25,7 +29,8 @@ export default async function Settings() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
   // order follows how a business sets Averiqo up: who we are → how documents look → how they are numbered → who gets told → integrations → data
   const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['templates', 'Document templates', admin], ['numbering', 'Numbering', admin], ['approvals', 'Approvals', admin], ['custom', 'Custom fields & statuses', admin], ['forms', 'Public forms', admin],
-    ['notifications', 'Notifications', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['ai', 'AI & OCR', admin], ['account', 'Account & appearance', true], ['data', 'Data & backup', true]]
+    ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['ai', 'AI & OCR', admin],
+    ['integrations', 'API & webhooks', admin], ['account', 'Account & security', true], ['data', 'Data & backup', true]]
   return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
     <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
     <nav aria-label="Settings sections" className="lg:sticky lg:top-20 lg:self-start">
@@ -60,6 +65,9 @@ export default async function Settings() {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="digest" defaultChecked={s.digestEnabled} />Send the daily summary to recipients who opted in</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="fallback" defaultChecked={s.emailFallback} />Email fallback when a WhatsApp message fails permanently</label></ActionForm></div></Card>}
 
+      {admin && <NotificationRules c={c} />}
+      {admin && <ScheduledReports c={c} />}
+
       {admin && wa && <Card id="whatsapp"><CardHeader title="WhatsApp Business Platform (Meta Cloud API)" action={<Badge tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.mode === 'live' ? 'Live' : 'Sandbox'}</Badge>} />
         <div className="grid gap-6 p-4 lg:grid-cols-2"><div className="space-y-4">
           <Alert tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.reason}</Alert>
@@ -78,11 +86,13 @@ export default async function Settings() {
             {(Object.keys(TEMPLATE_META) as (keyof typeof TEMPLATE_META)[]).map(k => <details key={k} className="rounded-md border border-border p-2"><summary className="cursor-pointer font-mono text-xs">{TEMPLATE_META[k].metaName} <span className="text-muted">({TEMPLATE_META[k].language}, utility)</span></summary><pre className="mt-2 whitespace-pre-wrap text-xs text-muted">{templateBody(k)}</pre></details>)}</div></div></Card>}
 
       {admin && <AiAutomation c={c} wa={wa} />}
+      {admin && <Integrations c={c} />}
 
-      <Card id="account"><CardHeader title="Your account & appearance" sub="Language here; light / dark theme from the toolbar (printing always uses the white paper theme)" /><div className="space-y-5 p-4 text-sm">
+      <Card id="account"><CardHeader title="Your account & security" sub="Language, two-step verification, signed-in devices and sign-in history. Light / dark theme is in the toolbar." /><div className="space-y-5 p-4 text-sm">
         <div><div className="text-xs text-muted">Signed in as</div><div>{c.email} · <span className="capitalize">{c.profile.role.replace('_', ' ')}</span></div></div>
         <ActionForm action={setLocale} submit="Save language" resetOnSuccess={false}><Field label="Interface language" hint="Arabic (right-to-left) and Bengali currently translate navigation and chrome only; page content is English."><Select name="locale" defaultValue={c.profile.locale}>{LOCALES.map(l => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}</Select></Field></ActionForm>
-        <div><h3 className="mb-2 font-medium">Two-step verification</h3><MfaSetup /></div></div></Card>
+        <div><h3 className="mb-2 font-medium">Two-step verification</h3><MfaSetup /></div>
+        <MySessions c={c} /></div></Card>
 
       <DataBackup c={c} />
     </div></div></>

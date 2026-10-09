@@ -6,6 +6,7 @@ import { cache } from 'react'
 import { createClient } from './supabase/server'
 import { can, ForbiddenError, type Permission, type Role } from './permissions'
 import { todayInTz } from './time'
+import { sessionIdFromJwt } from './device'
 
 export interface Ctx {
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -32,7 +33,13 @@ export const getCtx = cache(async (): Promise<Ctx> => {
     if (!user) redirect('/login')
     userId = user.id; email = user.email ?? ''
   }
-  const { data: row } = await supabase.from('profiles').select('id, company_id, full_name, role, locale, company:companies(id, name, timezone, currency, locale)').eq('id', userId).maybeSingle()
+  const sid = sessionIdFromJwt((await supabase.auth.getSession()).data.session?.access_token)
+  const ip = (h.get('x-forwarded-for')?.split(',')[0]?.trim() || '').slice(0, 64) || null, ua = (h.get('user-agent') ?? '').slice(0, 300) || null
+  const [{ data: row }, touch] = await Promise.all([
+    supabase.from('profiles').select('id, company_id, full_name, role, locale, company:companies(id, name, timezone, currency, locale)').eq('id', userId).maybeSingle(),
+    sid ? supabase.rpc('touch_session', { p_sid: sid, p_ip: ip, p_ua: ua }) : Promise.resolve({ data: false }),
+  ])
+  if (touch.data === true) redirect('/auth/signout?reason=revoked')   // this device was signed out from another device / by an admin
   if (!row) redirect('/onboarding')
   const company = (Array.isArray(row.company) ? row.company[0] : row.company) as Ctx['company'] | null
   if (!company) redirect('/onboarding')

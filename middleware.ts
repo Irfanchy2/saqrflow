@@ -10,7 +10,7 @@ function limited(key: string, max: number, windowMs: number) {
   if (!h || h.reset < now) { hits.set(key, { n: 1, reset: now + windowMs }); if (hits.size > 5000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k); return false }
   return ++h.n > max
 }
-const PUBLIC = ['/login', '/signup', '/api/webhooks', '/api/cron', '/api/health', '/auth', '/p', '/s', '/r', '/q', '/f']   // /p /s /r /q /f: token- or slug-scoped public pages (lib/portal.ts)
+const PUBLIC = ['/login', '/signup', '/api/webhooks', '/api/cron', '/api/health', '/api/v1', '/auth', '/p', '/s', '/r', '/q', '/f']   // /p /s /r /q /f: token- or slug-scoped public pages (lib/portal.ts); /api/v1: API-key auth (lib/api.ts)
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl

@@ -757,3 +757,82 @@ describe('Service tickets, warranties & knowledge base (0018)', () => {
     expect((await as(U.ownerB, `select count(*)::int n from kb_articles`)).rows[0].n).toBe(0)
   })
 })
+
+describe('Platform: sign-in history, sessions, events, integrations (0019)', () => {
+  const svc = async (sql: string, p: unknown[] = []) => as(null, sql, p, 'service_role')
+  it('sign-in history: own rows for everyone, the company’s rows for user managers, nothing across companies; no direct writes', async () => {
+    await sup(`insert into login_events(company_id,user_id,email,event,ip) values ($1,$2,'o@x','sign_in','1.2.3.4'),($1,$3,'h@x','sign_in_failed','5.6.7.8')`, [A, U.ownerA, U.hrA])
+    expect((await as(U.ownerA, `select count(*)::int n from login_events where company_id=$1`, [A])).rows[0].n).toBeGreaterThanOrEqual(2)
+    expect((await as(U.hrA, `select distinct user_id from login_events`)).rows).toEqual([{ user_id: U.hrA }])
+    expect((await as(U.ownerB, `select count(*)::int n from login_events where company_id=$1`, [A])).rows[0].n).toBe(0)
+    await fails(as(U.hrA, `insert into login_events(company_id,user_id,event) values ($1,$2,'sign_in')`, [A, U.hrA]))
+    expect((await svc(`select * from profile_for_email('ownerA@test.local')`)).rows).toEqual([{ id: U.ownerA, company_id: A }])
+    await fails(as(U.ownerA, `select * from profile_for_email('ownerA@test.local')`), /permission denied/)
+  })
+  it('device sessions: registered on first use, revocable by the owner or a user manager, never hijacked by another user', async () => {
+    const s1 = uuid(), s2 = uuid(), s3 = uuid()
+    expect((await as(U.hrA, `select touch_session($1,'1.1.1.1','UA') r`, [s1])).rows[0].r).toBe(false)
+    expect((await as(U.hrA, `select touch_session($1,'1.1.1.1','UA') r`, [s2])).rows[0].r).toBe(false)
+    expect((await as(U.ownerB, `select touch_session($1,'9.9.9.9','evil') r`, [s1])).rows[0].r).toBe(false)
+    expect((await sup(`select user_id, ip from user_sessions where id=$1`, [s1])).rows[0]).toEqual({ user_id: U.hrA, ip: '1.1.1.1' })
+    await fails(as(U.accA, `select revoke_session($1)`, [s1]), /insufficient privilege/)
+    expect((await as(U.ownerA, `select revoke_session($1) r`, [s1])).rows[0].r).toBe(true)
+    expect((await as(U.hrA, `select touch_session($1,null,null) r`, [s1])).rows[0].r).toBe(true)
+    expect((await as(U.hrA, `select touch_session($1,null,null) r`, [s2])).rows[0].r).toBe(false)
+    expect((await as(U.hrA, `select touch_session($1,null,null) r`, [s3])).rows[0].r).toBe(false)
+    expect((await as(U.hrA, `select revoke_other_sessions($1) n`, [s3])).rows[0].n).toBe(1)
+    expect((await as(U.hrA, `select id from user_sessions where revoked_at is null`)).rows).toEqual([{ id: s3 }])
+    await fails(as(U.accA, `select revoke_other_sessions(null, $1)`, [U.hrA]), /insufficient privilege/)
+    await fails(as(U.ownerB, `select revoke_other_sessions(null, $1)`, [U.hrA]), /insufficient privilege/)
+    expect((await as(U.ownerB, `select count(*)::int n from user_sessions where company_id=$1`, [A])).rows[0].n).toBe(0)
+    expect((await as(U.hrA, `select event from login_events where user_id=$1 and event like 'session%' order by id`, [U.hrA])).rows.map(r => r.event)).toEqual(['session_revoked', 'sessions_revoked'])
+  })
+  it('events: sales, payments, customers, cheques; imports do not raise per-row events; only admins read them; workers only via service role', async () => {
+    const cu = (await sup(`insert into customers(company_id,name) values ($1,'Event Client LLC') returning id`, [A])).rows[0].id
+    const q = (await sup(`insert into invoices(company_id,doc_type,number,customer_id,customer_name,total,status) values ($1,'quotation','EVQ-1',$2,'Event Client LLC',52500,'draft') returning id`, [A, cu])).rows[0].id
+    await sup(`update invoices set status='sent' where id=$1`, [q]); await sup(`update invoices set notes='x' where id=$1`, [q]); await sup(`update invoices set status='accepted' where id=$1`, [q])
+    const inv = (await sup(`insert into invoices(company_id,doc_type,number,customer_name,total,status) values ($1,'invoice','EVI-1','Event Client LLC',1000,'sent') returning id`, [A])).rows[0].id
+    await sup(`insert into payments(company_id,invoice_id,amount) values ($1,$2,400)`, [A, inv])
+    const ib = (await sup(`insert into import_batches(company_id,entity) values ($1,'customers') returning id`, [A])).rows[0].id
+    const imp = (await sup(`insert into customers(company_id,name,import_batch_id) values ($1,'Imported Co',$2) returning id`, [A, ib])).rows[0].id
+    await sup(`update cheques set status='returned' where id=$1`, [chequeA]).catch(() => null)
+    const ev = (await as(U.ownerA, `select event, entity_id, data from app_events where entity_id = any($1) or (event = 'payment.received' and data->>'number' = 'EVI-1') order by id`, [[cu, q, inv, imp]])).rows
+    expect(ev.map(e => e.event)).toEqual(['customer.created', 'quotation.created', 'quotation.sent', 'quotation.accepted', 'invoice.created', 'payment.received'])
+    expect(ev.find(e => e.event === 'quotation.accepted').data).toMatchObject({ number: 'EVQ-1', party: 'Event Client LLC', amount: 52500, status: 'accepted' })
+    expect(ev.find(e => e.event === 'payment.received')).toMatchObject({ entity_id: expect.any(String), data: { amount: 400, number: 'EVI-1' } })
+    expect((await as(U.accA, `select count(*)::int n from app_events`)).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, `select count(*)::int n from app_events where company_id=$1`, [A])).rows[0].n).toBe(0)
+    await fails(as(U.ownerA, `select * from claim_app_events(10)`), /permission denied/)
+    await fails(as(U.ownerA, `select * from claim_webhook_deliveries(10)`), /permission denied/)
+    const claimed = (await svc(`select id from claim_app_events(1000)`)).rows.length
+    expect(claimed).toBeGreaterThan(0)
+    expect((await svc(`select count(*)::int n from claim_app_events(1000)`)).rows[0].n).toBe(0)   // claimed rows are not handed out twice
+  })
+  it('rules, webhooks, API keys, schedules: settings managers only, secrets never readable, constraints hold', async () => {
+    const rec = (await sup(`insert into notification_recipients(company_id,name,channels) values ($1,'Owner',array['in_app']) returning id`, [A])).rows[0].id
+    await as(U.ownerA, `insert into notification_rules(company_id,name,event,channels,recipient_ids) values ($1,'Big wins','quotation.accepted',array['in_app','email'],array[$2::uuid])`, [A, rec])
+    await fails(as(U.accA, `insert into notification_rules(company_id,name,event,channels,recipient_ids) values ($1,'x','invoice.paid',array['in_app'],array[$2::uuid])`, [A, rec]))
+    await fails(as(U.ownerA, `insert into notification_rules(company_id,name,event,channels,recipient_ids) values ($1,'x','invoice.paid',array['sms'],array[$2::uuid])`, [A, rec]), /check/)
+    expect((await as(U.accA, `select count(*)::int n from notification_rules`)).rows[0].n).toBe(0)
+    const ep = (await as(U.ownerA, `insert into webhook_endpoints(company_id,url,events) values ($1,'https://hooks.example.com/a',array['*']) returning id`, [A])).rows[0].id
+    await sup(`insert into webhook_secrets(endpoint_id,company_id,secret) values ($1,$2,$3)`, [ep, A, 'whsec_' + 'x'.repeat(32)])
+    expect((await as(U.ownerA, `select count(*)::int n from webhook_secrets`).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n).toBe(0)
+    await fails(as(U.ownerA, `insert into webhook_endpoints(company_id,url,events) values ($1,'ftp://x',array['*'])`, [A]), /check/)
+    expect((await as(U.ownerB, `select count(*)::int n from webhook_endpoints`)).rows[0].n).toBe(0)
+    await as(U.ownerA, `insert into api_keys(company_id,name,prefix,key_hash,scopes) values ($1,'Sync','avq_abcdefgh',$2,array['customers.read'])`, [A, 'a'.repeat(64)])
+    await fails(as(U.ownerA, `insert into api_keys(company_id,name,prefix,key_hash,scopes) values ($1,'Bad','avq_abcdefgh',$2,array['salaries.read'])`, [A, 'b'.repeat(64)]), /check/)
+    await fails(as(U.accA, `insert into api_keys(company_id,name,prefix,key_hash,scopes) values ($1,'Sync','avq_abcdefgh',$2,array['customers.read'])`, [A, 'c'.repeat(64)]))
+    expect((await as(U.accA, `select count(*)::int n from api_keys`)).rows[0].n).toBe(0)
+    await fails(as(U.ownerA, `insert into report_schedules(company_id,name,frequency,sections,channels,recipient_ids) values ($1,'W','weekly',array['sales'],array['email'],array[$2::uuid])`, [A, rec]), /check/)
+    await as(U.ownerA, `insert into report_schedules(company_id,name,frequency,weekday,sections,channels,recipient_ids) values ($1,'W','weekly',1,array['sales'],array['email'],array[$2::uuid])`, [A, rec])
+    expect((await as(U.ownerB, `select count(*)::int n from report_schedules`)).rows[0].n).toBe(0)
+  })
+  it('import batches: editors only; scheduler health: settings managers only', async () => {
+    await as(U.pmA, `insert into import_batches(company_id,entity,file_name) values ($1,'leads','leads.xlsx')`, [A])
+    await fails(as(U.viewerA, `insert into import_batches(company_id,entity) values ($1,'leads')`, [A]))
+    expect((await as(U.viewerA, `select count(*)::int n from import_batches`)).rows[0].n).toBe(0)
+    await sup(`insert into system_runs(job,ok,detail) values ('cron',true,'12 ms')`)
+    expect((await as(U.ownerA, `select count(*)::int n from system_runs`)).rows[0].n).toBeGreaterThan(0)
+    expect((await as(U.accA, `select count(*)::int n from system_runs`)).rows[0].n).toBe(0)
+  })
+})

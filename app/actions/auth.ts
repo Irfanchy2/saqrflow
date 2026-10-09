@@ -4,6 +4,9 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { safe, str } from '@/lib/action'
 import type { ActionState } from '@/lib/utils'
+import { logLogin } from '@/lib/sessions'
+import { sessionIdFromJwt } from '@/lib/device'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const cred = z.object({ email: z.string().email('Enter a valid email'), password: z.string().min(10, 'Use at least 10 characters') })
 const safeNext = (n?: string) => (n && n.startsWith('/') && !n.startsWith('//') ? n : '/')
@@ -12,8 +15,9 @@ export async function signIn(_: ActionState, fd: FormData): Promise<ActionState>
   return safe(async () => {
     const v = z.object({ email: z.string().email('Enter a valid email'), password: z.string().min(1, 'Enter your password') }).parse({ email: str(fd, 'email'), password: fd.get('password') })
     const sb = await createClient()
-    const { error } = await sb.auth.signInWithPassword(v)
-    if (error) return { error: 'Incorrect email or password.' }       // same message for unknown user / wrong password
+    const { data: signed, error } = await sb.auth.signInWithPassword(v)
+    if (error) { await logLogin('sign_in_failed', { email: v.email }); return { error: 'Incorrect email or password.' } }       // same message for unknown user / wrong password
+    await logLogin('sign_in', { userId: signed.user?.id, email: v.email, sessionId: sessionIdFromJwt(signed.session?.access_token) })
     const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel()
     redirect(aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' ? '/login/mfa' : safeNext(str(fd, 'next')))
   })
@@ -25,7 +29,9 @@ export async function verifyMfa(_: ActionState, fd: FormData): Promise<ActionSta
     const factor = f?.totp.find(x => x.status === 'verified'); if (!factor) return { error: 'No authenticator is enrolled.' }
     const ch = await sb.auth.mfa.challenge({ factorId: factor.id }); if (ch.error) return { error: ch.error.message }
     const v = await sb.auth.mfa.verify({ factorId: factor.id, challengeId: ch.data.id, code: String(fd.get('code') ?? '').replace(/\s/g, '') })
-    if (v.error) return { error: 'That code is not valid. Try again.' }
+    const { data: { user } } = await sb.auth.getUser()
+    if (v.error) { await logLogin('mfa_failed', { userId: user?.id, email: user?.email }); return { error: 'That code is not valid. Try again.' } }
+    await logLogin('mfa_verified', { userId: user?.id, email: user?.email, sessionId: sessionIdFromJwt(v.data?.access_token) })
     redirect('/')
   })
 }
@@ -47,4 +53,13 @@ export async function createCompany(_: ActionState, fd: FormData): Promise<Actio
     redirect('/')
   })
 }
-export async function signOut() { await (await createClient()).auth.signOut(); redirect('/login') }
+export async function signOut() {
+  const sb = await createClient()
+  const [{ data: { user } }, { data: { session } }] = await Promise.all([sb.auth.getUser(), sb.auth.getSession()])
+  const sid = sessionIdFromJwt(session?.access_token)
+  if (user) {
+    await logLogin('sign_out', { userId: user.id, email: user.email, sessionId: sid })
+    if (sid) { try { await createAdminClient().from('user_sessions').update({ revoked_at: new Date().toISOString(), revoked_by: user.id }).eq('id', sid).eq('user_id', user.id).is('revoked_at', null) } catch {} }
+  }
+  await sb.auth.signOut(); redirect('/login')
+}

@@ -5,13 +5,15 @@ import { formatAed, formatLongDate } from '../time'
  * no document files, no credentials. Templates must be created & approved in Meta Business Manager with
  * exactly this body text and variable order (see docs/WHATSAPP_SETUP.md).
  */
-export type TemplateName = 'document_reminder' | 'payment_alert' | 'daily_summary' | 'test_message'
+export type TemplateName = 'document_reminder' | 'payment_alert' | 'daily_summary' | 'test_message' | 'event_alert' | 'scheduled_report'
 
 export const TEMPLATE_META: Record<TemplateName, { metaName: string; language: string; vars: string[] }> = {
   document_reminder: { metaName: 'saqrflow_document_reminder', language: 'en', vars: ['document', 'subject', 'expiryDate', 'daysRemaining', 'status'] },
   payment_alert: { metaName: 'saqrflow_payment_alert', language: 'en', vars: ['type', 'party', 'amount', 'date', 'action'] },
   daily_summary: { metaName: 'saqrflow_daily_summary', language: 'en', vars: ['expiring', 'cheques', 'invoices', 'renewals'] },
   test_message: { metaName: 'saqrflow_test_message', language: 'en', vars: ['note'] },
+  event_alert: { metaName: 'saqrflow_event_alert', language: 'en', vars: ['rule', 'event'] },
+  scheduled_report: { metaName: 'saqrflow_scheduled_report', language: 'en', vars: ['report', 'period', 'invoiced', 'collected', 'outstanding'] },
 }
 
 export type Params = Record<string, string>
@@ -21,6 +23,8 @@ const BODY: Record<TemplateName, string> = {
   payment_alert: 'AVERIQO PAYMENT ALERT\nType: {{1}}\nParty: {{2}}\nAmount: {{3}}\nDate: {{4}}\nAction Required: {{5}}',
   daily_summary: 'Good Morning.\nAveriqo Daily Summary\nDocuments expiring within 30 days: {{1}}\nCheques due this week: {{2}}\nInvoices awaiting payment: {{3}}\nPending renewal tasks: {{4}}\nOpen Averiqo to review.',
   test_message: 'AVERIQO TEST\n{{1}}',
+  event_alert: 'AVERIQO ALERT\nRule: {{1}}\n{{2}}\nOpen Averiqo to review.',
+  scheduled_report: 'AVERIQO REPORT\n{{1}}\nPeriod: {{2}}\nInvoiced: {{3}}\nCollected: {{4}}\nOutstanding receivables: {{5}}\nOpen Averiqo for the full report.',
 }
 export const templateBody = (t: TemplateName) => BODY[t]
 
