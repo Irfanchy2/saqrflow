@@ -11,7 +11,7 @@ export async function buildSalesPdf(c: Ctx, id: string) {
   const [b, images] = await Promise.all([brandingFor(c), brandingBytes(c)])
   const bytes = await renderSalesPdf(d.doc, d.items, { companyName: c.company.name, images, showHeaderFooter: b.showHeaderFooter, showStamp: b.showStamp, bankDetails: b.bankDetails, paid: d.paid + ((d as any).credited ?? 0),
     companyTrn: b.companyTrn, sealSize: b.sealSize, signatureWidth: b.signatureWidth, signAlign: b.signAlign, signSpacing: b.signSpacing,
-    signatoryName: b.signatoryName, signatoryTitle: b.signatoryTitle, brandColor: b.brandColor, companyAddress: b.companyAddress, companyPhone: b.companyPhone, companyEmail: b.companyEmail, companyWebsite: b.companyWebsite })
+    signatoryName: b.signatoryName, signatoryTitle: b.signatoryTitle, brandColor: b.brandColor, companyAddress: b.companyAddress, companyPhone: b.companyPhone, companyEmail: b.companyEmail, companyWebsite: b.companyWebsite, templates: b.templates })
   const name = salesPdfName(d.doc as any)
   return { bytes, name, data: d }
 }

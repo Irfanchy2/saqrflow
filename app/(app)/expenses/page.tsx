@@ -41,7 +41,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   return <>
     <PageHeader title="Expenses" sub="Materials, labour, fuel, transport and other costs. Per project or general. Receipts are stored privately; OCR only suggests the details."
       actions={<><SavedViews page="/expenses" />{c.can('data.export') && <LinkButton href="/api/export/expenses?format=xlsx" variant="secondary"><Download size={14} />Excel</LinkButton>}
-        {edit && <DialogButton wide openParam="expense" label="Add expense" title="Add expense" icon={<Plus size={15} />}><ActionForm action={saveExpense.bind(null, null, null)} submit="Save expense" idempotent><ExpenseFields today={c.today} projects={projs} assets={assetOpts} employees={emps} suppliers={sups} /></ActionForm></DialogButton>}</>} />
+        {edit && <DialogButton wide openParam="expense" label="Add expense" title="Add expense" icon={<Plus size={15} />}><ActionForm draftKey="expense:new" action={saveExpense.bind(null, null, null)} submit="Save expense" idempotent><ExpenseFields today={c.today} projects={projs} assets={assetOpts} employees={emps} suppliers={sups} /></ActionForm></DialogButton>}</>} />
     <Metrics className="mb-5" cols={4}>
       <StatCard label="This month (excl. VAT)" value={formatAed(mTotal)} icon={Wallet} tone="blue" />
       <StatCard label="Input VAT this month" value={formatAed(mVat)} hint="Recoverable VAT on receipts" />

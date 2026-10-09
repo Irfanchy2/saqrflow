@@ -51,7 +51,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const o = (rows: any[], label: (r: any) => string) => rows.map(r => ({ id: r.id, name: label(r) }))
   const userOpts = o(users ?? [], (u: any) => u.full_name), projOpts = o(projects ?? [], (p: any) => p.name), empOpts = o(employees ?? [], (e: any) => e.full_name)
   const qs = (x: Record<string, string>) => `/tasks?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp).filter(([k, v]) => v && !['page', 'open'].includes(k))) as Record<string, string>, ...x })}`
-  const add = <DialogButton wide label="New task" title="New task" icon={<Plus size={15} />} openParam="task"><ActionForm action={createTask} submit="Add task" idempotent><TaskFields users={userOpts} employees={empOpts} projects={projOpts} t={{ due_date: c.today, project_id: sp.project }} /></ActionForm></DialogButton>
+  const add = <DialogButton wide label="New task" title="New task" icon={<Plus size={15} />} openParam="task"><ActionForm draftKey="task:new" action={createTask} submit="Add task" idempotent><TaskFields users={userOpts} employees={empOpts} projects={projOpts} t={{ due_date: c.today, project_id: sp.project }} /></ActionForm></DialogButton>
   const canEditFocus = focus && (edit || focus.owner_id === c.userId)
 
   return <>

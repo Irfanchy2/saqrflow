@@ -5,12 +5,13 @@ import { DOC_TYPES, typeDef } from '../inbox/catalog'
 import { nameScore } from '../inbox/match'
 import { addDays, endOfMonth, formatLongDate } from '../time'
 import { aiProviders } from './llm'
+import { BUSINESS, businessAnswer } from './business'
 
 // Natural-language search. The question (only the question — no company data) may be turned into a structured
 // query by Gemini; the query itself always runs with the signed-in user's Supabase session, so RLS decides what they see.
 
 export const Intent = z.object({
-  entity: z.enum(['documents', 'invoices', 'quotations', 'employees']),
+  entity: z.enum(['documents', 'invoices', 'quotations', 'employees', 'receivables', 'projects', 'expiries', 'cheques', 'tickets', 'leads']),
   doc_type: z.string().nullable(),
   person: z.string().max(120).nullable(),
   customer: z.string().max(120).nullable(),
@@ -20,7 +21,8 @@ export const Intent = z.object({
 })
 export type SearchIntent = z.infer<typeof Intent>
 export interface SearchResult { title: string; sub: string; href: string; badge?: string; tone?: 'red' | 'amber' | 'green' | 'blue' | 'neutral' }
-export interface SearchAnswer { summary: string; engine: 'gemini' | 'rules'; intent: SearchIntent; results: SearchResult[] }
+export interface SearchStat { label: string; value: string; tone?: 'red' | 'amber' | 'green' | 'blue' | 'neutral' }
+export interface SearchAnswer { summary: string; engine: 'gemini' | 'rules'; intent: SearchIntent; results: SearchResult[]; stats?: SearchStat[] }
 
 const SYNONYMS: [RegExp, string][] = [
   [/\bvisas?\b|residen(ce|cy)/i, 'residence_visa'], [/emirates\s*id|\beid\b/i, 'emirates_id'], [/passports?/i, 'passport'], [/trade\s*licen[cs]e/i, 'trade_license'],
@@ -33,8 +35,14 @@ const SYNONYMS: [RegExp, string][] = [
 export function parseQuery(q: string, today: string): SearchIntent {
   const s = q.trim()
   const intent: SearchIntent = { entity: 'documents', doc_type: null, person: null, customer: null, expiring_within_days: null, expired: false, latest: false }
-  if (/\binvoices?\b/i.test(s) && !/supplier/i.test(s)) intent.entity = 'invoices'
+  if (/outstanding|\bowe[sd]?\b|\bowing\b|unpaid|receivables?|balance due|pending payments?|not (yet )?paid|(hasn'?t|have ?n'?t|not) paid|collect(ion)?s? due/i.test(s)) intent.entity = 'receivables'
+  else if (/\bcheques?\b|\bchecks?\b|\bPDCs?\b/i.test(s)) intent.entity = 'cheques'
+  else if (/\btickets?\b|service requests?|complaints?|\brepairs?\b|warranty claims?/i.test(s)) intent.entity = 'tickets'
+  else if (/\bleads?\b|pipeline|enquir(y|ies)/i.test(s)) intent.entity = 'leads'
+  else if (/\bprojects?\b/i.test(s)) intent.entity = 'projects'
+  else if (/\binvoices?\b/i.test(s) && !/supplier/i.test(s)) intent.entity = 'invoices'
   else if (/\bquotations?\b|\bquotes?\b/i.test(s)) intent.entity = 'quotations'
+  else if (/vehicles?|fleet|\bassets?\b|equipment|machinery|renewals?|what('s| is)? (expiring|due)|anything|everything/i.test(s) && /expir|renew|due/i.test(s)) intent.entity = 'expiries'
   for (const [re, key] of SYNONYMS) if (re.test(s)) { intent.doc_type = key; break }
   if (!intent.doc_type) for (const d of DOC_TYPES) if (new RegExp(`\\b${d.label.replace(/[()]/g, '').split(' ')[0]}`, 'i').test(s) && d.label.length > 5) { intent.doc_type = d.key; break }
   const within = /(?:within|in|next)\s+(\d{1,4})\s*(day|week|month)s?/i.exec(s)
@@ -43,12 +51,16 @@ export function parseQuery(q: string, today: string): SearchIntent {
   else if (/this\s+month/i.test(s)) intent.expiring_within_days = Math.round((Date.parse(endOfMonth(today)) - Date.parse(today)) / 864e5)
   else if (/this\s+week/i.test(s)) intent.expiring_within_days = 7
   else if (/expir/i.test(s) && !/expired/i.test(s)) intent.expiring_within_days = 30
-  if (/\bexpired\b|already\s+expired|overdue/i.test(s)) intent.expired = true
+  if (/\bexpired\b|already\s+expired|overdue|\blate\b|delayed|behind/i.test(s)) intent.expired = true
   if (/\blatest|newest|most\s+recent|current\b/i.test(s)) intent.latest = true
   const poss = /(?:find|show|get|open)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})(?:'s|’s)\s/.exec(s)
   if (poss) intent.person = poss[1].replace(/^(Find|Show|Get|Open)\s+/, '')
   const forWho = /\b(?:for|of|from)\s+([A-Z][\w&.\- ]{2,60}?)(?:\s*[?.!]|$)/.exec(s)
-  if (forWho && !/next|this|our/i.test(forWho[1])) { if (intent.entity === 'invoices' || intent.entity === 'quotations') intent.customer = forWho[1].trim(); else intent.person ??= forWho[1].trim() }
+  const named = ['invoices', 'quotations', 'receivables', 'projects', 'tickets', 'leads', 'cheques'].includes(intent.entity)
+  if (forWho && !/next|this|our|the (next|last)|\d+ days?/i.test(forWho[1])) { if (named) intent.customer = forWho[1].trim(); else intent.person ??= forWho[1].trim() }
+  const proj = /(?:status of|how is|progress (?:of|on)|update on)\s+(?:the\s+)?(.+?)(?:\s+project)?\s*[?.!]*$/i.exec(s)
+  if (intent.entity === 'projects' && proj && !/\b(all|our|my|every|open|active)\b/i.test(proj[1])) intent.customer = proj[1].trim()
+  if (intent.customer && /^(customers?|clients?|projects?|all|everyone)$/i.test(intent.customer)) intent.customer = null
   if (/which\s+employees/i.test(s) && !intent.doc_type) intent.entity = 'employees'
   return intent
 }
@@ -56,7 +68,7 @@ export function parseQuery(q: string, today: string): SearchIntent {
 const AI_SCHEMA = {
   type: 'OBJECT', required: ['entity', 'doc_type', 'person', 'customer', 'expiring_within_days', 'expired', 'latest'],
   properties: {
-    entity: { type: 'STRING', enum: ['documents', 'invoices', 'quotations', 'employees'] },
+    entity: { type: 'STRING', enum: ['documents', 'invoices', 'quotations', 'employees', 'receivables', 'projects', 'expiries', 'cheques', 'tickets', 'leads'] },
     doc_type: { type: 'STRING', nullable: true, enum: DOC_TYPES.map(d => d.key) },
     person: { type: 'STRING', nullable: true }, customer: { type: 'STRING', nullable: true },
     expiring_within_days: { type: 'INTEGER', nullable: true }, expired: { type: 'BOOLEAN' }, latest: { type: 'BOOLEAN' },
@@ -71,7 +83,8 @@ export async function aiSearch(c: Ctx, q: string): Promise<SearchAnswer> {
     const t0 = Date.now()
     try {
       intent = await gemini.generateStructuredOutput(
-        `Turn a business user's search question into a JSON query. Today is ${c.today}. "next month" means until the end of next month. Never invent names that are not in the question.`,
+        `Turn a business user's question into a JSON query. Today is ${c.today}. "next month" means until the end of next month. Never invent names that are not in the question.
+entity: receivables = money customers still owe / unpaid or outstanding invoices; invoices / quotations = list those documents (expired=true for overdue invoices); projects = project status or progress (customer = the project or client name; expired=true for late projects); expiries = anything expiring or due for renewal including vehicles, equipment and documents; cheques = cheques due; tickets = service / repair tickets (expired=true for overdue); leads = sales pipeline; documents / employees = company and employee documents.`,
         q, AI_SCHEMA, raw => { const r = Intent.parse(raw); return { ...r, doc_type: r.doc_type && typeDef(r.doc_type) ? r.doc_type : null } })
       engine = 'gemini'
       await c.supabase.from('ai_processing_logs').insert({ company_id: c.company.id, created_by: c.userId, provider: 'gemini', model: gemini.model, purpose: 'search', ok: true, input_chars: q.length, processing_ms: Date.now() - t0 })
@@ -82,7 +95,9 @@ export async function aiSearch(c: Ctx, q: string): Promise<SearchAnswer> {
   return { ...(await execute(c, intent)), engine, intent }
 }
 
-async function execute(c: Ctx, it: SearchIntent): Promise<{ summary: string; results: SearchResult[] }> {
+async function execute(c: Ctx, it: SearchIntent): Promise<{ summary: string; results: SearchResult[]; stats?: SearchStat[] }> {
+  if (BUSINESS.has(it.entity)) return businessAnswer(c, it)
+  if (it.entity === 'invoices' && it.expired) return businessAnswer(c, { ...it, entity: 'receivables' })   // "overdue invoices" = unpaid and past due
   const results: SearchResult[] = []
   if (it.entity === 'invoices' || it.entity === 'quotations') {
     if (!c.can('finance.view')) return { summary: 'You do not have access to invoices.', results }

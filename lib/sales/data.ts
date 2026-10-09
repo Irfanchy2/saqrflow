@@ -3,13 +3,14 @@ import type { Ctx } from '../auth'
 import { createAdminClient } from '../supabase/admin'
 import { SIGN_DEFAULTS, type Branding, type PaperDoc, type PaperItem } from '@/components/sales/paper'
 import { DEFAULTS, type SalesType } from './docs'
+import { TEMPLATE_KINDS } from './template'
 
 export const BRAND_KINDS = ['header', 'header_invoice', 'footer', 'stamp', 'signature', 'logo'] as const
 export type BrandKind = (typeof BRAND_KINDS)[number]
 
 export interface SalesSettings { terms: string[]; paymentTerms: string[]; intro: string; closing: string; vatRate: number; dueDays: number; validityDays: number; quoteVat: 'note' | 'add'; followupDays: number[]; requireApproval: boolean }
 export async function salesSettings(c: Ctx): Promise<SalesSettings & { raw: Record<string, any> }> {
-  const { data } = await c.supabase.from('app_settings').select('key,value').eq('company_id', c.company.id).or('key.like.sales.%,key.like.branding.%')   // explicit company filter: also safe for server-side (portal) reads
+  const { data } = await c.supabase.from('app_settings').select('key,value').eq('company_id', c.company.id).or('key.like.sales.%,key.like.branding.%,key.like.template.%')   // explicit company filter: also safe for server-side (portal) reads
   const m = Object.fromEntries((data ?? []).map(r => [r.key, r.value]))
   const arr = (v: unknown, d: string[]) => (Array.isArray(v) ? v.filter(x => typeof x === 'string') : d)
   return {
@@ -48,6 +49,11 @@ export function brandText(raw: Record<string, any>) {
   }
 }
 
+/** Saved template-builder settings (Settings → Template builder), keyed by document type. */
+export function templatesFrom(raw: Record<string, any>) {
+  return Object.fromEntries(TEMPLATE_KINDS.filter(k => raw[`template.${k}`] && typeof raw[`template.${k}`] === 'object').map(k => [k, raw[`template.${k}`]]))
+}
+
 /** Branding for on-screen rendering: images are served by /api/branding/<kind> (auth + company-scoped, never public). */
 export async function brandingFor(c: Ctx): Promise<Branding> {
   const { raw } = await salesSettings(c)
@@ -55,6 +61,7 @@ export async function brandingFor(c: Ctx): Promise<Branding> {
   return {
     companyName: c.company.name, logo: url('logo'), header: url('header'), headerInvoice: url('header_invoice'), footer: url('footer'), stamp: url('stamp'), signature: url('signature'),
     showHeaderFooter: raw['branding.show_header_footer'] !== false, showStamp: raw['branding.show_stamp'] !== false,
+    templates: templatesFrom(raw),
     bankDetails: typeof raw['branding.bank_details'] === 'string' ? raw['branding.bank_details'] : null,
     companyTrn: typeof raw['branding.company_trn'] === 'string' ? raw['branding.company_trn'] : null,
     ...signLayout(raw), ...brandText(raw),

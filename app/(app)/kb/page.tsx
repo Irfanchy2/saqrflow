@@ -21,7 +21,7 @@ export default async function KbPage({ searchParams }: { searchParams: Promise<R
   if (sp.category) q = q.eq('category', sp.category)
   const [{ data: rows }, { data: all }] = await Promise.all([q, c.supabase.from('kb_articles').select('category').limit(2000)])
   const cats = [...new Set((all ?? []).map(r => r.category))].sort()
-  const add = edit ? <DialogButton wide label="New article" title="New knowledge base article" icon={<Plus size={15} />} openParam="kb"><ActionForm action={saveKbArticle.bind(null, null)} submit="Save article"><KbFields categories={cats} /></ActionForm></DialogButton> : undefined
+  const add = edit ? <DialogButton wide label="New article" title="New knowledge base article" icon={<Plus size={15} />} openParam="kb"><ActionForm draftKey="kb:new" action={saveKbArticle.bind(null, null)} submit="Save article"><KbFields categories={cats} /></ActionForm></DialogButton> : undefined
   const snippet = (b: string) => { const s = b.replace(/^#+\s*/gm, '').replace(/^\s*([-*•]|\d+[.)])\s+/gm, '').replace(/\s+/g, ' ').trim(); return s.length > 160 ? s.slice(0, 160) + '…' : s }
   return <>
     <PageHeader title="Knowledge base" sub="Standard procedures, safety rules and how-tos for the whole team." actions={add} />

@@ -87,7 +87,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     <div className="grid gap-5 xl:grid-cols-3 [&>*]:min-w-0">
       <div className="space-y-5 xl:col-span-2">
         <Card><CardHeader title="Activity" sub="Calls, WhatsApp, meetings, stage changes and quotations, newest first" />
-          {edit && <ActionForm action={addLeadActivity.bind(null, id)} submit="Add to history" className="flex flex-col gap-3 border-b border-border p-4" variant="secondary">
+          {edit && <ActionForm draftKey={`lead-activity:${id}`} action={addLeadActivity.bind(null, id)} submit="Add to history" className="flex flex-col gap-3 border-b border-border p-4" variant="secondary">
             <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
               <Field label="Type"><Select name="kind" defaultValue="call"><option value="call">Call</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="meeting">Meeting</option><option value="note">Note</option></Select></Field>
               <Field label="What happened *"><Textarea name="body" rows={2} maxLength={2000} required placeholder="e.g. Customer wants a revised price with powder coating" /></Field>

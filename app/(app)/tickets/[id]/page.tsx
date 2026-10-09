@@ -77,7 +77,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
             <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]"><Field label="Status"><Select name="status" defaultValue={t.status}>{Object.entries(TICKET_STATUS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}</Select></Field>
               <Field label="Resolution" hint="required to resolve or close"><Textarea name="resolution" rows={2} maxLength={4000} defaultValue={t.resolution ?? ''} placeholder="What was done, parts used, follow-up needed" /></Field></div></ActionForm></div></Card>}
         <Card><CardHeader title="Timeline" sub="Notes, calls and status changes" />
-          {canWork && <div className="border-b border-border p-4"><ActionForm action={addTicketNote.bind(null, id)} submit="Add note">
+          {canWork && <div className="border-b border-border p-4"><ActionForm draftKey={`ticket-note:${id}`} action={addTicketNote.bind(null, id)} submit="Add note">
             <Field label="Note"><Textarea name="body" rows={2} required maxLength={4000} /></Field>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="kind" value="customer" />This was a conversation with the customer</label></ActionForm></div>}
           {!(events ?? []).length ? <p className="px-4 py-4 text-sm text-muted">No entries yet.</p> :

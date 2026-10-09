@@ -33,7 +33,7 @@ export async function buildReport(admin: Admin, companyId: string, sections: Sec
     if (want.has('collections')) lines.push('COLLECTIONS', `Payments received: ${(pays ?? []).length} · ${formatAed(out.collected)}`, '')
   }
   if (want.has('expenses')) {
-    const { data: ex } = await admin.from('project_expenses').select('amount,category').eq('company_id', companyId).is('deleted_at', null).gte('spent_on', from).lte('spent_on', to).limit(20000)
+    const { data: ex } = await admin.from('project_expenses').select('amount,category').eq('company_id', companyId).gte('spent_on', from).lte('spent_on', to).limit(20000)
     const byCat = new Map<string, number>(); for (const e of ex ?? []) byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount))
     const top = [...byCat.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k.replace(/_/g, ' ')} ${formatAed(v)}`)
     lines.push('EXPENSES', `Recorded: ${(ex ?? []).length} · ${formatAed(sum(ex, 'amount'))}`, ...(top.length ? [`Largest: ${top.join(' · ')}`] : []), '')

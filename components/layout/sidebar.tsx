@@ -68,7 +68,7 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false, user = 
       {nav(true)}
       <div className="flex items-center gap-2 border-t border-border px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <ThemeToggle /><span className="flex-1 truncate text-xs text-muted">{user}</span>
-        <form action={signOut}><button className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg"><LogOut size={16} />Sign out</button></form>
+        <form action={signOut} data-signout><button className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg"><LogOut size={16} />Sign out</button></form>
       </div></aside>
 
     <aside aria-label="Navigation" data-collapsed={collapsed} className={cn('sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-e border-border bg-nav transition-[width] duration-200 ease-out lg:flex', collapsed ? 'w-[60px]' : 'w-60')}>

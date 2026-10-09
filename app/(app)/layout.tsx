@@ -8,6 +8,7 @@ import { cookies } from 'next/headers'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { NotificationBell } from '@/components/layout/notification-bell'
 import { signOut } from '@/app/actions/auth'
+import { Pwa } from '@/components/pwa'
 import { t, isRtl } from '@/lib/i18n'
 import { Button } from '@/components/ui/primitives'
 import { Toaster } from '@/components/ui/toast'
@@ -74,14 +75,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <a href="/search" aria-label="Search" className="grid h-10 w-10 place-items-center rounded-md text-muted hover:bg-surface-2 sm:hidden"><Search size={19} /></a>
           <span className="hidden sm:inline-flex"><ThemeToggle /></span><NotificationBell items={notes ?? []} unread={unread ?? 0} />
           <div className="mx-2 hidden text-end leading-tight sm:block"><div className="text-sm font-medium">{c.profile.full_name}</div><div className="text-2xs capitalize text-muted">{c.profile.role.replace(/_/g, ' ')}</div></div>
-          <form action={signOut} className="hidden sm:block"><Button variant="ghost" size="icon" aria-label={t(l, 'signout')} title={t(l, 'signout')}><LogOut size={16} /></Button></form>
+          <form action={signOut} data-signout className="hidden sm:block"><Button variant="ghost" size="icon" aria-label={t(l, 'signout')} title={t(l, 'signout')}><LogOut size={16} /></Button></form>
         </div></header>
       <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1760px] flex-1 overflow-x-clip p-4 pb-24 sm:p-6 sm:pb-24 lg:pb-6">{children}</main>
     </div><BottomNav items={[
       { href: '/', label: 'Home', icon: 'home' as const }, { href: '/tasks', label: 'Tasks', icon: 'tasks' as const },
       c.can('crm.view') ? { href: '/leads', label: 'Leads', icon: 'leads' as const } : c.can('finance.view') ? { href: '/invoices', label: 'Sales', icon: 'sales' as const } : null,
       c.can('documents.view') ? { href: '/projects', label: 'Projects', icon: 'projects' as const } : null,
-    ].filter(x => !!x)} /><Suspense><NavProgress /></Suspense><Toaster /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
+    ].filter(x => !!x)} /><Suspense><NavProgress /></Suspense><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
       ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
       ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings#integrations', group: 'Settings' }] : []),
