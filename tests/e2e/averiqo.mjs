@@ -25,7 +25,7 @@ const EMAIL = `averiqo-${Date.now()}@alsaqr.test`
 try {
   console.log('\n[B] Brand & shell')
   await p.goto(`${BASE}/login`); await settle()
-  ok((await p.title()).includes('Averiqo') && (await p.locator('body').innerText()).includes('Averiqo') && !(await p.content()).includes('SaqrFlow'), 'sign-in shows Averiqo (no SaqrFlow left in the page)')
+  ok((await p.title()).includes('Averiqo') && await p.getByRole('img', { name: 'Averiqo' }).first().isVisible() && await p.getByRole('img', { name: 'Averiqo' }).first().evaluate(i => i.complete && i.naturalWidth > 0) && !(await p.content()).includes('SaqrFlow'), 'sign-in shows the Averiqo logo (no SaqrFlow left in the page)')
   await p.goto(`${BASE}/signup`); await p.getByLabel('Work email').fill(EMAIL); await p.getByLabel('Password').fill('correct-horse-battery'); await p.getByRole('button', { name: 'Create account' }).click()
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('AL SAQR AL AHMAR WELDING AND BLACKSMITH'); await p.getByLabel('Your full name').fill('Faisal Rahman'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`); await settle()
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email=$1`, [EMAIL])).company_id
