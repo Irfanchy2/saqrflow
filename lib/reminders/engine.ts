@@ -30,6 +30,7 @@ export function makeSenders(admin: Admin): Senders {
   return {
     whatsapp: async (to, t, p, companyId) => sendWhatsApp(await cfg(companyId), to, t, p),
     email: async (to, subject, text) => sendEmail({ apiKey: process.env.RESEND_API_KEY, from: process.env.EMAIL_FROM }, to, subject, text),
+    party: async log => { const { deliverParty } = await import('../whatsapp/outbox'); return deliverParty(admin, log as any) },
   }
 }
 

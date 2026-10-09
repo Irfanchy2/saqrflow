@@ -1,3 +1,4 @@
+import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, Download, Mail, Plus, Printer, Wallet } from 'lucide-react'
@@ -37,6 +38,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
         <LinkButton href={`/print/statement/${id}?${qs}${qs ? '&' : ''}auto=1`} variant="secondary" target="_blank"><Printer size={14} />Print statement</LinkButton>
         <LinkButton href={`/api/statements/${id}?${qs}`} variant="secondary"><Download size={14} />Statement PDF</LinkButton>
         <LinkButton href={mail} variant="secondary"><Mail size={14} />Email</LinkButton>
+        {c.can('records.edit') && <WhatsAppSend kind="statement" recordId={id} label="WhatsApp" size="md" />}
         {c.can('records.edit') && <DialogButton label="Payment on account" title={`Payment on account: ${cu.name}`} icon={<Plus size={14} />} wide><ActionForm action={recordPaymentOnAccount.bind(null, id)} submit="Save payment" idempotent>
           <p className="text-sm text-muted">For money not tied to one invoice (e.g. an opening balance). To pay an invoice, open the invoice and use “Record payment”.</p>
           <div className="grid gap-4 sm:grid-cols-2">

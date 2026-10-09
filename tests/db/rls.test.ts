@@ -836,3 +836,28 @@ describe('Platform: sign-in history, sessions, events, integrations (0019)', () 
     expect((await as(U.accA, `select count(*)::int n from system_runs`)).rows[0].n).toBe(0)
   })
 })
+
+describe('WhatsApp messages to customers and employees (0020)', () => {
+  it('history is visible only to roles that may see that kind of record; contacts readable by editors; numbers validated', async () => {
+    const cu = (await sup(`insert into customers(company_id,name) values ($1,'WA Client LLC') returning id`, [A])).rows[0].id
+    const log = (party: string | null, id: string | null, kind: string, key: string) =>
+      sup(`insert into notification_logs(company_id,channel,template,dedupe_key,to_number,party_type,party_id,kind,status) values ($1,'whatsapp',$2,$3,$4,$5,$6,$7,'sent')`,
+        [A, 'wa_' + kind, key, party ? '+971501112222' : null, party, id, party ? kind : null])
+    await log('customer', cu, 'invoice', 'wa:t1'); await log('employee', empRecA, 'payslip', 'wa:t2')
+    await log('employee', empRecA2, 'document_expiry', 'wa:t3'); await log(null, null, 'doc_expiry', 'internal:t4')
+    const seen = async (uid: string) => (await as(uid, `select coalesce(kind, 'internal') k from notification_logs where dedupe_key like any(array['wa:t%','internal:t%']) order by dedupe_key`)).rows.map(r => r.k)
+    expect(await seen(U.ownerA)).toEqual(['internal', 'invoice', 'payslip', 'document_expiry'])
+    expect(await seen(U.accA)).toEqual(['internal', 'invoice', 'payslip'])            // finance + salary, not sensitive employee data
+    expect(await seen(U.hrA)).toEqual(['internal', 'payslip', 'document_expiry'])     // employees, not customer finance
+    expect(await seen(U.pmA)).toEqual(['internal'])                                   // reminder log only: no payslips, statements or invoices
+    expect(await seen(U.viewerA)).toEqual([])
+    expect(await seen(U.ownerB)).toEqual([])
+    await fails(sup(`insert into notification_logs(company_id,channel,template,dedupe_key,to_number) values ($1,'whatsapp','wa_x','wa:bad','0501234567')`, [A]), /check/)
+    await sup(`insert into whatsapp_contacts(company_id,phone,last_inbound_at) values ($1,'+971501112222',now())`, [A])
+    expect((await as(U.pmA, `select count(*)::int n from whatsapp_contacts`)).rows[0].n).toBe(1)
+    expect((await as(U.viewerA, `select count(*)::int n from whatsapp_contacts`)).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, `select count(*)::int n from whatsapp_contacts`)).rows[0].n).toBe(0)
+    await fails(as(U.ownerA, `insert into whatsapp_contacts(company_id,phone) values ($1,'+971509998888')`, [A]))
+    await fails(sup(`insert into whatsapp_contacts(company_id,phone) values ($1,'050')`, [A]), /check/)
+  })
+})

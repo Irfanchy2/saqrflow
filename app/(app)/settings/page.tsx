@@ -20,6 +20,8 @@ import { NotificationRules } from '@/components/settings/notification-rules'
 import { ScheduledReports } from '@/components/settings/scheduled-reports'
 import { Integrations } from '@/components/settings/integrations'
 import { MySessions } from '@/components/settings/sessions'
+import { WhatsAppTemplates } from '@/components/settings/whatsapp-templates'
+import { testWhatsAppConnection } from '@/app/actions/whatsapp'
 import Link from 'next/link'
 
 export const metadata = { title: 'Settings' }
@@ -30,7 +32,7 @@ export default async function Settings() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
   // order follows how a business sets Averiqo up: who we are → how documents look → how they are numbered → who gets told → integrations → data
   const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['builder', 'Template builder', admin], ['templates', 'Terms templates', admin], ['numbering', 'Numbering', admin], ['approvals', 'Approvals', admin], ['custom', 'Custom fields & statuses', admin], ['forms', 'Public forms', admin],
-    ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['ai', 'AI & OCR', admin],
+    ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['wa-templates', 'WhatsApp templates', admin && !!wa], ['ai', 'AI & OCR', admin],
     ['integrations', 'API & webhooks', admin], ['account', 'Account & security', true], ['data', 'Data & backup', true]]
   return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
     <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -75,11 +77,12 @@ export default async function Settings() {
           <Alert tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.reason}</Alert>
           <ActionForm action={saveWhatsApp} resetOnSuccess={false}>
             <Field label="Phone number ID"><Input name="phone_number_id" defaultValue={s.phoneNumberId ?? wa.phoneNumberId ?? ''} inputMode="numeric" /></Field>
-            <Field label="WhatsApp Business Account ID"><Input name="waba_id" defaultValue={s.wabaId ?? ''} inputMode="numeric" /></Field>
+            <Field label="WhatsApp Business Account ID" hint="needed to submit and check message templates"><Input name="waba_id" defaultValue={s.wabaId ?? ''} inputMode="numeric" /></Field>
+            <Field label="Meta App ID" hint="optional; needed only to submit templates that attach a PDF (example document upload)"><Input name="app_id" defaultValue={typeof st?.find(x => x.key === 'whatsapp.app_id')?.value === 'string' ? st!.find(x => x.key === 'whatsapp.app_id')!.value : ''} inputMode="numeric" /></Field>
             <Field label="Access token" hint={wa.hasToken ? 'A token is configured. Leave blank to keep it. Tokens are encrypted at rest and never shown again.' : 'Use a permanent System User token. Alternatively set WHATSAPP_ACCESS_TOKEN as a server environment variable.'}><Input name="token" type="password" autoComplete="off" placeholder={wa.hasToken ? '••••••••••••' : ''} /></Field>
             <Field label="Estimated cost per message (AED)" hint="Optional – only used to show an estimate in the delivery log."><Input name="cost" type="number" step="0.0001" min="0" defaultValue={s.whatsappCostPerMessage ?? ''} /></Field>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="sandbox" defaultChecked={s.whatsappMode === 'sandbox'} />Force sandbox mode (never send real messages)</label></ActionForm>
-          <ActionButton action={clearWhatsAppToken} variant="ghost" confirm="Remove the stored WhatsApp token?">Remove stored token</ActionButton></div>
+          <div className="flex flex-wrap gap-2"><ActionButton action={testWhatsAppConnection} variant="secondary">Test connection</ActionButton><ActionButton action={clearWhatsAppToken} variant="ghost" confirm="Remove the stored WhatsApp token?">Remove stored token</ActionButton></div></div>
           <div className="space-y-3 text-sm"><h3 className="font-medium">Webhook (delivery receipts &amp; STOP replies)</h3>
             <p className="text-muted">In Meta → WhatsApp → Configuration set:</p>
             <dl className="space-y-1 rounded-md bg-surface-2 p-3 font-mono text-xs"><div>Callback URL: <b className="select-all">{appUrl}/api/webhooks/whatsapp</b></div><div>Verify token: the value of <b>WHATSAPP_VERIFY_TOKEN</b></div><div>Subscribe to field: <b>messages</b></div></dl>
@@ -87,6 +90,7 @@ export default async function Settings() {
             <h3 className="pt-2 font-medium">Message templates to approve in Meta</h3>
             {(Object.keys(TEMPLATE_META) as (keyof typeof TEMPLATE_META)[]).map(k => <details key={k} className="rounded-md border border-border p-2"><summary className="cursor-pointer font-mono text-xs">{TEMPLATE_META[k].metaName} <span className="text-muted">({TEMPLATE_META[k].language}, utility)</span></summary><pre className="mt-2 whitespace-pre-wrap text-xs text-muted">{templateBody(k)}</pre></details>)}</div></div></Card>}
 
+      {admin && wa && <WhatsAppTemplates c={c} live={wa.mode === 'live'} />}
       {admin && <AiAutomation c={c} wa={wa} />}
       {admin && <Integrations c={c} />}
 

@@ -1,3 +1,4 @@
+import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { AlertTriangle, ArrowLeft, CalendarCheck, ClipboardCheck, ClipboardList, ListTodo, Camera, CheckCircle2, Circle, Clock, FileText, MapPin, Paperclip, Pencil, Plus, Receipt, Trash2, Upload, UserPlus, Users, Wallet } from 'lucide-react'
@@ -100,6 +101,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       </div>
       <div className="flex flex-wrap gap-2">
         <a href={`/print/qr?type=project&ids=${p.id}`} target="_blank" rel="noopener" className="inline-flex h-11 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm hover:bg-surface-2 sm:h-9"><QrCode size={14} aria-hidden />QR label</a>
+        {edit && p.customer_id && <WhatsAppSend kind="project_update" recordId={p.id} label="Send update" size="md" />}
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit project" icon={<Pencil size={14} />}><ActionForm action={updateProject.bind(null, id)} resetOnSuccess={false}><ProjectFields customers={customers ?? []} p={p} /></ActionForm></DialogButton>}
         {edit && fin && <NewSalesButtons projectId={id} customerId={p.customer_id ?? undefined} />}
         {del && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'project', id)} confirm={`Move project “${p.name}” to the trash? Its documents, invoices and costs are kept and it can be restored.`}><Trash2 size={14} />Delete</ActionButton>}

@@ -53,6 +53,10 @@ if (!process.env.AUDIT_EMPTY) {
   await q(`insert into employee_compensation(employee_id,company_id,monthly_salary) values ($2,$1,4500)`, [co, emp[0].id])
   await q(`insert into salary_payments(company_id,employee_id,period,amount,paid_on,method,notes) values ($1,$2,$3,4500,$4,'wps','September salary via WPS, Emirates NBD'),($1,$2,$5,4200,$6,'bank_transfer',null)`, [co, emp[0].id, d(-40).slice(0, 8) + '01', d(-35), d(-70).slice(0, 8) + '01', d(-65)])
   await q(`insert into employee_advances(company_id,employee_id,kind,amount,given_on,monthly_recovery) values ($1,$2,'advance',2000,$3,500),($1,$2,'deduction',150,$4,null)`, [co, emp[0].id, d(-20), d(-10)])
+  await q(`insert into service_tickets(company_id,number,title,customer_id,priority,due_date) values ($1,'ST-2026-0001','Sliding gate motor stopped working at Villa 214',$2,'high',$3)`, [co, cust[0].id, d(-1)])
+  await q(`insert into warranties(company_id,number,customer_id,title,start_date,end_date) values ($1,'WR-2026-0001',$2,'Staircase structure, welds and paint',$3,$4)`, [co, cust[0].id, d(-60), d(305)])
+  await q(`insert into kb_articles(company_id,title,category,body) values ($1,'Hot work permit before welding on site','Safety','# Before you start\n1. Permit signed by the site engineer\n2. Fire extinguisher within 5 m')`, [co])
+  await q(`insert into approval_requests(company_id,entity_type,title,amount) values ($1,'other','Purchase of new welding machine',14500)`, [co])
   await q(`insert into daily_site_reports(company_id,number,project_id,work_order_id,report_date,work_done,progress,issues) values ($1,'DSR-2026-0001',$2,$3,$4,'Stringers welded and primed. Treads cut to size.',40,'Glass delivery delayed')`, [co, proj[0].id, wo.id, d(0)])
 }
 
@@ -68,9 +72,10 @@ const m = await browser.newContext({ viewport: { width: +(process.env.AUDIT_W ||
 const one = async sql => (await q(sql, [co]))[0]?.id
 const ids = { lead: await one(`select id from leads where company_id=$1 limit 1`), wo: await one(`select id from work_orders where company_id=$1 limit 1`), proj: await one(`select id from projects where company_id=$1 limit 1`),
   emp: await one(`select id from employees where company_id=$1 limit 1`), asset: await one(`select id from assets where company_id=$1 limit 1`), cust: await one(`select id from customers where company_id=$1 limit 1`), inv: inv[0]?.id,
-  sv: await one(`select id from site_visits where company_id=$1 limit 1`), dsr: await one(`select id from daily_site_reports where company_id=$1 limit 1`) }
-const mpages = (process.env.AUDIT_PAGES ?? '/,/inbox,/tasks,/leads,/leads?view=list,/site-visits,/invoices,/parties,/catalog,/projects,/work-orders,/site-reports,/assets,/cheques,/expenses,/employees,/documents,/vault,/reports,/reminders,/calendar,/settings,/search?q=ABC').split(',')
-  .concat(Object.entries({ lead: '/leads/', wo: '/work-orders/', proj: '/projects/', emp: '/employees/', asset: '/assets/', cust: '/parties/', inv: '/invoices/', sv: '/site-visits/', dsr: '/site-reports/' }).filter(([k]) => ids[k]).map(([k, base]) => base + ids[k]))
+  sv: await one(`select id from site_visits where company_id=$1 limit 1`), dsr: await one(`select id from daily_site_reports where company_id=$1 limit 1`),
+  tk: await one(`select id from service_tickets where company_id=$1 limit 1`), kb: await one(`select id from kb_articles where company_id=$1 limit 1`) }
+const mpages = (process.env.AUDIT_PAGES ?? '/,/inbox,/brief,/approvals,/tasks,/leads,/leads?view=list,/site-visits,/invoices,/invoices?tab=invoice,/invoices?tab=payments,/invoices?tab=receivables,/parties,/parties?tab=suppliers,/catalog,/projects,/work-orders,/site-reports,/assets,/cheques,/expenses,/employees,/documents,/vault,/tickets,/tickets?tab=warranties,/kb,/reports,/reminders,/reminders?tab=recipients,/reminders?tab=log,/calendar,/assistant,/assistant?q=Who%20owes%20us%20money%3F,/settings,/import,/backup,/users,/users/activity,/audit,/trash,/search?q=ABC').split(',')
+  .concat(Object.entries({ lead: '/leads/', wo: '/work-orders/', proj: '/projects/', emp: '/employees/', asset: '/assets/', cust: '/parties/', inv: '/invoices/', sv: '/site-visits/', dsr: '/site-reports/', tk: '/tickets/', kb: '/kb/' }).filter(([k]) => ids[k]).map(([k, base]) => base + ids[k]))
   .concat(ids.emp ? ['documents', 'salary', 'leave', 'history'].map(t => `/employees/${ids.emp}?tab=${t}`) : [])
 const report = []
 for (const path of mpages) {

@@ -137,7 +137,7 @@ describe('crypto & webhook signatures', () => {
     expect(p.statuses[0]).toMatchObject({ id: 'wamid.1', status: 'failed', error: 'Undeliverable (code 131026)' })
     expect(p.messages[0].from).toBe('+971501234567'); expect(optIntent(p.messages[0].text)).toBe('opt_out')
     expect(optIntent('yes')).toBe('opt_in'); expect(optIntent('hello')).toBeNull()
-    expect(parseWebhook({})).toEqual({ statuses: [], messages: [] })
+    expect(parseWebhook({})).toEqual({ statuses: [], messages: [], inbound: [] })
   })
 })
 

@@ -13,7 +13,8 @@ import type { ActionState } from '@/lib/utils'
 import { findDuplicates, readParty } from '@/lib/parties'
 
 async function setting(c: Awaited<ReturnType<typeof getCtx>>, key: string, value: unknown) {
-  const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key, value, updated_at: new Date().toISOString() }); if (error) throw error
+  // app_settings.value is NOT NULL: "not set" is stored as false (readers check the type, so false reads as unset)
+  const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key, value: value ?? false, updated_at: new Date().toISOString() }); if (error) throw error
 }
 
 export async function saveCompany(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -41,8 +42,9 @@ export async function saveWhatsApp(_: ActionState, fd: FormData): Promise<Action
     const c = await getCtx(); need(c, 'settings.manage')
     const pid = str(fd, 'phone_number_id'); if (pid && !/^\d{5,20}$/.test(pid)) return { error: 'Phone number ID should be digits only (from Meta → WhatsApp → API setup).' }
     const waba = str(fd, 'waba_id'); if (waba && !/^\d{5,20}$/.test(waba)) return { error: 'WhatsApp Business Account ID should be digits only.' }
+    const appId = str(fd, 'app_id'); if (appId && !/^\d{5,20}$/.test(appId)) return { error: 'Meta App ID should be digits only (Meta for Developers → your app).' }
     const cost = str(fd, 'cost'); const costN = cost ? z.coerce.number().min(0).max(100).parse(cost) : null
-    await Promise.all([setting(c, 'whatsapp.phone_number_id', pid ?? null), setting(c, 'whatsapp.waba_id', waba ?? null), setting(c, 'whatsapp.mode', fd.get('sandbox') === 'on' ? 'sandbox' : 'auto'), setting(c, 'whatsapp.cost_per_message', costN)])
+    await Promise.all([setting(c, 'whatsapp.phone_number_id', pid ?? null), setting(c, 'whatsapp.waba_id', waba ?? null), setting(c, 'whatsapp.app_id', appId ?? null), setting(c, 'whatsapp.mode', fd.get('sandbox') === 'on' ? 'sandbox' : 'auto'), setting(c, 'whatsapp.cost_per_message', costN)])
     const token = str(fd, 'token')
     if (token) {
       if (!process.env.SETTINGS_ENCRYPTION_KEY) return { error: 'Cannot store the token: SETTINGS_ENCRYPTION_KEY is not set on the server. Set it, or provide WHATSAPP_ACCESS_TOKEN as an environment variable instead.' }

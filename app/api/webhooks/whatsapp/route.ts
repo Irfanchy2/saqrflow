@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const raw = await req.text()
   if (!verifySignature(secret, raw, req.headers.get('x-hub-signature-256'))) return new NextResponse('Invalid signature', { status: 401 })
   let body: unknown; try { body = JSON.parse(raw) } catch { return new NextResponse('Bad request', { status: 400 }) }
-  const { statuses, messages } = parseWebhook(body)
+  const { statuses, messages, inbound } = parseWebhook(body)
   const admin = createAdminClient(), store = supabaseStore(admin)
 
   for (const s of statuses) {
@@ -42,6 +42,20 @@ export async function POST(req: NextRequest) {
   for (const m of messages) {
     const intent = optIntent(m.text); if (!intent) continue
     await admin.from('notification_recipients').update(intent === 'opt_out' ? { whatsapp_opt_in: 'opted_out', opted_in_at: null } : { whatsapp_opt_in: 'opted_in', opted_in_at: new Date().toISOString() }).eq('whatsapp_number', m.from)
+  }
+  // customers / employees: remember the last inbound message per company number (24-hour window) and STOP / START consent
+  const companyFor = new Map<string, string[]>()
+  const companiesOf = async (pid: string | null) => {
+    if (!pid) return []
+    if (!companyFor.has(pid)) { const { data } = await admin.from('app_settings').select('company_id').eq('key', 'whatsapp.phone_number_id').eq('value', JSON.stringify(pid)); companyFor.set(pid, (data ?? []).map(r => r.company_id)) }
+    return companyFor.get(pid)!
+  }
+  for (const m of inbound) {
+    const intent = optIntent(messages.find(x => x.from === m.from)?.text ?? '')
+    for (const cid of await companiesOf(m.phoneNumberId)) {
+      await admin.from('whatsapp_contacts').upsert({ company_id: cid, phone: m.from, last_inbound_at: m.at,
+        ...(intent === 'opt_out' ? { opted_out_at: new Date().toISOString() } : intent === 'opt_in' ? { opted_out_at: null, opted_in_at: new Date().toISOString() } : {}) }, { onConflict: 'company_id,phone' })
+    }
   }
   return NextResponse.json({ ok: true })
 }

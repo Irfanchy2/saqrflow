@@ -6,6 +6,8 @@ export interface LogRow {
   id: string; company_id: string; recipient_id: string | null; channel: 'whatsapp' | 'email' | 'in_app'; template: TemplateName
   params: Params; source_type: string | null; source_id: string | null; dedupe_key: string
   attempts: number; max_attempts: number; fallback_of: string | null; link?: string | null
+  /** set for WhatsApp messages to a customer / supplier / employee number (Send via WhatsApp) */
+  to_number?: string | null; kind?: string | null; body_text?: string | null; attachment_path?: string | null; attachment_name?: string | null; freeform?: boolean
 }
 export interface RecipientInfo {
   id: string; user_id: string | null; name: string; whatsapp_number: string | null; email: string | null
@@ -22,6 +24,8 @@ export interface Store {
 export interface Senders {
   whatsapp(to: string, t: TemplateName, p: Params, companyId: string): Promise<SendResult>
   email(to: string, subject: string, text: string, companyId: string): Promise<SendResult>
+  /** Send via WhatsApp to a party number (stored PDF + template or in-window message) */
+  party?(log: LogRow): Promise<SendResult>
 }
 
 const SUBJECT: Partial<Record<TemplateName, string>> = { daily_summary: 'Averiqo daily summary', event_alert: 'Averiqo alert', scheduled_report: 'Averiqo report' }
@@ -38,6 +42,15 @@ export async function processBatch(store: Store, senders: Senders, opts: { now?:
   const now = opts.now ?? new Date()
   const stats: Stats = { sent: 0, sandbox: 0, retried: 0, failed: 0, skipped: 0, deferred: 0, fallbacks: 0 }
   for (const log of await store.claim(opts.batch ?? 50)) {
+    if (log.to_number) {   // a document / message to a customer, supplier or employee: no internal recipient, no quiet hours
+      let res: SendResult
+      try { res = senders.party ? await senders.party(log) : { ok: false, retryable: false, error: 'Party messages are not supported by this sender' } } catch (e) { res = { ok: false, retryable: true, error: (e as Error).message } }
+      const attempts = log.attempts + 1
+      if (res.ok) { await store.update(log.id, { status: res.sandbox ? 'sandbox' : 'sent', sandbox: res.sandbox, attempts, sent_at: now.toISOString(), provider_message_id: res.messageId ?? null, last_error: null, claimed_at: null }); res.sandbox ? stats.sandbox++ : stats.sent++ }
+      else if (res.retryable && attempts < log.max_attempts) { await store.update(log.id, { status: 'retry', attempts, last_error: res.error, next_attempt_at: new Date(now.getTime() + backoffMs(attempts)).toISOString(), claimed_at: null }); stats.retried++ }
+      else { await store.update(log.id, { status: 'failed', attempts, last_error: res.error, claimed_at: null }); stats.failed++ }
+      continue
+    }
     const r = log.recipient_id ? await store.recipient(log.recipient_id) : null
     if (!r || !r.is_active) { await store.update(log.id, { status: 'skipped', last_error: 'Recipient missing or inactive' }); stats.skipped++; continue }
 
