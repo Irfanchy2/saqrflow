@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BadgeCheck, CheckCircle2, FileWarning, HardHat, Landmark, ListTodo, Receipt, Target } from 'lucide-react'
+import { BadgeCheck, CheckCircle2, FileWarning, HardHat, Landmark, ListTodo, Receipt, Target, Wrench } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { loadBrief } from '@/lib/brief'
 import { Badge, Card, CardHeader, Metrics, PageHeader, StatCard } from '@/components/ui/primitives'
@@ -50,6 +50,9 @@ export default async function BriefPage() {
 
       {b.approvals && <Card><CardHeader title="Waiting for my approval" action={<BadgeCheck size={15} className="text-muted" aria-hidden />} />
         {!b.approvals.length ? none : <ul className="divide-y divide-border">{b.approvals.slice(0, 15).map(a => <Row key={a.id} href={`/approvals?open=${a.id}`} title={a.title} sub={APPROVAL_TYPE_LABEL[a.entity_type as keyof typeof APPROVAL_TYPE_LABEL]} right={a.amount !== null ? <span className="shrink-0 tabular-nums">{formatAed(a.amount)}</span> : undefined} />)}</ul>}</Card>}
+
+      {b.tickets.length > 0 && <Card><CardHeader title="Service tickets due" sub="Open tickets due today or overdue" action={<Wrench size={15} className="text-muted" aria-hidden />} />
+        <ul className="divide-y divide-border">{b.tickets.slice(0, 15).map(t => <Row key={t.id} href={`/tickets/${t.id}`} title={`${t.number} · ${t.title}`} sub={t.due_date < c.today ? `Overdue since ${formatShortDate(t.due_date)}` : 'Due today'} bad={t.due_date < c.today} />)}</ul></Card>}
 
       {b.followups !== null && b.followups > 0 && <Card><CardHeader title="Lead follow-ups" action={<Target size={15} className="text-muted" aria-hidden />} />
         <ul><Row href="/leads?view=list&due=1" title={`${b.followups} lead follow-up${b.followups === 1 ? '' : 's'} due today or earlier`} right={<Badge tone="amber">Open</Badge>} /></ul></Card>}

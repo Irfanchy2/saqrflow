@@ -99,6 +99,7 @@ export async function publicEnquiry(slug: string, _: ActionState, fd: FormData):
       phone: z.string().trim().min(7, 'Enter a phone number').max(40).regex(/^[+0-9 ()-]+$/, 'Phone: digits only'), email: z.string().trim().email('Enter a valid email').max(200).optional(),
       location: z.string().trim().max(300).optional(), service: z.string().trim().max(300).optional(), message: z.string().trim().min(5, 'Tell us briefly what you need').max(3000),
     }).parse({ name: str(fd, 'name') ?? '', company: str(fd, 'company'), phone: str(fd, 'phone') ?? '', email: str(fd, 'email'), location: str(fd, 'location'), service: str(fd, 'service'), message: str(fd, 'message') ?? '' })
+    if (form.kind === 'service_request') return await serviceRequestTicket(admin, form, v, ip)
     const { data: number, error: ne } = await admin.rpc('issue_document_number', { cid: form.company_id, p_doc_type: 'lead' })
     if (ne || !number) { console.error('[public] numbering', ne?.message); return { error: 'Could not send right now. Please try again in a minute.' } }
     const kindLabel = form.kind === 'service_request' ? 'Service request' : 'Website enquiry'
@@ -117,5 +118,57 @@ export async function publicEnquiry(slug: string, _: ActionState, fd: FormData):
     const ids = (users ?? []).filter(u => roles.has(u.role)).map(u => u.id)
     if (ids.length) await admin.from('in_app_notifications').upsert(ids.map(id => ({ company_id: form.company_id, user_id: id, title: `New ${kindLabel.toLowerCase()}: ${v.company || v.name}`, body: `${number} · ${v.phone}${v.service ? ` · ${v.service}` : ''}`.slice(0, 500), link: `/leads/${lead.id}`, severity: 'info', dedupe_key: `enquiry:${lead.id}` })), { onConflict: 'user_id,dedupe_key', ignoreDuplicates: true })
     return { ok: true, message: `Thank you, ${v.name}. Your reference is ${number}. We will contact you shortly.` }
+  } catch (e) { if (!(e instanceof z.ZodError)) console.error('[public]', e); return { error: e instanceof z.ZodError ? e.issues[0].message : 'Something went wrong. Please try again.' } }
+}
+
+/** Public service request → service ticket (source: Website form), matched to an existing customer by phone when possible. */
+async function serviceRequestTicket(admin: ReturnType<typeof createAdminClient>, form: { id: string; company_id: string; title: string }, v: { name: string; company?: string; phone: string; email?: string; location?: string; service?: string; message: string }, ip: string): Promise<ActionState> {
+  const digits = v.phone.replace(/\D/g, '').slice(-9)
+  let customerId: string | null = null
+  if (digits.length >= 7) {
+    const { data: cands } = await admin.from('customers').select('id,phone').eq('company_id', form.company_id).is('deleted_at', null).not('phone', 'is', null).limit(5000)
+    customerId = (cands ?? []).find(x => (x.phone ?? '').replace(/\D/g, '').endsWith(digits))?.id ?? null
+  }
+  const { data: number, error: ne } = await admin.rpc('issue_document_number', { cid: form.company_id, p_doc_type: 'service_ticket' })
+  if (ne || !number) { console.error('[public] ticket numbering', ne?.message); return { error: 'Could not send right now. Please try again in a minute.' } }
+  const title = (v.service ? `${v.service}: ` : '') + v.message.split('\n')[0]
+  const { data: t, error } = await admin.from('service_tickets').insert({
+    company_id: form.company_id, number, title: title.slice(0, 200), description: `${v.message}${v.company ? `\n\nCompany: ${v.company}` : ''}${v.email ? `\nEmail: ${v.email}` : ''}`.slice(0, 4000),
+    category: 'repair', priority: 'normal', source: 'form', customer_id: customerId, contact_name: v.name, contact_phone: v.phone, site_location: v.location ?? null, created_by: null,
+  }).select('id').single()
+  if (error) { console.error('[public] ticket insert', error.message); return { error: 'Could not send right now. Please try again in a minute.' } }
+  await admin.from('ticket_events').insert({ company_id: form.company_id, ticket_id: t.id, kind: 'created', body: `Service request received through the public form “${form.title}”${customerId ? ' (matched to an existing customer by phone)' : ''}.`, user_id: null })
+  await admin.from('public_form_submissions').insert({ company_id: form.company_id, form_id: form.id, ip_hash: ip, ticket_id: t.id })
+  await notifyRole(admin, form.company_id, 'documents.view', { title: `New service request: ${v.name}`, body: `${number} · ${v.phone}`, link: `/tickets/${t.id}`, key: `service_form:${t.id}` })
+  return { ok: true, message: `Thank you, ${v.name}. Your service request number is ${number}. We will call you to arrange a visit.` }
+}
+
+async function notifyRole(admin: ReturnType<typeof createAdminClient>, companyId: string, perm: string, n: { title: string; body: string; link: string; key: string }) {
+  const { data: users } = await admin.from('profiles').select('id,role').eq('company_id', companyId).eq('is_active', true)
+  const { data: rp } = await admin.from('role_permissions').select('role').eq('permission', perm)
+  const roles = new Set((rp ?? []).map(x => x.role)), ids = (users ?? []).filter(u => roles.has(u.role)).map(u => u.id)
+  if (ids.length) await admin.from('in_app_notifications').upsert(ids.map(id => ({ company_id: companyId, user_id: id, title: n.title.slice(0, 200), body: n.body.slice(0, 500), link: n.link, severity: 'info', dedupe_key: n.key })), { onConflict: 'user_id,dedupe_key', ignoreDuplicates: true })
+}
+
+/** Customer portal → "Report an issue": a service ticket for that customer (source: Customer portal). At most 10 per day per customer. */
+export async function publicReportIssue(token: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const r = await resolveLink(token, 'customer_portal'); if (!r || !r.link.customer_id) return GONE
+    const v = z.object({ name: z.string().trim().min(2, 'Enter your name').max(120), phone: z.string().trim().max(40).optional(), title: z.string().trim().min(3, 'Describe the issue in a few words').max(200),
+      description: z.string().trim().max(4000).optional(), location: z.string().trim().max(300).optional(), project_id: z.string().uuid().optional() })
+      .parse({ name: str(fd, 'name') ?? '', phone: str(fd, 'phone'), title: str(fd, 'title') ?? '', description: str(fd, 'description'), location: str(fd, 'location'), project_id: str(fd, 'project_id') })
+    const { count } = await r.admin.from('service_tickets').select('id', { count: 'exact', head: true }).eq('company_id', r.company.id).eq('customer_id', r.link.customer_id).eq('source', 'portal').gte('created_at', new Date(Date.now() - 864e5).toISOString())
+    if ((count ?? 0) >= 10) return { error: 'You have reported several issues today. Please call us for anything urgent.' }
+    let projectId: string | null = null
+    if (v.project_id) { const { data: p } = await r.admin.from('projects').select('id').eq('id', v.project_id).eq('company_id', r.company.id).eq('customer_id', r.link.customer_id).maybeSingle(); projectId = p?.id ?? null }
+    const { data: number, error: ne } = await r.admin.rpc('issue_document_number', { cid: r.company.id, p_doc_type: 'service_ticket' })
+    if (ne || !number) return { error: 'Could not send right now. Please try again in a minute.' }
+    const { data: t, error } = await r.admin.from('service_tickets').insert({ company_id: r.company.id, number, title: v.title, description: v.description ?? null, category: 'repair', priority: 'normal', source: 'portal',
+      customer_id: r.link.customer_id, project_id: projectId, contact_name: v.name, contact_phone: v.phone ?? null, site_location: v.location ?? null, created_by: null }).select('id,under_warranty').single()
+    if (error) { console.error('[public] portal ticket', error.message); return { error: 'Could not send right now. Please try again in a minute.' } }
+    await r.admin.from('ticket_events').insert({ company_id: r.company.id, ticket_id: t.id, kind: 'customer', body: `Reported by ${v.name} through the customer portal.`, user_id: null })
+    await notifyCompany(r, 'documents.view', { title: `Issue reported by the customer: ${v.title}`, body: `${number} · ${v.name}`, link: `/tickets/${t.id}`, key: `portal_ticket:${t.id}`, severity: 'warning' })
+    revalidatePath('/tickets')
+    return { ok: true, message: `Thank you. Your reference is ${number}${t.under_warranty ? ' (covered by your warranty)' : ''}. We will contact you to arrange a visit.` }
   } catch (e) { if (!(e instanceof z.ZodError)) console.error('[public]', e); return { error: e instanceof z.ZodError ? e.issues[0].message : 'Something went wrong. Please try again.' } }
 }

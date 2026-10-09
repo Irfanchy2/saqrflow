@@ -712,3 +712,48 @@ describe('Secure links & public forms (0017)', () => {
     expect((await as(U.hrA, `select count(*)::int n from public_form_submissions`)).rows[0].n).toBe(0)
   })
 })
+
+describe('Service tickets, warranties & knowledge base (0018)', () => {
+  it('tickets: numbered ST-, warranty found automatically, due date from priority, resolve timestamps', async () => {
+    const cu = (await as(U.ownerA, `insert into customers(company_id,name) values ($1,'Warranty Client') returning id`, [A])).rows[0].id
+    const wr = (await as(U.accA, `insert into warranties(company_id,number,customer_id,title,start_date,end_date) values ($1,$2,$3,'Gate and motor',current_date - 30,current_date + 335) returning id`, [A, (await as(U.accA, `select next_document_number('warranty') n`)).rows[0].n, cu])).rows[0].id
+    const n = (await as(U.accA, `select next_document_number('service_ticket') n`)).rows[0].n
+    expect(n).toMatch(/^ST-\d{4}-\d{4}$/)
+    const t = (await as(U.accA, `insert into service_tickets(company_id,number,title,customer_id,priority) values ($1,$2,'Gate not closing',$3,'urgent') returning *`, [A, n, cu])).rows[0]
+    expect(t.warranty_id).toBe(wr); expect(t.under_warranty).toBe(true)
+    expect(String(t.due_date.toISOString?.() ?? t.due_date).slice(0, 10)).toBe(new Date(Date.now() + 4 * 3600e3 + 864e5).toISOString().slice(0, 10))   // urgent: +1 day (Dubai date)
+    const up = (await as(U.accA, `update service_tickets set status='resolved', resolution='Limit switch replaced' where id=$1 returning resolved_at, closed_at`, [t.id])).rows[0]
+    expect(up.resolved_at).not.toBeNull(); expect(up.closed_at).toBeNull()
+    const re = (await as(U.accA, `update service_tickets set status='in_progress' where id=$1 returning resolved_at`, [t.id])).rows[0]
+    expect(re.resolved_at).toBeNull()
+  })
+  it('a technician without office access sees and updates only tickets assigned to them; viewers cannot create', async () => {
+    const a = (await as(U.accA, `insert into service_tickets(company_id,number,title,assigned_to) values ($1,'ST-T-1','Assigned to field worker',$2) returning id`, [A, U.empA])).rows[0].id
+    await as(U.accA, `insert into service_tickets(company_id,number,title) values ($1,'ST-T-2','Somebody else')`, [A])
+    expect((await as(U.empA, `select number from service_tickets order by number`)).rows.map(r => r.number)).toEqual(['ST-T-1'])
+    await as(U.empA, `update service_tickets set status='in_progress' where id=$1`, [a])
+    await as(U.empA, `insert into ticket_events(company_id,ticket_id,kind,body,user_id) values ($1,$2,'note','On site now',auth.uid())`, [A, a])
+    await fails(as(U.viewerA, `insert into service_tickets(company_id,number,title) values ($1,'ST-T-3','x')`, [A]), /row-level security/)
+    expect((await as(U.ownerB, `select count(*)::int n from service_tickets`)).rows[0].n).toBe(0)
+  })
+  it('trash: tickets, warranties and articles disappear when trashed and come back on restore', async () => {
+    const t = (await as(U.accA, `insert into service_tickets(company_id,number,title) values ($1,'ST-T-9','To trash') returning id`, [A])).rows[0].id
+    await as(U.ownerA, `select soft_delete('service_ticket',$1)`, [t])
+    expect((await as(U.accA, `select count(*)::int n from service_tickets where id=$1`, [t])).rows[0].n).toBe(0)
+    expect((await as(U.ownerA, `select count(*)::int n from trash_list() where entity='service_ticket' and id=$1`, [t])).rows[0].n).toBe(1)
+    await as(U.ownerA, `select restore_deleted('service_ticket',$1)`, [t])
+    expect((await as(U.accA, `select count(*)::int n from service_tickets where id=$1`, [t])).rows[0].n).toBe(1)
+  })
+  it('knowledge base: everyone reads published, drafts only editors, every edit keeps a version', async () => {
+    const pub = (await as(U.pmA, `insert into kb_articles(company_id,title,body) values ($1,'Hot work permit','1. Get permit') returning id`, [A])).rows[0].id
+    await as(U.pmA, `insert into kb_articles(company_id,title,body,status) values ($1,'Draft SOP','wip','draft')`, [A])
+    expect((await as(U.empA, `select title from kb_articles order by title`)).rows.map(r => r.title)).toEqual(['Hot work permit'])
+    expect((await as(U.pmA, `select count(*)::int n from kb_articles`)).rows[0].n).toBe(2)
+    await fails(as(U.empA, `insert into kb_articles(company_id,title) values ($1,'x')`, [A]), /row-level security/)
+    const v = (await as(U.pmA, `update kb_articles set body='1. Get permit\n2. Fire watch' where id=$1 returning version`, [pub])).rows[0].version
+    expect(v).toBe(2)
+    expect((await as(U.pmA, `select version, body from kb_article_versions where article_id=$1`, [pub])).rows).toEqual([{ version: 1, body: '1. Get permit' }])
+    expect((await as(U.empA, `select count(*)::int n from kb_article_versions`)).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, `select count(*)::int n from kb_articles`)).rows[0].n).toBe(0)
+  })
+})

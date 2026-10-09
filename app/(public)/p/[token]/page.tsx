@@ -1,12 +1,13 @@
 import { FileText } from 'lucide-react'
-import { Badge, Card, CardHeader, Field, Input, Metrics, StatCard } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, Field, Input, Metrics, Select, StatCard, Textarea } from '@/components/ui/primitives'
 import { LinkGone, PublicShell } from '@/components/public/shell'
 import { PublicForm } from '@/components/public/public-form'
 import { logLinkEvent, resolveLink } from '@/lib/portal'
 import { buildLedger } from '@/lib/ledger'
 import { fmtMoney } from '@/lib/sales/money'
 import { DOC_META, statusLabel, STATUS_TONE, type SalesType } from '@/lib/sales/docs'
-import { publicRespondQuote } from '@/app/actions/public'
+import { publicReportIssue, publicRespondQuote } from '@/app/actions/public'
+import { TICKET_STATUS } from '@/lib/service'
 
 export const metadata = { title: 'Customer portal' }
 
@@ -25,6 +26,7 @@ export default async function CustomerPortal({ params }: { params: Promise<{ tok
     buildLedger(r.ctx, cust, {}),
     r.admin.from('projects').select('id,name,code,status,fabrication_progress,site_progress,expected_completion').eq('company_id', cid).eq('customer_id', cust).is('deleted_at', null).in('status', ['planning', 'active', 'on_hold', 'completed']).order('created_at', { ascending: false }).limit(20),
   ])
+  const { data: tickets } = await r.admin.from('service_tickets').select('id,number,title,status,created_at,under_warranty').eq('company_id', cid).eq('customer_id', cust).is('deleted_at', null).order('created_at', { ascending: false }).limit(20)
   const pids = (projects ?? []).map(p => p.id)
   const { data: miles } = pids.length ? await r.admin.from('project_milestones').select('project_id,title,due_date,done').eq('company_id', cid).in('project_id', pids).order('due_date') : { data: [] as any[] }
   const bal = new Map(ledger.invoices.map((i: any) => [i.id, i]))
@@ -64,6 +66,21 @@ export default async function CustomerPortal({ params }: { params: Promise<{ tok
 
     {others.length > 0 && <Card><CardHeader title="Delivery notes & credit notes" />
       <ul className="divide-y divide-border">{others.map((o: any) => <li key={o.id} className="flex items-center gap-2 px-4 py-3 text-sm"><span className="min-w-0 flex-1 font-medium">{DOC_META[o.doc_type as SalesType].label} {o.number}</span><span className="text-xs text-muted">{o.issue_date}</span><Pdf id={o.id} /></li>)}</ul></Card>}
+
+    <Card><CardHeader title="Service requests" sub="Report a problem with completed work; we reply within one working day" />
+      {(tickets ?? []).length > 0 && <ul className="divide-y divide-border border-b border-border">{(tickets ?? []).map((t: any) => <li key={t.id} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
+        <span className="min-w-0 flex-1"><span className="block font-medium">{t.number} · {t.title}</span><span className="block text-xs text-muted">{t.created_at.slice(0, 10)}{t.under_warranty ? ' · covered by warranty' : ''}</span></span>
+        <Badge tone={TICKET_STATUS[t.status]?.tone}>{TICKET_STATUS[t.status]?.label}</Badge></li>)}</ul>}
+      <details className="px-4 py-3"><summary className="cursor-pointer text-sm font-medium text-primary">Report an issue</summary>
+        <div className="pt-3"><PublicForm action={publicReportIssue.bind(null, token)} submit="Send">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Your name *"><Input name="name" required minLength={2} maxLength={120} defaultValue={r.link.recipient_name ?? ''} /></Field>
+            <Field label="Phone"><Input name="phone" type="tel" maxLength={40} /></Field>
+            <Field label="What is the problem? *" className="sm:col-span-2"><Input name="title" required minLength={3} maxLength={200} placeholder="e.g. Gate motor not working" /></Field>
+            {(projects ?? []).length > 0 && <Field label="Project"><Select name="project_id" defaultValue=""><option value="">Not sure</option>{(projects ?? []).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}
+            <Field label="Location"><Input name="location" maxLength={300} /></Field>
+            <Field label="Details" className="sm:col-span-2"><Textarea name="description" rows={3} maxLength={4000} /></Field>
+          </div></PublicForm></div></details></Card>
 
     {(projects ?? []).length > 0 && <Card><CardHeader title="Project updates" />
       <ul className="divide-y divide-border">{(projects ?? []).map((p: any) => { const ms = (miles ?? []).filter((m: any) => m.project_id === p.id)
