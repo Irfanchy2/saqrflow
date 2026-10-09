@@ -12,6 +12,7 @@ import { createLead } from '@/app/actions/crm'
 import { LEAD_SOURCES, LEAD_STAGES, LOST_REASONS, STAGE, followupState, pipelineSummary, sourceAnalytics, type LeadStage } from '@/lib/crm'
 import { addDays, formatAed, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Leads & Pipeline' }
 const VIEWS = [['pipeline', 'Pipeline', Columns3], ['list', 'List', List], ['sources', 'Sources & win rate', BarChart3]] as const
@@ -56,7 +57,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const maxLeads = Math.max(1, ...src.map(s => s.leads))
 
   return <>
-    <PageHeader title="Leads & Pipeline" sub="Every enquiry from first call to won job. Follow-ups remind you automatically." actions={edit ? add : undefined} />
+    <PageHeader title="Leads & Pipeline" sub="Every enquiry from first call to won job. Follow-ups remind you automatically." actions={<><SavedViews page="/leads" />{edit && add}</>} />
     <Metrics className="mb-5" cols={5}>
       <StatCard label="Open leads" value={sum.open} hint={sum.unvalued ? `${sum.unvalued} without an estimated value` : undefined} />
       <StatCard label="Pipeline value" value={formatAed(sum.value)} hint="Open leads, excl. VAT" />

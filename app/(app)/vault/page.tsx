@@ -11,6 +11,7 @@ import { DropZone } from '@/components/ui/drop-zone'
 import { DocsTable, Filters } from '@/components/documents/docs-table'
 import { bulkUpload } from '@/app/actions/documents'
 import { cn } from '@/lib/utils'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Document Vault' }
 export default async function Vault({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -24,7 +25,7 @@ export default async function Vault({ searchParams }: { searchParams: Promise<Re
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
     <PageHeader title="Document Vault" sub="Every file in one private place. Employee and cheque files stay linked to their record. No duplicates."
-      actions={<>{c.can('data.export') && <LinkButton href="/api/export/documents" variant="secondary">Export list (CSV)</LinkButton>}
+      actions={<><SavedViews page="/vault" />{c.can('data.export') && <LinkButton href="/api/export/documents" variant="secondary">Export list (CSV)</LinkButton>}
         {c.can('documents.upload') && <DialogButton wide label="Upload files" title="Upload to vault" icon={<Upload size={15} />}>
           <ActionForm action={bulkUpload} submit="Upload"><DropZone />
             <div className="grid gap-4 sm:grid-cols-2"><Field label="Category (optional)"><Select name="category_id" defaultValue=""><option value="">—</option>{cats?.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>

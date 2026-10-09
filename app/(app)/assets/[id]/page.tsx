@@ -16,6 +16,9 @@ import { ACTION_LABEL, changeSummary } from '@/lib/audit'
 import { formatAed, formatLongDate, formatShortDate, localDate } from '@/lib/time'
 import { ACCEPT_ATTR } from '@/lib/files'
 import { cn } from '@/lib/utils'
+import { RecordActivity } from '@/components/record-activity'
+import { RecordTasks } from '@/components/record-tasks'
+import { CustomFieldsCard } from '@/components/custom-fields-card'
 
 export const metadata = { title: 'Vehicle / asset' }
 const TABS = [['overview', 'Overview'], ['documents', 'Documents'], ['maintenance', 'Maintenance'], ['expenses', 'Expenses'], ['assignments', 'Assignments'], ['reminders', 'Reminders'], ['timeline', 'Timeline']] as const
@@ -197,6 +200,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
 
     {tab === 'reminders' && <ReminderTab c={c} a={a} id={id} deadlines={deadlines} km={km} isV={isV} />}
     {tab === 'timeline' && <TimelineTab c={c} a={a} id={id} maint={maint ?? []} assigns={assigns ?? []} exps={exps ?? []} docs={[...docs.values()]} />}
+    {tab === 'overview' && <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="asset" recordId={id} /><RecordTasks c={c} type={isV ? 'vehicle' : 'asset'} id={id} /><RecordActivity c={c} table="assets" id={id} className="xl:col-span-2" /></div>}
   </>
 }
 

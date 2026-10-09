@@ -11,6 +11,7 @@ import { createSiteVisit } from '@/app/actions/operations'
 import { VISIT_STATUS } from '@/lib/crm'
 import { addDays, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Site Visits' }
 const TABS = [['upcoming', 'Upcoming'], ['followup', 'Follow-up required'], ['completed', 'Completed'], ['all', 'All']] as const
@@ -45,7 +46,7 @@ export default async function SiteVisitsPage({ searchParams }: { searchParams: P
   const add = <DialogButton wide label="Schedule visit" title="Schedule site visit" icon={<Plus size={15} />} openParam="site_visit"><ActionForm action={createSiteVisit} submit="Schedule visit" idempotent>{form}</ActionForm></DialogButton>
 
   return <>
-    <PageHeader title="Site Visits" sub="Measurement and survey visits before quotation, with a printable visit report." actions={edit ? add : undefined} />
+    <PageHeader title="Site Visits" sub="Measurement and survey visits before quotation, with a printable visit report." actions={<><SavedViews page="/site-visits" />{edit && add}</>} />
     <Metrics className="mb-5" cols={4}>
       <StatCard label="Today" value={today.count ?? 0} href="/site-visits?tab=upcoming" />
       <StatCard label="Next 7 days" value={week.count ?? 0} href="/site-visits?tab=upcoming" />

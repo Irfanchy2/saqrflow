@@ -11,6 +11,7 @@ import { changeChequeStatus, createCheque } from '@/app/actions/cheques'
 import { nextStatuses, summarizeCheques, type ChequeStatus, type Direction } from '@/lib/cheques'
 import { formatAed } from '@/lib/time'
 import { ACCEPT_ATTR } from '@/lib/files'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Banking & Cheques' }
 const STATUS_TONE: Record<string, Tone> = { received: 'blue', issued: 'blue', scheduled: 'blue', deposited: 'amber', presented: 'amber', cleared: 'green', returned: 'red', cancelled: 'neutral' }
@@ -41,7 +42,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
 
   return <>
     <PageHeader title="Banking & Cheques" sub="A tracker for incoming, outgoing and post-dated cheques."
-      actions={<>{c.can('data.export') && <LinkButton href="/api/export/cheques" variant="secondary">Export CSV</LinkButton>}
+      actions={<><SavedViews page="/cheques" />{c.can('data.export') && <LinkButton href="/api/export/cheques" variant="secondary">Export CSV</LinkButton>}
         {manage && <DialogButton wide label="Add cheque" title="Add cheque" icon={<Plus size={15} />}>
           <ActionForm action={createCheque} submit="Save cheque">
             <div className="grid gap-4 sm:grid-cols-3"><Field label="Direction *"><Select name="direction" defaultValue="incoming"><option value="incoming">Incoming (received)</option><option value="outgoing">Outgoing (issued)</option></Select></Field>
@@ -89,7 +90,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
               return <tr key={r.id} className="hover:bg-surface-2/50"><Td className="tabular-nums">{r.cheque_date}{late && <Badge tone="red" className="ms-2">overdue</Badge>}</Td><Td className="font-mono text-xs">{r.cheque_no}</Td>
                 <Td><div className="font-medium">{r.party_name}</div><div className="text-xs text-muted">{r.purpose}</div>{r.invoice_id && <Link href={`/invoices/${r.invoice_id}`} className="text-xs text-primary hover:underline">Invoice {invNo.get(r.invoice_id) ?? ''}</Link>}</Td><Td className="text-muted">{r.bank_name}{r.account_display_name && <div className="text-xs">{r.account_display_name}</div>}</Td>
                 <Td className={`tabular-nums font-medium ${r.direction === 'incoming' ? 'text-success' : ''}`}>{r.direction === 'incoming' ? '+' : '−'}{formatAed(r.amount)}</Td>
-                <Td><span className="capitalize text-muted">{r.direction} · {r.kind === 'pdc' ? 'PDC' : r.kind}</span></Td><Td><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>{r.returned_reason && <div className="mt-1 text-xs text-danger">{r.returned_reason}</div>}</Td>
+                <Td><span className="capitalize text-muted">{r.direction} · {r.kind === 'pdc' ? 'PDC' : r.kind}</span></Td><Td><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>{r.approval_status && r.approval_status !== 'approved' && <Badge tone={r.approval_status === 'pending' ? 'amber' : 'red'} className="ms-1">{r.approval_status === 'pending' ? 'Awaiting approval' : r.approval_status === 'rejected' ? 'Rejected' : 'Changes requested'}</Badge>}{r.returned_reason && <div className="mt-1 text-xs text-danger">{r.returned_reason}</div>}</Td>
                 {manage && <Td>{next.length > 0 && <DialogButton size="sm" variant="secondary" label="Update" title={`Cheque ${r.cheque_no} – update status`}>
                   <ActionForm action={changeChequeStatus.bind(null, r.id)} submit="Update status">
                     <p className="text-sm text-muted">{formatAed(r.amount)} · {r.party_name} · currently <b>{r.status}</b></p>

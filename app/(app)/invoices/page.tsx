@@ -11,6 +11,7 @@ import { AGE_BUCKETS, receivablesAgeing, type InvRow } from '@/lib/sales/summary
 import { loadSalesKpis } from '@/lib/sales/kpis'
 import { formatAed } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Sales & Invoices' }
 const TABS = [
@@ -38,7 +39,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const tabHref = (t: string) => `${base}?tab=${t}`
   return <>
     <PageHeader title="Sales & Invoices" sub="Quotations, tax invoices, delivery notes and the payments against them."
-      actions={edit ? <NewSalesButtons /> : null} />
+      actions={<><SavedViews page="/invoices" />{edit && <NewSalesButtons />}</>} />
 
     <Metrics className="mb-5" cols={4}>
       <StatCard label="Outstanding receivables" value={formatAed(k.outstanding)} hint={`${k.openCount} open invoice${k.openCount === 1 ? '' : 's'}`} icon={Wallet} tone="blue" href={tabHref('receivables')} />

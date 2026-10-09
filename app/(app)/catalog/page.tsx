@@ -10,6 +10,7 @@ import { ImportForm } from '@/components/import-form'
 import { addStarterItems, saveCatalogItem, setCatalogActive } from '@/app/actions/catalog'
 import { importCatalog } from '@/app/actions/imports'
 import { VAT_CATEGORIES, fmtMoney, type VatCategory } from '@/lib/sales/money'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Products & Services' }
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -23,7 +24,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
     <PageHeader title="Products & Services" sub="Reusable items for quotations and invoices. In the editor use “Add from catalog”. The rate and text stay editable per document."
-      actions={<>
+      actions={<><SavedViews page="/catalog" />
         {c.can('data.export') && <LinkButton href="/api/export/catalog?format=xlsx" variant="secondary"><Download size={14} />Excel</LinkButton>}
         {edit && <DialogButton wide variant="secondary" label="Import" title="Import products & services" icon={<Upload size={14} />}><ImportForm action={importCatalog} columns="name, description, unit, rate, vat_category, category, notes" /></DialogButton>}
         {edit && <DialogButton wide label="Add item" title="Add product / service" icon={<Plus size={15} />}><ActionForm action={saveCatalogItem.bind(null, null)} submit="Add item"><CatalogFields /></ActionForm></DialogButton>}</>} />

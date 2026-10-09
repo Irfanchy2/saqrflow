@@ -11,6 +11,9 @@ import { trashRecord } from '@/app/actions/trash'
 import { PRIORITY, TASK_STATUS, isOverdue } from '@/lib/crm'
 import { addDays, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { SavedViews } from '@/components/saved-views'
+import { CustomFieldsCard } from '@/components/custom-fields-card'
+import { RecordActivity } from '@/components/record-activity'
 
 export const metadata = { title: 'Tasks' }
 const VIEWS = [['mine', 'My tasks'], ['today', 'Today'], ['overdue', 'Overdue'], ['week', 'This week'], ['open', 'All open'], ['done', 'Completed']] as const
@@ -24,7 +27,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const view = VIEWS.some(([k]) => k === sp.view) ? sp.view! : 'mine'
   const page = pageOf(sp.page), term = sanitizeQ(sp.q), edit = c.can('records.edit'), week = addDays(c.today, 6)
   const OPEN = ['todo', 'in_progress', 'waiting']
-  let q = c.supabase.from('tasks').select('id,title,description,status,priority,due_date,start_date,completion,owner_id,employee_id,related_type,related_id,project_id,work_order_id,project:projects(id,name),work_order:work_orders(id,number),employee:employees(full_name)', { count: 'exact' })
+  let q = c.supabase.from('tasks').select('id,title,description,status,priority,due_date,start_date,completion,owner_id,employee_id,related_type,related_id,project_id,work_order_id,custom_status_id,project:projects(id,name),work_order:work_orders(id,number),employee:employees(full_name)', { count: 'exact' })
   if (view === 'done') q = q.in('status', ['completed', 'cancelled']); else q = q.in('status', OPEN)
   if (view === 'mine') q = q.eq('owner_id', c.userId)
   if (view === 'today') q = q.eq('due_date', c.today)
@@ -35,6 +38,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   if (term) q = q.ilike('title', `%${term}%`)
   const head = { count: 'exact' as const, head: true }
   const open = () => c.supabase.from('tasks').select('id', head).in('status', OPEN)
+  const customStatus = c.supabase.from('custom_statuses').select('id,label,color').eq('entity', 'task').then(r => new Map((r.data ?? []).map(x => [x.id, x])))
   const [{ data: rows, count }, mine, today, overdue, wk, { data: users }, { data: projects }, { data: employees }, { data: focus }] = await Promise.all([
     q.order(view === 'done' ? 'completed_at' : 'due_date', { ascending: view !== 'done', nullsFirst: false }).order('created_at', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     open().eq('owner_id', c.userId), open().eq('due_date', c.today), open().lt('due_date', c.today), open().gte('due_date', c.today).lte('due_date', week),
@@ -43,7 +47,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     edit ? c.supabase.from('employees').select('id,full_name').neq('status', 'archived').order('full_name').limit(1000) : Promise.resolve({ data: [] as any[] }),
     sp.open && /^[0-9a-f-]{36}$/.test(sp.open) ? c.supabase.from('tasks').select('*').eq('id', sp.open).maybeSingle() : Promise.resolve({ data: null }),
   ])
-  const names = new Map((users ?? []).map((u: any) => [u.id, u.full_name as string]))
+  const names = new Map((users ?? []).map((u: any) => [u.id, u.full_name as string])), cs = await customStatus
   const o = (rows: any[], label: (r: any) => string) => rows.map(r => ({ id: r.id, name: label(r) }))
   const userOpts = o(users ?? [], (u: any) => u.full_name), projOpts = o(projects ?? [], (p: any) => p.name), empOpts = o(employees ?? [], (e: any) => e.full_name)
   const qs = (x: Record<string, string>) => `/tasks?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp).filter(([k, v]) => v && !['page', 'open'].includes(k))) as Record<string, string>, ...x })}`
@@ -51,7 +55,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const canEditFocus = focus && (edit || focus.owner_id === c.userId)
 
   return <>
-    <PageHeader title="Tasks" sub="Assigned work across projects, work orders, leads and the office. Overdue is worked out from the due date." actions={edit ? add : undefined} />
+    <PageHeader title="Tasks" sub="Assigned work across projects, work orders, leads and the office. Overdue is worked out from the due date." actions={<><SavedViews page="/tasks" />{edit && add}</>} />
     <Metrics className="mb-5" cols={4}>
       <StatCard label="My open tasks" value={mine.count ?? 0} href="/tasks?view=mine" />
       <StatCard label="Due today" value={today.count ?? 0} href="/tasks?view=today" />
@@ -66,6 +70,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         : <p className="whitespace-pre-line text-sm">{focus.description ?? 'No details.'}</p>}
         <div className="mt-3 flex flex-wrap gap-3 text-sm">{focus.related_type && LINK[focus.related_type] && <Link href={LINK[focus.related_type](focus.related_id)} className="text-primary hover:underline">Open {REL_LABEL[focus.related_type]?.toLowerCase()}</Link>}
           {c.can('records.delete') && <ActionButton variant="ghost" action={trashRecord.bind(null, 'task', focus.id)} confirm="Move this task to the trash?">Delete task</ActionButton>}</div></div></Card>}
+    {focus && <div className="-mt-1 mb-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="task" recordId={focus.id} customStatusId={focus.custom_status_id} /><RecordActivity c={c} table="tasks" id={focus.id} limit={15} /></div>}
 
     <nav aria-label="Task views" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">{VIEWS.map(([k, l]) => <Link key={k} href={qs({ view: k })} aria-current={view === k ? 'page' : undefined}
       className={cn('-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition-colors', view === k ? 'border-primary font-medium text-fg' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</nav>
@@ -87,7 +92,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
             {t.priority !== 'normal' && <Badge tone={PRIORITY[t.priority]?.tone} className="hidden sm:inline-flex">{PRIORITY[t.priority]?.label}</Badge>}
             {t.due_date && <span className={cn('shrink-0 text-xs tabular-nums', od ? 'font-medium text-danger' : 'text-muted')}>{t.due_date === c.today ? 'Today' : formatShortDate(t.due_date)}</span>}
             {mineOrEdit && t.status === 'todo' && <ActionButton variant="ghost" action={setTaskStatus.bind(null, t.id, 'in_progress')} className="hidden sm:inline-flex"><Play size={13} />Start</ActionButton>}
-            <Badge tone={od ? 'red' : TASK_STATUS[t.status]?.tone} className="shrink-0">{od ? 'Overdue' : TASK_STATUS[t.status]?.label}</Badge>
+            <Badge tone={od ? 'red' : (cs.get(t.custom_status_id)?.color as any) ?? TASK_STATUS[t.status]?.tone} className="shrink-0">{od ? 'Overdue' : cs.get(t.custom_status_id)?.label ?? TASK_STATUS[t.status]?.label}</Badge>
           </li> })}</ul>}
       <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/tasks" />
     </Card>

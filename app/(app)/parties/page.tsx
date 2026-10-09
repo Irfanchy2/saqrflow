@@ -11,6 +11,7 @@ import { ImportForm } from '@/components/import-form'
 import { createParty } from '@/app/actions/admin'
 import { importParties } from '@/app/actions/imports'
 import { cn } from '@/lib/utils'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Customers & Suppliers' }
 export default async function Parties({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -21,7 +22,7 @@ export default async function Parties({ searchParams }: { searchParams: Promise<
   const { data, count } = await query
   const isC = kind === 'customers', edit = c.can('records.edit')
   return <><PageHeader title="Customers & Suppliers" sub="Directory used by cheques, quotations, invoices and projects. Open a client for their ledger, documents and timeline."
-    actions={<>
+    actions={<><SavedViews page="/parties" />
       {c.can('data.export') && <LinkButton href={`/api/export/${kind}`} variant="secondary"><Download size={14} />Export CSV</LinkButton>}
       {edit && <DialogButton wide variant="secondary" label="Import CSV" title={`Import ${isC ? 'clients' : 'suppliers'} from CSV`} icon={<Upload size={14} />}><ImportForm action={importParties.bind(null, kind)} columns="name, contact_person, phone, whatsapp, email, trn, address, notes" /></DialogButton>}
       {edit && <DialogButton wide openParam={isC ? 'customer' : 'supplier'} label={`Add ${isC ? 'client' : 'supplier'}`} title={`Add ${isC ? 'client' : 'supplier'}`} icon={<Plus size={15} />}>

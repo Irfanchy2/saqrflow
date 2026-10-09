@@ -2,13 +2,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { Inbox, LayoutDashboard, FileText, Users, Vault, Landmark, Receipt, HardHat, Handshake, Truck, BellRing, CalendarDays, BarChart3, Sparkles, ShieldCheck, Settings, PanelLeftClose, PanelLeftOpen, Menu, X, LogOut, Wallet, Package, History, Trash2, Target, MapPinned, ClipboardList, ListTodo, ClipboardCheck } from 'lucide-react'
+import { Inbox, LayoutDashboard, FileText, Users, Vault, Landmark, Receipt, HardHat, Handshake, Truck, BellRing, CalendarDays, BarChart3, Sparkles, ShieldCheck, Settings, PanelLeftClose, PanelLeftOpen, Menu, X, LogOut, Wallet, Package, History, Trash2, Target, MapPinned, ClipboardList, ListTodo, ClipboardCheck, BadgeCheck, Sunrise } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AveriqoMark, AveriqoWordmark } from '@/components/brand/logo'
 import { ThemeToggle } from './theme-toggle'
 import { signOut } from '@/app/actions/auth'
 
-const ICONS = { inbox: Inbox, overview: LayoutDashboard, documents: FileText, employees: Users, vault: Vault, cheques: Landmark, invoices: Receipt, projects: HardHat, parties: Handshake, assets: Truck, reminders: BellRing, calendar: CalendarDays, reports: BarChart3, assistant: Sparkles, users: ShieldCheck, settings: Settings, expenses: Wallet, catalog: Package, audit: History, trash: Trash2, leads: Target, site_visits: MapPinned, work_orders: ClipboardList, tasks: ListTodo, site_reports: ClipboardCheck }
+const ICONS = { approvals: BadgeCheck, brief: Sunrise, inbox: Inbox, overview: LayoutDashboard, documents: FileText, employees: Users, vault: Vault, cheques: Landmark, invoices: Receipt, projects: HardHat, parties: Handshake, assets: Truck, reminders: BellRing, calendar: CalendarDays, reports: BarChart3, assistant: Sparkles, users: ShieldCheck, settings: Settings, expenses: Wallet, catalog: Package, audit: History, trash: Trash2, leads: Target, site_visits: MapPinned, work_orders: ClipboardList, tasks: ListTodo, site_reports: ClipboardCheck }
 export interface NavItem { key: keyof typeof ICONS; href: string; label: string; group: string }
 import { SIDEBAR_COOKIE } from '@/lib/ui-prefs'
 

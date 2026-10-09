@@ -11,6 +11,7 @@ import { createWorkOrder } from '@/app/actions/operations'
 import { PRIORITY, WO_STATUS, tasksCompletion } from '@/lib/crm'
 import { formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { SavedViews } from '@/components/saved-views'
 
 export const metadata = { title: 'Work Orders' }
 const ACTIVE = ['pending', 'approved', 'scheduled', 'in_fabrication', 'ready_for_site', 'installation', 'inspection', 'on_hold']
@@ -46,7 +47,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
     <WorkOrderFields customers={customers.map((x: any) => ({ id: x.id, name: x.name }))} projects={projects.map((x: any) => ({ id: x.id, name: x.name }))} users={users.map((u: any) => ({ id: u.id, name: u.full_name }))} w={{ start_date: c.today }} /></ActionForm></DialogButton>
 
   return <>
-    <PageHeader title="Work Orders" sub="Job cards for the workshop and site crews. Create one from an accepted quotation to copy its scope." actions={edit ? add : undefined} />
+    <PageHeader title="Work Orders" sub="Job cards for the workshop and site crews. Create one from an accepted quotation to copy its scope." actions={<><SavedViews page="/work-orders" />{edit && add}</>} />
     <Metrics className="mb-5" cols={3}>
       <StatCard label="Active work orders" value={act.count ?? 0} href="/work-orders?tab=active" />
       <StatCard label="Past target date" value={late.count ?? 0} tone={late.count ? 'red' : 'neutral'} href="/work-orders?tab=active" />

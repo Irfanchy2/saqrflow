@@ -351,7 +351,7 @@ describe('Sales documents, payments & projects (0008)', () => {
     const i1 = (await as(U.accA, `select next_document_number('invoice') n`)).rows[0].n
     const b1 = (await as(U.ownerB, `select next_document_number('quotation') n`)).rows[0].n
     const yr = new Date().getFullYear()
-    expect(n1).toBe(`AS0025180/${yr}`); expect(n2).toBe(`AS0025181/${yr}`); expect(i1).toMatch(/^INV-\d{4}-0001$/); expect(b1).toBe(`AS0025180/${yr}`)
+    expect(n1).toBe(`AS-002600/${yr}`); expect(n2).toBe(`AS-002601/${yr}`); expect(i1).toBe('INV-610'); expect(b1).toBe(`AS-002600/${yr}`)
     await fails(as(U.viewerA, `select next_document_number('invoice')`), /insufficient privilege/)
     await fails(as(U.accA, `select next_document_number('bogus')`), /unknown document type/)
   })
@@ -359,12 +359,13 @@ describe('Sales documents, payments & projects (0008)', () => {
     const yr = new Date().getFullYear()
     await fails(as(U.accA, `update document_number_formats set next_seq = 1 where doc_type='quotation' returning *`).then(r => { if (!r.rowCount) throw new Error('blocked') }))
     await as(U.ownerA, `update document_number_formats set next_seq = 30000 where doc_type='quotation'`)
-    await as(U.accA, `insert into invoices(company_id,doc_type,number) values ($1,'quotation',$2)`, [A, `AS0030000/${yr}`])   // e.g. typed by hand earlier
-    expect((await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n).toBe(`AS0030001/${yr}`)
+    await as(U.accA, `insert into invoices(company_id,doc_type,number) values ($1,'quotation',$2)`, [A, `AS-030000/${yr}`])   // e.g. typed by hand earlier
+    expect((await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n).toBe(`AS-030001/${yr}`)
     await sup(`update document_number_formats set last_year = last_year - 1 where company_id=$1 and doc_type='quotation'`, [A])  // simulate a new year
-    expect((await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n).toBe(`AS0030002/${yr}`)
+    expect((await as(U.accA, `select next_document_number('quotation') n`)).rows[0].n).toBe(`AS-030002/${yr}`)
     expect((await sup(`select format_document_number('AS','00',5,7,'/',2027) n`)).rows[0].n).toBe('AS0000007/2027')
-    expect((await sup(`select count(*)::int n from document_number_formats where company_id=$1 and doc_type='invoice'`, [A])).rows[0].n).toBe(0)   // other types unchanged
+    expect((await sup(`select format_document_number_v2('AS','-','',6,7,'/','yy',2027) n`)).rows[0].n).toBe('AS-000007/27')
+    expect((await sup(`select next_seq::int n from document_number_formats where company_id=$1 and doc_type='invoice'`, [A])).rows[0].n).toBe(611)   // invoices keep their own INV- series
   })
   it('payments: only on issued invoices, never above the balance; status follows the money', async () => {
     qtn = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status) values ($1,'quotation','QTN-T-1',1050,'sent') returning id`, [A])).rows[0].id
@@ -436,7 +437,7 @@ describe('ERP workflow (0012)', () => {
   it('concurrent numbering from two sessions never duplicates (Test C)', async () => {
     const nums = await Promise.all(Array.from({ length: 12 }, (_, i) => as(i % 2 ? U.accA : U.ownerA, `select next_document_number('quotation') n`).then(r => r.rows[0].n as string)))
     expect(new Set(nums).size).toBe(12)
-    for (const n of nums) expect(n).toMatch(/^AS00\d{5}\/\d{4}$/)
+    for (const n of nums) expect(n).toMatch(/^AS-\d{6}\/\d{4}$/)
   })
   it('project references and optional year', async () => {
     expect((await as(U.accA, `select next_document_number('project') n`)).rows[0].n).toMatch(/^PRJ-\d{4}-0001$/)
@@ -605,5 +606,77 @@ describe('Phase 1 operations (0014)', () => {
     const w = (await as(U.pmA, `insert into work_orders(company_id,number,title,project_id) values ($1,'WO-1','Fabricate',$2) returning id`, [A, p])).rows[0].id
     await as(U.pmA, `insert into work_order_members(company_id,work_order_id,employee_id) values ($1,$2,$3)`, [A, w, empRecA2])
     expect((await as(U.pmA, `delete from work_order_members where work_order_id=$1 returning employee_id`, [w])).rowCount).toBe(1)
+  })
+})
+
+describe('Approvals, saved views, custom fields & statuses (0016)', () => {
+  it('quotation approval mirrors into approval_requests and back, with notifications', async () => {
+    const q = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status) values ($1,'quotation','APR-Q-1',2100,'draft') returning id`, [A])).rows[0].id
+    await as(U.accA, `update invoices set approval_status='pending' where id=$1`, [q])
+    const r = (await sup(`select * from approval_requests where entity_id=$1`, [q])).rows
+    expect(r).toHaveLength(1); expect(r[0].status).toBe('pending'); expect(r[0].requested_by).toBe(U.accA)
+    expect((await sup(`select count(*)::int n from in_app_notifications where user_id=$1 and dedupe_key=$2`, [U.ownerA, 'approval:' + r[0].id])).rows[0].n).toBe(1)
+    // the accountant cannot decide; the owner can (via the document, as the editor does)
+    await fails(as(U.accA, `update approval_requests set status='approved' where id=$1`, [r[0].id]), /not allowed to decide/)
+    await as(U.ownerA, `update invoices set approval_status='approved', approved_by=auth.uid(), approved_at=now() where id=$1`, [q])
+    const d = (await sup(`select status, decided_by from approval_requests where id=$1`, [r[0].id])).rows[0]
+    expect(d.status).toBe('approved'); expect(d.decided_by).toBe(U.ownerA)
+    expect((await sup(`select count(*)::int n from in_app_notifications where user_id=$1 and dedupe_key=$2`, [U.accA, 'approval_decided:' + r[0].id])).rows[0].n).toBe(1)
+    await fails(as(U.ownerA, `update approval_requests set status='rejected' where id=$1`, [r[0].id]), /already decided/)
+  })
+  it('expense and outgoing-cheque thresholds create requests; a pending cheque cannot move on', async () => {
+    await as(U.ownerA, `insert into app_settings(company_id,key,value) values ($1,'approvals.expense_threshold','5000'),($1,'approvals.cheque_threshold','10000') on conflict (company_id,key) do update set value=excluded.value`, [A])
+    const small = (await as(U.accA, `insert into project_expenses(company_id,category,description,amount) values ($1,'material','Bolts',300) returning id, approval_status`, [A])).rows[0]
+    const big = (await as(U.accA, `insert into project_expenses(company_id,category,description,amount) values ($1,'material','Steel plates',7500) returning id, approval_status`, [A])).rows[0]
+    expect(small.approval_status).toBeNull(); expect(big.approval_status).toBe('pending')
+    expect((await sup(`select count(*)::int n from approval_requests where entity_type='expense' and entity_id=$1 and status='pending'`, [big.id])).rows[0].n).toBe(1)
+    const chq = (await as(U.accA, `insert into cheques(company_id,cheque_no,direction,party_name,bank_name,amount,cheque_date,status) values ($1,'APR-1','outgoing','Steel Co','ENBD',12000,'2026-11-01','issued') returning id, approval_status`, [A])).rows[0]
+    expect(chq.approval_status).toBe('pending')
+    await fails(as(U.accA, `update cheques set status='presented' where id=$1`, [chq.id]), /waiting for approval/)
+    await as(U.ownerA, `update cheques set approval_status='approved' where id=$1`, [chq.id])
+    await as(U.accA, `update cheques set status='presented' where id=$1`, [chq.id])
+    const inc = (await as(U.accA, `insert into cheques(company_id,cheque_no,direction,party_name,bank_name,amount,cheque_date,status) values ($1,'APR-2','incoming','Client','ADCB',50000,'2026-11-01','received') returning approval_status`, [A])).rows[0]
+    expect(inc.approval_status).toBeNull()   // incoming cheques never need approval
+    await sup(`delete from app_settings where company_id=$1 and key in ('approvals.expense_threshold','approvals.cheque_threshold')`, [A])
+  })
+  it('free-form requests: requester may cancel own; other tenants see nothing', async () => {
+    const id = (await as(U.pmA, `insert into approval_requests(company_id,entity_type,title,amount) values ($1,'other','Buy 2 grinders',1800) returning id`, [A])).rows[0].id
+    expect((await as(U.ownerB, `select count(*)::int n from approval_requests where id=$1`, [id])).rows[0].n).toBe(0)
+    await fails(as(U.viewerA, `insert into approval_requests(company_id,entity_type,title) values ($1,'other','x')`, [A]), /row-level security/)
+    await fails(as(U.hrA, `update approval_requests set status='cancelled' where id=$1 returning id`, [id]).then(r => { if (!r.rowCount) throw new Error('blocked') }))
+    await as(U.pmA, `update approval_requests set status='cancelled' where id=$1`, [id])
+    expect((await sup(`select status from approval_requests where id=$1`, [id])).rows[0].status).toBe('cancelled')
+  })
+  it('saved views are private unless shared; shared views need an editor', async () => {
+    await as(U.pmA, `insert into saved_views(company_id,user_id,page,name,query) values ($1,auth.uid(),'/tasks','Mine','view=mine')`, [A])
+    await as(U.pmA, `insert into saved_views(company_id,user_id,page,name,query,shared) values ($1,auth.uid(),'/tasks','Team overdue','view=overdue',true)`, [A])
+    expect((await as(U.accA, `select name from saved_views where page='/tasks' order by name`)).rows.map(r => r.name)).toEqual(['Team overdue'])
+    await fails(as(U.viewerA, `insert into saved_views(company_id,user_id,page,name,shared) values ($1,auth.uid(),'/tasks','x',true)`, [A]), /row-level security/)
+    await fails(as(U.accA, `insert into saved_views(company_id,user_id,page,name) values ($1,$2,'/tasks','spoof')`, [A, U.pmA]), /row-level security/)
+    await fails(as(U.pmA, `insert into saved_views(company_id,user_id,page,name) values ($1,auth.uid(),'javascript:alert(1)','x')`, [A]))
+  })
+  it('custom fields: settings.manage defines, editors fill, readers follow the record permission', async () => {
+    await fails(as(U.accA, `insert into custom_field_defs(company_id,entity,key,label,field_type) values ($1,'project','supervisor','Supervisor','text')`, [A]), /row-level security/)
+    await as(U.ownerA, `insert into custom_field_defs(company_id,entity,key,label,field_type) values ($1,'employee','shoe_size','Shoe size','number')`, [A])
+    await as(U.hrA, `insert into custom_field_values(company_id,entity,record_id,data) values ($1,'employee',$2,'{"shoe_size":42}')`, [A, empRecA])
+    expect((await as(U.viewerA, `select data from custom_field_values where record_id=$1`, [empRecA])).rows[0].data).toEqual({ shoe_size: 42 })
+    expect((await as(U.empA, `select count(*)::int n from custom_field_values where record_id=$1`, [empRecA])).rows[0].n).toBe(0)
+    await fails(as(U.viewerA, `update custom_field_values set data='{}' where record_id=$1 returning 1`, [empRecA]).then(r => { if (!r.rowCount) throw new Error('blocked') }))
+    expect((await sup(`select count(*)::int n from audit_logs where table_name='custom_field_values' and record_id=$1`, [empRecA])).rows[0].n).toBe(1)
+  })
+  it('custom statuses set the standard status they map to, and clear when it changes', async () => {
+    const st = (await as(U.ownerA, `insert into custom_statuses(company_id,entity,label,base_status) values ($1,'task','Waiting for material','waiting') returning id`, [A])).rows[0].id
+    const other = (await as(U.ownerA, `insert into custom_statuses(company_id,entity,label,base_status) values ($1,'project','Painting','active') returning id`, [A])).rows[0].id
+    const t = (await as(U.pmA, `insert into tasks(company_id,title) values ($1,'Weld frame') returning id`, [A])).rows[0].id
+    await as(U.pmA, `update tasks set custom_status_id=$2 where id=$1`, [t, st])
+    expect((await sup(`select status, custom_status_id from tasks where id=$1`, [t])).rows[0]).toMatchObject({ status: 'waiting', custom_status_id: st })
+    await fails(as(U.pmA, `update tasks set custom_status_id=$2 where id=$1`, [t, other]), /another record type/)
+    await as(U.pmA, `update tasks set status='completed' where id=$1`, [t])
+    expect((await sup(`select status, custom_status_id from tasks where id=$1`, [t])).rows[0]).toMatchObject({ status: 'completed', custom_status_id: null })
+  })
+  it('user preferences are private to each user', async () => {
+    await as(U.pmA, `insert into user_preferences(user_id,key,value) values (auth.uid(),'dashboard.layout','{"items":[]}')`)
+    expect((await as(U.ownerA, `select count(*)::int n from user_preferences where user_id=$1`, [U.pmA])).rows[0].n).toBe(0)
+    await fails(as(U.ownerA, `insert into user_preferences(user_id,key,value) values ($1,'dashboard.layout','{}')`, [U.pmA]), /row-level security/)
   })
 })

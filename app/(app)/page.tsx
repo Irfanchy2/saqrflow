@@ -4,7 +4,7 @@ import { getCtx } from '@/lib/auth'
 import { Card, CardHeader, EmptyState, PageHeader } from '@/components/ui/primitives'
 import { buildAlerts } from '@/lib/dashboard'
 import { summarizeCheques } from '@/lib/cheques'
-import { addDays, formatAed } from '@/lib/time'
+import { addDays, formatAed, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SmartInboxPanel } from '@/components/inbox/smart-center'
 import { Progress } from '@/components/projects/project-fields'
@@ -13,6 +13,9 @@ import { AGE_BUCKETS, receivablesAgeing } from '@/lib/sales/summary'
 import { PROJECT_STATUS } from '@/lib/projects'
 import { ACTION_LABEL, TABLE_LABEL } from '@/lib/audit'
 import { QuickActions } from '@/components/layout/quick-actions'
+import { DashboardCustomize } from '@/components/dashboard-customize'
+import { normalizeLayout, type WidgetKey } from '@/lib/dashboard-widgets'
+import { canDecide } from '@/lib/approvals'
 
 export const metadata = { title: 'Dashboard' }
 
@@ -31,6 +34,14 @@ export default async function Dashboard() {
     c.supabase.from('tasks').select('id', head1).eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).lte('due_date', c.today),
     c.can('crm.view') ? c.supabase.from('leads').select('id', head1).lte('next_followup', c.today).not('stage', 'in', '(won,lost,on_hold)') : Promise.resolve({ count: undefined }),
     c.can('documents.view') ? c.supabase.from('site_visits').select('id', head1).in('status', ['scheduled', 'rescheduled']).eq('scheduled_date', c.today) : Promise.resolve({ count: undefined }),
+  ])
+  // per-user layout + the two optional widgets (only queried when shown)
+  const prefs = await c.supabase.from('user_preferences').select('value').eq('user_id', c.userId).eq('key', 'dashboard.layout').maybeSingle()
+  const layout = normalizeLayout(prefs.data?.value)
+  const on = (k: WidgetKey) => layout.items.some(i => i.key === k && !i.hidden)
+  const extras = Promise.all([
+    on('mytasks') ? c.supabase.from('tasks').select('id,title,due_date').eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).is('deleted_at', null).order('due_date', { nullsFirst: false }).limit(8) : null,
+    on('approvals') ? c.supabase.from('approval_requests').select('id,title,amount,entity_type').eq('status', 'pending').order('requested_at').limit(20) : null,
   ])
   const [sources, cheques, activity, salesData, monthInv, monthExp, dueSoon, followDue, activeProjects, activeCount, exp30, expired, visas, vehicles, emp, docsAny, people] = await Promise.all([
     sb.from('reminder_sources').select('source_type,source_id,title,subject,owner_type,due_date,amount,direction,link').lte('due_date', in30).order('due_date').limit(60),
@@ -51,6 +62,9 @@ export default async function Dashboard() {
     canDocs ? sb.from('documents').select('id', head).is('deleted_at', null).limit(1) : null,
     c.can('audit.view') ? sb.from('profiles').select('id,full_name') : null,
   ])
+  const [myTasksRes, apprRes] = await extras
+  const myTasks = myTasksRes ? myTasksRes.data ?? [] : null
+  const pendingApprovals = apprRes ? (apprRes.data ?? []).filter(a => canDecide(a.entity_type, c.can)).slice(0, 8) : null
   const alerts = buildAlerts((sources.data ?? []) as any, c.today)
   const salesNet = (monthInv?.data ?? []).reduce((s, r) => s + Number(r.total) - Number(r.vat_amount), 0)
   const expenses = (monthExp?.data ?? []).reduce((s, r) => s + Number(r.amount), 0)
@@ -79,15 +93,8 @@ export default async function Dashboard() {
     { l: 'Cheques awaiting clearance', v: cs?.awaitingClearance.length, href: '/cheques?status=deposited' },
   ].filter(x => x.v !== undefined && x.v !== null)
 
-  return <>
-    <PageHeader title="Dashboard" sub={`${c.company.name} · ${date}`} actions={<QuickActions can={{ sales: canFin && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }} />} />
-
-    {isNew && <Card className="mb-5 p-5"><h2 className="text-sm font-semibold">Set up Averiqo</h2><p className="mt-0.5 text-sm text-muted">Four steps to a useful dashboard. Each one fills part of this page.</p>
-      <ol className="mt-4 grid gap-px overflow-hidden rounded-md border border-border bg-border text-sm sm:grid-cols-2 lg:grid-cols-4">{[['Add company documents', '/documents', 'Trade licence, VAT certificate, tenancy'], ['Add employees', '/employees', 'Passports, visas, Emirates IDs'], ['Create a quotation', '/invoices', 'Your letterhead, stamp and terms'], ['Set up reminders', '/reminders', 'Recipients and WhatsApp opt-in']].map(([t, h, s], i) =>
-        <li key={h} className="bg-surface"><Link href={h} className="block h-full p-3 hover:bg-surface-2/60"><div className="font-medium"><span className="me-1.5 tabular-nums text-muted">{i + 1}.</span>{t}</div><div className="mt-0.5 text-xs text-muted">{s}</div></Link></li>)}</ol></Card>}
-
-    {/* 1. financial pulse */}
-    {sk && ageing && cs && <Card className="mb-5 grid grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+  const W: Partial<Record<WidgetKey, React.ReactNode>> = {
+    finance: (sk && ageing && cs) ? <>{sk && ageing && cs && <Card className="mb-5 grid grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
       <Link href="/invoices?tab=receivables" className="group block border-b border-border p-5 hover:bg-surface-2/30 lg:border-b-0 lg:border-e">
         <div className="flex items-center justify-between text-xs font-medium text-muted"><span>Outstanding receivables</span><ArrowRight size={14} className="opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" aria-hidden /></div>
         <div className="mt-1.5 text-[28px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{formatAed(sk.outstanding)}</div>
@@ -107,37 +114,49 @@ export default async function Dashboard() {
             <div className="mt-1 truncate text-lg font-semibold tabular-nums tracking-[-0.01em]">{x.v}</div><div className="truncate text-xs text-muted" title={x.h}>{x.h}</div></Link>)}
       </div>
     </Card>}
-    {sk && expenses > 0 && <p className="-mt-3 mb-5 text-xs text-muted">Recorded expenses this month: <Link href="/expenses" className="font-medium text-fg tabular-nums hover:text-primary">{formatAed(expenses)}</Link>. Estimated margin {formatAed(salesNet - expenses)} (sales ex VAT minus recorded expenses; labour and overheads are only included if recorded).</p>}
-
-    {/* 2. what needs attention */}
-    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] [&>*]:min-w-0">
-      <Card><CardHeader title="Needs attention" sub="Overdue or due within 30 days" action={c.can('reminders.create') ? <Link href="/reminders" className="text-xs font-medium text-primary hover:underline">All reminders</Link> : undefined} />
+    {sk && expenses > 0 && <p className="-mt-3 mb-5 text-xs text-muted">Recorded expenses this month: <Link href="/expenses" className="font-medium text-fg tabular-nums hover:text-primary">{formatAed(expenses)}</Link>. Estimated margin {formatAed(salesNet - expenses)} (sales ex VAT minus recorded expenses; labour and overheads are only included if recorded).</p>}</> : null,
+    attention: <Card><CardHeader title="Needs attention" sub="Overdue or due within 30 days" action={c.can('reminders.create') ? <Link href="/reminders" className="text-xs font-medium text-primary hover:underline">All reminders</Link> : undefined} />
         {!alerts.length ? <EmptyState icon={CheckCircle2} title="Nothing is due" body="No documents, cheques, invoices or renewals fall due in the next 30 days." /> :
           <ul className="max-h-[440px] divide-y divide-border overflow-y-auto">{alerts.slice(0, 20).map(a => <li key={a.key}><Link href={a.href} className="group flex items-start gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2/50">
             <span className={cn('mt-0.5 w-[72px] shrink-0 text-xs font-medium tabular-nums', a.severity === 'critical' ? 'text-danger' : a.severity === 'warning' ? 'text-warning' : 'text-muted')}>{a.days < 0 ? `${-a.days}d late` : a.days === 0 ? 'Today' : `In ${a.days}d`}</span>
-            <span className="min-w-0 flex-1"><span className="block truncate font-medium" title={a.text}>{a.text}</span><span className="block truncate text-xs text-muted">{a.sub}</span></span></Link></li>)}</ul>}</Card>
-      <div className="flex min-w-0 flex-col gap-5">
-        {ops.length > 0 && <Card><CardHeader title="Operations" />
+            <span className="min-w-0 flex-1"><span className="block truncate font-medium" title={a.text}>{a.text}</span><span className="block truncate text-xs text-muted">{a.sub}</span></span></Link></li>)}</ul>}</Card>,
+    operations: ops.length > 0 && <Card><CardHeader title="Operations" />
           <ul className="divide-y divide-border">{ops.map(o => <li key={o.l}><Link href={o.href} className="flex items-center justify-between gap-3 px-4 py-2 text-sm hover:bg-surface-2/50">
             <span className="min-w-0 truncate text-muted">{o.l}</span>
-            <span className={cn('font-semibold tabular-nums', !o.v ? 'text-muted/60' : o.bad ? 'text-danger' : o.warn ? 'text-warning' : 'text-fg')}>{o.v}</span></Link></li>)}</ul></Card>}
-        {(c.can('documents.upload') || c.can('employees.view_sensitive')) && <SmartInboxPanel c={c} />}
-      </div>
-    </div>
-
-    {/* 3. operations detail */}
-    <div className="mt-5 grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] [&>*]:min-w-0">
-      {activeProjects && <Card><CardHeader title="Projects in progress" sub={`${activeCount?.count ?? 0} active`} action={<Link href="/projects" className="text-xs font-medium text-primary hover:underline">All projects</Link>} />
+            <span className={cn('font-semibold tabular-nums', !o.v ? 'text-muted/60' : o.bad ? 'text-danger' : o.warn ? 'text-warning' : 'text-fg')}>{o.v}</span></Link></li>)}</ul></Card> || null,
+    inbox: (c.can('documents.upload') || c.can('employees.view_sensitive')) ? <SmartInboxPanel c={c} /> : null,
+    projects: activeProjects && <Card><CardHeader title="Projects in progress" sub={`${activeCount?.count ?? 0} active`} action={<Link href="/projects" className="text-xs font-medium text-primary hover:underline">All projects</Link>} />
         {!(activeProjects.data ?? []).length ? <EmptyState icon={HardHat} title="No open projects" body="Create a project to follow fabrication and site progress, costs and billing." /> :
           <ul className="divide-y divide-border">{(activeProjects.data ?? []).map((p: any) => <li key={p.id}><Link href={`/projects/${p.id}`} className="grid gap-2 px-4 py-3 hover:bg-surface-2/50 sm:grid-cols-[minmax(0,1fr)_130px_130px] sm:items-center">
             <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}</span><span className="block truncate text-xs text-muted">{p.customer?.name ?? 'No customer'} · {PROJECT_STATUS[p.status]?.label}</span></span>
-            <Progress label="Fabrication" value={p.fabrication_progress} /><Progress label="Site" value={p.site_progress} tone="bg-success" /></Link></li>)}</ul>}</Card>}
-      <Card><CardHeader title="Recent activity" action={c.can('audit.view') ? <Link href="/audit" className="text-xs font-medium text-primary hover:underline">Audit log</Link> : undefined} />
+            <Progress label="Fabrication" value={p.fabrication_progress} /><Progress label="Site" value={p.site_progress} tone="bg-success" /></Link></li>)}</ul>}</Card> || null,
+    activity: <Card><CardHeader title="Recent activity" action={c.can('audit.view') ? <Link href="/audit" className="text-xs font-medium text-primary hover:underline">Audit log</Link> : undefined} />
         {activity ? ((activity.data?.length ?? 0) === 0 ? <EmptyState title="No activity yet" /> :
           <ul className="divide-y divide-border text-sm">{activity.data!.map(a => <li key={a.id} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
             <span className="min-w-0 truncate"><span className="font-medium">{TABLE_LABEL[a.table_name] ?? a.table_name.replace(/_/g, ' ')}</span> <span className="text-muted">{(ACTION_LABEL[a.action] ?? a.action).toLowerCase()} by {a.user_id ? who.get(a.user_id) ?? 'a former user' : 'the system'}</span></span>
             <time className="shrink-0 text-xs tabular-nums text-muted">{new Date(a.created_at).toLocaleString('en-GB', { timeZone: c.company.timezone, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</time></li>)}</ul>)
-          : <EmptyState title="Activity is visible to owners" body="Ask an owner for access to the audit trail." />}</Card>
+          : <EmptyState title="Activity is visible to owners" body="Ask an owner for access to the audit trail." />}</Card>,
+    mytasks: myTasks ? <Card><CardHeader title="My tasks" sub="Open, by due date" action={<Link href="/tasks?view=mine" className="text-xs font-medium text-primary hover:underline">All my tasks</Link>} />
+      {!myTasks.length ? <EmptyState icon={CheckCircle2} title="No open tasks" /> : <ul className="divide-y divide-border text-sm">{myTasks.map((t: any) => <li key={t.id}><Link href={`/tasks?view=mine&open=${t.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/50">
+        <span className="min-w-0 flex-1 truncate">{t.title}</span>{t.due_date && <span className={cn('shrink-0 text-xs tabular-nums', t.due_date < c.today ? 'font-medium text-danger' : 'text-muted')}>{t.due_date === c.today ? 'Today' : formatShortDate(t.due_date)}</span>}</Link></li>)}</ul>}</Card> : null,
+    approvals: pendingApprovals ? <Card><CardHeader title="Waiting for approval" action={<Link href="/approvals" className="text-xs font-medium text-primary hover:underline">Approvals</Link>} />
+      {!pendingApprovals.length ? <EmptyState icon={CheckCircle2} title="Nothing to approve" /> : <ul className="divide-y divide-border text-sm">{pendingApprovals.map((a: any) => <li key={a.id}><Link href={`/approvals?open=${a.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/50">
+        <span className="min-w-0 flex-1 truncate">{a.title}</span>{a.amount !== null && <span className="shrink-0 text-xs tabular-nums text-muted">{formatAed(a.amount)}</span>}</Link></li>)}</ul>}</Card> : null,
+  }
+  const visible = layout.items.filter(i => !i.hidden && W[i.key])
+  const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className="min-w-0">{W[i.key]}</div>)
+
+  return <>
+    <PageHeader title="Dashboard" sub={`${c.company.name} · ${date}`} actions={<><DashboardCustomize layout={layout} available={(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))} /><QuickActions can={{ sales: canFin && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }} /></>} />
+
+    {isNew && <Card className="mb-5 p-5"><h2 className="text-sm font-semibold">Set up Averiqo</h2><p className="mt-0.5 text-sm text-muted">Four steps to a useful dashboard. Each one fills part of this page.</p>
+      <ol className="mt-4 grid gap-px overflow-hidden rounded-md border border-border bg-border text-sm sm:grid-cols-2 lg:grid-cols-4">{[['Add company documents', '/documents', 'Trade licence, VAT certificate, tenancy'], ['Add employees', '/employees', 'Passports, visas, Emirates IDs'], ['Create a quotation', '/invoices', 'Your letterhead, stamp and terms'], ['Set up reminders', '/reminders', 'Recipients and WhatsApp opt-in']].map(([t, h, s], i) =>
+        <li key={h} className="bg-surface"><Link href={h} className="block h-full p-3 hover:bg-surface-2/60"><div className="font-medium"><span className="me-1.5 tabular-nums text-muted">{i + 1}.</span>{t}</div><div className="mt-0.5 text-xs text-muted">{s}</div></Link></li>)}</ol></Card>}
+
+    {col('top')}
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] [&>*]:min-w-0">
+      <div className="flex min-w-0 flex-col gap-5">{col('left')}</div>
+      <div className="flex min-w-0 flex-col gap-5">{col('right')}</div>
     </div>
   </>
 }

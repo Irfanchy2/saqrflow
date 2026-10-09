@@ -15,6 +15,8 @@ import { STATUS_TONE, statusLabel } from '@/lib/sales/docs'
 import { formatAed, formatShortDate } from '@/lib/time'
 import { waLink } from '@/lib/phone'
 import { cn } from '@/lib/utils'
+import { RecordActivity } from '@/components/record-activity'
+import { CustomFieldsCard } from '@/components/custom-fields-card'
 
 export const metadata = { title: 'Lead' }
 
@@ -124,5 +126,6 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               <span className="min-w-0 flex-1 truncate">{t.title}</span>{t.due_date && <span className="text-xs tabular-nums text-muted">{formatShortDate(t.due_date)}</span>}<Badge tone={TASK_STATUS[t.status]?.tone}>{TASK_STATUS[t.status]?.label}</Badge></Link></li>)}</ul>}</Card>
       </div>
     </div>
+    <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="lead" recordId={id} customStatusId={l.custom_status_id} /><RecordActivity c={c} table="leads" id={id} /></div>
   </>
 }
