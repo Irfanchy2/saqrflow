@@ -24,7 +24,7 @@ const session = (u, sid = crypto.randomUUID()) => {   // like GoTrue, a refresh 
 const user = u => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, email_confirmed_at: new Date().toISOString(), app_metadata: {}, user_metadata: {}, factors: [], created_at: new Date().toISOString() })
 const body = req => new Promise(r => { const c = []; req.on('data', d => c.push(d)); req.on('end', () => r(Buffer.concat(c))) })
 const json = (res, code, o) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)) }
-const ocrFixtures = new Map(), geminiFixtures = [], mockCalls = { ocrspace: [], gemini: [] }
+const ocrFixtures = new Map(), geminiFixtures = [], mockCalls = { ocrspace: [], gemini: [], graph: [] }, graphTemplates = new Map()
 const UNKNOWN_DOC = { document_type: 'unknown', category: 'other', document_owner_type: 'unknown', company_name: null, employee_name: null, document_number: null, issue_date: null, expiry_date: null, issuing_authority: null, confidence: 0.3, fields: [], requires_manual_review: true }
 
 http.createServer(async (req, res) => {
@@ -58,6 +58,33 @@ http.createServer(async (req, res) => {
       return json(res, 200, { ok: true })
     }
     if (path === '/mock/calls') return json(res, 200, mockCalls)
+    // WhatsApp Business Cloud API (Graph) stand-in: same paths and response shapes as graph.facebook.com/<version>/…
+    const gm = path.match(/^\/mock\/graph\/v[\d.]+\/(.+)$/)
+    if (gm) {
+      const rest = gm[1], raw = req.method === 'POST' ? await body(req) : Buffer.alloc(0)
+      const auth = req.headers.authorization ?? ''
+      if (!/^(Bearer|OAuth) test-wa-token$/.test(auth)) return json(res, 401, { error: { message: 'Invalid OAuth access token', code: 190 } })
+      const call = { method: req.method, path: rest, type: req.headers['content-type'] ?? '', size: raw.length, json: null }
+      try { if (String(call.type).includes('json')) call.json = JSON.parse(raw.toString()) } catch {}
+      mockCalls.graph.push(call)
+      let mm
+      if (req.method === 'GET' && /^\d+$/.test(rest)) return json(res, 200, { display_phone_number: '+971 4 555 0100', verified_name: 'Al Saqr Test', quality_rating: 'GREEN', id: rest })
+      if (req.method === 'POST' && /^\d+\/media$/.test(rest)) return raw.includes(Buffer.from('%PDF-')) ? json(res, 200, { id: `media-${mockCalls.graph.length}` }) : json(res, 400, { error: { message: 'Not a PDF', code: 131053 } })
+      if (req.method === 'POST' && /^\d+\/messages$/.test(rest)) {
+        if (String(call.json?.to ?? '').endsWith('000')) return json(res, 400, { error: { message: 'Message undeliverable', code: 131026 } })
+        if (call.json?.type === 'template' && graphTemplates.get(call.json.template.name)?.status !== 'APPROVED') return json(res, 400, { error: { message: 'Template not approved', code: 132001 } })
+        return json(res, 200, { messaging_product: 'whatsapp', contacts: [{ wa_id: call.json?.to }], messages: [{ id: `wamid.TEST${mockCalls.graph.length}` }] })
+      }
+      if (req.method === 'POST' && (mm = rest.match(/^(\d+)\/uploads$/))) return json(res, 200, { id: 'upload:TEST1' })
+      if (req.method === 'POST' && rest === 'upload:TEST1') return json(res, 200, { h: 'handle-TEST1' })
+      if ((mm = rest.match(/^(\d+)\/message_templates/))) {
+        if (req.method === 'POST') { const t = { id: `tpl-${call.json.name}`, name: call.json.name, language: call.json.language, status: 'PENDING', components: call.json.components }; graphTemplates.set(t.name, t); return json(res, 200, { id: t.id, status: 'PENDING', category: 'UTILITY' }) }
+        return json(res, 200, { data: [...graphTemplates.values()] })
+      }
+      if (req.method === 'POST' && rest.startsWith('tpl-')) { const t = [...graphTemplates.values()].find(x => x.id === rest); if (t) { t.components = call.json.components; t.status = 'PENDING' } return json(res, 200, { success: true }) }
+      return json(res, 404, { error: { message: `unknown graph path ${rest}` } })
+    }
+    if (path === '/mock/graph-approve' && req.method === 'POST') { const b = JSON.parse((await body(req)).toString()); for (const n of b.names) { const t = graphTemplates.get(n); if (t) t.status = 'APPROVED' } return json(res, 200, { ok: true }) }
     if (path === '/mock/ocrspace/parse/image' && req.method === 'POST') {
       const buf = await body(req)
       if (req.headers.apikey !== 'test-ocr-key') { res.writeHead(403, { 'content-type': 'text/plain' }); return res.end('The API key is invalid or has been revoked') }

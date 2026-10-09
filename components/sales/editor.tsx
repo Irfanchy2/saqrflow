@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { WhatsAppSend } from '@/components/whatsapp/send'
 import { clearDraft, draftAge, readDraft, writeDraft } from '@/lib/drafts'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -217,6 +218,12 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const termsTpl = templates.filter(x => x.kind === 'terms'), payTpl = templates.filter(x => x.kind === 'payment')
   const canDeliver = isQtn && canStatus && !['cancelled', 'rejected'].includes(doc.status) && Object.values(delivery).some(d => d.ordered - d.delivered > 0)
   const approval = doc.approval_status as string | null
+  // Send via WhatsApp (Cloud API, PDF attached): the document itself, plus a follow-up / payment reminder once it has been sent
+  const waKinds: [string, string][] = canStatus ? [
+    ...(t === 'quotation' || t === 'invoice' || t === 'delivery_note' ? [[t, 'WhatsApp'] as [string, string]] : []),
+    ...(isQtn && ['sent', 'viewed', 'follow_up'].includes(doc.status) ? [['quotation_followup', 'Follow-up'] as [string, string]] : []),
+    ...(t === 'invoice' && ['sent', 'partially_paid', 'overdue'].includes(doc.status) ? [['payment_reminder', 'Reminder'] as [string, string]] : []),
+  ] : []
 
   return <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
     {/* toolbar */}
@@ -235,6 +242,8 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
         {editable && <Button size="sm" onClick={() => save()} disabled={saving || !dirty}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}Save</Button>}
         <Button size="sm" variant="secondary" onClick={() => (dirty ? save(openPrint) : openPrint())}><Printer size={14} /><span className="hidden sm:inline">Print</span></Button>
         <Button size="sm" variant="secondary" onClick={() => (dirty ? save(download) : download())}><Download size={14} /><span className="hidden sm:inline">PDF</span></Button>
+        {waKinds.map(([k, l]) => <WhatsAppSend key={k} kind={k} recordId={doc.id} label={l}
+          trigger={open => <Button size="sm" variant="secondary" onClick={() => (dirty ? save(open) : open())} aria-label={`Send ${l === 'WhatsApp' ? meta.label.toLowerCase() : l.toLowerCase()} via WhatsApp`}><MessageCircle size={14} /><span className="hidden sm:inline">{l}</span></Button>} />)}
         <Menu label={<><MoreHorizontal size={15} /><span className="sr-only">More actions</span></>} busy={busy}>
           {canVault && <MenuItem icon={FolderArchive} onClick={() => run(() => archivePdfToVault(doc.id), { saveFirst: true })}>Save PDF to Document Vault</MenuItem>}
           <MenuItem icon={Mail} href={mail} onClick={() => void logSalesEvent(doc.id, 'emailed')}>Email to customer…</MenuItem>

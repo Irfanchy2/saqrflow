@@ -1,3 +1,5 @@
+import { WhatsAppSend } from '@/components/whatsapp/send'
+import { WhatsAppHistory } from '@/components/whatsapp/history'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, BookOpen, Clock, FileText, HardHat, Landmark, Mail, MapPin, MessageCircle, Pencil, Phone, Receipt, Target, Trash2, Wallet } from 'lucide-react'
@@ -73,6 +75,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           {cu.notes && <p className="mt-2 max-w-3xl whitespace-pre-line text-sm text-muted">{cu.notes}</p>}</div></div>
       <div className="flex flex-wrap gap-2">
         {fin && <LinkButton href={`/parties/${id}/ledger`} variant="secondary"><BookOpen size={14} />Ledger & statement</LinkButton>}
+        {fin && edit && <WhatsAppSend kind="statement" recordId={id} label="Send statement" size="md" />}
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit client" icon={<Pencil size={14} />}><ActionForm action={updateParty.bind(null, 'customers', id)} resetOnSuccess={false}><PartyFields p={cu} /></ActionForm></DialogButton>}
         {edit && fin && <NewSalesButtons customerId={id} only={['quotation', 'invoice']} />}
         {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'customer', id)} confirm={`Move “${cu.name}” to the trash? Their documents and invoices are kept; an admin can restore the customer from Settings → Trash.`}><Trash2 size={14} />Delete</ActionButton>}
@@ -117,6 +120,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <ul className="divide-y divide-border">{docs.map((d: any) => <li key={d.id}><Link href={`/documents/${d.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">
             <FileText size={15} className="text-primary" aria-hidden /><span className="min-w-0 flex-1 truncate">{d.name}</span><span className="text-xs text-muted">{localDate(d.created_at, c.company.timezone)}</span></Link></li>)}</ul>}</Card>
     </div>
+    {fin && <div className="mt-5"><WhatsAppHistory c={c} partyType="customer" partyId={id} /></div>}
     <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><ShareLinks c={c} kind="customer_portal" target="customer" targetId={id} recipient={cu.contact_person ?? cu.name} sub="Your customer sees their quotations (and can accept them), invoices, statement and project progress. Read-only." shareText={`Your account with ${c.company.name}`} /><ShareLinks c={c} kind="document_request" target="customer" targetId={id} title="Request documents" recipient={cu.contact_person ?? cu.name} sub="Ask for trade licence, TRN certificate, LPO and similar. Files arrive in Smart Inbox for review." shareText={`${c.company.name}: documents requested`} /><CustomFieldsCard c={c} entity="customer" recordId={id} /><RecordTasks c={c} type="customer" id={id} title={`Follow up ${cu.name}`} /><CustomerServiceCard c={c} customerId={id} /><RecordActivity c={c} table="customers" id={id} className="xl:col-span-2" /></div>
   </>
 }

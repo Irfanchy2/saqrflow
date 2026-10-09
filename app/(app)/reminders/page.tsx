@@ -1,3 +1,4 @@
+import { KINDS, maskPhone } from '@/lib/whatsapp/messages'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { BellRing, Play, Plus, Send, UserPlus } from 'lucide-react'
@@ -94,16 +95,16 @@ async function Log({ c, sp }: { c: C; sp: Record<string, string | undefined> }) 
   const by = (s: string) => (all ?? []).filter(x => x.status === s).length
   const cost = (all ?? []).filter(x => x.channel === 'whatsapp' && ['sent', 'delivered', 'read'].includes(x.status)).reduce((a, x) => a + Number(x.cost_estimate ?? 0), 0)
   const hasCost = (all ?? []).some(x => x.cost_estimate != null)
-  const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
+  const cls = 'h-11 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-base sm:h-9 sm:flex-none sm:text-sm'
   return <>
     <Metrics className="mb-4" cols={6}>{[['Sandbox', by('sandbox')], ['Sent', by('sent')], ['Delivered', by('delivered') + by('read')], ['Failed', by('failed')], ['Retrying', by('retry')], ['Skipped', by('skipped')]].map(([l, n]) => <StatCard key={l as string} label={`${l} this month`} value={n as number} tone={l === 'Failed' && n ? 'red' : 'neutral'} />)}</Metrics>
     {hasCost ? <p className="mb-3 text-sm text-muted">Estimated WhatsApp cost this month: <b>{formatAed(cost)}</b> (based on the per-message price in Settings; actual charges come from Meta).</p> : <p className="mb-3 text-xs text-muted">Add a per-message price in Settings to see estimated WhatsApp cost.</p>}
-    <form className="mb-3 flex gap-2"><input type="hidden" name="tab" value="log" /><select name="channel" defaultValue={sp.channel ?? ''} className={cls}><option value="">All channels</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="in_app">In-app</option></select>
-      <select name="status" defaultValue={sp.status ?? ''} className={cls}><option value="">All statuses</option>{Object.keys(STATUS_TONE).map(s => <option key={s}>{s}</option>)}</select><button className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-fg">Filter</button></form>
+    <form className="mb-3 flex flex-wrap gap-2"><input type="hidden" name="tab" value="log" /><select name="channel" defaultValue={sp.channel ?? ''} className={cls}><option value="">All channels</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="in_app">In-app</option></select>
+      <select name="status" defaultValue={sp.status ?? ''} className={cls}><option value="">All statuses</option>{Object.keys(STATUS_TONE).map(s => <option key={s}>{s}</option>)}</select><button className="h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-fg sm:h-9">Filter</button></form>
     <Card className="overflow-hidden"><CardHeader title="Delivery log" sub={`${count ?? 0} message(s)`} />
       {!data?.length ? <EmptyState title="No messages yet" body="Messages appear here as soon as the first reminder is queued." /> :
         <TableWrap><thead className="border-b border-border"><tr><Th>When</Th><Th>Recipient</Th><Th>Channel</Th><Th>Message</Th><Th>Status</Th><Th>Attempts</Th><Th /></tr></thead><tbody className="divide-y divide-border">
-          {data.map((l: any) => <tr key={l.id}><Td className="whitespace-nowrap text-xs tabular-nums text-muted">{l.created_at.slice(0, 16).replace('T', ' ')}</Td><Td>{l.recipient?.name ?? '—'}</Td><Td><Badge>{l.channel.replace('_', '-')}</Badge></Td>
+          {data.map((l: any) => <tr key={l.id}><Td className="whitespace-nowrap text-xs tabular-nums text-muted">{l.created_at.slice(0, 16).replace('T', ' ')}</Td><Td>{l.recipient?.name ?? (l.to_number ? `${KINDS[l.kind]?.label ?? 'WhatsApp'} · ${maskPhone(l.to_number)}` : '—')}</Td><Td><Badge>{l.channel.replace('_', '-')}</Badge></Td>
             <Td className="max-w-[260px] truncate text-muted" title={l.params?.document ?? l.params?.type ?? l.template}>{l.params?.document ?? l.params?.type ?? l.template.replace('_', ' ')}</Td>
             <Td><Badge tone={STATUS_TONE[l.status]}>{l.status}</Badge>{l.sandbox && <div className="text-[11px] text-warning">not sent</div>}{l.last_error && <div className="mt-1 max-w-[260px] text-xs text-danger">{l.last_error}</div>}</Td>
             <Td className="tabular-nums text-muted">{l.attempts}/{l.max_attempts}</Td>

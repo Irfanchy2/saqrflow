@@ -15,16 +15,21 @@ export function mergeStatus(current: string, incoming: string): string {
 
 export interface StatusEvent { id: string; status: string; timestamp?: string; error?: string }
 export interface InboundMessage { from: string; text: string }
-export function parseWebhook(body: any): { statuses: StatusEvent[]; messages: InboundMessage[] } {
-  const statuses: StatusEvent[] = [], messages: InboundMessage[] = []
+/** any inbound message (text, image, document…): opens WhatsApp's 24-hour customer-service window for that number */
+export interface Inbound { from: string; phoneNumberId: string | null; at: string }
+export function parseWebhook(body: any): { statuses: StatusEvent[]; messages: InboundMessage[]; inbound: Inbound[] } {
+  const statuses: StatusEvent[] = [], messages: InboundMessage[] = [], inbound: Inbound[] = []
   for (const entry of body?.entry ?? []) for (const ch of entry?.changes ?? []) {
     for (const s of ch?.value?.statuses ?? []) statuses.push({
       id: s.id, status: s.status, timestamp: s.timestamp,
       error: s.errors?.[0] ? `${s.errors[0].title ?? s.errors[0].message ?? 'error'} (code ${s.errors[0].code})` : undefined,
     })
-    for (const m of ch?.value?.messages ?? []) if (m?.type === 'text') messages.push({ from: `+${m.from}`, text: String(m.text?.body ?? '') })
+    for (const m of ch?.value?.messages ?? []) {
+      if (m?.type === 'text') messages.push({ from: `+${m.from}`, text: String(m.text?.body ?? '') })
+      if (m?.from) inbound.push({ from: `+${m.from}`, phoneNumberId: ch?.value?.metadata?.phone_number_id ?? null, at: new Date(Number(m.timestamp ?? Date.now() / 1000) * 1000).toISOString() })
+    }
   }
-  return { statuses, messages }
+  return { statuses, messages, inbound }
 }
 /** STOP/UNSUBSCRIBE → opt out. START/YES → opt in (explicit consent). Anything else: ignore. */
 export function optIntent(text: string): 'opt_out' | 'opt_in' | null {

@@ -67,6 +67,7 @@ The e2e harness replaces only Supabase **Auth and Storage** with a small local s
 4. Message Templates → create the four templates listed in Settings (names `saqrflow_document_reminder`, `saqrflow_payment_alert`, `saqrflow_daily_summary`, `saqrflow_test_message`; category *Utility*, language *en*, body text exactly as shown). Business-initiated messages **require approved templates**.
 5. Webhook: callback `https://<app>/api/webhooks/whatsapp`, verify token = `WHATSAPP_VERIFY_TOKEN`, subscribe to `messages`; set `WHATSAPP_APP_SECRET` (App → Settings → Basic) so signatures can be verified.
 6. Add recipients (Smart Reminders → Recipients) and **record their opt-in**. Until credentials exist the UI shows `WhatsApp: SANDBOX` and logs `sandbox / not sent`.
+7. **Send via WhatsApp** to customers, suppliers and employees (quotations, invoices, delivery notes, receipts, payslips, statements, reminders, project updates): add the WhatsApp Business Account ID and App ID, submit the `averiqo_*` templates from **Settings → WhatsApp message templates**, and see [docs/WHATSAPP.md](docs/WHATSAPP.md).
 
 Costs: Meta bills per conversation/message by category and country; enter your price in Settings to see an *estimate* in the delivery log. Verify current pricing with Meta.
 

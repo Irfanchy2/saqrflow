@@ -1,3 +1,5 @@
+import { WhatsAppHistory } from '@/components/whatsapp/history'
+import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed, Plus, UserRound } from 'lucide-react'
@@ -67,9 +69,9 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         <ActionForm action={createDocument} submit="Save document"><input type="hidden" name="owner_type" value="employee" /><input type="hidden" name="owner_id" value={id} />
           <DocFields categories={cats ?? []} people={people ?? []} fileRequired /></ActionForm></DialogButton> : undefined} />
         {!docs?.length ? <EmptyState title="No documents on file" body="Add the passport, Emirates ID, residence visa, work permit, labour contract and medical insurance." /> :
-          <TableWrap><thead className="border-b border-border"><tr><Th>Document</Th><Th>Number</Th><Th>Expiry</Th><Th>Status</Th></tr></thead>
+          <TableWrap><thead className="border-b border-border"><tr><Th>Document</Th><Th>Number</Th><Th>Expiry</Th><Th>Status</Th>{canEdit && <Th><span className="sr-only">Remind</span></Th>}</tr></thead>
             <tbody className="divide-y divide-border">{docs.map((d: any) => <tr key={d.id} className="hover:bg-surface-2/50"><Td><Link className="font-medium hover:text-primary" href={`/documents/${d.id}`}>{d.category?.name ?? d.name}</Link><div className="text-xs text-muted">{d.name}</div></Td>
-              <Td className="font-mono text-xs text-muted">{d.reference_no ?? '—'}</Td><Td className="tabular-nums">{d.expiry_date ?? '—'}</Td><Td><StatusBadge doc={d} today={c.today} /></Td></tr>)}</tbody></TableWrap>}</Card>
+              <Td className="font-mono text-xs text-muted">{d.reference_no ?? '—'}</Td><Td className="tabular-nums">{d.expiry_date ?? '—'}</Td><Td><StatusBadge doc={d} today={c.today} /></Td>{canEdit && <Td className="text-right">{d.expiry_date && <WhatsAppSend kind="document_expiry" recordId={d.id} label="Remind" ariaLabel={`Send ${d.category?.name ?? d.name} expiry reminder via WhatsApp`} variant="ghost" />}</Td>}</tr>)}</tbody></TableWrap>}</Card>
       <Card><CardHeader title="Compliance checklist" sub={`${checklist.score}% complete`} />
         <ul className="divide-y divide-border">{checklist.items.map(i => <li key={i.name} className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm">
           <span className="flex items-center gap-2">{i.state === 'missing' || i.state === 'expired' ? <AlertTriangle size={15} className="text-danger" /> : i.state === 'expiring_soon' ? <CircleDashed size={15} className="text-warning" /> : <CheckCircle2 size={15} className="text-success" />}{i.name}</span>
@@ -77,6 +79,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
 
     {tab === 'personal' && <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="employee" recordId={id} /><RecordTasks c={c} type="employee" id={id} /></div>}
     {tab === 'history' && canSens && <RecordActivity c={c} table="employees" id={id} className="mb-5" />}
+    {tab === 'history' && (canSens || canSalary) && <div className="mb-5"><WhatsAppHistory c={c} partyType="employee" partyId={id} /></div>}
     {tab === 'documents' && canEdit && <div className="mt-5"><ShareLinks c={c} kind="document_request" target="employee" targetId={id} title="Request documents" recipient={e.full_name} sub="Send a secure upload link (WhatsApp or email) for passport, visa, Emirates ID and similar. Files arrive in Smart Inbox for review." shareText={`${c.company.name}: please upload your documents`} /></div>}
     {tab === 'salary' && canSalary && <SalaryTab id={id} c={c} />}
     {tab === 'leave' && canSens && <LeaveTab id={id} c={c} />}
@@ -99,8 +102,8 @@ async function SalaryTab({ id, c }: { id: string; c: Awaited<ReturnType<typeof g
     <Card className="lg:col-span-2"><CardHeader title="Salary payments" action={<DialogButton size="sm" label="Record payment" icon={<Plus size={14} />} title="Record salary payment">
       <ActionForm action={addSalaryPayment.bind(null, id)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Month *"><Input type="month" name="period" required /></Field><Field label="Amount (AED) *"><Input type="number" step="0.01" min="0" name="amount" defaultValue={comp?.monthly_salary} required /></Field>
         <Field label="Paid on"><Input type="date" name="paid_on" /></Field><Field label="Method"><Select name="method"><option value="">—</option><option value="wps">WPS</option><option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="cheque">Cheque</option></Select></Field></div><Field label="Notes"><Textarea name="notes" /></Field></ActionForm></DialogButton>} />
-      {!pays?.length ? <EmptyState title="No payments recorded" /> : <TableWrap><thead className="border-b border-border"><tr><Th>Period</Th><Th>Amount</Th><Th>Paid on</Th><Th>Method</Th></tr></thead><tbody className="divide-y divide-border">
-        {pays.map(p => <tr key={p.id}><Td>{p.period.slice(0, 7)}</Td><Td className="tabular-nums">{formatAed(p.amount)}</Td><Td>{p.paid_on ?? '—'}</Td><Td className="uppercase text-muted">{p.method ?? '—'}</Td></tr>)}</tbody></TableWrap>}</Card>
+      {!pays?.length ? <EmptyState title="No payments recorded" /> : <TableWrap><thead className="border-b border-border"><tr><Th>Period</Th><Th>Amount</Th><Th>Paid on</Th><Th>Method</Th>{c.can('records.edit') && <Th><span className="sr-only">Payslip</span></Th>}</tr></thead><tbody className="divide-y divide-border">
+        {pays.map(p => <tr key={p.id}><Td>{p.period.slice(0, 7)}</Td><Td className="tabular-nums">{formatAed(p.amount)}</Td><Td>{p.paid_on ?? '—'}</Td><Td className="uppercase text-muted">{p.method ?? '—'}</Td>{c.can('records.edit') && <Td className="text-right"><WhatsAppSend kind="payslip" recordId={p.id} label="Payslip" ariaLabel={`Send ${p.period.slice(0, 7)} payslip via WhatsApp`} variant="ghost" /></Td>}</tr>)}</tbody></TableWrap>}</Card>
     <Card className="lg:col-span-3"><CardHeader title="Advances & deductions" sub={`Outstanding advances: ${formatAed(outstanding)}`} action={<DialogButton size="sm" label="Add" icon={<Plus size={14} />} title="Advance / deduction">
       <ActionForm action={addAdvance.bind(null, id)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Type"><Select name="kind"><option value="advance">Advance</option><option value="deduction">Deduction</option></Select></Field><Field label="Amount (AED) *"><Input type="number" step="0.01" min="0.01" name="amount" required /></Field>
         <Field label="Date"><Input type="date" name="given_on" /></Field><Field label="Monthly recovery"><Input type="number" step="0.01" min="0" name="monthly_recovery" /></Field></div><Field label="Notes"><Textarea name="notes" /></Field></ActionForm></DialogButton>} />

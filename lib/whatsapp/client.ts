@@ -3,6 +3,8 @@ import { cloudApiPayload, renderText, type Params, type TemplateName } from './t
 export interface WhatsAppConfig { phoneNumberId?: string; accessToken?: string; apiVersion: string; forceSandbox?: boolean }
 export type SendResult = { ok: true; sandbox: boolean; messageId?: string } | { ok: false; retryable: boolean; error: string }
 
+/** Graph API base (WHATSAPP_GRAPH_URL only for a local test stand-in). */
+export const graphBase = () => (process.env.WHATSAPP_GRAPH_URL || 'https://graph.facebook.com').replace(/\/$/, '')
 export const isConfigured = (c: WhatsAppConfig) => !!c.phoneNumberId && !!c.accessToken && !c.forceSandbox
 
 /** Meta error codes that are worth retrying (throttling / transient). Everything else is permanent. */
@@ -21,7 +23,7 @@ export async function sendWhatsApp(cfg: WhatsAppConfig, to: string, template: Te
     return { ok: true, sandbox: true }
   }
   try {
-    const res = await fetchImpl(`https://graph.facebook.com/${cfg.apiVersion}/${cfg.phoneNumberId}/messages`, {
+    const res = await fetchImpl(`${graphBase()}/${cfg.apiVersion}/${cfg.phoneNumberId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${cfg.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(cloudApiPayload(template, params, to)),

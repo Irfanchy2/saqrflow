@@ -1,3 +1,4 @@
+import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, ScrollText, Target, Truck, Wallet } from 'lucide-react'
@@ -121,15 +122,16 @@ async function FollowupsTab() {
 
 async function PaymentsTab({ sp }: { sp: Record<string, string | undefined> }) {
   const c = await getCtx()
-  const page = pageOf(sp.page)
+  const page = pageOf(sp.page), edit = c.can('records.edit')
   const { data, count } = await c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name)', { count: 'exact' }).order('paid_on', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
   return <Card>{!data?.length ? <EmptyState icon={Banknote} title="No payments yet" body="Open an issued tax invoice and use “Record payment”. Partial payments update the balance and status automatically." />
-    : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Invoice</Th><Th>Customer</Th><Th>Method</Th><Th>Reference</Th><Th className="text-right">Amount (AED)</Th></tr></thead>
+    : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Invoice</Th><Th>Customer</Th><Th>Method</Th><Th>Reference</Th><Th className="text-right">Amount (AED)</Th>{edit && <Th><span className="sr-only">Send receipt</span></Th>}</tr></thead>
       <tbody className="divide-y divide-border">{data.map((p: any) => <tr key={p.id} className="hover:bg-surface-2/50">
         <Td className="tabular-nums">{p.paid_on}</Td>
         <Td>{p.invoice ? <Link href={`/invoices/${p.invoice.id}`} className="font-mono text-[13px] text-primary hover:underline">{p.invoice.number}</Link> : '—'}</Td>
         <Td className="max-w-[220px] truncate">{p.invoice?.customer_name ?? '—'}</Td><Td>{METHOD[p.method] ?? p.method ?? '—'}</Td><Td className="text-muted">{p.reference ?? '—'}</Td>
-        <Td className="text-right font-medium tabular-nums text-success">{fmtMoney(p.amount)}</Td></tr>)}</tbody></TableWrap>}
+        <Td className="text-right font-medium tabular-nums text-success">{fmtMoney(p.amount)}</Td>
+        {edit && <Td className="text-right"><WhatsAppSend kind="receipt" recordId={p.id} label="Receipt" ariaLabel="Send payment receipt via WhatsApp" variant="ghost" /></Td>}</tr>)}</tbody></TableWrap>}
     <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/invoices" /></Card>
 }
 
