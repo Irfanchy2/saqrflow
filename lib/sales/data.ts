@@ -9,7 +9,7 @@ export type BrandKind = (typeof BRAND_KINDS)[number]
 
 export interface SalesSettings { terms: string[]; paymentTerms: string[]; intro: string; closing: string; vatRate: number; dueDays: number; validityDays: number; quoteVat: 'note' | 'add'; followupDays: number[]; requireApproval: boolean }
 export async function salesSettings(c: Ctx): Promise<SalesSettings & { raw: Record<string, any> }> {
-  const { data } = await c.supabase.from('app_settings').select('key,value').or('key.like.sales.%,key.like.branding.%')
+  const { data } = await c.supabase.from('app_settings').select('key,value').eq('company_id', c.company.id).or('key.like.sales.%,key.like.branding.%')   // explicit company filter: also safe for server-side (portal) reads
   const m = Object.fromEntries((data ?? []).map(r => [r.key, r.value]))
   const arr = (v: unknown, d: string[]) => (Array.isArray(v) ? v.filter(x => typeof x === 'string') : d)
   return {
@@ -75,11 +75,11 @@ export async function brandingBytes(c: Ctx): Promise<Partial<Record<BrandKind, {
 
 export interface SalesDoc extends PaperDoc { id: string; status: string; customer_id: string | null; project_id: string | null; quotation_id: string | null; source_invoice_id: string | null; total: number; subtotal: number; vat_amount: number; pdf_document_id: string | null; created_at: string; updated_at: string; external_provider: string | null; approval_status: string | null; approval_note: string | null; approved_by: string | null; revision: number; salesperson_id: string | null }
 export async function loadSalesDoc(c: Ctx, id: string) {
-  const { data: doc } = await c.supabase.from('invoices').select('*').eq('id', id).maybeSingle()
+  const { data: doc } = await c.supabase.from('invoices').select('*').eq('id', id).eq('company_id', c.company.id).maybeSingle()
   if (!doc) return null
   const [{ data: items }, { data: pays }, { data: related }, { data: project }, { data: customer }] = await Promise.all([
-    c.supabase.from('invoice_items').select('*').eq('invoice_id', id).order('position'),
-    doc.doc_type === 'invoice' ? c.supabase.from('payments').select('*').eq('invoice_id', id).order('paid_on') : Promise.resolve({ data: [] as any[] }),
+    c.supabase.from('invoice_items').select('*').eq('invoice_id', id).eq('company_id', c.company.id).order('position'),
+    doc.doc_type === 'invoice' ? c.supabase.from('payments').select('*').eq('invoice_id', id).eq('company_id', c.company.id).order('paid_on') : Promise.resolve({ data: [] as any[] }),
     c.supabase.from('invoices').select('id,doc_type,number,status,total,issue_date,source_invoice_id,quotation_id').or(`id.eq.${doc.quotation_id ?? '00000000-0000-0000-0000-000000000000'},id.eq.${doc.source_invoice_id ?? '00000000-0000-0000-0000-000000000000'},quotation_id.eq.${id},source_invoice_id.eq.${id}`),
     doc.project_id ? c.supabase.from('projects').select('id,name,code').eq('id', doc.project_id).maybeSingle() : Promise.resolve({ data: null }),
     doc.customer_id ? c.supabase.from('customers').select('id,name').eq('id', doc.customer_id).maybeSingle() : Promise.resolve({ data: null }),

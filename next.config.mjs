@@ -29,7 +29,9 @@ export default {
       // The file route sets its own (stricter) CSP; a global object-src 'none' would stop the browser PDF viewer.
       { source: '/api/documents/:path*', headers: common },
       { source: '/api/inbox/:path*', headers: common },
-      { source: '/((?!api/documents|api/inbox).*)', headers: [{ key: 'Content-Security-Policy', value: csp }, ...common] },
+      // public enquiry forms (/f/<slug>) may be embedded in the company's own website; everything else stays same-origin only
+      { source: '/f/:path*', headers: [{ key: 'Content-Security-Policy', value: csp.replace("frame-ancestors 'self'", 'frame-ancestors *') }, ...common.filter(h => h.key !== 'X-Frame-Options')] },
+      { source: '/((?!api/documents|api/inbox|f/).*)', headers: [{ key: 'Content-Security-Policy', value: csp }, ...common] },
     ]
   },
 }

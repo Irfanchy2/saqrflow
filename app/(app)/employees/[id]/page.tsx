@@ -19,6 +19,7 @@ import { Timeline } from '@/components/timeline'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
 import { CustomFieldsCard } from '@/components/custom-fields-card'
+import { ShareLinks } from '@/components/share-links'
 
 export const metadata = { title: 'Employee' }
 const TABS = [['personal', 'Personal'], ['documents', 'Documents'], ['salary', 'Salary'], ['leave', 'Leave'], ['history', 'History']] as const
@@ -76,6 +77,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
 
     {tab === 'personal' && <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="employee" recordId={id} /><RecordTasks c={c} type="employee" id={id} /></div>}
     {tab === 'history' && canSens && <RecordActivity c={c} table="employees" id={id} className="mb-5" />}
+    {tab === 'documents' && canEdit && <div className="mt-5"><ShareLinks c={c} kind="document_request" target="employee" targetId={id} title="Request documents" recipient={e.full_name} sub="Send a secure upload link (WhatsApp or email) for passport, visa, Emirates ID and similar. Files arrive in Smart Inbox for review." shareText={`${c.company.name}: please upload your documents`} /></div>}
     {tab === 'salary' && canSalary && <SalaryTab id={id} c={c} />}
     {tab === 'leave' && canSens && <LeaveTab id={id} c={c} />}
     {tab === 'history' && canSens && <HistoryTab id={id} c={c} e={e} />}

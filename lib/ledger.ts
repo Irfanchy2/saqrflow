@@ -15,10 +15,10 @@ const METHOD: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank tran
  */
 export async function buildLedger(c: Ctx, customerId: string, f: { from?: string; to?: string; project?: string; status?: string } = {}): Promise<Ledger> {
   const [{ data: cu }, { data: docs }, { data: pays }] = await Promise.all([
-    c.supabase.from('customers').select('opening_balance,opening_balance_date').eq('id', customerId).maybeSingle(),
-    c.supabase.from('invoices').select('id,doc_type,number,status,issue_date,due_date,total,project_id,subject,source_invoice_id').eq('customer_id', customerId)
+    c.supabase.from('customers').select('opening_balance,opening_balance_date').eq('id', customerId).eq('company_id', c.company.id).maybeSingle(),
+    c.supabase.from('invoices').select('id,doc_type,number,status,issue_date,due_date,total,project_id,subject,source_invoice_id').eq('customer_id', customerId).eq('company_id', c.company.id).is('deleted_at', null)
       .in('doc_type', ['invoice', 'credit_note']).not('status', 'in', '(draft,cancelled)').order('issue_date').limit(5000),
-    c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice_id,cheque:cheques(cheque_no),invoice:invoices(number,project_id)').eq('customer_id', customerId).order('paid_on').limit(5000),
+    c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice_id,cheque:cheques(cheque_no),invoice:invoices(number,project_id)').eq('customer_id', customerId).eq('company_id', c.company.id).order('paid_on').limit(5000),
   ])
   const projOk = (p?: string | null) => !f.project || p === f.project
   const raw: Omit<LedgerEntry, 'balance'>[] = []
