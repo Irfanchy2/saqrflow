@@ -37,14 +37,31 @@ try {
 
   console.log('\n[P1] AS numbering')
   const yr = new Date().getFullYear()
-  ok((await p.locator('#numbering').innerText()).includes(`AS0025180/${yr}`), `Settings → Document numbering previews AS0025180/${yr}`)
+  ok((await p.locator('#numbering').innerText()).includes(`AS-002600/${yr}`), `Settings → Document numbering previews AS-002600/${yr}`)
   await p.goto(`${BASE}/invoices`); await p.getByRole('button', { name: 'New quotation' }).first().click(); await p.waitForURL(/\/invoices\/[0-9a-f-]{36}$/); await settle()
   const qid = p.url().split('/').pop()
   const n1 = (await one(`select number from invoices where id=$1`, [qid])).number
-  ok(n1 === `AS0025180/${yr}`, `new quotation numbered ${n1}`)
+  ok(n1 === `AS-002600/${yr}`, `new quotation numbered ${n1}`)
   await p.goto(`${BASE}/invoices`); await p.getByRole('button', { name: 'New quotation' }).first().click(); await p.waitForURL(u => /\/invoices\/[0-9a-f-]{36}$/.test(u.href) && !u.href.endsWith(qid)); await settle()
   const n2 = (await one(`select number from invoices where id=$1`, [p.url().split('/').pop()])).number
-  ok(n2 === `AS0025181/${yr}` && !/QTN/.test(n1 + n2), `next quotation ${n2} (no QTN/… format)`)
+  ok(n2 === `AS-002601/${yr}` && !/QTN/.test(n1 + n2), `next quotation ${n2} (no QTN/… format)`)
+
+  console.log('\n[P1b] Editable numbering: INV-610, DL-1300, year format, never a duplicate')
+  const newDoc = async label => { await p.goto(`${BASE}/invoices`); const before = p.url(); await p.getByRole('button', { name: label }).first().click()
+    await p.waitForURL(u => /\/invoices\/[0-9a-f-]{36}$/.test(u.href) && u.href !== before); await settle(); return (await one(`select number from invoices where id=$1`, [p.url().split('/').pop()])).number }
+  ok(/^INV-610$/.test(await newDoc('New tax invoice')), 'new tax invoice numbered INV-610')
+  ok(/^DL-1300$/.test(await newDoc('New delivery note')), 'new delivery note numbered DL-1300')
+  const qForm = async () => { await p.goto(`${BASE}/settings#numbering`); await settle(); return p.locator('#numbering details').first() }
+  let qf = await qForm()
+  await qf.getByLabel('Year format').selectOption('yy'); await qf.getByLabel('Starting number').fill('2600')
+  ok((await qf.locator('[aria-live]').innerText()) === `AS-002600/${String(yr).slice(2)}`, 'live preview follows the edited fields (AS-002600/YY)')
+  await qf.getByRole('button', { name: 'Save numbering' }).click(); await settle()
+  ok(await newDoc('New quotation') === `AS-002600/${String(yr).slice(2)}`, 'year format YY is used by the next quotation')
+  qf = await qForm(); await qf.getByLabel('Year format').selectOption('yyyy'); await qf.getByLabel('Starting number').fill('2600'); await qf.getByRole('button', { name: 'Save numbering' }).click(); await settle()
+  const n4 = await newDoc('New quotation')
+  ok(n4 === `AS-002602/${yr}`, `starting number moved back to 2600 → used numbers skipped, next is ${n4} (no duplicate)`)
+  const nums = (await db.query(`select number from invoices where company_id=$1 and doc_type='quotation' order by created_at`, [co])).rows.map(r => r.number)
+  ok(nums[0] === n1 && nums[1] === n2 && new Set(nums).size === nums.length, `existing numbers unchanged and all unique (${nums.join(', ')})`)
 
   console.log('\n[P2] Editor: alignment, address, live preview')
   await p.goto(`${BASE}/invoices/${qid}`); await settle()

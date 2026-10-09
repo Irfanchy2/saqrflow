@@ -17,15 +17,19 @@ export async function saveNumbering(docType: string, _: ActionState, fd: FormDat
       if (error) throw error
       revalidatePath('/settings'); return { ok: true, message: 'Back to the standard format.' }
     }
+    const yf = (fd.get('year_format') as string) ?? 'yyyy'
     const v = z.object({
       prefix: z.string().trim().regex(/^[A-Za-z0-9-]{0,12}$/, 'Prefix: letters, digits or “-”, up to 12'),
+      number_separator: z.enum(['', '-', '/', '.']),
       fixed_digits: z.string().trim().regex(/^[0-9]{0,6}$/, 'Fixed digits: up to 6 digits, e.g. 00'),
       seq_pad: z.coerce.number().int().min(1).max(10),
-      next_seq: z.coerce.number().int().min(1, 'Next number must be at least 1').max(9_999_999_999),
+      next_seq: z.coerce.number().int().min(1, 'Starting number must be at least 1').max(9_999_999_999),
       year_separator: z.enum(['/', '-', '']),
+      year_format: z.enum(['yyyy', 'yy']),
       yearly_reset: z.boolean(), include_year: z.boolean(),
-    }).parse({ prefix: str(fd, 'prefix') ?? '', fixed_digits: str(fd, 'fixed_digits') ?? '', seq_pad: str(fd, 'seq_pad'), next_seq: str(fd, 'next_seq'),
-      year_separator: (fd.get('year_separator') as string) ?? '/', yearly_reset: fd.get('yearly_reset') === 'on', include_year: fd.get('include_year') === 'on' })
+    }).parse({ prefix: str(fd, 'prefix') ?? '', number_separator: (fd.get('number_separator') as string) ?? '', fixed_digits: str(fd, 'fixed_digits') ?? '', seq_pad: str(fd, 'seq_pad'), next_seq: str(fd, 'next_seq'),
+      year_separator: (fd.get('year_separator') as string) ?? '/', year_format: yf === 'yy' ? 'yy' : 'yyyy', yearly_reset: fd.get('yearly_reset') === 'on', include_year: yf !== 'none' })
+    if (!v.prefix && !v.number_separator && !v.fixed_digits) return { error: 'Add a prefix (e.g. AS or INV) so numbers are recognisable.' }
     const { error } = await c.supabase.from('document_number_formats').upsert({ ...v, reset_to: 1, company_id: c.company.id, doc_type: t, updated_by: c.userId, updated_at: new Date().toISOString() })
     if (error) throw error
     revalidatePath('/settings'); return { ok: true, message: 'Numbering saved. New documents use it; existing numbers are unchanged.' }

@@ -60,7 +60,7 @@ try {
   await p.getByRole('button', { name: 'New quotation' }).first().dblclick(); await p.waitForURL(/\/invoices\/[0-9a-f-]{36}$/); await settle(1200)
   ok((await one(`select count(*)::int n from invoices where company_id=$1`, [co])).n === before + 1, 'double click created exactly ONE quotation (idempotency token)')
   const qid = docId(), qnum = (await one(`select number from invoices where id=$1`, [qid])).number
-  ok(qnum === `AS0025180/${yr}`, `numbered ${qnum}`)
+  ok(qnum === `AS-002600/${yr}`, `numbered ${qnum}`)
 
   console.log('\n[A3] Quotation with 10 items, autofill, catalog, discount, VAT categories, autosave')
   await p.locator('button[aria-haspopup="listbox"]').first().click(); await p.getByRole('combobox', { name: 'Search customers' }).fill('ABC Contracting LLC'); await p.getByRole('option', { name: /ABC Contracting LLC/ }).first().click()
@@ -98,11 +98,11 @@ try {
 
   console.log('\n[A4] Print + PDF (filename) + send history')
   const pr = await ctx.newPage(); await pr.goto(`${BASE}/print/sales/${qid}`); await pr.waitForLoadState('networkidle')
-  ok((await pr.title()) === `AS0025180-${yr}_ABC-Contracting-LLC_Quotation`, `print page title = “Save as PDF” file name (${await pr.title()})`)
+  ok((await pr.title()) === `AS-002600-${yr}_ABC-Contracting-LLC_Quotation`, `print page title = “Save as PDF” file name (${await pr.title()})`)
   await pr.emulateMedia({ media: 'print' }); await pr.pdf({ path: `${OUT}/A4-quotation.pdf`, preferCSSPageSize: true, printBackground: true }); await pr.close()
   ok(pdfPages(`${OUT}/A4-quotation.pdf`) >= 1, `browser PDF rendered (${pdfPages(`${OUT}/A4-quotation.pdf`)} page(s))`)
   const dl = await ctx.request.get(`${BASE}/api/sales/${qid}/pdf`)
-  ok(dl.ok() && /filename="AS0025180-\d{4}_ABC-Contracting-LLC_Quotation\.pdf"/.test(dl.headers()['content-disposition'] ?? ''), `download name: ${dl.headers()['content-disposition']?.match(/filename="([^"]+)"/)?.[1]}`)
+  ok(dl.ok() && /filename="AS-002600-\d{4}_ABC-Contracting-LLC_Quotation\.pdf"/.test(dl.headers()['content-disposition'] ?? ''), `download name: ${dl.headers()['content-disposition']?.match(/filename="([^"]+)"/)?.[1]}`)
   fs.writeFileSync(`${OUT}/A4-download.pdf`, await dl.body())
   const txt = execFileSync('pdftotext', ['-layout', `${OUT}/A4-download.pdf`, '-']).toString()
   ok(txt.includes((total / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })), 'downloaded PDF shows the same grand total as the editor')
@@ -126,7 +126,7 @@ try {
   await inputs.first().fill('60'); for (let i = 1; i < await inputs.count(); i++) await inputs.nth(i).fill('0')
   await dlg().getByRole('button', { name: 'Create delivery note' }).click(); await p.waitForURL(u => !u.href.includes(qid)); await settle()
   const dn = await one(`select i.number, i.quotation_id, (select quantity::text from invoice_items where invoice_id=i.id) q from invoices i where i.id=$1`, [docId()])
-  ok(/^DN-/.test(dn.number) && dn.quotation_id === qid && dn.q === '60.000', `delivery note ${dn.number}: 60 delivered, linked to the quotation`)
+  ok(/^DL-\d+$/.test(dn.number) && dn.quotation_id === qid && dn.q === '60.000', `delivery note ${dn.number}: 60 delivered, linked to the quotation`)
   await p.goto(`${BASE}/invoices/${qid}`); await settle()
   const qd = await one(`select ordered::text o, delivered::text d from quotation_delivery where quotation_id=$1 order by ordered desc limit 1`, [qid])
   ok((await body()).includes('Delivered 60 / 100') && qd.o === '100.000' && qd.d === '60.000', 'quotation shows Delivered 60 / 100 (40 remaining for the next delivery)')
@@ -137,7 +137,7 @@ try {
   const iid = docId()
   const inv = await one(`select number, status, quotation_id, total::text, terms, (select count(*)::int from invoice_items where invoice_id=$1) n, due_date::text due, issue_date::text iss from invoices where id=$1`, [iid])
   const qAfter = await one(`select status, total::text, (select string_agg(description, '|' order by position) from invoice_items where invoice_id=$1) d from invoices where id=$1`, [qid])
-  ok(/^INV-/.test(inv.number) && inv.quotation_id === qid && inv.n === 10 && inv.total === qBefore.total && inv.terms.length > 0, `invoice ${inv.number}: 10 lines, same total ${inv.total}, terms copied, linked`)
+  ok(/^INV-\d+$/.test(inv.number) && inv.quotation_id === qid && inv.n === 10 && inv.total === qBefore.total && inv.terms.length > 0, `invoice ${inv.number}: 10 lines, same total ${inv.total}, terms copied, linked`)
   ok(qAfter.status === 'converted' && qAfter.total === qBefore.total && qAfter.d === qBefore.d, 'quotation content unchanged; status Converted')
   ok(inv.due === new Date(Date.parse(inv.iss + 'T00:00:00Z') + 45 * 864e5).toISOString().slice(0, 10), `due date from the customer’s 45-day credit terms (${inv.due})`)
 
@@ -209,7 +209,7 @@ try {
   await Promise.all([p2.getByRole('button', { name: 'New quotation' }).first().click(), p3.getByRole('button', { name: 'New quotation' }).first().click()])
   await Promise.all([p2.waitForURL(/\/invoices\/[0-9a-f-]{36}$/), p3.waitForURL(/\/invoices\/[0-9a-f-]{36}$/)])
   const [n2, n3] = await Promise.all([p2, p3].map(async x => (await one(`select number from invoices where id=$1`, [x.url().split('/').pop()])).number))
-  ok(n2 !== n3 && /^AS00\d{5}\/\d{4}$/.test(n2) && /^AS00\d{5}\/\d{4}$/.test(n3), `simultaneous creation → distinct numbers ${n2} and ${n3}`)
+  ok(n2 !== n3 && /^AS-\d{6}\/\d{4}$/.test(n2) && /^AS-\d{6}\/\d{4}$/.test(n3), `simultaneous creation → distinct numbers ${n2} and ${n3}`)
   ok((await one(`select count(*)::int n from (select number from invoices where company_id=$1 and doc_type='quotation' group by number having count(*)>1) x`, [co])).n === 0, 'no duplicate quotation numbers in the database')
   await c2.close(); await p3.close()
 

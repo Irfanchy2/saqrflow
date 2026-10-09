@@ -58,7 +58,7 @@ try {
   await p.getByRole('button', { name: 'New quotation' }).first().click(); await p.waitForURL(/\/invoices\/[0-9a-f-]{36}$/); await settle()
   const qid = p.url().split('/').pop()
   const qnum = (await one(`select number from invoices where id=$1`, [qid])).number
-  ok(/^AS00\d{5}\/\d{4}$/.test(qnum), `quotation numbered automatically (${qnum})`)
+  ok(/^AS-\d{6}\/\d{4}$/.test(qnum), `quotation numbered automatically (${qnum})`)
   await p.getByLabel('Company name').fill('ABC Contracting LLC'); await p.getByLabel('Attention (contact name)').fill('Mr. Ahmed')
   await p.getByText('Save “ABC Contracting LLC” as a customer').click()
   await p.getByLabel('Address').fill('Musaffah M-44, Abu Dhabi'); await p.getByLabel('Working place / site').fill('Villa 22, Fujairah')
@@ -86,7 +86,7 @@ try {
   await menu('Convert to invoice'); await p.waitForURL(u => !u.href.endsWith(qid)); await settle()
   const iid = p.url().split('/').pop()
   const inv = await one(`select number, status, total::text, vat_amount::text, quotation_id from invoices where id=$1`, [iid])
-  ok(/^INV-/.test(inv.number) && inv.quotation_id === qid && inv.total === '34282.50' && inv.vat_amount === '1632.50', `invoice created from quotation with 5% VAT (${inv.total})`)
+  ok(/^INV-\d+$/.test(inv.number) && inv.quotation_id === qid && inv.total === '34282.50' && inv.vat_amount === '1632.50', `invoice created from quotation with 5% VAT (${inv.total})`)
   ok((await one(`select status from invoices where id=$1`, [qid])).status === 'converted', 'quotation marked Converted (its content untouched)')
   await menu('Issue tax invoice'); await settle(1000)
   ok((await one(`select status from invoices where id=$1`, [iid])).status === 'sent', 'invoice issued')
@@ -108,7 +108,7 @@ try {
   ok(vd && vd.folder === 'Customers/ABC Contracting LLC/Invoices' && vd.v === 1 && vd.r === 2, 'invoice PDF archived to Vault → Customers/ABC Contracting LLC/Invoices, linked to invoice + customer')
   await menu('Create delivery note'); await p.waitForURL(u => !u.href.endsWith(iid)); await settle()
   const dn = await one(`select number, total::text, source_invoice_id from invoices where id=$1`, [p.url().split('/').pop()])
-  ok(/^DN-/.test(dn.number) && dn.total === '0.00' && dn.source_invoice_id === iid, 'delivery note created from the invoice (unpriced)')
+  ok(/^DL-\d+$/.test(dn.number) && dn.total === '0.00' && dn.source_invoice_id === iid, 'delivery note created from the invoice (unpriced)')
   ok((await p.locator('.sales-paper').innerText()).includes('Received By'), 'delivery note preview has Delivered/Received by lines')
 
   console.log('\n[S5] Hub, receivables, customer profile')
