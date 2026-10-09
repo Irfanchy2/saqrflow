@@ -15,6 +15,8 @@ import { ACCEPT_ATTR } from '@/lib/files'
 import { formatLongDate } from '@/lib/time'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
+import { ShareLinks } from '@/components/share-links'
+import { PoSupplierCard } from '@/components/po-supplier-card'
 
 export const metadata = { title: 'Sales document' }
 const METHOD: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank transfer', cheque: 'Cheque', pdc: 'PDC cheque', card: 'Card', other: 'Other' }
@@ -152,6 +154,8 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
         {d.doc.approval_status && <p className="border-t border-border px-4 py-2 text-xs text-muted">Approval: {APPROVAL_LABEL[d.doc.approval_status]}{d.doc.approved_by ? ` by ${names.get(d.doc.approved_by) ?? '—'}` : ''}</p>}
       </Card>
     </div>
+    {d.doc.doc_type === 'quotation' && ['sent', 'viewed', 'follow_up'].includes(d.doc.status) && <div className="mt-5"><ShareLinks c={c} kind="quote_response" target="invoice" targetId={id} title="Online accept / reject" recipient={(d.doc as any).attention ?? d.doc.customer_name ?? undefined} sub="The customer opens the quotation, downloads the PDF and accepts or declines online. The status, follow-ups and lead update automatically." shareText={`Quotation ${d.doc.number} from ${c.company.name}`} /></div>}
+    {d.doc.doc_type === 'purchase_order' && <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><PoSupplierCard c={c} po={d.doc as any} /></div>}
     <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0">{(d.doc.doc_type === 'quotation' || d.doc.doc_type === 'invoice') && <RecordTasks c={c} type={d.doc.doc_type} id={id} title={`Follow up ${d.doc.number}`} />}<RecordActivity c={c} table="invoices" id={id} /></div>
   </>
 }

@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
 import { CustomFieldsCard } from '@/components/custom-fields-card'
+import { QrCode } from 'lucide-react'
 
 export const metadata = { title: 'Vehicle / asset' }
 const TABS = [['overview', 'Overview'], ['documents', 'Documents'], ['maintenance', 'Maintenance'], ['expenses', 'Expenses'], ['assignments', 'Assignments'], ['reminders', 'Reminders'], ['timeline', 'Timeline']] as const
@@ -86,6 +87,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
           {a.location && <span className="inline-flex items-center gap-1"><MapPin size={13} aria-hidden />{a.location}</span>}
         </div>
       </div>
+      <div className="flex flex-wrap gap-2"><a href={`/print/qr?type=asset&ids=${a.id}`} target="_blank" rel="noopener" className="inline-flex h-11 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm hover:bg-surface-2 sm:h-9"><QrCode size={14} aria-hidden />QR label</a>
       {c.can('records.edit') && <div className="flex flex-wrap gap-2">
         {edit && <DialogButton wide variant="secondary" label={a.assigned_to ? 'Reassign' : 'Assign'} title={`Assign ${isV ? 'vehicle' : 'asset'}`} icon={<UserRound size={14} />}>{assignForm}</DialogButton>}
         {edit && a.assigned_to && <ActionButton size="md" action={returnAsset.bind(null, id)} confirm={`Return ${a.name}? The current assignment is closed today.`}><Undo2 size={14} />Return</ActionButton>}
@@ -93,7 +95,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
         {a.archived_at ? <ActionButton size="md" action={setAssetArchived.bind(null, id, false)}><ArchiveRestore size={14} />Restore</ActionButton>
           : <ActionButton size="md" variant="ghost" action={setAssetArchived.bind(null, id, true)} confirm="Archive this item? Its documents and history are kept; reminders stop."><Archive size={14} />Archive</ActionButton>}
         {c.can('records.delete') && <ActionButton size="md" variant="ghost" action={trashRecord.bind(null, 'asset', id)} confirm="Move this item to the trash? It can be restored from Trash."><Trash2 size={14} />Delete</ActionButton>}
-      </div>}
+      </div>}</div>
     </div>
     {a.archived_at && <div className="mb-4"><Alert tone="amber">Archived on {formatLongDate(localDate(a.archived_at, c.company.timezone))}. No reminders are sent for archived items.</Alert></div>}
 

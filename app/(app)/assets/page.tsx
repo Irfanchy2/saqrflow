@@ -61,7 +61,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
 
   return <>
     <PageHeader title="Vehicles & Assets" sub="Company vehicles and equipment with registration, insurance, maintenance and assignment history."
-      actions={<><SavedViews page="/assets" />{c.can('data.export') && tab !== 'archived' && <><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}`}><Download size={15} />CSV</LinkButton><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}?format=xlsx`}><Download size={15} />Excel</LinkButton></>}
+      actions={<><SavedViews page="/assets" />{tab !== 'archived' && <LinkButton variant="ghost" href={`/print/qr?type=asset&kind=${isV ? 'vehicle' : 'equipment'}`}>QR labels</LinkButton>}{c.can('data.export') && tab !== 'archived' && <><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}`}><Download size={15} />CSV</LinkButton><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}?format=xlsx`}><Download size={15} />Excel</LinkButton></>}
         {edit && tab !== 'archived' && <>{addVehicle}{addAsset}</>}</>} />
     <Metrics className="mb-5" cols={5}>
       <StatCard label="Vehicles" value={nV} href="/assets?tab=vehicles" />

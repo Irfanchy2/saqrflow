@@ -17,6 +17,7 @@ import { formatAed, localDate } from '@/lib/time'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
 import { CustomFieldsCard } from '@/components/custom-fields-card'
+import { ShareLinks } from '@/components/share-links'
 
 export const metadata = { title: 'Customer' }
 type Ev = { at: string; icon: typeof FileText; text: string; href?: string }
@@ -115,6 +116,6 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <ul className="divide-y divide-border">{docs.map((d: any) => <li key={d.id}><Link href={`/documents/${d.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">
             <FileText size={15} className="text-primary" aria-hidden /><span className="min-w-0 flex-1 truncate">{d.name}</span><span className="text-xs text-muted">{localDate(d.created_at, c.company.timezone)}</span></Link></li>)}</ul>}</Card>
     </div>
-    <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="customer" recordId={id} /><RecordTasks c={c} type="customer" id={id} title={`Follow up ${cu.name}`} /><RecordActivity c={c} table="customers" id={id} className="xl:col-span-2" /></div>
+    <div className="mt-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><ShareLinks c={c} kind="customer_portal" target="customer" targetId={id} recipient={cu.contact_person ?? cu.name} sub="Your customer sees their quotations (and can accept them), invoices, statement and project progress. Read-only." shareText={`Your account with ${c.company.name}`} /><ShareLinks c={c} kind="document_request" target="customer" targetId={id} title="Request documents" recipient={cu.contact_person ?? cu.name} sub="Ask for trade licence, TRN certificate, LPO and similar. Files arrive in Smart Inbox for review." shareText={`${c.company.name}: documents requested`} /><CustomFieldsCard c={c} entity="customer" recordId={id} /><RecordTasks c={c} type="customer" id={id} title={`Follow up ${cu.name}`} /><RecordActivity c={c} table="customers" id={id} className="xl:col-span-2" /></div>
   </>
 }

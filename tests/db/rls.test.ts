@@ -680,3 +680,35 @@ describe('Approvals, saved views, custom fields & statuses (0016)', () => {
     await fails(as(U.ownerA, `insert into user_preferences(user_id,key,value) values ($1,'dashboard.layout','{}')`, [U.pmA]), /row-level security/)
   })
 })
+
+describe('Secure links & public forms (0017)', () => {
+  const h = (n: number) => n.toString(16).padStart(64, 'a')
+  it('links: finance users create portals, editors create document requests; tenants isolated; hash only', async () => {
+    const cu = (await as(U.accA, `insert into customers(company_id,name) values ($1,'Portal Client') returning id`, [A])).rows[0].id
+    await as(U.accA, `insert into share_links(company_id,kind,token_hash,customer_id,expires_at) values ($1,'customer_portal',$2,$3,now()+interval '30 days')`, [A, h(1), cu])
+    await fails(as(U.pmA, `insert into share_links(company_id,kind,token_hash,customer_id,expires_at) values ($1,'customer_portal',$2,$3,now()+interval '30 days')`, [A, h(2), cu]), /row-level security/)
+    await as(U.pmA, `insert into share_links(company_id,kind,token_hash,customer_id,items,expires_at) values ($1,'document_request',$2,$3,'{"Trade licence"}',now()+interval '7 days')`, [A, h(3), cu])
+    await fails(as(U.accA, `insert into share_links(company_id,kind,token_hash,customer_id,expires_at) values ($1,'customer_portal','not-a-hash',$2,now()+interval '1 day')`, [A, cu]))
+    await fails(as(U.accA, `insert into share_links(company_id,kind,token_hash,customer_id,expires_at) values ($1,'customer_portal',$2,$3,now()+interval '2 years')`, [A, h(4), cu]))
+    await fails(as(U.accA, `insert into share_links(company_id,kind,token_hash,expires_at) values ($1,'customer_portal',$2,now()+interval '1 day')`, [A, h(5)]))   // portal without a customer
+    expect((await as(U.ownerB, `select count(*)::int n from share_links`)).rows[0].n).toBe(0)
+    expect((await as(U.viewerA, `select count(*)::int n from share_links`)).rows[0].n).toBe(0)
+    expect(await as(null, `select count(*)::int n from share_links`, [], 'anon').then(r => r.rows[0].n, e => /permission denied/.test(e.message) ? 0 : -1)).toBe(0)   // anon: no rows (or no grant at all)
+  })
+  it('issue_document_number is service-only; next_document_number still checks the caller', async () => {
+    await fails(as(U.ownerA, `select issue_document_number($1,'lead')`, [A]), /permission denied/)
+    const r = await pool.connect()
+    try { await r.query('begin'); await r.query('set local role service_role'); expect((await r.query(`select issue_document_number($1,'lead') n`, [A])).rows[0].n).toMatch(/^LD-/); await r.query('rollback') } finally { r.release() }
+    expect((await as(U.accA, `select next_document_number('lead') n`)).rows[0].n).toMatch(/^LD-/)
+    await fails(as(U.viewerA, `select next_document_number('lead')`), /insufficient privilege/)
+  })
+  it('public forms: settings.manage only, unique slug; submissions readable by CRM users', async () => {
+    await fails(as(U.accA, `insert into public_forms(company_id,slug,title) values ($1,'acc-form','x')`, [A]), /row-level security/)
+    const f = (await as(U.ownerA, `insert into public_forms(company_id,slug,title) values ($1,'al-saqr-quote','Request a quotation') returning id`, [A])).rows[0].id
+    await fails(as(U.ownerB, `insert into public_forms(company_id,slug,title) values ($1,'al-saqr-quote','copy')`, [B]), /duplicate|unique/)
+    await fails(as(U.ownerA, `insert into public_forms(company_id,slug,title) values ($1,'Bad Slug!','x')`, [A]))
+    await sup(`insert into public_form_submissions(company_id,form_id,ip_hash) values ($1,$2,'abc')`, [A, f])
+    expect((await as(U.accA, `select count(*)::int n from public_form_submissions`)).rows[0].n).toBe(1)
+    expect((await as(U.hrA, `select count(*)::int n from public_form_submissions`)).rows[0].n).toBe(0)
+  })
+})

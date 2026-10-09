@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { flat } from '@/lib/queries'
 import { RecordActivity } from '@/components/record-activity'
 import { CustomFieldsCard } from '@/components/custom-fields-card'
+import { QrCode } from 'lucide-react'
 
 export const metadata = { title: 'Project' }
 
@@ -98,6 +99,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         {p.description && <p className="mt-2 max-w-3xl whitespace-pre-line text-sm">{p.description}</p>}
       </div>
       <div className="flex flex-wrap gap-2">
+        <a href={`/print/qr?type=project&ids=${p.id}`} target="_blank" rel="noopener" className="inline-flex h-11 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm hover:bg-surface-2 sm:h-9"><QrCode size={14} aria-hidden />QR label</a>
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit project" icon={<Pencil size={14} />}><ActionForm action={updateProject.bind(null, id)} resetOnSuccess={false}><ProjectFields customers={customers ?? []} p={p} /></ActionForm></DialogButton>}
         {edit && fin && <NewSalesButtons projectId={id} customerId={p.customer_id ?? undefined} />}
         {del && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'project', id)} confirm={`Move project “${p.name}” to the trash? Its documents, invoices and costs are kept and it can be restored.`}><Trash2 size={14} />Delete</ActionButton>}
