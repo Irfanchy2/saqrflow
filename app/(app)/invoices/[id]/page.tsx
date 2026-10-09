@@ -6,7 +6,7 @@ import { brandingFor, loadSalesDoc, salesSettings } from '@/lib/sales/data'
 import { APPROVAL_LABEL, DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
 import { SalesEditor } from '@/components/sales/editor'
-import { matchesFormat } from '@/lib/numbering'
+import { matchesFormat, NUMBER_FORMAT_COLS } from '@/lib/numbering'
 import { Badge, Card, CardHeader, Field, Input, Select, Td, Th, TableWrap, Textarea } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
@@ -57,7 +57,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const docName = new Map((payDocs ?? []).map((x: any) => [x.id, x.name]))
 
   // a draft still carrying a number from before the custom format was configured (e.g. QTN-2026-0004) can take a new one
-  const { data: fmt } = edit && d.doc.status === 'draft' && !(d.doc as any).sent_at && !d.doc.revision ? await c.supabase.from('document_number_formats').select('prefix,fixed_digits,seq_pad,year_separator,include_year').eq('doc_type', d.doc.doc_type).maybeSingle() : { data: null }
+  const { data: fmt } = edit && d.doc.status === 'draft' && !(d.doc as any).sent_at && !d.doc.revision ? await c.supabase.from('document_number_formats').select(NUMBER_FORMAT_COLS).eq('doc_type', d.doc.doc_type).maybeSingle() : { data: null }
   const canRenumber = !!fmt && !matchesFormat(d.doc.number, fmt)
   return <>
     <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} customers={(customers ?? []) as any} projects={(projects ?? []) as any}

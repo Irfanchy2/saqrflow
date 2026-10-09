@@ -163,7 +163,7 @@ try {
   await p.goto(`${BASE}/invoices/${old}`); await settle(1200)
   await p.getByRole('button', { name: 'More actions' }).click(); await p.getByRole('menuitem', { name: 'Renumber to current format' }).click(); await settle(1500)
   const nn = (await one(`select number from invoices where id=$1`, [old])).number
-  ok(/^AS00\d{5,}\/\d{4}$/.test(nn), `legacy draft renumbered to the configured format (${nn})`)
+  ok(/^AS-\d{6,}\/\d{4}$/.test(nn), `legacy draft renumbered to the configured format (${nn})`)
   ok((await one(`select count(*)::int n from invoices where company_id=$1 and number=$2`, [co, nn])).n === 1, 'new number is unique')
 
   console.log('\n[R] Roles: viewer sees no finance reports')

@@ -12,7 +12,7 @@ import { computeTotals } from '@/lib/sales/money'
 import { BRAND_KINDS, loadSalesDoc, salesSettings } from '@/lib/sales/data'
 import { buildSalesPdf } from '@/lib/sales/build'
 import { diffSnapshots, snapshotOf } from '@/lib/sales/revisions'
-import { matchesFormat } from '@/lib/numbering'
+import { matchesFormat, NUMBER_FORMAT_COLS } from '@/lib/numbering'
 import type { ActionState } from '@/lib/utils'
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a valid date')
@@ -404,7 +404,7 @@ export async function renumberDraft(id: string): Promise<ActionState> {
     const { data: d } = await c.supabase.from('invoices').select('id,doc_type,number,status,sent_at,revision').eq('id', id).maybeSingle()
     if (!d) return { error: 'Not found.' }
     if (d.status !== 'draft' || d.sent_at || d.revision > 0) return { error: 'Only drafts that were never sent can be renumbered.' }
-    const { data: f } = await c.supabase.from('document_number_formats').select('prefix,fixed_digits,seq_pad,year_separator,include_year').eq('doc_type', d.doc_type).maybeSingle()
+    const { data: f } = await c.supabase.from('document_number_formats').select(NUMBER_FORMAT_COLS).eq('doc_type', d.doc_type).maybeSingle()
     if (!f) return { error: 'No custom number format is set for this document type (Settings → Numbering).' }
     if (matchesFormat(d.number, f)) return { error: `${d.number} already follows the current format.` }
     const { data: num, error: ne } = await c.supabase.rpc('next_document_number', { p_doc_type: d.doc_type })

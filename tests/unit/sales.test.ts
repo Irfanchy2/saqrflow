@@ -61,7 +61,7 @@ describe('PDF file names', () => {
   })
 })
 
-import { matchesFormat } from '@/lib/numbering'
+import { formatNumber, matchesFormat } from '@/lib/numbering'
 describe('document number formats', () => {
   const as = { prefix: 'AS', fixed_digits: '00', seq_pad: 5, year_separator: '/', include_year: true }
   it('recognises the configured AS format', () => {
@@ -90,5 +90,27 @@ describe('report periods (company-local dates, no UTC shift)', () => {
   it('custom ranges are validated and ordered', () => {
     expect(resolvePeriod({ from: '2026-09-30', to: '2026-09-01' }, '2026-10-08')).toMatchObject({ key: 'custom', from: '2026-09-01', to: '2026-09-30' })
     expect(resolvePeriod({ period: 'custom', from: 'nonsense', to: '2026-13-45' }, '2026-10-08')).toMatchObject({ from: '2026-10-01', to: '2026-10-08' })
+  })
+})
+describe('default number formats (AS-002600/2026 · INV-610 · DL-1300)', () => {
+  const q = { prefix: 'AS', number_separator: '-', fixed_digits: '', seq_pad: 6, year_separator: '/', include_year: true, year_format: 'yyyy' }
+  const inv = { prefix: 'INV', number_separator: '-', fixed_digits: '', seq_pad: 1, year_separator: '/', include_year: false, year_format: 'yyyy' }
+  const dl = { ...inv, prefix: 'DL' }
+  it('formats like the database', () => {
+    expect(formatNumber(q, 2600, 2026)).toBe('AS-002600/2026')
+    expect(formatNumber(inv, 610, 2026)).toBe('INV-610')
+    expect(formatNumber(dl, 1300, 2026)).toBe('DL-1300')
+    expect(formatNumber({ ...q, year_format: 'yy' }, 2601, 2026)).toBe('AS-002601/26')
+    expect(formatNumber({ ...q, number_separator: '' }, 1234567, 2026)).toBe('AS1234567/2026')
+  })
+  it('recognises its own numbers and flags older formats', () => {
+    expect(matchesFormat('AS-002600/2026', q)).toBe(true)
+    expect(matchesFormat('INV-610', inv)).toBe(true)
+    expect(matchesFormat('DL-1300', dl)).toBe(true)
+    expect(matchesFormat('AS-002601/26', { ...q, year_format: 'yy' })).toBe(true)
+    expect(matchesFormat('AS0025182/2026', q)).toBe(false)
+    expect(matchesFormat('AS-002602', q)).toBe(false)
+    expect(matchesFormat('INV-2026-0007', inv)).toBe(false)
+    expect(matchesFormat('DN-2026-0001', dl)).toBe(false)
   })
 })
