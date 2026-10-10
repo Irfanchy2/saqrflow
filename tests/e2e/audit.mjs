@@ -12,6 +12,7 @@ const exe = fs.readdirSync('/opt/pw-browsers').filter(d => d.startsWith('chromiu
 const browser = await chromium.launch({ executablePath: exe })
 const EMAIL = `audit-${Date.now()}@alsaqr.test`
 const d = n => { const x = new Date(); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10) }
+const mon = n => { const x = new Date(); x.setUTCDate(1); x.setUTCMonth(x.getUTCMonth() + n); return x.toISOString().slice(0, 8) + '01' }   // first day of this month + n (n months apart never collide)
 
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } }); const p = await ctx.newPage()
 const errors = []; p.on('pageerror', e => errors.push(`${p.url()}: ${e.message}`))
@@ -51,7 +52,7 @@ if (!process.env.AUDIT_EMPTY) {
   const [wo] = await q(`insert into work_orders(company_id,number,title,project_id,customer_id,status,priority,start_date,target_date,site_location,scope) values ($1,'WO-2026-0001','Fabricate and install villa staircase',$2,$3,'in_fabrication','high',$4,$5,'Villa 214, Khalifa City','• Stringers\n• Treads\n• Handrail') returning id`, [co, proj[0].id, cust[0].id, d(-5), d(12)])
   await q(`insert into tasks(company_id,title,work_order_id,project_id,due_date,status,employee_id) values ($1,'Cut and weld stringers',$2,$3,$4,'completed',$6),($1,'Prime and paint',$2,$3,$5,'in_progress',$6),($1,'Install treads and balustrade',$2,$3,$5,'todo',$6)`, [co, wo.id, proj[0].id, d(-1), d(3), emp[2].id])
   await q(`insert into employee_compensation(employee_id,company_id,monthly_salary) values ($2,$1,4500)`, [co, emp[0].id])
-  await q(`insert into salary_payments(company_id,employee_id,period,amount,paid_on,method,notes) values ($1,$2,$3,4500,$4,'wps','September salary via WPS, Emirates NBD'),($1,$2,$5,4200,$6,'bank_transfer',null)`, [co, emp[0].id, d(-40).slice(0, 8) + '01', d(-35), d(-70).slice(0, 8) + '01', d(-65)])
+  await q(`insert into salary_payments(company_id,employee_id,period,amount,paid_on,method,notes) values ($1,$2,$3,4500,$4,'wps','September salary via WPS, Emirates NBD'),($1,$2,$5,4200,$6,'bank_transfer',null)`, [co, emp[0].id, mon(-1), d(-5), mon(-2), d(-35)])
   await q(`insert into employee_advances(company_id,employee_id,kind,amount,given_on,monthly_recovery) values ($1,$2,'advance',2000,$3,500),($1,$2,'deduction',150,$4,null)`, [co, emp[0].id, d(-20), d(-10)])
   await q(`insert into service_tickets(company_id,number,title,customer_id,priority,due_date) values ($1,'ST-2026-0001','Sliding gate motor stopped working at Villa 214',$2,'high',$3)`, [co, cust[0].id, d(-1)])
   await q(`insert into warranties(company_id,number,customer_id,title,start_date,end_date) values ($1,'WR-2026-0001',$2,'Staircase structure, welds and paint',$3,$4)`, [co, cust[0].id, d(-60), d(305)])
@@ -71,7 +72,7 @@ if (inv[0]) { await p.goto(`${BASE}/invoices/${inv[0].id}`); await p.waitForTime
 const m = await browser.newContext({ viewport: { width: +(process.env.AUDIT_W || 390), height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, storageState: await ctx.storageState() }); const mp = await m.newPage()
 const one = async sql => (await q(sql, [co]))[0]?.id
 const ids = { lead: await one(`select id from leads where company_id=$1 limit 1`), wo: await one(`select id from work_orders where company_id=$1 limit 1`), proj: await one(`select id from projects where company_id=$1 limit 1`),
-  emp: await one(`select id from employees where company_id=$1 limit 1`), asset: await one(`select id from assets where company_id=$1 limit 1`), cust: await one(`select id from customers where company_id=$1 limit 1`), inv: inv[0]?.id,
+  emp: await one(`select e.id from employees e where e.company_id=$1 order by exists(select 1 from salary_payments s where s.employee_id=e.id) desc limit 1`), asset: await one(`select id from assets where company_id=$1 limit 1`), cust: await one(`select id from customers where company_id=$1 limit 1`), inv: inv[0]?.id,
   sv: await one(`select id from site_visits where company_id=$1 limit 1`), dsr: await one(`select id from daily_site_reports where company_id=$1 limit 1`),
   tk: await one(`select id from service_tickets where company_id=$1 limit 1`), kb: await one(`select id from kb_articles where company_id=$1 limit 1`) }
 const mpages = (process.env.AUDIT_PAGES ?? '/,/inbox,/brief,/approvals,/tasks,/leads,/leads?view=list,/site-visits,/invoices,/invoices?tab=invoice,/invoices?tab=payments,/invoices?tab=receivables,/parties,/parties?tab=suppliers,/catalog,/projects,/work-orders,/site-reports,/assets,/cheques,/expenses,/employees,/documents,/vault,/tickets,/tickets?tab=warranties,/kb,/reports,/reminders,/reminders?tab=recipients,/reminders?tab=log,/calendar,/assistant,/assistant?q=Who%20owes%20us%20money%3F,/settings,/import,/backup,/users,/users/activity,/audit,/trash,/search?q=ABC').split(',')
