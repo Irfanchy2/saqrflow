@@ -6,6 +6,7 @@ import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import pg from 'pg'
+import { execFileSync } from 'node:child_process'
 
 const BASE = process.env.E2E_BASE, GW = process.env.E2E_GATEWAY ?? 'http://127.0.0.1:54399'
 const OUT = 'tests/e2e/shots/whatsapp'; fs.mkdirSync(OUT, { recursive: true })
@@ -176,6 +177,20 @@ try {
   await p.goto(`${BASE}/reminders?tab=log`); await settle()
   ok((await p.locator('main').innerText()).includes('Tax invoice · +9715 ••• 222'), 'delivery log lists WhatsApp document sends')
   ok(!(await p.content()).includes('test-wa-token'), 'token never appears in any page')
+
+  console.log('\n[7b] Payslip PDF download')
+  const feb = (await one(`insert into salary_payments(company_id,employee_id,period,amount,paid_on,method) values ($1,$2,'2026-02-01',3000,'2026-02-28','wps') returning id`, [co, emp])).id
+  await one(`insert into employee_advances(company_id,employee_id,kind,amount,given_on) values ($1,$2,'deduction',300,'2026-02-15') returning id`, [co, emp])
+  await p.goto(`${BASE}/employees/${emp}?tab=salary`); await settle()
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.getByRole('link', { name: 'PDF payslip 2026-02' }).click()])
+  ok(dl.suggestedFilename() === 'Payslip_Anil-Thomas_2026-02.pdf', `payslip downloads with a clear file name (${dl.suggestedFilename()})`)
+  await dl.saveAs(`${OUT}/payslip-feb.pdf`)
+  const ps = execFileSync('pdftotext', ['-layout', `${OUT}/payslip-feb.pdf`, '-']).toString()
+  ok(/salary payslip/i.test(ps) && ps.includes('Anil Thomas') && ps.includes('E-77') && ps.includes('February 2026'), 'payslip PDF: employee, ID and period')
+  ok(ps.includes('3,000.00') && ps.includes('300.00') && /Net paid\s+2,700\.00/.test(ps), 'payslip PDF: deductions in a 28-day month are included and net is correct')
+  const anon = await browser.newContext(); const ar = await anon.request.get(`${BASE}/api/payslips/${feb}`, { maxRedirects: 0 })
+  ok(!(ar.headers()['content-type'] ?? '').includes('pdf'), `signed-out request gets no PDF (${ar.status()})`); await anon.close()
+  ok((await ctx.request.get(`${BASE}/api/payslips/${crypto.randomUUID()}`)).status() === 404, 'unknown payslip: 404')
 
   console.log('\n[8] Phone')
   const m = await browser.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, storageState: await ctx.storageState() }); const mp = await m.newPage()

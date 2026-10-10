@@ -30,6 +30,8 @@ export class SendError extends Error {}
 const fail = (m: string): never => { throw new SendError(m) }
 const need = (c: Ctx, p: Parameters<Ctx['can']>[0]) => { if (!c.can(p)) fail('You do not have permission to send this.') }
 const phoneOf = (...xs: (string | null | undefined)[]) => { for (const x of xs) { const e = x ? toE164(x) : null; if (e) return e } return null }
+/** first day of the period's month (+n months), as YYYY-MM-DD; `-31` is not a valid date in short months */
+const monthStart = (iso: string, n = 0) => { const d = new Date(`${iso.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 10) }
 const monthLabel = (iso: string) => new Date(`${iso.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 /** What a message type says and attaches, read with the user's own session (RLS) after the permission check. */
@@ -83,7 +85,7 @@ export async function resolveMessage(c: Ctx, kind: string, recordId: string): Pr
     const { data: s } = await sb.from('salary_payments').select('id,period,amount,paid_on,method,employee:employees(id,full_name,employee_no,designation,phone)').eq('id', recordId).maybeSingle()
     if (!s) fail('Salary payment not found.')
     const e: any = (s as any).employee
-    const { data: adv } = await sb.from('employee_advances').select('kind,amount,given_on').eq('employee_id', e.id).gte('given_on', s!.period).lte('given_on', `${s!.period.slice(0, 7)}-31`)
+    const { data: adv } = await sb.from('employee_advances').select('kind,amount,given_on').eq('employee_id', e.id).gte('given_on', monthStart(s!.period)).lt('given_on', monthStart(s!.period, 1))
     const ded = (adv ?? []).filter((a: any) => a.kind === 'deduction')
     return {
       kind, recordType: 'salary_payment', recordId, link: `/employees/${e.id}?tab=salary`,
