@@ -218,6 +218,11 @@ export async function saveSalesDoc(id: string, input: SalesDocInput, opts: { exp
       if (/conflict/.test(error.message)) return { error: 'Someone else saved this document after you opened it. Reload to see their changes. Your edits are still on screen.', data: { conflict: true } }
       throw error
     }
+    // the advance is stored next to the save (save_sales_doc predates it); no trigger touches updated_at, so the conflict check is unaffected
+    if (Math.abs(advance - Number(cur.advance_applied ?? 0)) > 0.004) {
+      const { error: ae } = await c.supabase.from('invoices').update({ advance_applied: advance }).eq('id', id)
+      if (ae) throw ae
+    }
     // a quotation from a lead that created / picked the customer links the lead to it (Lead → Customer without re-entry)
     if (customerId && cur.lead_id) await c.supabase.from('leads').update({ customer_id: customerId }).eq('id', cur.lead_id).is('customer_id', null)
     if (revision) await logEvent(c, id, 'revised', `Revision ${cur.revision + 1}: ${revision.changes.slice(0, 4).join('; ')}`)

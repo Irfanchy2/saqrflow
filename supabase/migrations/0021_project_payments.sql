@@ -4,7 +4,7 @@
 -- Documents carry advance_applied (the amount shown as "Less: advance received"). When a tax invoice is issued, that amount is
 -- linked to the invoice from the project's unapplied advances (oldest first); an advance used only in part is split, so the
 -- invoice balance, status, receivables and ledger keep working from payments exactly as before.
--- Additive only.
+-- Additive only. The advance on a document is stored by the save action (app/actions/sales.ts) after save_sales_doc.
 
 alter table payments add column if not exists project_id uuid references projects(id) on delete set null;
 alter table payments add column if not exists split_from uuid references payments(id) on delete set null;   -- the part of an advance applied to an invoice
@@ -25,10 +25,6 @@ begin
 end $$;
 create trigger payments_project_guard_t before insert or update on payments for each row execute function payments_project_guard();
 
--- applied parts of an advance are not new money: they do not raise "payment received" alerts / webhooks
-drop trigger if exists emit_event_payments on payments;
-create trigger emit_event_payments after insert on payments for each row when (new.split_from is null) execute function emit_app_event();
-
 -- unapplied advances of a project (received on account, not yet linked to an invoice)
 create or replace function project_unapplied(p_project uuid) returns numeric
 language sql stable security definer set search_path = public as $$
@@ -41,7 +37,7 @@ grant execute on function project_unapplied(uuid) to authenticated;
 -- links up to p_amount of the project's unapplied advances to an issued tax invoice (oldest first, splitting the last one)
 create or replace function apply_project_advance(p_invoice uuid, p_amount numeric) returns numeric
 language plpgsql security definer set search_path = public as $$
-declare inv record; p record; left_ numeric; avail numeric; owed numeric;
+declare inv record; p record; left_ numeric; avail numeric; owed numeric; nid uuid;
 begin
   if p_amount is null or p_amount <= 0 then return 0; end if;
   select * into inv from invoices where id = p_invoice for update;
@@ -62,7 +58,10 @@ begin
     else
       update payments set amount = p.amount - left_ where id = p.id;
       insert into payments(company_id, invoice_id, customer_id, project_id, amount, paid_on, method, reference, bank_name, notes, created_by, split_from)
-        values (p.company_id, p_invoice, p.customer_id, p.project_id, left_, p.paid_on, p.method, p.reference, p.bank_name, p.notes, p.created_by, p.id);
+        values (p.company_id, p_invoice, p.customer_id, p.project_id, left_, p.paid_on, p.method, p.reference, p.bank_name, p.notes, p.created_by, p.id)
+        returning id into nid;
+      -- the applied part of an advance is not new money: its "payment received" event is closed, so no alert or webhook is sent
+      update app_events set claimed_at = now(), processed_at = now() where entity_id = nid and processed_at is null;
       left_ := 0;
     end if;
   end loop;
@@ -81,49 +80,3 @@ begin
   return null;
 end $$;
 create trigger invoice_issue_advance_t after update of status on invoices for each row execute function invoice_issue_advance();
-
--- the document save RPC also stores the advance applied (same function as 0012 plus advance_applied)
-create or replace function save_sales_doc(p_id uuid, p_head jsonb, p_items jsonb, p_expected text, p_revision jsonb)
-returns timestamptz language plpgsql security invoker set search_path = public as $$
-declare cur invoices; ts timestamptz := clock_timestamp();
-begin
-  select * into cur from invoices where id = p_id for update;
-  if cur.id is null then raise exception 'document not found'; end if;
-  if p_expected is not null and date_trunc('milliseconds', cur.updated_at) <> date_trunc('milliseconds', p_expected::timestamptz) then
-    raise exception 'conflict: this document was changed by someone else' using errcode = 'P0409';
-  end if;
-  if p_revision is not null then
-    insert into sales_doc_revisions(company_id, invoice_id, revision, snapshot, changes, created_by)
-    values (cur.company_id, p_id, cur.revision, p_revision->'snapshot', array(select jsonb_array_elements_text(p_revision->'changes')), auth.uid());
-  end if;
-  update invoices set
-    customer_id = nullif(p_head->>'customer_id','')::uuid, project_id = nullif(p_head->>'project_id','')::uuid,
-    salesperson_id = nullif(p_head->>'salesperson_id','')::uuid,
-    issue_date = (p_head->>'issue_date')::date, due_date = nullif(p_head->>'due_date','')::date, valid_until = nullif(p_head->>'valid_until','')::date,
-    attention = p_head->>'attention', customer_name = p_head->>'customer_name', customer_address = p_head->>'customer_address',
-    customer_trn = p_head->>'customer_trn', customer_phone = p_head->>'customer_phone', customer_email = p_head->>'customer_email',
-    site = p_head->>'site', subject = p_head->>'subject', reference = p_head->>'reference', lpo_ref = p_head->>'lpo_ref',
-    intro = p_head->>'intro', closing = p_head->>'closing', receiver_name = p_head->>'receiver_name', vehicle_no = p_head->>'vehicle_no', notes = p_head->>'notes',
-    vat_rate = (p_head->>'vat_rate')::numeric, discount_type = coalesce(p_head->>'discount_type','amount'), discount_value = coalesce((p_head->>'discount_value')::numeric, 0),
-    discount = (p_head->>'discount')::numeric, show_total = coalesce((p_head->>'show_total')::boolean, true), apply_vat = (p_head->>'apply_vat')::boolean,
-    terms = array(select jsonb_array_elements_text(coalesce(p_head->'terms','[]'))), payment_terms = array(select jsonb_array_elements_text(coalesce(p_head->'payment_terms','[]'))),
-    subtotal = (p_head->>'subtotal')::numeric, vat_amount = (p_head->>'vat_amount')::numeric, total = (p_head->>'total')::numeric,
-    advance_applied = coalesce((p_head->>'advance_applied')::numeric, advance_applied),
-    revision = case when p_revision is not null then cur.revision + 1 else cur.revision end,
-    updated_at = ts
-  where id = p_id;
-
-  delete from invoice_items where invoice_id = p_id
-    and id not in (select (x->>'id')::uuid from jsonb_array_elements(p_items) x where coalesce(x->>'id','') <> '');
-  update invoice_items t set position = r.position, description = r.description, materials = r.materials, quantity = r.quantity, unit = r.unit,
-         unit_price = r.unit_price, vat_category = r.vat_category, discount_pct = r.discount_pct, catalog_item_id = r.catalog_item_id
-    from jsonb_to_recordset(p_items) as r(id uuid, position int, description text, materials text, quantity numeric, unit text, unit_price numeric, vat_category text, discount_pct numeric, source_item_id uuid, catalog_item_id uuid)
-    where t.id = r.id and t.invoice_id = p_id;
-  insert into invoice_items(company_id, invoice_id, position, description, materials, quantity, unit, unit_price, vat_category, discount_pct, source_item_id, catalog_item_id)
-    select cur.company_id, p_id, r.position, r.description, r.materials, r.quantity, r.unit, r.unit_price, r.vat_category, r.discount_pct, r.source_item_id, r.catalog_item_id
-    from jsonb_to_recordset(p_items) as r(id uuid, position int, description text, materials text, quantity numeric, unit text, unit_price numeric, vat_category text, discount_pct numeric, source_item_id uuid, catalog_item_id uuid)
-    where r.id is null or not exists (select 1 from invoice_items x where x.id = r.id and x.invoice_id = p_id);
-  return ts;
-end $$;
-revoke execute on function save_sales_doc(uuid, jsonb, jsonb, text, jsonb) from public, anon;
-grant execute on function save_sales_doc(uuid, jsonb, jsonb, text, jsonb) to authenticated;

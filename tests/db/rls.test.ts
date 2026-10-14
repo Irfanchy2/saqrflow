@@ -876,13 +876,13 @@ describe('Project payments / advances (0021)', () => {
 
     // draft invoice with advance 7000 → issue → 6000 linked + 1000 split from the second advance
     const inv = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,vat_amount,status,project_id,customer_id,advance_applied) values ($1,'invoice','INV-ADV-1',21000,1000,'draft',$2,$3,7000) returning id`, [A, pr, cu])).rows[0].id
-    const before = Number((await sup(`select count(*) n from app_events where event='payment.received' and company_id=$1`, [A])).rows[0].n)
+    const before = Number((await sup(`select count(*) n from app_events where event='payment.received' and company_id=$1 and processed_at is null`, [A])).rows[0].n)
     await as(U.accA, `update invoices set status='sent' where id=$1`, [inv])
     const linked = (await sup(`select amount, split_from from payments where invoice_id=$1 order by amount desc`, [inv])).rows
     expect(linked.map(r => Number(r.amount))).toEqual([6000, 1000]); expect(linked[1].split_from).not.toBeNull()
     expect(Number((await as(U.accA, `select project_unapplied($1) n`, [pr])).rows[0].n)).toBe(3000)
     expect((await sup(`select status, vat_amount from invoices where id=$1`, [inv])).rows[0]).toMatchObject({ status: 'partially_paid', vat_amount: '1000.00' })
-    expect(Number((await sup(`select count(*) n from app_events where event='payment.received' and company_id=$1`, [A])).rows[0].n)).toBe(before)   // the split is not new money
+    expect(Number((await sup(`select count(*) n from app_events where event='payment.received' and company_id=$1 and processed_at is null`, [A])).rows[0].n)).toBe(before)   // the split is not new money
     expect(Number((await sup(`select sum(amount) s from payments where project_id=$1`, [pr])).rows[0].s)).toBe(10000)                              // nothing created or lost
 
     // later application from the invoice: limited by what is left on the project and on the invoice
