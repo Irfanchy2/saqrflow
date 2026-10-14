@@ -62,7 +62,8 @@ try {
   ok(rv.includes('Document detected') && rv.includes('Mohammed Ayub') && rv.includes('97%'), 'review screen shows detection with confidence (Mohammed Ayub · 97%)')
   ok(rv.includes('784-1990-1234567-6') && rv.includes('9 January 2027'), 'extracted ID number + expiry shown for verification')
   ok(await p.locator('iframe[title="Uploaded document"]').isVisible(), 'document preview shown next to the form')
-  ok(rv.includes('90d →') && rv.includes('on expiry →'), 'reminder schedule preview (90d … on expiry)')
+  const want90 = Date.parse('2027-01-09') - 90 * 864e5 > Date.now()   // reminders whose date has passed are (correctly) not previewed
+  ok((!want90 || rv.includes('90d →')) && rv.includes('on expiry →'), 'reminder schedule preview (90d … on expiry)')
   await shot('21-inbox-review')
   await p.getByRole('button', { name: 'Confirm & File' }).click(); await p.waitForURL(/\/documents\/[0-9a-f-]{36}/, { timeout: 20000 }); await settle()
   const eid = await one(`select d.id,d.owner_type,d.owner_id,d.reference_no,d.expiry_date::text,d.reminders_active,c.name cat from documents d join document_categories c on c.id=d.category_id where d.company_id=$1`, [co])

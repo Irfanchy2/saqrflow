@@ -12,12 +12,13 @@ export function FitPaper({ children, max = 1 }: { children: ReactNode; max?: num
   const [scale, setScale] = useState(0.6)
   useLayoutEffect(() => {
     const o = outer.current; if (!o) return
-    const fit = () => setScale(Math.min(max, o.clientWidth / A4_PX))
+    const fit = () => setScale(Math.min(max, Math.max(0, o.clientWidth - 0.5) / A4_PX))   // −0.5 px: rounding never adds a scrollbar
     fit()
     const ro = new ResizeObserver(fit); ro.observe(o)
     return () => ro.disconnect()
   }, [max])
-  return <div ref={outer} className="w-full">
+  // until the column is measured (server render / slow phones) the paper scrolls inside its column instead of widening the page
+  return <div ref={outer} className="w-full overflow-x-auto overscroll-x-contain">
     <div style={{ width: A4_PX, zoom: scale }} className="overflow-hidden rounded-sm shadow-[0_2px_6px_rgba(15,23,42,.08),0_12px_32px_-8px_rgba(15,23,42,.18)] ring-1 ring-black/5">{children}</div>
   </div>
 }

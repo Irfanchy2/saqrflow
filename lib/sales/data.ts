@@ -80,6 +80,12 @@ export async function brandingBytes(c: Ctx): Promise<Partial<Record<BrandKind, {
   return out
 }
 
+/** advance shown on the document: the amount chosen while drafting, or (issued invoice) the project advances actually linked to it */
+function advanceOf(doc: any, pays: any[]) {
+  const pending = !(doc.doc_type === 'invoice' && doc.status !== 'draft')
+  if (!doc.project_id) return { advance_applied: 0, advance_pending: pending }
+  return { advance_applied: pending ? Number(doc.advance_applied ?? 0) : pays.filter(p => p.project_id).reduce((s, p) => s + Number(p.amount), 0), advance_pending: pending }
+}
 export interface SalesDoc extends PaperDoc { id: string; status: string; customer_id: string | null; project_id: string | null; quotation_id: string | null; source_invoice_id: string | null; total: number; subtotal: number; vat_amount: number; pdf_document_id: string | null; created_at: string; updated_at: string; external_provider: string | null; approval_status: string | null; approval_note: string | null; approved_by: string | null; revision: number; salesperson_id: string | null }
 export async function loadSalesDoc(c: Ctx, id: string) {
   const { data: doc } = await c.supabase.from('invoices').select('*').eq('id', id).eq('company_id', c.company.id).maybeSingle()
@@ -96,7 +102,7 @@ export async function loadSalesDoc(c: Ctx, id: string) {
   const dn = (related ?? []).find((r: any) => r.doc_type === 'delivery_note')
   const against = doc.doc_type === 'credit_note' && doc.source_invoice_id ? (related ?? []).find((r: any) => r.id === doc.source_invoice_id) : null
   return {
-    doc: { ...doc, project_name: project?.name ?? null, doc_type: doc.doc_type as SalesType, vat_rate: Number(doc.vat_rate), discount: Number(doc.discount), terms: doc.terms ?? [], payment_terms: doc.payment_terms ?? [], del_no: dn?.number ?? null, against_number: against?.number ?? null } as SalesDoc,
+    doc: { ...doc, ...advanceOf(doc, pays ?? []), project_name: project?.name ?? null, doc_type: doc.doc_type as SalesType, vat_rate: Number(doc.vat_rate), discount: Number(doc.discount), terms: doc.terms ?? [], payment_terms: doc.payment_terms ?? [], del_no: dn?.number ?? null, against_number: against?.number ?? null } as SalesDoc,
     items: (items ?? []).map((i: any) => ({ ...i, quantity: Number(i.quantity), unit_price: Number(i.unit_price) })) as (PaperItem & { id: string })[],
     payments: (pays ?? []) as any[], paid, credited, related: (related ?? []) as any[], project, customer,
   }

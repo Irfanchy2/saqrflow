@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import Link from 'next/link'
-import { Children } from 'react'
+import { Children, type Ref } from 'react'
 import { cn } from '@/lib/utils'
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { LucideIcon } from 'lucide-react'
@@ -38,7 +38,7 @@ const TEXTUAL = new Set([undefined, 'text', 'search', 'email', 'tel', 'url', 'pa
 export const Input = ({ className, dir, type, ...p }: InputHTMLAttributes<HTMLInputElement>) =>
   <input type={type} dir={dir ?? (TEXTUAL.has(type) ? 'auto' : undefined)} className={cn(field, 'h-11 text-start sm:h-9', className)} {...p} />
 export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'h-11 cursor-pointer pe-8 sm:h-9', className)} {...p} />
-export const Textarea = ({ className, dir, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) =>
+export const Textarea = ({ className, dir, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) =>
   <textarea dir={dir ?? 'auto'} className={cn(field, 'min-h-[84px] resize-y px-3 py-2 text-start leading-[1.55] [overflow-wrap:anywhere] [unicode-bidi:plaintext] whitespace-pre-wrap', className)} {...p} />
 
 /** Label above the control, hint below. A trailing " *" in the label renders as a required marker. */

@@ -5,6 +5,7 @@ import { DOC_META, isTaxDoc } from './docs'
 import { docDiscount, vatOn, type PaperDoc, type PaperItem } from '@/components/sales/paper'
 import type { BrandKind } from './data'
 import { resolveTemplate, templateKind, type TemplateKind } from './template'
+import { parseRich, type Run } from './rich'
 
 /** A4 PDF in the Al Saqr template layout. Arabic text in images (letterhead/stamp) is preserved; typed text uses Helvetica. */
 export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
@@ -16,6 +17,7 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   const pdf = await PDFDocument.create()
   pdf.setTitle(`${DOC_META[doc.doc_type].label} ${doc.number}`); pdf.setCreator('Averiqo'); pdf.setProducer('Averiqo')
   const font = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold), italic = await pdf.embedFont(StandardFonts.HelveticaBoldOblique)
+  const oblique = await pdf.embedFont(StandardFonts.HelveticaOblique)
   const img: Partial<Record<BrandKind, PDFImage>> = {}
   for (const [k, v] of Object.entries(opts.images)) { try { img[k as BrandKind] = v!.png ? await pdf.embedPng(v!.bytes) : await pdf.embedJpg(v!.bytes) } catch { /* unsupported image → skipped */ } }
 
@@ -45,6 +47,53 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
     }
     return out
   }
+
+  // rich text ("Materials to be used"): styled runs wrapped word by word; lists indent with a hanging bullet / number
+  type Seg = { t: string; f: PDFFont; u?: boolean }
+  type RLine = { x: number; segs: Seg[]; marker?: string }
+  const fontOf = (r: Run) => (r.b ? (r.i ? italic : bold) : r.i ? oblique : font)
+  const flowRuns = (rs: Run[], size: number, width: number): Seg[][] => {
+    const toks: Seg[] = []
+    for (const r of rs) for (const t of r.text.split(/(\s+)/)) if (t) toks.push({ t: /^\s+$/.test(t) ? ' ' : safe(fontOf(r), t), f: fontOf(r), u: r.u })
+    const lines: Seg[][] = []; let line: Seg[] = [], w = 0
+    const tw = (x: Seg) => x.f.widthOfTextAtSize(x.t, size)
+    for (const tok of toks) {
+      if (tok.t === ' ') { if (line.length) { line.push(tok); w += tw(tok) } continue }
+      let word = tok
+      while (tw(word) > width) {                                          // a word longer than the cell is broken
+        if (line.length) { lines.push(line); line = []; w = 0 }
+        let i = word.t.length; while (i > 1 && word.f.widthOfTextAtSize(word.t.slice(0, i), size) > width) i--
+        lines.push([{ ...word, t: word.t.slice(0, i) }]); word = { ...word, t: word.t.slice(i) }
+      }
+      if (w + tw(word) > width && line.length) { while (line.length && line[line.length - 1].t === ' ') line.pop(); lines.push(line); line = []; w = 0 }
+      line.push(word); w += tw(word)
+    }
+    while (line.length && line[line.length - 1].t === ' ') line.pop()
+    lines.push(line)
+    return lines
+  }
+  const richLines = (src: string, label: string, size: number, width: number): RLine[] => {
+    const out: RLine[] = [], blocks = parseRich(src)
+    const lab: Run = { text: label + ' ', b: true }
+    if (blocks[0] && blocks[0].kind !== 'p') out.push({ x: 0, segs: [{ t: label, f: bold }] })
+    blocks.forEach((bl, bi) => {
+      if (bl.kind === 'p') { flowRuns(bi === 0 ? [lab, ...bl.runs] : bl.runs, size, width).forEach(segs => out.push({ x: 0, segs })); return }
+      const ind = bl.kind === 'ol' ? 13 : 9
+      bl.items.forEach((it, j) => flowRuns(it, size, width - ind).forEach((segs, k) => out.push({ x: ind, segs, marker: k ? undefined : bl.kind === 'ol' ? `${bl.start + j}.` : '\u2022' })))
+    })
+    return out
+  }
+  const drawRich = (ls: RLine[], x0: number, y0: number, size: number, lh: number) => ls.forEach((l, i) => {
+    const yy = y0 - i * lh
+    if (l.marker) page.drawText(safe(font, l.marker), { x: x0 + l.x - font.widthOfTextAtSize(safe(font, l.marker), size) - 3, y: yy, size, font, color: black })
+    let x = x0 + l.x
+    for (const sg of l.segs) {
+      const w = sg.f.widthOfTextAtSize(sg.t, size)
+      if (sg.t !== ' ' || l.segs.length > 1) page.drawText(sg.t, { x, y: yy, size, font: sg.f, color: black })
+      if (sg.u) page.drawLine({ start: { x, y: yy - 1.4 }, end: { x: x + w, y: yy - 1.4 }, thickness: 0.5, color: black })
+      x += w
+    }
+  })
 
   let page: PDFPage = pdf.addPage([W, H]), y = H - M
   const text = (s: string, x: number, yy: number, size = 10, f: PDFFont = font, color = black) => page.drawText(safe(f, s), { x, y: yy, size, font: f, color })
@@ -121,34 +170,57 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
     const desc = wrap(it.description || '-', font, 9, cols[1].w - 8)
     const note = !isDn && (Number(it.discount_pct) > 0 || (it.vat_category && it.vat_category !== 'standard'))
       ? [Number(it.discount_pct) > 0 ? `Less ${Number(it.discount_pct)}% discount` : '', it.vat_category && it.vat_category !== 'standard' ? VAT_CATEGORIES[it.vat_category as VatCategory] : ''].filter(Boolean).join(' · ') : ''
-    const mat = [...(it.materials ? wrap(`Materials to be used: ${it.materials}`, font, 8, cols[1].w - 8) : []), ...(note ? wrap(note, font, 8, cols[1].w - 8) : [])]
-    const rh = Math.max(22, (desc.length * 11) + (mat.length * 10) + 10)
-    if (y - rh < bottom + 40) { newPage(); tableHeader() }
+    const mat = it.materials ? richLines(it.materials, 'Materials to be used:', 8.5, cols[1].w - 8) : []
+    const notes = note ? wrap(note, font, 8, cols[1].w - 8) : []
+    // the description cell as a list of lines; a row taller than the space left continues on the next page (never off the page)
+    const cell: { h: number; draw: (x: number, yy: number) => void }[] = [
+      ...desc.map(l => ({ h: 11, draw: (x: number, yy: number) => text(l, x, yy, 9) })),
+      ...mat.map(l => ({ h: 10.5, draw: (x: number, yy: number) => drawRich([l], x, yy - 0.5, 8.5, 10.5) })),
+      ...notes.map(l => ({ h: 10, draw: (x: number, yy: number) => text(l, x, yy, 8, font, grey) })),
+    ]
+    const full = Math.max(22, cell.reduce((a, l) => a + l.h, 0) + 10), pageBody = H - M - bottom - 26 - 12
+    if (y - full < bottom + 40 && full <= pageBody) { newPage(); tableHeader() }
     const amt = lineAmount(it), vat = lineVat(it, doc.vat_rate)
     const qty = `${Number(it.quantity || 0)}${it.unit && it.unit !== 'Nos' ? ' ' + it.unit : ''}`
     const vals = isInv ? [String(idx + 1).padStart(2, '0'), '', qty, Number(it.unit_price) ? fmtMoney(it.unit_price) : '-', fmtMoney(amt), fmtMoney(vat), fmtMoney(amt + vat)]
       : [String(idx + 1).padStart(2, '0'), '', qty, isDn ? '' : Number(it.unit_price) ? fmtMoney(it.unit_price) : '-', isDn ? '' : fmtMoney(amt)]
-    let x = M
-    cols.forEach((c, ci) => {
-      rect(x, y - rh, c.w, rh, isDn && ci >= 3 ? hatch : undefined)
-      if (ci === 1) { desc.forEach((l, i) => text(l, x + 4, y - 13 - i * 11, 9)); mat.forEach((l, i) => text(l, x + 4, y - 13 - desc.length * 11 - i * 10, 8, font, grey)) }
-      else if (ci === 2 && it.unit && it.unit !== 'Nos' && font.widthOfTextAtSize(safe(font, qty), 9) > c.w - 4) {
-        center(String(Number(it.quantity || 0)), x + c.w / 2, y - rh / 2 + 2, 9); center(it.unit, x + c.w / 2, y - rh / 2 - 8, 7)
-      }
-      else if (vals[ci]) { const yy = y - rh / 2 - 3; c.a === 'c' ? center(vals[ci], x + c.w / 2, yy, 9, ci === 0 || ci === 6 ? bold : font) : right(vals[ci], x + c.w - 4, yy, 9, ci === 6 ? bold : font) }
-      x += c.w
-    })
-    y -= rh
+    if (full > pageBody && y - bottom < 120) { newPage(); tableHeader() }   // a long row starts with real room, not one line at the foot of a page
+    let rest = cell, first = true
+    while (first || rest.length) {
+      if (!first) { newPage(); tableHeader() }
+      let take = rest.length, acc = rest.reduce((a, l) => a + l.h, 0)
+      if (acc + 10 > y - bottom - 10) { take = 0; acc = 0; while (take < rest.length && acc + rest[take].h + 10 <= y - bottom - 10) acc += rest[take++].h; take = Math.max(1, take) ; acc = rest.slice(0, take).reduce((a, l) => a + l.h, 0) }
+      const part = rest.slice(0, take), rh = Math.max(first ? 22 : 16, acc + 10)
+      let x = M
+      cols.forEach((c, ci) => {
+        rect(x, y - rh, c.w, rh, isDn && ci >= 3 ? hatch : undefined)
+        if (ci === 1) { let yy = y - 13; for (const l of part) { l.draw(x + 4, yy); yy -= l.h } }
+        else if (!first) { /* values only on the row's first page */ }
+        else if (ci === 2 && it.unit && it.unit !== 'Nos' && font.widthOfTextAtSize(safe(font, qty), 9) > c.w - 4) {
+          center(String(Number(it.quantity || 0)), x + c.w / 2, y - Math.min(rh, 40) / 2 + 2, 9); center(it.unit, x + c.w / 2, y - Math.min(rh, 40) / 2 - 8, 7)
+        }
+        else if (vals[ci]) { const yy = y - Math.min(rh, full) / 2 - 3; c.a === 'c' ? center(vals[ci], x + c.w / 2, yy, 9, ci === 0 || ci === 6 ? bold : font) : right(vals[ci], x + c.w - 4, yy, 9, ci === 6 ? bold : font) }
+        x += c.w
+      })
+      y -= rh; rest = rest.slice(take); first = false
+    }
   })
   const t = computeTotals(items, doc.vat_rate, docDiscount(doc), vatOn(doc))
+  const adv = Number(doc.advance_applied) || 0, paidShown = (opts.paid ?? 0) + (isInv && doc.advance_pending ? adv : 0)
   if (isQtn && doc.show_total !== false) {
-    const small = (label: string, v: string) => { const rh = 18; if (y - rh < bottom) newPage(); let x = M; cols.forEach((c, ci) => { rect(x, y - rh, c.w, rh); if (ci === 3) center(label, x + c.w / 2, y - 12, 8.5); if (ci === 4) center(v, x + c.w / 2, y - 12, 9); x += c.w }); y -= rh }
+    const small = (label: string, v: string) => { const ls = wrap(label, font, 8.5, cols[3].w - 6), rh = Math.max(18, ls.length * 10 + 8); if (y - rh < bottom) newPage(); let x = M; cols.forEach((c, ci) => { rect(x, y - rh, c.w, rh); if (ci === 3) ls.forEach((l, i) => center(l, x + c.w / 2, y - 12 - i * 10, 8.5)); if (ci === 4) center(v, x + c.w / 2, y - rh / 2 - 3, 9); x += c.w }); y -= rh }
     if (t.discount > 0 || qVat) small('Subtotal', fmtMoney(t.subtotal))
     if (t.discount > 0) small(`Discount${doc.discount_type === 'percent' ? ` ${Number(doc.discount_value)}%` : ''}`, `- ${fmtMoney(t.discount)}`)
     if (qVat) small(`VAT ${doc.vat_rate}%`, fmtMoney(t.vat))
-    const rh = 28; let x = M
+    const rh = 28; if (y - rh < bottom) newPage(); let x = M
     cols.forEach((c, ci) => { rect(x, y - rh, c.w, rh); if (ci === 3) { center(qVat ? 'Grand' : 'Total', x + c.w / 2, y - 11, 9, bold); center(qVat ? 'Total' : 'Amount', x + c.w / 2, y - 22, 9, bold) } if (ci === 4) center(fmtMoney(qVat ? t.total : t.taxable), x + c.w / 2, y - 17, 9.5, bold); x += c.w })
     y -= rh
+    if (adv > 0) {
+      small('Less: Advance received', `- ${fmtMoney(adv)}`)
+      const bh = 20; if (y - bh < bottom) newPage(); let bx = M
+      cols.forEach((c, ci) => { rect(bx, y - bh, c.w, bh); if (ci === 3) center('Balance', bx + c.w / 2, y - 13, 9, bold); if (ci === 4) center(fmtMoney((qVat ? t.total : t.taxable) - adv), bx + c.w / 2, y - 13, 9.5, bold); bx += c.w })
+      y -= bh
+    }
   }
   if (isInv) {
     const rh = 22; let x = M
@@ -166,10 +238,10 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   }
   if (isInv && !isCn) {
     if (y - 46 < bottom) newPage()
-    const pw = 100, vw = 80, ww = CW - pw - vw, paid = opts.paid ?? 0
+    const pw = 100, vw = 80, ww = CW - pw - vw, paid = paidShown
     rect(M, y - 44, ww, 44); const words = tp.showWords ? wrap(`Amount in Words: - ${amountInWords(t.total).replace(/^UAE Dirhams /, '')}`, bold, 10, ww - 12) : []
     words.slice(0, 3).forEach((l, i) => text(l, M + 6, y - 16 - i * 12 + (words.length > 2 ? 6 : 0), 10, bold))
-    rect(M + ww, y - 22, pw, 22); center('Paid Amount', M + ww + pw / 2, y - 15, 10, bold); rect(M + ww + pw, y - 22, vw, 22); right(fmtMoney(paid), M + CW - 4, y - 15, 10, bold)
+    rect(M + ww, y - 22, pw, 22); if (adv > 0) { center('Paid Amount', M + ww + pw / 2, y - 11, 10, bold); center(`incl. advance ${fmtMoney(adv)}`, M + ww + pw / 2, y - 19, 6.5) } else center('Paid Amount', M + ww + pw / 2, y - 15, 10, bold); rect(M + ww + pw, y - 22, vw, 22); right(fmtMoney(paid), M + CW - 4, y - 15, 10, bold)
     rect(M + ww, y - 44, pw, 22); center('Total Balance', M + ww + pw / 2, y - 37, 10, bold); rect(M + ww + pw, y - 44, vw, 22); right(fmtMoney(t.total - paid), M + CW - 4, y - 37, 10, bold)
     y -= 56
   }
@@ -207,6 +279,7 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
     if (tp.showComputerLine) { ensure(20); y -= 8; center('This is a computer-generated report.', W / 2, y - 8, 9, italic); y -= 14 }
   }
   if (tp.footerNote) { y -= 6; for (const l of wrap(tp.footerNote, font, 9.5, CW)) { ensure(12); text(l, M, y - 9, 9.5); y -= 12 } }
+  if (isDn && adv > 0) { ensure(16); y -= 6; text('Advance received for this project:', M, y - 9, 9.5, bold); text(`AED ${fmtMoney(adv)}`, M + bold.widthOfTextAtSize('Advance received for this project:', 9.5) + 5, y - 9, 9.5); y -= 13 }
   if (isDn) {
     ensure(70); y -= 34
     text('Delivered By:', M, y, 10, font, red); page.drawLine({ start: { x: M + 68, y: y - 2 }, end: { x: M + 210, y: y - 2 }, thickness: 0.7, color: red }); if (doc.vehicle_no) text(`Vehicle: ${doc.vehicle_no}`, M + 218, y, 9)

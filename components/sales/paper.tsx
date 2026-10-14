@@ -5,6 +5,7 @@ import { memo } from 'react'
 import { amountInWords, computeTotals, fmtMoney, lineAmount, lineVat, VAT_CATEGORIES, type VatCategory } from '@/lib/sales/money'
 import { DOC_META, isTaxDoc, type SalesType } from '@/lib/sales/docs'
 import { resolveTemplate, templateKind, type TemplateKind } from '@/lib/sales/template'
+import { RichBlocks } from './rich-text'
 
 export interface PaperItem { description: string; materials?: string | null; quantity: number | string; unit?: string | null; unit_price: number | string; vat_category?: string | null; discount_pct?: number | string | null }
 export interface PaperDoc {
@@ -12,6 +13,8 @@ export interface PaperDoc {
   attention?: string | null; customer_name?: string | null; customer_address?: string | null; customer_trn?: string | null; customer_phone?: string | null; customer_email?: string | null
   site?: string | null; subject?: string | null; intro?: string | null; closing?: string | null; lpo_ref?: string | null; del_no?: string | null; reference?: string | null
   project_name?: string | null; revision?: number | null; against_number?: string | null; apply_vat?: boolean | null
+  /** project advance shown as a deduction (a payment, not VAT); pending = not yet linked to the invoice (quotation, DN, draft invoice) */
+  advance_applied?: number | string | null; advance_pending?: boolean
   vat_rate: number; discount?: number; discount_type?: 'amount' | 'percent' | null; discount_value?: number | string | null; show_total?: boolean; terms: string[]; payment_terms: string[]; receiver_name?: string | null; vehicle_no?: string | null
 }
 export interface Branding {
@@ -52,6 +55,8 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
   const showSign = branding.showStamp && tp.showSignature && !!(branding.stamp || branding.signature || branding.signatoryName)
   const footer = branding.showHeaderFooter ? branding.footer : null
   const cols = isInv ? 7 : 5
+  const adv = Number(doc.advance_applied) || 0
+  const paidShown = paid + (isInv && doc.advance_pending ? adv : 0)
 
   return <div className={`sales-paper ${footer ? 'has-footer' : ''} ${branding.brandColor ? 'has-accent' : ''} ${className}`} data-doc={doc.doc_type} style={accent}>
     {pageGuides && <div className="paper-guides no-print" aria-hidden />}
@@ -116,7 +121,7 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
               return <tr key={i}>
                 <td className="text-center font-bold">{String(i + 1).padStart(2, '0')}</td>
                 <td className="paper-desc">{it.description ? <div className="paper-text" dir="auto">{it.description}</div> : <span className="text-neutral-400">—</span>}
-                  {it.materials && <div className="paper-text mt-[0.5mm] text-[12px]" dir="auto"><b>Materials to be used:</b> {it.materials}</div>}
+                  {it.materials && <RichBlocks src={it.materials} label="Materials to be used:" className="mt-[0.5mm] text-[12px]" />}
                   {!isDn && (Number(it.discount_pct) > 0 || (it.vat_category && it.vat_category !== 'standard')) && <div className="mt-[0.5mm] text-[11px] italic">
                     {Number(it.discount_pct) > 0 && <>Less {Number(it.discount_pct)}% discount{it.vat_category && it.vat_category !== 'standard' ? ' · ' : ''}</>}
                     {it.vat_category && it.vat_category !== 'standard' && VAT_CATEGORIES[it.vat_category as VatCategory]}</div>}</td>
@@ -131,7 +136,9 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
               {(t.discount > 0 || qVat) && <tr className="paper-total"><td /><td /><td /><td className="text-center">Subtotal</td><td className="text-center">{fmtMoney(t.subtotal)}</td></tr>}
               {t.discount > 0 && <tr className="paper-total"><td /><td /><td /><td className="text-center">Discount{doc.discount_type === 'percent' ? ` ${Number(doc.discount_value)}%` : ''}</td><td className="text-center">− {fmtMoney(t.discount)}</td></tr>}
               {qVat && <tr className="paper-total"><td /><td /><td /><td className="text-center">VAT {doc.vat_rate}%</td><td className="text-center">{fmtMoney(t.vat)}</td></tr>}
-              <tr className="paper-total"><td /><td /><td /><td className="text-center font-bold">{qVat ? <>Grand<br />Total</> : <>Total<br />Amount</>}</td><td className="text-center font-bold">{fmtMoney(qVat ? t.total : t.taxable)}</td></tr></>}
+              <tr className="paper-total"><td /><td /><td /><td className="text-center font-bold">{qVat ? <>Grand<br />Total</> : <>Total<br />Amount</>}</td><td className="text-center font-bold">{fmtMoney(qVat ? t.total : t.taxable)}</td></tr>
+              {adv > 0 && <><tr className="paper-total" data-advance><td /><td /><td /><td className="text-center">Less: Advance<br />received</td><td className="text-center">− {fmtMoney(adv)}</td></tr>
+                <tr className="paper-total"><td /><td /><td /><td className="text-center font-bold">Balance</td><td className="text-center font-bold">{fmtMoney((qVat ? t.total : t.taxable) - adv)}</td></tr></>}</>}
             {isInv && t.discount > 0 && <tr className="paper-total"><td className="text-center" colSpan={2}>Less discount{doc.discount_type === 'percent' ? ` ${Number(doc.discount_value)}%` : ''} (VAT charged on the discounted amount)</td><td /><td /><td className="text-right">− {fmtMoney(t.discount)}</td><td /><td /></tr>}
             {isInv && <tr className="paper-total font-bold"><td className="text-center" colSpan={2}>Grand Total</td><td /><td /><td className="text-right">{fmtMoney(t.taxable)}</td><td className="text-right">{fmtMoney(t.vat)}</td><td className="text-right">{fmtMoney(t.total)}</td></tr>}
             {isInv && (t.zeroBase > 0 || t.exemptBase > 0) && <tr className="paper-total text-[11px]"><td colSpan={7} className="text-left">VAT summary: standard-rated {fmtMoney(t.standardBase)}{t.zeroBase > 0 ? ` · zero-rated ${fmtMoney(t.zeroBase)}` : ''}{t.exemptBase > 0 ? ` · exempt / out of scope ${fmtMoney(t.exemptBase)}` : ''}</td></tr>}
@@ -140,8 +147,8 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
 
         {isInv && !isCn && <table className="paper-items paper-keep mt-0 text-[14px]"><colgroup><col /><col style={{ width: '36mm' }} /><col style={{ width: '30mm' }} /></colgroup><tbody><tr>
           <td className="px-[3mm] font-bold" rowSpan={2}>{tp.showWords && <>Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</>}</td>
-          <td className="text-center font-bold">Paid Amount</td><td className="text-right font-bold">{fmtMoney(paid)}</td></tr>
-          <tr><td className="text-center font-bold">Total Balance</td><td className="text-right font-bold">{fmtMoney(t.total - paid)}</td></tr></tbody></table>}
+          <td className="text-center font-bold">Paid Amount{adv > 0 && <span className="block text-[10px] font-normal" data-advance>incl. advance {fmtMoney(adv)}</span>}</td><td className="text-right font-bold">{fmtMoney(paidShown)}</td></tr>
+          <tr><td className="text-center font-bold">Total Balance</td><td className="text-right font-bold">{fmtMoney(t.total - paidShown)}</td></tr></tbody></table>}
 
         {isCn && tp.showWords && <div className="paper-keep mt-[2mm] text-[14px] font-bold">Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</div>}
         {isQtn && doc.closing && <div className="paper-keep mt-[3mm] text-[14px]">{doc.closing.split('\n').map((l, i) => <div key={i} className={`paper-text ${i === 0 ? 'font-bold' : ''}`}>{l}</div>)}</div>}
@@ -150,9 +157,9 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
         <div className={`paper-tail ${align === 'left' ? 'paper-tail--sign-left' : ''}`}>
           {showSign && align !== 'center' && <div className="paper-sign" style={{ paddingTop: spacing }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {branding.stamp && <img src={branding.stamp} alt="Company seal" style={{ width: seal, height: seal, objectFit: 'contain' }} />}
+            {branding.stamp && <img src={branding.stamp} alt="Company seal" decoding="sync" style={{ width: seal, height: seal, objectFit: 'contain' }} />}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {branding.signature && <img src={branding.signature} alt="Authorised signature" style={{ width: sigW, height: 'auto', maxHeight: Math.round(sigW * 0.75), objectFit: 'contain', marginInlineStart: branding.stamp ? -Math.round(seal * 0.18) : 0 }} />}
+            {branding.signature && <img src={branding.signature} alt="Authorised signature" decoding="sync" style={{ width: sigW, height: 'auto', maxHeight: Math.round(sigW * 0.75), objectFit: 'contain', marginInlineStart: branding.stamp ? -Math.round(seal * 0.18) : 0 }} />}
             {branding.signatoryName && <div className="paper-signatory"><b>{branding.signatoryName}</b>{branding.signatoryTitle && <span>{branding.signatoryTitle}</span>}</div>}
           </div>}
           <div className="paper-tail-text">
@@ -166,6 +173,7 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
               {tp.showComputerLine && <div className="mt-[3mm] text-center text-[12px] font-bold italic paper-red">This is a computer-generated report.</div>}
             </>}
             {tp.footerNote && <div className="paper-keep paper-text mt-[3mm] text-[13px]" dir="auto" data-footer-note>{tp.footerNote}</div>}
+            {isDn && adv > 0 && <div className="paper-keep mt-[3mm] text-[13px]" data-advance><b>Advance received for this project:</b> AED {fmtMoney(adv)}</div>}
             {isDn && <div className="paper-keep mt-[12mm] space-y-[6mm] text-[14px] paper-red">
               <div>Delivered By: <span className="inline-block w-[50mm] border-b border-current align-bottom" />{doc.vehicle_no && <span className="ms-2 text-black">Vehicle: {doc.vehicle_no}</span>}</div>
               <div>Received By: <span className="inline-block w-[50mm] border-b border-current align-bottom" />{doc.receiver_name && <span className="ms-2 text-black">{doc.receiver_name}</span>}</div>
@@ -173,16 +181,16 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
           </div>
           {showSign && align === 'center' && <div className="paper-sign paper-sign--center" style={{ paddingTop: spacing }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {branding.stamp && <img src={branding.stamp} alt="Company seal" style={{ width: seal, height: seal, objectFit: 'contain' }} />}
+            {branding.stamp && <img src={branding.stamp} alt="Company seal" decoding="sync" style={{ width: seal, height: seal, objectFit: 'contain' }} />}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {branding.signature && <img src={branding.signature} alt="Authorised signature" style={{ width: sigW, height: 'auto', maxHeight: Math.round(sigW * 0.75), objectFit: 'contain', marginInlineStart: branding.stamp ? -Math.round(seal * 0.18) : 0 }} />}
+            {branding.signature && <img src={branding.signature} alt="Authorised signature" decoding="sync" style={{ width: sigW, height: 'auto', maxHeight: Math.round(sigW * 0.75), objectFit: 'contain', marginInlineStart: branding.stamp ? -Math.round(seal * 0.18) : 0 }} />}
             {branding.signatoryName && <div className="paper-signatory"><b>{branding.signatoryName}</b>{branding.signatoryTitle && <span>{branding.signatoryTitle}</span>}</div>}
           </div>}
         </div>
       </td></tr></tbody>
     </table>
     {/* eslint-disable-next-line @next/next/no-img-element */}
-    {footer && <div className="paper-footer"><img src={footer} alt="Company contact details" /></div>}
+    {footer && <div className="paper-footer"><img src={footer} alt="Company contact details" decoding="sync" /></div>}
   </div>
 }
 /** memoised: the editor re-renders on every keystroke, the paper only when its (deferred) props change */

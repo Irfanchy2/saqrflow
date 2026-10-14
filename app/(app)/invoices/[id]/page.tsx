@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowRightLeft, BellRing, CheckCircle2, Clock, FileMinus, FolderOpen, History, Link2, Paperclip, Plus, ShieldCheck, Trash2, Truck } from 'lucide-react'
+import { ArrowRightLeft, BellRing, CheckCircle2, Clock, FileMinus, FolderOpen, History, Link2, Paperclip, Plus, ShieldCheck, Trash2, Truck, Wallet } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { brandingFor, loadSalesDoc, salesSettings } from '@/lib/sales/data'
 import { APPROVAL_LABEL, DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
@@ -10,7 +10,7 @@ import { matchesFormat, NUMBER_FORMAT_COLS } from '@/lib/numbering'
 import { Badge, Card, CardHeader, Field, Input, Select, Td, Th, TableWrap, Textarea } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
-import { addFollowup, completeFollowup, decideApproval, deletePayment, recordPayment } from '@/app/actions/sales'
+import { addFollowup, applyProjectAdvance, completeFollowup, decideApproval, deletePayment, recordPayment, unapplyProjectAdvance } from '@/app/actions/sales'
 import { ACCEPT_ATTR } from '@/lib/files'
 import { formatLongDate } from '@/lib/time'
 import { RecordActivity } from '@/components/record-activity'
@@ -59,6 +59,9 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const creditNotes = d.related.filter((r: any) => r.doc_type === 'credit_note' && r.source_invoice_id === id)
   const { data: payDocs } = isInv && d.payments.some((p: any) => p.document_id) ? await c.supabase.from('documents').select('id,name').in('id', d.payments.map((p: any) => p.document_id).filter(Boolean)) : { data: [] as any[] }
   const docName = new Map((payDocs ?? []).map((x: any) => [x.id, x.name]))
+  // project advances received on account and not yet applied to an invoice
+  const { data: advs } = isInv && d.doc.project_id && c.can('finance.view') ? await c.supabase.from('payments').select('amount').eq('project_id', d.doc.project_id).is('invoice_id', null) : { data: [] as any[] }
+  const unapplied = Math.round((advs ?? []).reduce((s: number, a: any) => s + Number(a.amount), 0) * 100) / 100
 
   // a draft still carrying a number from before the custom format was configured (e.g. QTN-2026-0004) can take a new one
   const { data: fmt } = edit && d.doc.status === 'draft' && !(d.doc as any).sent_at && !d.doc.revision ? await c.supabase.from('document_number_formats').select(NUMBER_FORMAT_COLS).eq('doc_type', d.doc.doc_type).maybeSingle() : { data: null }
@@ -77,7 +80,13 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
 
       {isInv && <Card className="lg:col-span-2 2xl:col-span-2">
         <CardHeader title="Payments" sub={`Invoice AED ${fmtMoney(d.doc.total)} · Paid AED ${fmtMoney(d.paid)}${credited ? ` · Credited AED ${fmtMoney(credited)}` : ''} · Balance AED ${fmtMoney(balance)}${d.doc.due_date && balance > 0 && d.doc.due_date < c.today ? ` · ${Math.round((Date.parse(c.today) - Date.parse(d.doc.due_date)) / 864e5)} days overdue` : ''}`}
-          action={edit && !['draft', 'cancelled', 'paid'].includes(d.doc.status) ? <DialogButton size="sm" label="Record payment" title={`Record payment: ${d.doc.number}`} icon={<Plus size={14} />} wide>
+          action={edit && !['draft', 'cancelled', 'paid'].includes(d.doc.status) ? <div className="flex flex-wrap justify-end gap-2">
+            {unapplied > 0 && balance > 0 && <DialogButton size="sm" variant="secondary" label="Apply project advance" title={`Apply project advance: ${d.doc.number}`} icon={<Wallet size={14} />}>
+              <ActionForm action={applyProjectAdvance.bind(null, id)} submit="Apply advance">
+                <p className="text-sm">This project has <b>AED {fmtMoney(unapplied)}</b> of advances not yet applied. Applying links them to this invoice as payments (oldest first). No VAT is added.</p>
+                <Field label="Amount to apply (AED) *"><Input name="amount" type="number" step="0.01" min="0.01" max={Math.min(unapplied, balance).toFixed(2)} defaultValue={Math.min(unapplied, balance).toFixed(2)} required inputMode="decimal" /></Field>
+              </ActionForm></DialogButton>}
+            <DialogButton size="sm" label="Record payment" title={`Record payment: ${d.doc.number}`} icon={<Plus size={14} />} wide>
             <ActionForm action={recordPayment.bind(null, id)} submit="Save payment" idempotent>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Amount (AED) *" hint={`Outstanding: AED ${fmtMoney(balance)}`}><Input name="amount" type="number" step="0.01" min="0.01" max={balance.toFixed(2)} defaultValue={balance.toFixed(2)} required inputMode="decimal" /></Field>
@@ -90,17 +99,17 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
                 {c.can('documents.upload') && <Field label="Receipt / proof (optional)" className="sm:col-span-2"><input type="file" name="file" accept={ACCEPT_ATTR} className="text-sm" /></Field>}
                 <Field label="Notes" className="sm:col-span-2"><Input name="notes" maxLength={1000} /></Field>
               </div>
-            </ActionForm></DialogButton> : null} />
+            </ActionForm></DialogButton></div> : null} />
         {d.doc.status === 'draft' ? <p className="px-4 py-6 text-sm text-muted">Issue the invoice (⋯ → Issue tax invoice) before recording payments.</p>
           : d.payments.length === 0 ? <p className="px-4 py-6 text-sm text-muted">No payments recorded yet.</p>
           : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Method</Th><Th>Reference</Th><Th>Cheque / bank</Th><Th>By</Th><Th className="text-right">Amount</Th><Th /></tr></thead><tbody className="divide-y divide-border">
             {d.payments.map((p: any) => { const q = p.cheque_id ? chequeOf.get(p.cheque_id) : null
-              return <tr key={p.id}><Td className="whitespace-nowrap tabular-nums">{p.paid_on}</Td><Td>{METHOD[p.method] ?? p.method ?? '—'}</Td>
+              return <tr key={p.id}><Td className="whitespace-nowrap tabular-nums">{p.paid_on}</Td><Td>{METHOD[p.method] ?? p.method ?? '—'}{p.project_id && <div className="text-xs text-muted">Project advance</div>}</Td>
                 <Td className="text-muted">{p.reference ?? '—'}{p.notes && <div className="text-xs">{p.notes}</div>}{p.document_id && <Link href={`/documents/${p.document_id}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"><Paperclip size={11} />{docName.get(p.document_id) ?? 'Attachment'}</Link>}</Td>
                 <Td className="text-muted">{q ? <Link href={`/cheques?open=${q.id}`} className="text-primary hover:underline">#{q.cheque_no}</Link> : null}{q ? ` · ${q.bank_name}` : p.bank_name ?? '—'}</Td>
                 <Td className="text-muted">{names.get(p.created_by) ?? '—'}</Td>
                 <Td className="text-right font-medium tabular-nums">{fmtMoney(p.amount)}</Td>
-                <Td className="text-right">{c.can('records.delete') && <ActionButton variant="ghost" action={deletePayment.bind(null, p.id)} confirm="Delete this payment? The invoice balance will be recalculated."><Trash2 size={14} /><span className="sr-only">Delete payment</span></ActionButton>}</Td></tr> })}
+                <Td className="text-right">{edit && p.project_id && <ActionButton variant="ghost" action={unapplyProjectAdvance.bind(null, p.id)} confirm="Move this advance back to the project? The invoice balance goes up; the money stays recorded on the project.">Move back</ActionButton>}{c.can('records.delete') && !p.project_id && <ActionButton variant="ghost" action={deletePayment.bind(null, p.id)} confirm="Delete this payment? The invoice balance will be recalculated."><Trash2 size={14} /><span className="sr-only">Delete payment</span></ActionButton>}</Td></tr> })}
           </tbody></TableWrap>}
         <div className="h-2 overflow-hidden rounded-b-lg bg-surface-2" aria-hidden><div className="h-full bg-success transition-all" style={{ width: `${Math.min(100, Number(d.doc.total) ? ((d.paid + credited) / Number(d.doc.total)) * 100 : 0)}%` }} /></div>
       </Card>}
