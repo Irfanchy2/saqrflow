@@ -6,10 +6,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle,
-  MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, HardHat,
+  MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, HardHat, Wallet,
 } from 'lucide-react'
 import { SalesPaper, docDiscount, vatOn, type Branding, type PaperItem } from './paper'
 import { FitPaper } from './preview'
+import { RichTextField } from './rich-field'
 import { CustomerPicker, type CustomerOpt } from './customer-picker'
 import { CatalogPicker, type CatalogOpt } from './catalog-picker'
 import { Badge, Button, Input, Select, Textarea } from '@/components/ui/primitives'
@@ -18,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { APPROVAL_LABEL, APPROVAL_TONE, CONVERSIONS, DOC_META, STATUS_TONE, UNITS, isTaxDoc, manualStatuses, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { VAT_CATEGORIES, amountInWords, computeTotals, fmtMoney, lineAmount } from '@/lib/sales/money'
 import {
-  archivePdfToVault, convertSalesDoc, createDeliveryNote, deleteSalesDraft, duplicateSalesDoc, logSalesEvent, renumberDraft, requestApproval, saveSalesDoc, setSalesStatus, type SalesDocInput,
+  archivePdfToVault, convertSalesDoc, createDeliveryNote, deleteSalesDraft, duplicateSalesDoc, logSalesEvent, projectAdvanceInfo, renumberDraft, requestApproval, saveSalesDoc, setSalesStatus, type SalesDocInput,
 } from '@/app/actions/sales'
 import type { ActionState } from '@/lib/utils'
 import { createProjectFromQuotation, createWorkOrderFromQuotation } from '@/app/actions/operations'
@@ -59,7 +60,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
     site: doc.site ?? '', subject: doc.subject ?? '', reference: doc.reference ?? '', lpo_ref: doc.lpo_ref ?? '', intro: doc.intro ?? '', closing: doc.closing ?? '',
     receiver_name: doc.receiver_name ?? '', vehicle_no: doc.vehicle_no ?? '', notes: doc.notes ?? '',
     vat_rate: Number(doc.vat_rate ?? 5), discount_type: doc.discount_type ?? 'amount', discount_value: Number(doc.discount_value ?? doc.discount ?? 0),
-    show_total: doc.show_total !== false, apply_vat: isQtn ? doc.apply_vat === true : null,
+    show_total: doc.show_total !== false, apply_vat: isQtn ? doc.apply_vat === true : null, advance_applied: Number(doc.advance_applied ?? 0),
     termsText: (doc.terms ?? []).join('\n'), paymentText: (doc.payment_terms ?? []).join('\n'),
   }))
   const [items, setItems] = useState<Item[]>(() => initialItems.length ? initialItems.map(i => ({ ...i, key: key(), id: i.id ?? null, materials: i.materials ?? '', unit: i.unit ?? 'Nos', vat_category: i.vat_category ?? 'standard', discount_pct: Number(i.discount_pct ?? 0) })) : [blank()])
@@ -105,11 +106,22 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const lines = (s: string) => s.split('\n').map(x => x.trim()).filter(Boolean)
 
   const projectName = projects.find(p => p.id === head.project_id)?.name ?? null
+  // project advances (payments on account): shown as "Less: advance received", never VAT; an issued invoice applies them from its Payments tab
+  const advanceEditable = !isCn && (!isInv || draft)
+  const [advInfo, setAdvInfo] = useState<{ unapplied: number; recorded: number } | null>(null)
+  useEffect(() => {
+    let live = true
+    if (!head.project_id) { setAdvInfo(null); return }
+    projectAdvanceInfo(head.project_id).then(r => { if (live) setAdvInfo(r) }).catch(() => {})
+    return () => { live = false }
+  }, [head.project_id])
+  const advance = head.project_id ? Number(head.advance_applied) || 0 : 0
   const paperDocNow = useMemo(() => ({
     project_name: projectName,
     ...doc, ...head, doc_type: t, number: doc.number, due_date: head.due_date || null, valid_until: head.valid_until || null,
     terms: lines(head.termsText), payment_terms: lines(head.paymentText), vat_rate: Number(head.vat_rate) || 0,
-  }), [doc, head, t, projectName])
+    advance_applied: head.project_id ? Number(head.advance_applied) || 0 : 0, advance_pending: !isInv || draft,
+  }), [doc, head, t, projectName, isInv, draft])
   const paperItemsNow = useMemo(() => items.filter(i => i.description.trim() || Number(i.unit_price) || i === items[0]), [items])
   // typing stays instant: the A4 preview renders from deferred copies and only re-renders when they change (SalesPaper is memoised)
   const paperDoc = useDeferredValue(paperDocNow), paperItems = useDeferredValue(paperItemsNow)
@@ -118,7 +130,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const payload = useCallback((): SalesDocInput => {
     const { termsText, paymentText, ...h } = head
     return {
-      ...h, customer_id: h.customer_id || null, project_id: h.project_id || null, salesperson_id: h.salesperson_id || null, terms: lines(termsText), payment_terms: lines(paymentText),
+      ...h, advance_applied: h.project_id ? Number(h.advance_applied) || 0 : 0, customer_id: h.customer_id || null, project_id: h.project_id || null, salesperson_id: h.salesperson_id || null, terms: lines(termsText), payment_terms: lines(paymentText),
       items: items.filter(i => i.description.trim()).map(({ key: _k, ...i }) => ({ ...i, id: i.id || null, quantity: Number(i.quantity) || 0, unit_price: Number(i.unit_price) || 0, discount_pct: Number(i.discount_pct) || 0, materials: i.materials || null, vat_category: i.vat_category as any })),
     }
   }, [head, items])
@@ -342,7 +354,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
                 </div>
                 <Textarea aria-label={`Line ${i + 1} description`} rows={2} className={GROW} value={it.description} onChange={e => setItem(i, { description: e.target.value })} placeholder="e.g. Supply and installation of steel staircase with handrail" aria-invalid={!!fieldErr[`items.${i}.description`]} />
                 {err(`items.${i}.description`)}
-                {isQtn && <Input aria-label={`Line ${i + 1} materials`} className="mt-2" value={it.materials} onChange={e => setItem(i, { materials: e.target.value })} placeholder="Materials to be used (optional)" />}
+                {isQtn && <div className="mt-2"><RichTextField label={`Line ${i + 1} materials`} value={it.materials} onChange={v => setItem(i, { materials: v })} placeholder="Materials to be used (optional)" /></div>}
                 <div className={cn('mt-2 grid gap-2', meta.priced ? 'grid-cols-[1fr_1fr_1.3fr]' : 'grid-cols-2')}>
                   <F label="Qty" small error={err(`items.${i}.quantity`)}><Input type="number" min={0} step="any" inputMode="decimal" value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} /></F>
                   <F label="Unit" small><Select value={it.unit} onChange={e => setItem(i, { unit: e.target.value })}>{[...new Set([...UNITS, it.unit])].map(u => <option key={u}>{u}</option>)}</Select></F>
@@ -375,9 +387,20 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
               {tot.discount > 0 && <Row k={`Discount${head.discount_type === 'percent' ? ` ${Number(head.discount_value)}%` : ''}`} v={`− ${fmtMoney(tot.discount)}`} />}
               {vatOn(paperDoc as any) && <Row k={`VAT ${head.vat_rate}%${tot.zeroBase || tot.exemptBase ? ` on ${fmtMoney(tot.standardBase)}` : ''}`} v={fmtMoney(tot.vat)} />}
               <Row k={vatOn(paperDoc as any) ? 'Grand total' : 'Total'} v={`AED ${fmtMoney(tot.total)}`} strong />
-              {isInv && paid > 0 && <><Row k="Paid" v={fmtMoney(paid)} /><Row k="Balance" v={`AED ${fmtMoney(tot.total - paid)}`} strong /></>}
+              {!isInv && advance > 0 && <><Row k="Less: advance received" v={`− ${fmtMoney(advance)}`} /><Row k="Balance" v={`AED ${fmtMoney((vatOn(paperDoc as any) ? tot.total : tot.taxable) - advance)}`} strong /></>}
+              {isInv && (paid > 0 || (draft && advance > 0)) && <><Row k={draft && advance > 0 ? 'Paid (incl. advance)' : 'Paid'} v={fmtMoney(paid + (draft ? advance : 0))} /><Row k="Balance" v={`AED ${fmtMoney(tot.total - paid - (draft ? advance : 0))}`} strong /></>}
               <p className="mt-2 text-xs text-muted">{amountInWords(tot.total)}</p>
             </dl>
+          </Section>}
+
+          {head.project_id && advInfo && !isCn && (advInfo.recorded > 0 || advance > 0) && <Section icon={Wallet} title="Project advance" sub="Payments recorded on the project. Applying one is a payment: no VAT, no tax invoice">
+            <p className="text-sm">Unapplied advances on this project: <b className="tabular-nums">AED {fmtMoney(advInfo.unapplied)}</b>{advInfo.recorded > advInfo.unapplied ? <span className="text-muted"> (AED {fmtMoney(advInfo.recorded - advInfo.unapplied)} already applied to invoices)</span> : null}</p>
+            {advanceEditable ? <div className="flex flex-wrap items-end gap-2">
+              <F label="Apply against this document (AED)" error={err('advance_applied')}><Input type="number" min={0} step="0.01" inputMode="decimal" className="w-44" value={head.advance_applied as number} onChange={e => set('advance_applied', e.target.value as any)} /></F>
+              <Button type="button" variant="secondary" size="sm" className="mb-0.5" disabled={!advInfo.unapplied} onClick={() => set('advance_applied', Math.round(Math.min(advInfo.unapplied, meta.priced ? (vatOn(paperDoc as any) ? tot.total : tot.taxable) : advInfo.unapplied) * 100) / 100)}>Apply available</Button>
+              {advance > 0 && <Button type="button" variant="ghost" size="sm" className="mb-0.5" onClick={() => set('advance_applied', 0)}>Remove</Button>}
+              <p className="basis-full text-xs text-muted">{isInv ? 'Shown as paid on the invoice. When you issue it, the advance is linked to the invoice (oldest payments first).' : 'Shown as “Less: advance received” and the balance on the document. It carries over when you convert to an invoice.'}</p>
+            </div> : <p className="text-xs text-muted">This invoice is issued: apply advances from the invoice’s Payments tab.</p>}
           </Section>}
 
           {(isQtn || isInv) && <Section icon={ScrollText} title={isQtn ? 'Letter & terms' : 'Terms'} sub="Pick a template (Settings → Document templates) and edit it for this document" collapsed={!isQtn}>

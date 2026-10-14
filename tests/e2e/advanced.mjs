@@ -152,7 +152,9 @@ try {
     await mp.goto(BASE + path); await mp.waitForLoadState('networkidle').catch(() => {})
     const clip = await mp.evaluate(() => { const main = document.querySelector('main'); const edge = Math.min(innerWidth, main.getBoundingClientRect().right) + 1
       const scroller = e => { for (let a = e.parentElement; a && a !== main; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if (o === 'auto' || o === 'scroll') return true } return false }
-      return [...main.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > edge && !scroller(e) }).length })
+      const bad = [...main.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > edge && !scroller(e) })
+      const z = document.querySelector('#builder .sales-paper')?.parentElement; const zi = z ? ` zoom=${z.style.zoom} outer=${z.parentElement.clientWidth}` : ''
+      return bad.length ? `${bad.length}${zi}: ${bad.slice(0, 3).map(e => `${e.tagName.toLowerCase()}#${e.closest('[id]')?.id ?? ''} “${(e.textContent ?? '').trim().slice(0, 30)}”`).join(', ')}` : 0 })
     ok(clip === 0, `${path}: nothing cut off on a 360px phone (${clip})`)
   }
   await mp.goto(`${BASE}/brief`); await mp.screenshot({ path: `${OUT}/m-brief.png`, fullPage: true }); await m.close()

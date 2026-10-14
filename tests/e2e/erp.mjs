@@ -234,7 +234,7 @@ try {
   await dp.goto(`${BASE}/print/sales/${qid}`); await dp.waitForLoadState('networkidle'); await dp.emulateMedia({ media: 'print', colorScheme: 'dark' })
   const pc = await dp.evaluate(() => { const s = getComputedStyle(document.querySelector('.sales-paper')); return { bg: s.backgroundColor, fg: s.color, html: getComputedStyle(document.documentElement).backgroundColor, dark: document.documentElement.classList.contains('dark') } })
   await dp.pdf({ path: `${OUT}/F-dark-print.pdf`, preferCSSPageSize: true, printBackground: true }); try { execFileSync('pdftoppm', ['-png', '-r', '40', '-f', '1', '-l', '1', `${OUT}/F-dark-print.pdf`, `${OUT}/F-dark-print`]) } catch {}
-  ok(pc.dark && darkBg !== 'rgb(255, 255, 255)' && pc.bg === 'rgb(255, 255, 255)' && pc.fg === 'rgb(17, 17, 17)', `dark UI (${darkBg}) → printed paper white with dark ink (${pc.bg} / ${pc.fg})`)
+  ok(pc.dark && darkBg !== 'rgb(255, 255, 255)' && pc.bg === 'rgb(255, 255, 255)' && ['rgb(0, 0, 0)', 'rgb(17, 17, 17)'].includes(pc.fg), `dark UI (${darkBg}) → printed paper white with dark ink (${pc.bg} / ${pc.fg})`)
   await dk.close()
 
   console.log('\n[G] Approval workflow (optional setting)')

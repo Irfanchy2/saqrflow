@@ -39,3 +39,14 @@ export function projectFinancials(contract: number | string | null, invoices: Pr
     collectedPct: invoiced > 0 ? Math.min(100, Math.round((received / invoiced) * 100)) : null, byCategory,
   }
 }
+
+/**
+ * Project payments panel: money received from the customer for this project = payments against its invoices + advances
+ * received on account and not yet applied to an invoice. Remaining = contract value (else accepted quotation, else invoiced) − received.
+ * Advances are payments only: they never add VAT or invoice anything.
+ */
+export function projectPaymentSummary(value: number, invoicePaid: number, unapplied: number) {
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const received = r2(invoicePaid + unapplied)
+  return { received, unapplied: r2(unapplied), remaining: value > 0 ? r2(Math.max(0, value - received)) : null }
+}

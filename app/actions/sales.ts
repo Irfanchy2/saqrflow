@@ -8,7 +8,7 @@ import { safe, str } from '@/lib/action'
 import { saveVersion } from '@/lib/doc-upload'
 import { addDays } from '@/lib/time'
 import { CONVERSIONS, DOC_META, manualStatuses, type SalesType } from '@/lib/sales/docs'
-import { computeTotals } from '@/lib/sales/money'
+import { computeTotals, fmtMoney } from '@/lib/sales/money'
 import { BRAND_KINDS, loadSalesDoc, salesSettings } from '@/lib/sales/data'
 import { buildSalesPdf } from '@/lib/sales/build'
 import { diffSnapshots, snapshotOf } from '@/lib/sales/revisions'
@@ -25,7 +25,7 @@ const vatCat = z.enum(['standard', 'zero', 'exempt', 'out_of_scope']).default('s
 const itemSchema = z.object({
   id: z.string().uuid().optional().nullable(),
   description: z.string().trim().min(1, 'Every line needs a description').max(2000, 'A line description is limited to 2000 characters'),
-  materials: optText(1000),
+  materials: optText(4000),
   quantity: z.coerce.number({ message: 'Quantity must be a number' }).min(0, 'Quantity cannot be negative').max(1e9),
   unit: z.string().trim().min(1).max(20).default('Nos'),
   unit_price: z.coerce.number({ message: 'Rate must be a number' }).min(0, 'Rate cannot be negative').max(1e10),
@@ -50,6 +50,7 @@ const docSchema = z.object({
   discount_type: z.enum(['amount', 'percent']).default('amount'),
   discount_value: z.coerce.number({ message: 'Discount must be a number' }).min(0, 'Discount cannot be negative').max(1e10).default(0),
   show_total: z.boolean().default(true), apply_vat: z.boolean().nullable().optional(),
+  advance_applied: z.coerce.number({ message: 'Advance must be a number' }).min(0, 'Advance cannot be negative').max(1e10).default(0).transform(n => Math.round(n * 100) / 100),
   terms: z.array(z.string().trim().max(1000)).max(60).transform(a => a.filter(Boolean)),
   payment_terms: z.array(z.string().trim().max(500)).max(40).transform(a => a.filter(Boolean)),
   items: z.array(itemSchema).max(300, 'A document can have up to 300 lines'),
@@ -183,13 +184,23 @@ export async function saveSalesDoc(id: string, input: SalesDocInput, opts: { exp
       const { data: b } = await c.supabase.from('invoice_balances').select('paid,credited').eq('id', id).maybeSingle()
       if (b && Number(b.paid) + Number(b.credited ?? 0) > tot.total + 0.005) return { error: 'The new total is lower than what has already been paid or credited.' }
     }
+    // project advance shown as "Less: advance received": a payment, never VAT. Issued invoices apply advances from the Payments tab.
+    let advance = v.project_id ? v.advance_applied : 0
+    if (t === 'invoice' && cur.status !== 'draft') advance = Number(cur.advance_applied ?? 0)
+    else if (t === 'credit_note') advance = 0
+    else if (advance > 0 && Math.abs(advance - Number(cur.advance_applied ?? 0)) > 0.004) {   // only a changed amount is re-checked (an old quotation stays editable)
+      const { data: avail } = await c.supabase.rpc('project_unapplied', { p_project: v.project_id })
+      if (advance > Number(avail ?? 0) + 0.005) return { error: `The advance applied (AED ${fmtMoney(advance)}) is more than the project's unapplied payments (AED ${fmtMoney(Number(avail ?? 0))}).`, fieldErrors: { advance_applied: 'More than received' } }
+    }
+    if (priced && advance > 0 && !(t === 'invoice' && cur.status !== 'draft') && advance > (vatApplies(t, applyVat) ? tot.total : tot.taxable) + 0.005)
+      return { error: 'The advance applied cannot be more than the document total.', fieldErrors: { advance_applied: 'More than the total' } }
     if (customerId && v.update_customer) {
       const { error: ue } = await c.supabase.from('customers').update({ name: v.customer_name ?? undefined, address: v.customer_address, trn: v.customer_trn?.replace(/\s|-/g, '') ?? null, phone: v.customer_phone, email: v.customer_email, contact_person: v.attention, updated_at: new Date().toISOString() }).eq('id', customerId)
       if (ue) throw ue
     }
     const { items, new_customer: _nc, update_customer: _uc, ...h } = v
     const head = {
-      ...h, customer_id: customerId, customer_trn: v.customer_trn?.replace(/\s|-/g, '') ?? null, apply_vat: applyVat,
+      ...h, advance_applied: advance, customer_id: customerId, customer_trn: v.customer_trn?.replace(/\s|-/g, '') ?? null, apply_vat: applyVat,
       subtotal: priced ? tot.subtotal : 0, discount: priced ? tot.discount : 0, vat_amount: priced ? tot.vat : 0, total: priced ? tot.total : 0,
     }
     const lines = items.map((it, i) => ({ ...it, id: it.id ?? null, position: i, unit_price: priced ? it.unit_price : 0, discount_pct: priced ? it.discount_pct : 0 }))
@@ -237,11 +248,11 @@ export async function setSalesStatus(id: string, status: string): Promise<Action
       if (count) return { error: 'This invoice has payments. Delete the payments first (or issue a credit note).' }
     }
     const { error } = await c.supabase.from('invoices').update({ status, sent_at: status === 'sent' && !cur.sent_at ? new Date().toISOString() : undefined, updated_at: new Date().toISOString() }).eq('id', id)
-    if (error) { if (/exceeds the invoice balance|not issued/.test(error.message)) return { error: error.message.charAt(0).toUpperCase() + error.message.slice(1) + '.' }; throw error }
+    if (error) { if (/exceeds the invoice balance|not issued|advance exceeds|not linked to a project/.test(error.message)) return { error: error.message.charAt(0).toUpperCase() + error.message.slice(1) + '.' }; throw error }
     // an issued invoice whose due date already passed is overdue straight away
     if (t === 'invoice' && status === 'sent') {
       const { data: inv } = await c.supabase.from('invoices').select('due_date').eq('id', id).single()
-      if (inv?.due_date && inv.due_date < c.today) await c.supabase.from('invoices').update({ status: 'overdue' }).eq('id', id)
+      if (inv?.due_date && inv.due_date < c.today) await c.supabase.from('invoices').update({ status: 'overdue' }).eq('id', id).eq('status', 'sent')   // an applied advance may already have made it (partly) paid
     }
     // first time a quotation is sent → schedule the follow-ups (Settings → Sales, default +3 and +10 days)
     if (t === 'quotation' && status === 'sent') {
@@ -287,6 +298,7 @@ async function copyDoc(c: Ctx, id: string, to: SalesType, link: boolean, tok?: s
     salesperson_id: d.salesperson_id ?? c.userId, customer_id: d.customer_id, project_id: d.project_id, attention: d.attention, customer_name: d.customer_name, customer_address: d.customer_address,
     customer_trn: d.customer_trn, customer_phone: d.customer_phone, customer_email: d.customer_email, site: d.site, subject: d.subject, reference: d.reference, lpo_ref: d.lpo_ref,
     vat_rate: d.vat_rate, show_total: d.show_total, notes: d.notes, apply_vat: to === 'quotation' ? d.apply_vat : null,
+    advance_applied: link && d.project_id && to !== 'credit_note' && !(d.doc_type === 'invoice' && d.status !== 'draft') ? Number(d.advance_applied ?? 0) : 0,   // carried quotation → invoice / delivery note
     discount_type: tot.discount ? d.discount_type ?? 'amount' : 'amount', discount_value: tot.discount ? Number(d.discount_value ?? d.discount) : 0,
     intro: to === 'quotation' ? d.intro ?? s.intro : null, closing: to === 'quotation' ? d.closing ?? s.closing : null,
     terms: to === 'quotation' || to === 'invoice' ? d.terms : [], payment_terms: to === 'delivery_note' ? [] : d.payment_terms,
@@ -658,4 +670,64 @@ export async function recordPaymentOnAccount(customerId: string, _: ActionState,
     revalidatePath(`/parties/${customerId}`); revalidatePath(`/parties/${customerId}/ledger`)
     return { ok: true, message: 'Payment on account recorded.' }
   })
+}
+
+// ───────────── Project payments (customer advances) ─────────────
+/** Advance / payment received from the customer for a project. A payment only: it creates no tax invoice and no VAT. */
+export async function recordProjectPayment(projectId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'records.edit'); need(c, 'finance.view')
+    const parsed = paySchema.safeParse({ amount: str(fd, 'amount'), paid_on: str(fd, 'paid_on') ?? c.today, method: str(fd, 'method'), reference: str(fd, 'reference'), notes: str(fd, 'notes'), idempotency_key: str(fd, 'idempotency_key') })
+    if (!parsed.success) return { error: parsed.error.issues[0].message, fieldErrors: Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.'), i.message])) }
+    const v = parsed.data
+    if (v.paid_on > c.today) return { error: 'Payment date cannot be in the future. Track post-dated cheques under Cheques.', fieldErrors: { paid_on: 'Cannot be in the future' } }
+    const { data: pr } = await c.supabase.from('projects').select('id,customer_id').eq('id', projectId).maybeSingle()
+    if (!pr) return { error: 'Project not found.' }
+    if (!pr.customer_id) return { error: 'Link a customer to this project first (Edit project), so the payment appears in their statement.' }
+    const { error } = await c.supabase.from('payments').insert({ ...v, company_id: c.company.id, invoice_id: null, project_id: projectId, customer_id: pr.customer_id, created_by: c.userId })
+    if (error) { if (error.code === '23505') return { ok: true, message: 'Payment already recorded.' }; throw error }
+    revalidatePath(`/projects/${projectId}`); revalidatePath(`/parties/${pr.customer_id}`); revalidatePath(`/parties/${pr.customer_id}/ledger`)
+    return { ok: true, message: 'Project payment recorded. No invoice or VAT was created.' }
+  })
+}
+
+const advanceError = (m: string) => (/advance exceeds|issue the invoice before applying|not linked to a project|invoice balance/.test(m) ? m.charAt(0).toUpperCase() + m.slice(1) + '.' : null)
+
+/** Applies part of the project's unapplied advances to an issued tax invoice (oldest first). */
+export async function applyProjectAdvance(invoiceId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'records.edit'); need(c, 'finance.view')
+    const amount = Math.round(Number(str(fd, 'amount')) * 100) / 100
+    if (!(amount > 0)) return { error: 'Enter the amount to apply.', fieldErrors: { amount: 'Required' } }
+    const { error } = await c.supabase.rpc('apply_project_advance', { p_invoice: invoiceId, p_amount: amount })
+    if (error) { const m = advanceError(error.message); if (m) return { error: m }; throw error }
+    await logEvent(c, invoiceId, 'payment', `Project advance of AED ${amount.toFixed(2)} applied`)
+    const { data: inv } = await c.supabase.from('invoices').select('project_id').eq('id', invoiceId).maybeSingle()
+    done(invoiceId); if (inv?.project_id) revalidatePath(`/projects/${inv.project_id}`)
+    return { ok: true, message: `Advance of AED ${fmtMoney(amount)} applied to this invoice.` }
+  })
+}
+
+/** Moves an applied advance back to the project as unapplied (the money stays recorded). */
+export async function unapplyProjectAdvance(paymentId: string): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'records.edit'); need(c, 'finance.view')
+    const { data: p } = await c.supabase.from('payments').select('id,invoice_id,project_id,amount').eq('id', paymentId).maybeSingle()
+    if (!p || !p.project_id || !p.invoice_id) return { error: 'Only a project advance applied to an invoice can be moved back.' }
+    const { error } = await c.supabase.from('payments').update({ invoice_id: null }).eq('id', paymentId)
+    if (error) throw error
+    await logEvent(c, p.invoice_id, 'payment', `Project advance of AED ${Number(p.amount).toFixed(2)} moved back to the project`)
+    done(p.invoice_id); revalidatePath(`/projects/${p.project_id}`)
+    return { ok: true, message: 'Moved back to the project as an unapplied advance.' }
+  })
+}
+
+/** For the document editor: the project's advances (recorded payments on account) not yet applied to an invoice. */
+export async function projectAdvanceInfo(projectId: string): Promise<{ unapplied: number; recorded: number } | null> {
+  try {
+    const c = await getCtx(); if (!c.can('finance.view') || !/^[0-9a-f-]{36}$/i.test(projectId)) return null
+    const { data } = await c.supabase.from('payments').select('amount,invoice_id').eq('project_id', projectId).limit(2000)
+    const rows = data ?? []
+    return { unapplied: rows.filter(r => !r.invoice_id).reduce((s, r) => s + Number(r.amount), 0), recorded: rows.reduce((s, r) => s + Number(r.amount), 0) }
+  } catch { return null }
 }

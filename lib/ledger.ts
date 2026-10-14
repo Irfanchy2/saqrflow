@@ -18,7 +18,7 @@ export async function buildLedger(c: Ctx, customerId: string, f: { from?: string
     c.supabase.from('customers').select('opening_balance,opening_balance_date').eq('id', customerId).eq('company_id', c.company.id).maybeSingle(),
     c.supabase.from('invoices').select('id,doc_type,number,status,issue_date,due_date,total,project_id,subject,source_invoice_id').eq('customer_id', customerId).eq('company_id', c.company.id).is('deleted_at', null)
       .in('doc_type', ['invoice', 'credit_note']).not('status', 'in', '(draft,cancelled)').order('issue_date').limit(5000),
-    c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice_id,cheque:cheques(cheque_no),invoice:invoices(number,project_id)').eq('customer_id', customerId).eq('company_id', c.company.id).order('paid_on').limit(5000),
+    c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice_id,project_id,cheque:cheques(cheque_no),invoice:invoices(number,project_id),project:projects(name)').eq('customer_id', customerId).eq('company_id', c.company.id).order('paid_on').limit(5000),
   ])
   const projOk = (p?: string | null) => !f.project || p === f.project
   const raw: Omit<LedgerEntry, 'balance'>[] = []
@@ -29,8 +29,9 @@ export async function buildLedger(c: Ctx, customerId: string, f: { from?: string
   }
   for (const p of pays ?? []) {
     const inv: any = p.invoice, chq: any = p.cheque
-    if (!projOk(inv?.project_id)) continue
-    raw.push({ date: p.paid_on, kind: 'payment', ref: chq?.cheque_no ? `Chq ${chq.cheque_no}` : p.reference ?? '—', description: `${METHOD[p.method ?? 'other'] ?? 'Payment'} received${inv?.number ? `: ${inv.number}` : '. On account'}`, debit: 0, credit: Number(p.amount), href: p.invoice_id ? `/invoices/${p.invoice_id}` : undefined, projectId: inv?.project_id })
+    const pid = inv?.project_id ?? (p as any).project_id ?? null, proj: any = (p as any).project
+    if (!projOk(pid)) continue
+    raw.push({ date: p.paid_on, kind: 'payment', ref: chq?.cheque_no ? `Chq ${chq.cheque_no}` : p.reference ?? '—', description: `${METHOD[p.method ?? 'other'] ?? 'Payment'} received${inv?.number ? `: ${inv.number}` : proj?.name ? `. Advance for ${proj.name}` : '. On account'}`, debit: 0, credit: Number(p.amount), href: p.invoice_id ? `/invoices/${p.invoice_id}` : undefined, projectId: pid })
   }
   const order = { opening: 0, invoice: 1, credit_note: 2, payment: 3 }
   raw.sort((a, b) => a.date.localeCompare(b.date) || order[a.kind] - order[b.kind])

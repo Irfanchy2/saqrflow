@@ -137,6 +137,15 @@ main :where(p, dd, li, h1, h2, h3, label) { overflow-wrap: break-word; }
 .sales-paper.has-accent .paper-items thead th { background: var(--paper-accent); color: #fff; }
 .sales-paper.has-accent .paper-title h1 { color: var(--paper-accent); }
 .paper-clauses ol { list-style: none; margin: 0; padding: 0; }
+/* "Materials to be used" rich text: real vertical lists that wrap inside the description cell and never overflow the page */
+.paper-rich, .rich-preview { overflow-wrap: anywhere; word-break: normal; line-height: 1.45; }
+.paper-rich-p { white-space: pre-wrap; }
+.paper-rich ul, .paper-rich ol { margin: 0.3mm 0 0.6mm; padding-inline-start: 5mm; }
+.paper-rich ul { list-style: disc outside; }
+.paper-rich ol { list-style: decimal outside; }
+.paper-rich li { display: list-item; padding-inline-start: 0.5mm; break-inside: avoid; page-break-inside: avoid; }
+.paper-rich u { text-decoration-thickness: 0.08em; text-underline-offset: 0.15em; }
+.rich-preview ul, .rich-preview ol { padding-inline-start: 1.25rem; } .rich-preview ul { list-style: disc; } .rich-preview ol { list-style: decimal; }
 .paper-clauses li { display: grid; grid-template-columns: 7mm minmax(0, 1fr); break-inside: avoid; page-break-inside: avoid; }
 .paper-clauses .paper-keep-next + ol li:first-child { break-before: avoid; }
 .paper-footer { margin-top: auto; padding: 2mm 0 5mm; }
@@ -151,6 +160,16 @@ main :where(p, dd, li, h1, h2, h3, label) { overflow-wrap: break-word; }
   .sales-paper.has-footer .pf-bottom { height: 30mm; }                       /* room for the footer repeated on each page */
   .sales-paper.has-footer .paper-footer { position: fixed; left: 0; right: 0; bottom: 4mm; width: 210mm; margin: 0 auto; padding: 0 10mm; }
   .print-sheet { padding: 0 !important; background: #fff !important; }
+  /* crisp output: near-black greys are halftoned (dotted, fuzzy) by printers → true black text and rules; rules get a fixed
+     physical width so every border prints the same thickness at any printer resolution */
+  .sales-paper { --ink: #000; --rule: #000; --box-rule: #5c5345; -webkit-font-smoothing: auto; text-rendering: geometricPrecision; font-kerning: normal; }
+  .sales-paper .paper-items th, .sales-paper .paper-items td { border-width: 0.25mm; }
+  .sales-paper .paper-box { border-width: 0.25mm; }
+  .sales-paper img { image-rendering: auto; break-inside: avoid; page-break-inside: avoid; }
+  .sales-paper .paper-items thead th { color: inherit; }
+  .sales-paper.has-accent .paper-items thead th { color: #fff; }
+  .sales-paper .paper-letterhead, .sales-paper .paper-boxes, .sales-paper .paper-title { break-inside: avoid; page-break-inside: avoid; }
+  .sales-paper p, .sales-paper .paper-text, .sales-paper .paper-rich li { orphans: 2; widows: 2; }
 }
 
 @keyframes navbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }

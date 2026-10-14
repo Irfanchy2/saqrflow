@@ -861,3 +861,39 @@ describe('WhatsApp messages to customers and employees (0020)', () => {
     await fails(sup(`insert into whatsapp_contacts(company_id,phone) values ($1,'050')`, [A]), /check/)
   })
 })
+
+describe('Project payments / advances (0021)', () => {
+  it('advances are payments on account: applied on issue (oldest first, split), no VAT, guarded, no duplicate alerts', async () => {
+    const cu = (await sup(`insert into customers(company_id,name) values ($1,'Advance Client LLC') returning id`, [A])).rows[0].id
+    const pr = (await as(U.ownerA, `insert into projects(company_id,name,customer_id,contract_value) values ($1,'Villa gate',$2,50000) returning id`, [A, cu])).rows[0].id
+    // two advances; the customer comes from the project
+    const a1 = (await as(U.accA, `insert into payments(company_id,project_id,amount,paid_on,method,reference) values ($1,$2,6000,'2026-09-01','bank_transfer','TT-1') returning id, customer_id, invoice_id`, [A, pr])).rows[0]
+    expect(a1).toMatchObject({ customer_id: cu, invoice_id: null })
+    await as(U.accA, `insert into payments(company_id,project_id,amount,paid_on,method) values ($1,$2,4000,'2026-09-15','cash')`, [A, pr])
+    expect(Number((await as(U.accA, `select project_unapplied($1) n`, [pr])).rows[0].n)).toBe(10000)
+    expect(Number((await as(U.pmA, `select project_unapplied($1) n`, [pr])).rows[0].n)).toBe(0)          // no finance access → nothing
+    await fails(as(U.ownerB, `insert into payments(company_id,project_id,amount,paid_on,method) values ($1,$2,1,'2026-09-01','cash')`, [B, pr]), /another company/)
+
+    // draft invoice with advance 7000 → issue → 6000 linked + 1000 split from the second advance
+    const inv = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,vat_amount,status,project_id,customer_id,advance_applied) values ($1,'invoice','INV-ADV-1',21000,1000,'draft',$2,$3,7000) returning id`, [A, pr, cu])).rows[0].id
+    const before = Number((await sup(`select count(*) n from app_events where event='payment.received' and company_id=$1`, [A])).rows[0].n)
+    await as(U.accA, `update invoices set status='sent' where id=$1`, [inv])
+    const linked = (await sup(`select amount, split_from from payments where invoice_id=$1 order by amount desc`, [inv])).rows
+    expect(linked.map(r => Number(r.amount))).toEqual([6000, 1000]); expect(linked[1].split_from).not.toBeNull()
+    expect(Number((await as(U.accA, `select project_unapplied($1) n`, [pr])).rows[0].n)).toBe(3000)
+    expect((await sup(`select status, vat_amount from invoices where id=$1`, [inv])).rows[0]).toMatchObject({ status: 'partially_paid', vat_amount: '1000.00' })
+    expect(Number((await sup(`select count(*) n from app_events where event='payment.received' and company_id=$1`, [A])).rows[0].n)).toBe(before)   // the split is not new money
+    expect(Number((await sup(`select sum(amount) s from payments where project_id=$1`, [pr])).rows[0].s)).toBe(10000)                              // nothing created or lost
+
+    // later application from the invoice: limited by what is left on the project and on the invoice
+    await fails(as(U.accA, `select apply_project_advance($1, 5000)`, [inv]), /advance exceeds the unapplied/)
+    await fails(as(U.pmA, `select apply_project_advance($1, 100)`, [inv]), /not found|permission/)
+    await as(U.accA, `select apply_project_advance($1, 3000)`, [inv])
+    expect(Number((await as(U.accA, `select project_unapplied($1) n`, [pr])).rows[0].n)).toBe(0)
+    // issuing with more advance than is available fails and leaves the invoice a draft
+    const inv2 = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status,project_id,customer_id,advance_applied) values ($1,'invoice','INV-ADV-2',5000,'draft',$2,$3,100) returning id`, [A, pr, cu])).rows[0].id
+    await fails(as(U.accA, `update invoices set status='sent' where id=$1`, [inv2]), /advance exceeds the unapplied/)
+    expect((await sup(`select status from invoices where id=$1`, [inv2])).rows[0].status).toBe('draft')
+    await fails(as(U.accA, `update invoices set advance_applied=-1 where id=$1`, [inv2]), /check/)
+  })
+})

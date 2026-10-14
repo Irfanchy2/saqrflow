@@ -14,7 +14,8 @@ import { ExpenseFields } from '@/components/expenses/expense-fields'
 import { NewSalesButtons } from '@/components/sales/new-buttons'
 import { addMilestone, deleteExpense, deleteMilestone, removeProjectMember, saveExpense, setProjectMember, toggleMilestone, updateProject, uploadProjectFiles, uploadProjectPhotos } from '@/app/actions/projects'
 import { trashRecord } from '@/app/actions/trash'
-import { EXPENSE_CATS, PHOTO_CATS, PROJECT_STATUS, projectFinancials } from '@/lib/projects'
+import { deletePayment, recordProjectPayment } from '@/app/actions/sales'
+import { EXPENSE_CATS, PHOTO_CATS, PROJECT_STATUS, projectFinancials, projectPaymentSummary } from '@/lib/projects'
 import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
 import { formatAed, formatShortDate, localDate } from '@/lib/time'
@@ -26,6 +27,7 @@ import { CustomFieldsCard } from '@/components/custom-fields-card'
 import { QrCode } from 'lucide-react'
 
 export const metadata = { title: 'Project' }
+const PAY_METHODS: Record<string, string> = { bank_transfer: 'Bank transfer', cash: 'Cash', cheque: 'Cheque', pdc: 'Post-dated cheque (cleared)', card: 'Card', other: 'Other' }
 
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { id } = await params
@@ -56,8 +58,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const invIds = (sales ?? []).filter((s: any) => s.doc_type === 'invoice').map((s: any) => s.id)
   const [{ data: bals }, { data: pays }] = invIds.length ? await Promise.all([
     c.supabase.from('invoice_balances').select('id,paid').in('id', invIds),
-    c.supabase.from('payments').select('id,amount,paid_on,method,reference,created_at,invoice:invoices(id,number)').in('invoice_id', invIds).order('paid_on', { ascending: false }).limit(100),
+    c.supabase.from('payments').select('id,amount,paid_on,method,reference,notes,created_at,invoice_id,invoice:invoices(id,number)').in('invoice_id', invIds).order('paid_on', { ascending: false }).limit(100),
   ]) : [{ data: [] as any[] }, { data: [] as any[] }]
+  const { data: advRows } = fin ? await c.supabase.from('payments').select('id,amount,paid_on,method,reference,notes,created_at,invoice_id,invoice:invoices(id,number)').eq('project_id', id).order('paid_on', { ascending: false }).limit(300) : { data: [] as any[] }
   const paid = new Map((bals ?? []).map((b: any) => [b.id, Number(b.paid)]))
   const f = projectFinancials(p.contract_value, (sales ?? []).map((s: any) => ({ ...s, paid: paid.get(s.id) ?? 0 })), exps ?? [])
   const photos = (owned ?? []).filter((d: any) => String(d.version?.mime_type ?? '').startsWith('image/') && /\/Photos\//.test(d.folder ?? ''))
@@ -66,6 +69,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const files = new Map<string, any>()
   for (const d of owned ?? []) if (!photos.includes(d)) files.set(d.id, d)
   for (const r of rel ?? []) { const d: any = r.document; if (d && !d.deleted_at && !files.has(d.id) && !photos.some(x => x.id === d.id) && !String(r.role).startsWith('photo')) files.set(d.id, { ...d, role: r.role }) }
+  // project payments = advances on account (this project) + payments against its invoices (applied advances are both: listed once)
+  const projPays = [...new Map([...(advRows ?? []), ...(pays ?? [])].map((x: any) => [x.id, { ...x, advance: (advRows ?? []).some((a: any) => a.id === x.id) }])).values()].sort((a: any, b: any) => b.paid_on.localeCompare(a.paid_on) || b.created_at.localeCompare(a.created_at))
+  const ps = projectPaymentSummary(f.value, f.received, (advRows ?? []).filter((a: any) => !a.invoice_id).reduce((s: number, a: any) => s + Number(a.amount), 0))
   const prog = projectProgress(p, f.billedPct)
   const cc = costControl({ contract: f.value, budgets: budgets ?? [], byCategory: f.byCategory, started: p.status !== 'planning' })
   const userOpts = (users ?? []).map((u: any) => ({ id: u.id, name: u.full_name }))
@@ -80,7 +86,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const ev = [
     { at: p.created_at, text: 'Project created', icon: Clock },
     ...(sales ?? []).map((s: any) => ({ at: s.created_at, text: `${DOC_META[s.doc_type as SalesType]?.label ?? s.doc_type} ${s.number} (${statusLabel(s.doc_type, s.status).toLowerCase()})`, icon: Receipt, href: `/invoices/${s.id}` })),
-    ...(pays ?? []).map((x: any) => ({ at: x.created_at, text: `Payment AED ${fmtMoney(x.amount)}: ${x.invoice?.number ?? ''}`, icon: Wallet, href: x.invoice ? `/invoices/${x.invoice.id}` : undefined })),
+    ...projPays.map((x: any) => ({ at: x.created_at, text: `${x.advance ? 'Advance' : 'Payment'} AED ${fmtMoney(x.amount)}${x.invoice?.number ? `: ${x.invoice.number}` : ''}`, icon: Wallet, href: x.invoice ? `/invoices/${x.invoice.id}` : undefined })),
     ...[...files.values()].map((d: any) => ({ at: d.created_at, text: `${d.role === 'lpo' || /LPO/.test(d.folder ?? '') ? 'PO / LPO' : 'File'}: ${d.name}`, icon: Paperclip, href: `/documents/${d.id}` })),
     ...(photos.length ? [{ at: photos[0].created_at, text: `${photos.length} photo${photos.length === 1 ? '' : 's'} (latest: ${PHOTO_CATS[photoCat(photos[0]) as keyof typeof PHOTO_CATS]})`, icon: Camera }] : []),
     ...(exps ?? []).slice(0, 20).map((e: any) => ({ at: e.created_at, text: `Expense ${EXPENSE_CATS[e.category] ?? e.category}: AED ${fmtMoney(e.amount)}: ${e.description}`, icon: Wallet })),
@@ -112,7 +118,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       <Metrics className="mb-3" cols={4}>
         <StatCard label={f.contract ? 'Contract value' : f.quoted ? 'Accepted quotation (ex VAT)' : 'Contract value'} value={formatAed(f.value)} hint={!f.contract && !f.quoted ? 'Add a contract value' : undefined} />
         <StatCard label="Invoiced (ex VAT)" value={formatAed(f.invoicedNet)} hint={f.billedPct !== null ? `${f.billedPct}% of contract` : undefined} icon={Receipt} tone="blue" />
-        <StatCard label="Payments received" value={formatAed(f.received)} hint={f.collectedPct !== null ? `${f.collectedPct}% collected` : undefined} icon={Wallet} tone="green" />
+        <StatCard label="Payments received" value={formatAed(ps.received)} hint={ps.unapplied > 0 ? `incl. AED ${fmtMoney(ps.unapplied)} advance not yet invoiced` : f.collectedPct !== null ? `${f.collectedPct}% collected` : undefined} icon={Wallet} tone="green" />
         <StatCard label="Outstanding" value={formatAed(f.outstanding)} tone={f.outstanding ? 'amber' : 'neutral'} />
         <StatCard label="Recorded costs" value={formatAed(f.expenses)} hint="excl. VAT" />
         <StatCard label="Estimated profit" value={formatAed(f.profit)} hint={f.margin !== null ? `${f.margin}% margin on contract` : undefined} tone={f.profit < 0 ? 'red' : 'green'} />
@@ -165,9 +171,34 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               <Td><Badge tone={STATUS_TONE[s.status]}>{statusLabel(s.doc_type, s.status)}</Badge></Td></tr>)}</tbody></TableWrap>}
       </Card>}
 
-      {fin && <Card><CardHeader title="Payments" />
-        {!(pays ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No payments against this project’s invoices yet.</p>
-          : <ul className="max-h-80 divide-y divide-border overflow-y-auto text-sm">{(pays ?? []).map((x: any) => <li key={x.id} className="flex items-center gap-3 px-4 py-2.5"><span className="tabular-nums text-xs text-muted">{x.paid_on}</span><span className="min-w-0 flex-1 truncate">{x.invoice?.number}{x.reference ? ` · ${x.reference}` : ''}</span><span className="font-medium tabular-nums text-success">{fmtMoney(x.amount)}</span></li>)}</ul>}</Card>}
+      {fin && <Card data-project-payments><CardHeader title="Project payments" sub="Advances and payments from the customer. Recording one creates no invoice and no VAT"
+        action={edit ? <DialogButton size="sm" variant="secondary" label="Record payment" title="Record project payment" icon={<Plus size={14} />}><ActionForm action={recordProjectPayment.bind(null, id)} submit="Record payment" idempotent>
+          {!p.customer_id && <p className="rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">Link a customer to this project first (Edit project).</p>}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Date *"><Input type="date" name="paid_on" defaultValue={c.today} max={c.today} required /></Field>
+            <Field label="Amount (AED) *"><Input type="number" name="amount" min="0.01" step="0.01" inputMode="decimal" required /></Field>
+            <Field label="Payment method *"><Select name="method" defaultValue="bank_transfer" required>{Object.entries(PAY_METHODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+            <Field label="Reference"><Input name="reference" maxLength={120} placeholder="Transfer ref., cheque no., receipt no." /></Field>
+          </div>
+          <Field label="Notes"><Input name="notes" maxLength={1000} placeholder="e.g. 50% advance as per quotation" /></Field>
+          <p className="text-xs text-muted">This is a payment record only. No tax invoice or VAT is created. Apply it later on the project’s quotation, invoice or delivery note.</p>
+        </ActionForm></DialogButton> : undefined} />
+        <dl className="grid grid-cols-3 gap-2 border-b border-border px-4 py-3 text-sm">
+          <div><dt className="text-xs text-muted">Total received</dt><dd className="font-semibold tabular-nums" data-pp-received>{fmtMoney(ps.received)}</dd></div>
+          <div><dt className="text-xs text-muted">Remaining balance</dt><dd className="font-semibold tabular-nums" data-pp-remaining>{ps.remaining === null ? '—' : fmtMoney(ps.remaining)}</dd></div>
+          <div><dt className="text-xs text-muted">Not yet applied</dt><dd className="font-semibold tabular-nums" data-pp-unapplied>{fmtMoney(ps.unapplied)}</dd></div>
+        </dl>
+        {ps.remaining === null && <p className="px-4 pt-2 text-xs text-muted">Add a contract value to see the remaining balance.</p>}
+        {!projPays.length ? <p className="px-4 py-5 text-sm text-muted">No payments recorded for this project yet.</p>
+          : <ul className="max-h-96 divide-y divide-border overflow-y-auto text-sm" data-pp-history>{projPays.map((x: any) => <li key={x.id} className="flex items-start gap-3 px-4 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="tabular-nums text-xs text-muted">{formatShortDate(x.paid_on)}</span><span>{PAY_METHODS[x.method] ?? 'Payment'}</span>
+                {x.advance && !x.invoice_id ? <Badge tone="amber">Advance · not applied</Badge> : x.invoice ? <Link href={`/invoices/${x.invoice.id}`} className="text-xs text-primary hover:underline">{x.advance ? 'Advance applied to ' : ''}{x.invoice.number}</Link> : null}</div>
+              {(x.reference || x.notes) && <div className="mt-0.5 break-words text-xs text-muted">{[x.reference, x.notes].filter(Boolean).join(' · ')}</div>}
+            </div>
+            <span className="font-medium tabular-nums text-success">{fmtMoney(x.amount)}</span>
+            {del && x.advance && !x.invoice_id && <ActionButton variant="ghost" action={deletePayment.bind(null, x.id)} confirm={`Delete the payment of AED ${fmtMoney(x.amount)} from ${x.paid_on}?`}><Trash2 size={13} /><span className="sr-only">Delete payment</span></ActionButton>}
+          </li>)}</ul>}</Card>}
 
       {fin && <Card className="xl:col-span-3"><CardHeader title="Cost control" sub="Estimated cost per category vs costs recorded on this project. Nothing is estimated for you"
         action={edit ? <DialogButton wide size="sm" variant="secondary" label="Set estimate" title="Estimated cost (budget)"><ActionForm action={saveProjectBudget.bind(null, id)} resetOnSuccess={false} submit="Save estimate">
