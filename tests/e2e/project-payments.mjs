@@ -137,6 +137,15 @@ try {
   await p.goto(`${BASE}/parties/${cu}/ledger`); await settle()
   ok((await body()).includes('Advance for Villa gate & railing') || (await body()).includes(`INV-`), 'statement lists the advances as payments received')
 
+  console.log('\n[6b] Whole-row click')
+  await p.goto(`${BASE}/invoices`); await settle()
+  const row = p.locator('.rtable tbody tr').first(); const num = await row.locator('a').first().innerText()
+  await row.locator('td').nth(1).click(); await p.waitForURL(/\/invoices\/[0-9a-f-]{36}/, { timeout: 8000 }).catch(() => {})
+  ok(/\/invoices\/[0-9a-f-]{36}/.test(p.url()) && (await body()).includes(num), `clicking a row's empty space opens the record (${num})`)
+  await p.goto(`${BASE}/projects/${pr}`); await settle()
+  const before = p.url(); await p.locator('[data-project-payments]').getByRole('button', { name: 'Record payment' }).click(); await p.waitForTimeout(300)
+  ok(p.url() === before && await dlg().isVisible(), 'buttons keep their own action (no accidental navigation)'); await p.keyboard.press('Escape')
+
   console.log('\n[7] Phone 360 px')
   const m = await browser.newContext({ viewport: { width: 360, height: 780 }, storageState: await ctx.storageState() }); const mp = await m.newPage()
   for (const u of [`/projects/${pr}`, `/invoices/${qid}`]) {

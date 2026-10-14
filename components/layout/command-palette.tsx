@@ -89,6 +89,6 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
 }
 
 export function PaletteHint() {
-  return <button type="button" onClick={() => dispatchEvent(new Event('saqrflow:palette'))} className="hidden cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted hover:bg-surface-2 hover:text-fg md:inline-flex" aria-label="Open command palette (Ctrl+K)">
+  return <button type="button" onClick={() => dispatchEvent(new Event('saqrflow:palette'))} className="absolute end-1.5 top-1/2 hidden -translate-y-1/2 cursor-pointer items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] font-medium text-muted shadow-sm transition-colors hover:text-fg md:inline-flex" aria-label="Open command palette (Ctrl+K)">
     <kbd className="font-sans">Ctrl K</kbd></button>
 }

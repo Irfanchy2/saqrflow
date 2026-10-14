@@ -5,6 +5,8 @@ import { ChevronDown, Loader2, Plus } from 'lucide-react'
 import { newSalesDoc } from '@/app/actions/sales'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import { AnimatePresence, m } from 'framer-motion'
+import { T } from '@/components/motion'
 
 type Can = { sales: boolean; docs: boolean; people: boolean; assets: boolean }
 /** One "New" menu with the handful of things people create every day (instead of a row of buttons). Keyboard: arrows, Enter, Escape. */
@@ -38,10 +40,11 @@ export function QuickActions({ can }: { can: Can }) {
   }
   return <div ref={box} className="relative">
     <button ref={btn} type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)} disabled={pending}
-      className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary ps-3 pe-2.5 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 disabled:opacity-60">
-      {pending ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Plus size={15} aria-hidden />}New<ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} aria-hidden /></button>
-    {open && <div role="menu" aria-label="Create new" onKeyDown={move} className="toast-in absolute end-0 z-pop mt-1.5 w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-pop">
+      className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary ps-3 pe-2.5 text-sm font-medium text-primary-fg shadow-btn transition-colors hover:bg-primary/[.92] disabled:opacity-60">
+      {pending ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Plus size={15} aria-hidden />}Create<ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} aria-hidden /></button>
+    <AnimatePresence>{open && <m.div role="menu" aria-label="Create new" onKeyDown={move} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={T.fast}
+      className="absolute end-0 z-pop mt-1.5 w-56 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-pop">
       {items.map(([l, run]) => <button key={l} role="menuitem" type="button" onClick={() => { setOpen(false); run() }}
-        className="block w-full cursor-pointer px-3 py-1.5 text-start text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none">{l}</button>)}</div>}
+        className="block w-full cursor-pointer rounded-md px-2.5 py-1.5 text-start text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none">{l}</button>)}</m.div>}</AnimatePresence>
   </div>
 }

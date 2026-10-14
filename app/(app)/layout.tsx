@@ -1,21 +1,22 @@
-import { Search, LogOut } from 'lucide-react'
+import { CalendarDays, Search } from 'lucide-react'
 import { supabaseConfigured } from '@/lib/env'
 import { SetupRequired } from '@/components/layout/setup-required'
 import { getCtx } from '@/lib/auth'
 import { Sidebar, type NavItem } from '@/components/layout/sidebar'
 import { SIDEBAR_COOKIE } from '@/lib/ui-prefs'
 import { cookies } from 'next/headers'
-import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { NotificationBell } from '@/components/layout/notification-bell'
-import { signOut } from '@/app/actions/auth'
 import { Pwa } from '@/components/pwa'
 import { t, isRtl } from '@/lib/i18n'
-import { Button } from '@/components/ui/primitives'
 import { Toaster } from '@/components/ui/toast'
 import { CommandPalette, PaletteHint } from '@/components/layout/command-palette'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { NavProgress } from '@/components/layout/nav-progress'
 import { Suspense } from 'react'
+import { MotionRoot } from '@/components/motion'
+import { MenuButton } from '@/components/layout/menu-button'
+import { RowNavigator } from '@/components/layout/row-navigator'
+import { QuickActions } from '@/components/layout/quick-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,22 +63,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     c.supabase.from('in_app_notifications').select('id', { count: 'exact', head: true }).is('read_at', null),
   ])
   const visible = items.filter(i => i.show)
-  return <div className="flex min-h-screen">
+  const tz = c.company.timezone || 'Asia/Dubai'
+  const today = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz }).format(new Date())
+  const city = tz.split('/').pop()!.replace(/_/g, ' ')
+  return <MotionRoot><div className="flex min-h-screen">
     <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
-    <Sidebar items={visible} company={c.company.name} user={c.profile.full_name} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} />
+    <Sidebar items={visible} company={c.company.name} user={c.profile.full_name} role={c.profile.role} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} />
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
-      <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-bg/90 pe-2 ps-14 backdrop-blur-sm sm:gap-3 sm:pe-4 lg:ps-6">
+      <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-surface/85 px-2 backdrop-blur-md sm:gap-3 sm:px-4 lg:px-6">
+        <MenuButton />
         <div className="min-w-0 flex-1 truncate text-[15px] font-semibold sm:hidden">{c.company.name}</div>
-        <form action="/search" className="relative hidden max-w-md flex-1 sm:block"><Search size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-9 w-full rounded-md border border-border bg-surface ps-9 pe-3 text-sm placeholder:text-muted/60 hover:border-border-strong" /></form>
-        <PaletteHint />
-        <div className="ms-auto flex items-center gap-0.5 sm:gap-1">
+        <form action="/search" role="search" className="relative hidden max-w-[560px] flex-1 sm:block"><Search size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
+          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-9 w-full rounded-md border border-transparent bg-surface-2 pe-[72px] ps-9 text-sm transition-[border-color,background-color,box-shadow] placeholder:text-muted/70 hover:border-border focus:border-primary focus:bg-surface focus-visible:ring-4 focus-visible:ring-primary/[.12] focus-visible:ring-offset-0" />
+          <PaletteHint /></form>
+        <div className="ms-auto flex items-center gap-1 sm:gap-2">
+          <span className="hidden items-center gap-1.5 rounded-md px-2 text-[13px] text-muted xl:inline-flex" title={tz}><CalendarDays size={14} aria-hidden /><span className="font-medium text-fg">{today}</span><span aria-hidden>·</span>{city}</span>
           <a href="/search" aria-label="Search" className="grid h-10 w-10 place-items-center rounded-md text-muted hover:bg-surface-2 sm:hidden"><Search size={19} /></a>
-          <span className="hidden sm:inline-flex"><ThemeToggle /></span><NotificationBell items={notes ?? []} unread={unread ?? 0} />
-          <div className="mx-2 hidden text-end leading-tight sm:block"><div className="text-sm font-medium">{c.profile.full_name}</div><div className="text-2xs capitalize text-muted">{c.profile.role.replace(/_/g, ' ')}</div></div>
-          <form action={signOut} data-signout className="hidden sm:block"><Button variant="ghost" size="icon" aria-label={t(l, 'signout')} title={t(l, 'signout')}><LogOut size={16} /></Button></form>
+          <NotificationBell items={notes ?? []} unread={unread ?? 0} />
+          <span className="hidden sm:block"><QuickActions can={{ sales: c.can('finance.view') && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }} /></span>
         </div></header>
-      <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1760px] flex-1 overflow-x-clip p-4 pb-24 sm:p-6 sm:pb-24 lg:pb-6">{children}</main>
+      <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-24 pt-5 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-10">{children}</main>
     </div><BottomNav items={[
       { href: '/', label: 'Home', icon: 'home' as const }, { href: '/tasks', label: 'Tasks', icon: 'tasks' as const },
       c.can('crm.view') ? { href: '/leads', label: 'Leads', icon: 'leads' as const } : c.can('finance.view') ? { href: '/invoices', label: 'Sales', icon: 'sales' as const } : null,
@@ -87,6 +92,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
       ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings#integrations', group: 'Settings' }] : []),
       ...(c.can('users.manage') ? [{ label: 'Sign-in activity', href: '/users/activity', group: 'Security' }] : []),
-      { label: 'My devices & sign-in history', href: '/settings#account', group: 'Security' }]} canSales={c.can('records.edit') && c.can('finance.view')} /></div>
+      { label: 'My devices & sign-in history', href: '/settings#account', group: 'Security' }]} canSales={c.can('records.edit') && c.can('finance.view')} /><RowNavigator /></div></MotionRoot>
 }
 

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, CheckCircle2, HardHat } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
-import { Card, CardHeader, EmptyState, PageHeader } from '@/components/ui/primitives'
+import { Card, CardHeader, EmptyState } from '@/components/ui/primitives'
 import { buildAlerts } from '@/lib/dashboard'
 import { summarizeCheques } from '@/lib/cheques'
 import { addDays, formatAed, formatShortDate } from '@/lib/time'
@@ -16,6 +16,13 @@ import { QuickActions } from '@/components/layout/quick-actions'
 import { DashboardCustomize } from '@/components/dashboard-customize'
 import { normalizeLayout, type WidgetKey } from '@/lib/dashboard-widgets'
 import { canDecide } from '@/lib/approvals'
+import { buildTrend, greeting } from '@/lib/dashboard-trend'
+import { Spark } from '@/components/dashboard/spark'
+import { TrendChart } from '@/components/dashboard/trend-chart'
+import { CardTabs } from '@/components/dashboard/tabs'
+import { Badge, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { STATUS_TONE, statusLabel } from '@/lib/sales/docs'
+import { fmtMoney } from '@/lib/sales/money'
 
 export const metadata = { title: 'Dashboard' }
 
@@ -26,7 +33,8 @@ export const metadata = { title: 'Dashboard' }
 export default async function Dashboard() {
   const c = await getCtx(); const sb = c.supabase; const head = { count: 'exact' as const, head: true }
   const canDocs = c.can('documents.view') || c.can('employees.view_sensitive'), canFin = c.can('finance.view')
-  const in30 = addDays(c.today, 30), month = c.today.slice(0, 7) + '-01', week = addDays(c.today, 7)
+  const in30 = addDays(c.today, 30), week = addDays(c.today, 7)
+  const yearStart = (() => { const d = new Date(`${c.today.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() - 11); return d.toISOString().slice(0, 10) })()
 
   // field operations: my open tasks due today / overdue, lead follow-ups due, visits today
   const head1 = { count: 'exact' as const, head: true }
@@ -48,8 +56,8 @@ export default async function Dashboard() {
     canFin ? sb.from('cheques').select('direction,status,amount,cheque_date').in('status', ['received', 'issued', 'scheduled', 'deposited', 'presented']).limit(5000) : null,
     c.can('audit.view') ? sb.from('audit_logs').select('id,action,table_name,created_at,user_id,record_id').in('table_name', ['invoices', 'payments', 'customers', 'projects', 'cheques', 'documents', 'employees', 'assets', 'project_expenses']).order('created_at', { ascending: false }).limit(8) : null,
     canFin ? loadSalesKpis(c) : null,
-    canFin ? sb.from('invoices').select('total,vat_amount').eq('doc_type', 'invoice').not('status', 'in', '(draft,cancelled)').gte('issue_date', month).lte('issue_date', c.today).limit(5000) : null,
-    canFin ? sb.from('project_expenses').select('amount').gte('spent_on', month).lte('spent_on', c.today).limit(10000) : null,
+    canFin ? sb.from('invoices').select('issue_date,total,vat_amount').eq('doc_type', 'invoice').not('status', 'in', '(draft,cancelled)').is('deleted_at', null).gte('issue_date', yearStart).lte('issue_date', c.today).limit(20000) : null,
+    canFin ? sb.from('project_expenses').select('spent_on,amount').gte('spent_on', yearStart).lte('spent_on', c.today).limit(20000) : null,
     canFin ? sb.from('invoices').select('id', head).eq('doc_type', 'invoice').in('status', ['sent', 'partially_paid']).gte('due_date', c.today).lte('due_date', week) : null,
     canFin ? sb.from('sales_followups').select('id', head).is('done_at', null).lte('due_date', c.today) : null,
     c.can('documents.view') ? sb.from('projects').select('id,name,status,fabrication_progress,site_progress,customer:customers(name)').in('status', ['active', 'planning', 'on_hold']).order('updated_at', { ascending: false }).limit(5) : null,
@@ -63,11 +71,18 @@ export default async function Dashboard() {
     c.can('audit.view') ? sb.from('profiles').select('id,full_name') : null,
   ])
   const [myTasksRes, apprRes] = await extras
+  const [payYear, recentQ, recentI, recentP] = canFin ? await Promise.all([
+    sb.from('payments').select('paid_on,amount').gte('paid_on', yearStart).lte('paid_on', c.today).limit(20000),
+    on('recent') ? sb.from('invoices').select('id,number,customer_name,issue_date,valid_until,total,status,doc_type').eq('doc_type', 'quotation').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
+    on('recent') ? sb.from('invoices').select('id,number,customer_name,issue_date,due_date,total,status,doc_type').eq('doc_type', 'invoice').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
+    on('recent') ? sb.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name),customer:customers(id,name)').order('paid_on', { ascending: false }).order('created_at', { ascending: false }).limit(6) : null,
+  ]) : [null, null, null, null]
+  const trend = canFin ? buildTrend(c.today, (monthInv?.data ?? []) as any, (payYear?.data ?? []) as any, (monthExp?.data ?? []) as any) : null
   const myTasks = myTasksRes ? myTasksRes.data ?? [] : null
   const pendingApprovals = apprRes ? (apprRes.data ?? []).filter(a => canDecide(a.entity_type, c.can)).slice(0, 8) : null
   const alerts = buildAlerts((sources.data ?? []) as any, c.today)
-  const salesNet = (monthInv?.data ?? []).reduce((s, r) => s + Number(r.total) - Number(r.vat_amount), 0)
-  const expenses = (monthExp?.data ?? []).reduce((s, r) => s + Number(r.amount), 0)
+  const salesNet = trend?.mtd.sales ?? 0
+  const expenses = trend?.months[trend.months.length - 1].expenses ?? 0
   const who = new Map((people?.data ?? []).map(p => [p.id, p.full_name]))
   const sk = salesData?.kpis ?? null
   const cs = cheques ? summarizeCheques((cheques.data ?? []) as any, c.today) : null
@@ -76,6 +91,7 @@ export default async function Dashboard() {
   const amt = (xs: { amount: number | string }[]) => xs.reduce((a, x) => a + Number(x.amount), 0)
   const isNew = (docsAny?.count ?? 0) + (emp?.count ?? 0) + (cheques?.data?.length ?? 0) + (sk?.openCount ?? 0) + (sk?.pipelineCount ?? 0) === 0
   const date = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: c.company.timezone }).format(new Date())
+  const firstName = (c.profile.full_name || '').trim().split(/\s+/)[0] || ''
 
   // operations / compliance counts: one compact list, zero values stay quiet
   const [myDue, leadDue, visitsToday] = await opsCounts
@@ -92,38 +108,50 @@ export default async function Dashboard() {
     { l: 'Cheques past date, not banked', v: cs?.overdue.length, href: '/cheques?view=list', bad: true },
     { l: 'Cheques awaiting clearance', v: cs?.awaitingClearance.length, href: '/cheques?status=deposited' },
   ].filter(x => x.v !== undefined && x.v !== null)
+  const opsNow = ops.filter(o => (o.v ?? 0) > 0)
 
   const W: Partial<Record<WidgetKey, React.ReactNode>> = {
-    finance: (sk && ageing && cs) ? <>{sk && ageing && cs && <Card className="mb-5 grid grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-      <Link href="/invoices?tab=receivables" className="group block border-b border-border p-5 hover:bg-surface-2/30 lg:border-b-0 lg:border-e">
-        <div className="flex items-center justify-between text-xs font-medium text-muted"><span>Outstanding receivables</span><ArrowRight size={14} className="opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" aria-hidden /></div>
-        <div className="mt-1.5 text-[28px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{formatAed(sk.outstanding)}</div>
-        <div className="mt-2 text-sm text-muted">{sk.openCount} open invoice{sk.openCount === 1 ? '' : 's'}{sk.overdueCount > 0 && <> · <span className="font-medium text-danger">{formatAed(sk.overdue)} overdue</span> on {sk.overdueCount}</>}</div>
-        {ageing.grand > 0 && <div className="mt-5">
-          <div className="flex h-2 gap-px overflow-hidden rounded-sm" role="img" aria-label={`Ageing: ${AGE_BUCKETS.map((b, i) => `${b} ${formatAed(ageing.totals[i])}`).join(', ')}`}>
+    finance: (sk && ageing && cs && trend) ? <section aria-label="Financial pulse" className="mb-5 overflow-hidden rounded-lg border border-border bg-surface shadow-card">
+      <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 [&>*]:border-border sm:[&>*:nth-child(odd)]:border-e xl:[&>*]:border-e xl:[&>*:last-child]:border-e-0 sm:[&>*:nth-child(-n+2)]:border-b xl:[&>*:nth-child(-n+2)]:border-b-0">
+        <Pulse href="/reports?period=month" label="Sales this month" value={formatAed(salesNet)} delta={trend.change.sales} note="excl. VAT · vs same days last month"
+          spark={<Spark values={trend.months.map(m => m.sales)} label="Sales, last 12 months" />} />
+        <Pulse href="/invoices?tab=receivables" label="Outstanding receivables" value={formatAed(sk.outstanding)}
+          note={<>{sk.openCount} open invoice{sk.openCount === 1 ? '' : 's'}{sk.overdueCount > 0 && <> · <span className="font-medium text-danger">{formatAed(sk.overdue)} overdue</span></>}</>}
+          foot={ageing.grand > 0 ? <div className="mt-3"><div className="flex h-1.5 gap-px overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`Ageing: ${AGE_BUCKETS.map((b, i) => `${b} ${formatAed(ageing.totals[i])}`).join(', ')}`}>
             {ageing.totals.map((v, i) => v > 0 && <span key={i} style={{ flexGrow: v }} className={['bg-primary/70', 'bg-warning/60', 'bg-warning', 'bg-danger/70', 'bg-danger'][i]} />)}</div>
-          <dl className="mt-3 grid grid-cols-5 gap-2 text-xs">{AGE_BUCKETS.map((b, i) => <div key={b} className="min-w-0"><dt className="truncate text-muted">{i === 0 ? 'Not due' : `${b} days`}</dt><dd className={cn('mt-0.5 truncate font-medium tabular-nums', i >= 3 && ageing.totals[i] > 0 && 'text-danger')}>{ageing.totals[i] ? formatAed(ageing.totals[i]).replace('AED ', '') : '0'}</dd></div>)}</dl>
-        </div>}
-      </Link>
-      <div className="grid grid-cols-2 [&>a]:border-border [&>a:nth-child(odd)]:border-e [&>a:nth-child(-n+2)]:border-b">
-        {[{ l: 'Sales this month', v: formatAed(salesNet), h: 'Invoiced, excluding VAT', href: '/reports?period=month' },
-          { l: 'Collected this month', v: formatAed(sk.collectedThisMonth), h: `Invoiced ${formatAed(sk.invoicedThisMonth)} incl. VAT`, href: '/invoices?tab=payments' },
-          { l: 'Open quotations', v: formatAed(sk.pipeline), h: `${sk.pipelineCount} open${sk.winRate !== null ? ` · ${sk.winRate}% accepted` : ''}`, href: '/invoices?tab=quotation' },
-          { l: 'Cheques this week', v: formatAed(amt(weekIn) - amt(weekOut)), h: `In ${formatAed(amt(weekIn))} · Out ${formatAed(amt(weekOut))}`, href: '/cheques' }].map(x =>
-          <Link key={x.l} href={x.href} className="block min-w-0 px-5 py-4 hover:bg-surface-2/30"><div className="text-xs font-medium text-muted">{x.l}</div>
-            <div className="mt-1 truncate text-lg font-semibold tabular-nums tracking-[-0.01em]">{x.v}</div><div className="truncate text-xs text-muted" title={x.h}>{x.h}</div></Link>)}
+            <div className="mt-1.5 flex justify-between text-[11px] text-muted"><span>Not due</span><span>90+ days</span></div></div> : null} />
+        <Pulse href="/invoices?tab=payments" label="Collected this month" value={formatAed(trend.mtd.collected)} delta={trend.change.collected} note={`Invoiced ${formatAed(sk.invoicedThisMonth)} incl. VAT`}
+          spark={<Spark values={trend.months.map(m => m.collected)} className="text-success" label="Collections, last 12 months" />} />
+        <Pulse href="/invoices?tab=quotation" label="Open quotations" value={formatAed(sk.pipeline)}
+          note={<>{sk.pipelineCount} open{sk.winRate !== null ? ` · ${sk.winRate}% accepted` : ''} · {(followDue?.count ?? 0) > 0 ? <span className="font-medium text-warning">{followDue!.count} follow-up{followDue!.count === 1 ? '' : 's'} due</span> : 'no follow-ups due'}</>} />
       </div>
-    </Card>}
-    {sk && expenses > 0 && <p className="-mt-3 mb-5 text-xs text-muted">Recorded expenses this month: <Link href="/expenses" className="font-medium text-fg tabular-nums hover:text-primary">{formatAed(expenses)}</Link>. Estimated margin {formatAed(salesNet - expenses)} (sales ex VAT minus recorded expenses; labour and overheads are only included if recorded).</p>}</> : null,
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border bg-surface-2/40 px-4 py-2 text-xs text-muted">
+        <Link href="/cheques" className="hover:text-fg">Cheques this week <span className="font-medium tabular-nums text-fg">In {formatAed(amt(weekIn))}</span> · <span className="font-medium tabular-nums text-fg">Out {formatAed(amt(weekOut))}</span></Link>
+        {expenses > 0 && <Link href="/expenses" className="hover:text-fg" title="Sales excluding VAT minus recorded expenses; labour and overheads count only if recorded">Recorded expenses this month <span className="font-medium tabular-nums text-fg">{formatAed(expenses)}</span> · Estimated margin <span className="font-medium tabular-nums text-fg">{formatAed(salesNet - expenses)}</span></Link>}
+        {(dueSoon?.count ?? 0) > 0 && <Link href="/invoices?tab=invoice&status=sent" className="hover:text-fg"><span className="font-medium tabular-nums text-fg">{dueSoon!.count}</span> invoice{dueSoon!.count === 1 ? '' : 's'} due in 7 days</Link>}
+      </div>
+    </section> : null,
+    trend: trend ? <Card><CardHeader title="Sales & collections" sub="Last 12 months. Hover a month for its value" action={<Link href="/reports" className="text-xs font-medium text-primary hover:underline">Reports</Link>} />
+      <TrendChart months={trend.months} /></Card> : null,
+    recent: canFin && recentQ ? <Card><CardTabs id="recent" action={<Link href="/invoices" className="text-xs font-medium text-primary hover:underline">All documents</Link>} tabs={[
+      { key: 'q', label: 'Quotations', panel: <DocTable rows={recentQ.data ?? []} dateCol="Valid until" date={(r: any) => r.valid_until} empty="No quotations yet" /> },
+      { key: 'i', label: 'Invoices', panel: <DocTable rows={recentI?.data ?? []} dateCol="Due" date={(r: any) => r.due_date} empty="No invoices yet" /> },
+      { key: 'p', label: 'Payments', panel: !(recentP?.data ?? []).length ? <EmptyState title="No payments yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Received from</Th><Th>Against</Th><Th className="text-right">Amount</Th></tr></thead>
+        <tbody className="divide-y divide-border">{(recentP!.data ?? []).map((x: any) => <tr key={x.id}><Td className="whitespace-nowrap tabular-nums text-muted">{formatShortDate(x.paid_on)}</Td>
+          <Td className="max-w-[240px] truncate font-medium">{x.invoice?.customer_name ?? x.customer?.name ?? '—'}</Td>
+          <Td>{x.invoice ? <Link href={`/invoices/${x.invoice.id}`} className="font-mono text-[13px] text-primary hover:underline">{x.invoice.number}</Link> : x.customer ? <Link href={`/parties/${x.customer.id}`} className="text-muted hover:text-fg">On account</Link> : <span className="text-muted">On account</span>}</Td>
+          <Td className="text-right font-medium tabular-nums text-success">{fmtMoney(x.amount)}</Td></tr>)}</tbody></TableWrap> },
+    ]} /></Card> : null,
     attention: <Card><CardHeader title="Needs attention" sub="Overdue or due within 30 days" action={c.can('reminders.create') ? <Link href="/reminders" className="text-xs font-medium text-primary hover:underline">All reminders</Link> : undefined} />
         {!alerts.length ? <EmptyState icon={CheckCircle2} title="Nothing is due" body="No documents, cheques, invoices or renewals fall due in the next 30 days." /> :
-          <ul className="max-h-[440px] divide-y divide-border overflow-y-auto">{alerts.slice(0, 20).map(a => <li key={a.key}><Link href={a.href} className="group flex items-start gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2/50">
+          <ul className="max-h-[420px] divide-y divide-border overflow-y-auto overscroll-contain">{alerts.slice(0, 20).map(a => <li key={a.key}><Link href={a.href} className="group flex items-start gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2/50">
             <span className={cn('mt-0.5 w-[72px] shrink-0 text-xs font-medium tabular-nums', a.severity === 'critical' ? 'text-danger' : a.severity === 'warning' ? 'text-warning' : 'text-muted')}>{a.days < 0 ? `${-a.days}d late` : a.days === 0 ? 'Today' : `In ${a.days}d`}</span>
             <span className="min-w-0 flex-1"><span className="block truncate font-medium" title={a.text}>{a.text}</span><span className="block truncate text-xs text-muted">{a.sub}</span></span></Link></li>)}</ul>}</Card>,
-    operations: ops.length > 0 && <Card><CardHeader title="Operations" />
-          <ul className="divide-y divide-border">{ops.map(o => <li key={o.l}><Link href={o.href} className="flex items-center justify-between gap-3 px-4 py-2 text-sm hover:bg-surface-2/50">
+    operations: ops.length > 0 && <Card><CardHeader title="Operations" sub={opsNow.length ? 'Counts that need someone today' : undefined} />
+          {!opsNow.length ? <p className="flex items-center gap-2 px-4 py-4 text-sm text-muted"><CheckCircle2 size={15} className="text-success" aria-hidden />All clear: no tasks, follow-ups, renewals or cheques waiting.</p> :
+          <ul className="divide-y divide-border">{opsNow.map(o => <li key={o.l}><Link href={o.href} className="flex items-center justify-between gap-3 px-4 py-2 text-sm hover:bg-surface-2/50">
             <span className="min-w-0 truncate text-muted">{o.l}</span>
-            <span className={cn('font-semibold tabular-nums', !o.v ? 'text-muted/60' : o.bad ? 'text-danger' : o.warn ? 'text-warning' : 'text-fg')}>{o.v}</span></Link></li>)}</ul></Card> || null,
+            <span className={cn('font-semibold tabular-nums', !o.v ? 'text-muted/60' : o.bad ? 'text-danger' : o.warn ? 'text-warning' : 'text-fg')}>{o.v}</span></Link></li>)}</ul>}</Card> || null,
     inbox: (c.can('documents.upload') || c.can('employees.view_sensitive')) ? <SmartInboxPanel c={c} /> : null,
     projects: activeProjects && <Card><CardHeader title="Projects in progress" sub={`${activeCount?.count ?? 0} active`} action={<Link href="/projects" className="text-xs font-medium text-primary hover:underline">All projects</Link>} />
         {!(activeProjects.data ?? []).length ? <EmptyState icon={HardHat} title="No open projects" body="Create a project to follow fabrication and site progress, costs and billing." /> :
@@ -147,7 +175,12 @@ export default async function Dashboard() {
   const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className="min-w-0">{W[i.key]}</div>)
 
   return <>
-    <PageHeader title="Dashboard" sub={`${c.company.name} · ${date}`} actions={<><DashboardCustomize layout={layout} available={(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))} /><QuickActions can={{ sales: canFin && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }} /></>} />
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0"><h1 className="text-[22px] font-semibold leading-tight tracking-[-0.022em]">{greeting(c.company.timezone || 'Asia/Dubai')}{firstName ? `, ${firstName}` : ''}</h1>
+        <p className="mt-1 text-sm text-muted"><span className="sr-only">Dashboard · </span>{c.company.name} · {date}</p></div>
+      <div className="flex flex-wrap items-center gap-2"><DashboardCustomize layout={layout} available={(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))} />
+        <span className="sm:hidden"><QuickActions can={{ sales: canFin && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }} /></span></div>
+    </div>
 
     {isNew && <Card className="mb-5 p-5"><h2 className="text-sm font-semibold">Set up Averiqo</h2><p className="mt-0.5 text-sm text-muted">Four steps to a useful dashboard. Each one fills part of this page.</p>
       <ol className="mt-4 grid gap-px overflow-hidden rounded-md border border-border bg-border text-sm sm:grid-cols-2 lg:grid-cols-4">{[['Add company documents', '/documents', 'Trade licence, VAT certificate, tenancy'], ['Add employees', '/employees', 'Passports, visas, Emirates IDs'], ['Create a quotation', '/invoices', 'Your letterhead, stamp and terms'], ['Set up reminders', '/reminders', 'Recipients and WhatsApp opt-in']].map(([t, h, s], i) =>
@@ -159,4 +192,29 @@ export default async function Dashboard() {
       <div className="flex min-w-0 flex-col gap-5">{col('right')}</div>
     </div>
   </>
+}
+
+/** One pulse metric: the number, how it moved, what it means; the whole cell opens the list behind it. */
+function Pulse({ href, label, value, delta, note, spark, foot }: { href: string; label: string; value: string; delta?: number | null; note?: React.ReactNode; spark?: React.ReactNode; foot?: React.ReactNode }) {
+  return <Link href={href} className="group block min-w-0 px-4 py-4 transition-colors hover:bg-surface-2/40 sm:px-5">
+    <div className="flex items-start justify-between gap-2"><span className="text-[13px] font-medium text-muted">{label}</span>
+      {spark ? <span className="-mt-1 shrink-0 opacity-90">{spark}</span> : <ArrowRight size={14} className="text-muted opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" aria-hidden />}</div>
+    <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      <span className="text-[24px] font-semibold leading-tight tracking-[-0.025em] tabular-nums">{value}</span>
+      {delta !== undefined && delta !== null && <span className={cn('inline-flex items-center gap-0.5 rounded px-1 text-xs font-medium tabular-nums', delta >= 0 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger')} title="Month to date vs the same days last month">{delta >= 0 ? '↑' : '↓'} {Math.abs(delta)}%</span>}
+    </div>
+    {note && <div className="mt-1 truncate text-xs text-muted">{note}</div>}
+    {foot}
+  </Link>
+}
+
+function DocTable({ rows, dateCol, date, empty }: { rows: any[]; dateCol: string; date: (r: any) => string | null; empty: string }) {
+  if (!rows.length) return <EmptyState title={empty} />
+  return <TableWrap><thead><tr><Th>No.</Th><Th>Customer</Th><Th>{dateCol}</Th><Th className="text-right">Amount</Th><Th>Status</Th></tr></thead>
+    <tbody className="divide-y divide-border">{rows.map(r => <tr key={r.id}>
+      <Td className="whitespace-nowrap"><Link href={`/invoices/${r.id}`} className="font-mono text-[12.5px] text-primary hover:underline">{r.number}</Link><span className="block text-xs text-muted">{formatShortDate(r.issue_date)}</span></Td>
+      <Td className="max-w-[220px] truncate font-medium">{r.customer_name ?? '—'}</Td>
+      <Td className="whitespace-nowrap tabular-nums text-muted">{date(r) ? formatShortDate(date(r)!) : '—'}</Td>
+      <Td className="text-right tabular-nums">{fmtMoney(r.total)}</Td>
+      <Td><Badge tone={STATUS_TONE[r.status]}>{statusLabel(r.doc_type, r.status)}</Badge></Td></tr>)}</tbody></TableWrap>
 }
