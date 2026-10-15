@@ -13,6 +13,7 @@ import { loadSalesKpis } from '@/lib/sales/kpis'
 import { formatAed } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
+import { TabStrip } from '@/components/ui/tab-strip'
 
 export const metadata = { title: 'Sales & Invoices' }
 const TABS = [
@@ -49,11 +50,11 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
       <StatCard label="Open quotations" value={formatAed(k.pipeline)} hint={`${k.pipelineCount} open${k.winRate !== null ? ` · ${k.winRate}% win rate` : ''}`} icon={Target} tone="amber" href={`${base}?tab=quotation&status=sent`} />
     </Metrics>
 
-    <nav aria-label="Sales sections" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
+    <TabStrip label="Sales sections" className="mb-4">
       {TABS.map(t => <Link key={t.k} href={tabHref(t.k)} aria-current={tab === t.k ? 'page' : undefined}
         className={cn('-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm transition-colors', tab === t.k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted hover:text-fg')}>
         <t.icon size={14} aria-hidden />{t.label}{t.k in counts && <span className="rounded-sm bg-surface-2 px-1.5 text-[11px] tabular-nums text-muted">{counts[t.k]}</span>}</Link>)}
-    </nav>
+    </TabStrip>
 
     {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'followups' ? <FollowupsTab /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} /> : <DocsTab t={tab as SalesType} sp={sp} edit={edit} />}
   </>
@@ -82,8 +83,8 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
   const isInv = t === 'invoice'
   return <Card>
     <form className="flex flex-wrap gap-2 border-b border-border p-3"><input type="hidden" name="tab" value={t} />
-      <input name="q" type="search" defaultValue={sp.q} aria-label={`Search ${meta.plural.toLowerCase()}`} placeholder="Search number, customer, subject, site, LPO…" className={`${cls} min-w-52 flex-1`} />
-      <select name="status" defaultValue={sp.status ?? ''} aria-label="Status" className={cls}><option value="">Any status</option>{meta.statuses.map(s => <option key={s} value={s}>{statusLabel(t, s)}</option>)}</select>
+      <input name="q" type="search" defaultValue={sp.q} aria-label={`Search ${meta.plural.toLowerCase()}`} placeholder="Search number, customer, site, LPO…" className={`${cls} w-full sm:w-auto sm:min-w-52 sm:flex-1`} />
+      <select name="status" defaultValue={sp.status ?? ''} aria-label="Status" className={`${cls} min-w-0 flex-1 sm:flex-none`}><option value="">Any status</option>{meta.statuses.map(s => <option key={s} value={s}>{statusLabel(t, s)}</option>)}</select>
       <button className="h-9 cursor-pointer rounded-md border border-border px-3 text-sm hover:bg-surface-2">Filter</button></form>
     {(sp.due || sp.issued || sp.won || sp.from || sp.to || sp.customer || sp.project) && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-primary-soft/50 px-4 py-2 text-sm">
       <span>Filtered list{sp.due === 'overdue' ? ': overdue (past due date, not fully paid)' : sp.due === 'open' ? ': open invoices' : ''}{sp.won ? ': accepted or converted' : ''}{sp.from || sp.to ? ` · issued ${sp.from ?? '…'} to ${sp.to ?? '…'}` : ''}{sp.customer ? ' · one customer' : ''}{sp.project ? ' · one project' : ''}</span>
@@ -102,7 +103,7 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
             {t !== 'delivery_note' && <Td className={cn('whitespace-nowrap tabular-nums', isInv && r.status === 'overdue' && 'font-medium text-danger')}>{(isInv ? r.due_date : r.valid_until) ?? '—'}</Td>}
             {meta.priced && <Td className="text-right tabular-nums">{fmtMoney(r.total)}</Td>}
             {isInv && <Td className={cn('text-right tabular-nums', bal > 0 && !['draft', 'cancelled'].includes(r.status) ? 'font-medium' : 'text-muted')}>{['draft', 'cancelled'].includes(r.status) ? '—' : fmtMoney(bal)}</Td>}
-            <Td><Badge tone={STATUS_TONE[r.status]}>{statusLabel(t, r.status)}</Badge></Td></tr>
+            <Td badge><Badge tone={STATUS_TONE[r.status]}>{statusLabel(t, r.status)}</Badge></Td></tr>
         })}</tbody></TableWrap>}
     <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/invoices" />
   </Card>

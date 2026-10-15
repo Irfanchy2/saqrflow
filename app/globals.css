@@ -61,9 +61,15 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 
 /* data tables: quiet hover; a row that leads somewhere is clickable as a whole (components/layout/row-navigator) */
 .rtable tbody tr { transition: background-color .12s ease; }
-.rtable tbody tr:hover { background: hsl(var(--surface-2) / .55); }
+@media (hover: hover) { .rtable tbody tr:hover { background: hsl(var(--surface-2) / .55); } }
 .rtable tbody tr:has(a[href]:not([href^="/api/"])) { cursor: pointer; }
 [data-row-link] { cursor: pointer; }
+
+/* scrollable tab rows (components/ui/tab-strip): no scrollbar; the edges fade while more tabs are hidden that way */
+.tabstrip { --fs: 0px; --fe: 0px; scrollbar-width: none; mask-image: linear-gradient(to right, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
+[dir=rtl] .tabstrip { mask-image: linear-gradient(to left, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
+.tabstrip::-webkit-scrollbar { display: none; }
+.tabstrip[data-fade-start=true] { --fs: 28px; } .tabstrip[data-fade-end=true] { --fe: 28px; }
 
 /* ── phones ── */
 html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
@@ -95,6 +101,13 @@ main :where(p, dd, li, h1, h2, h3, label) { overflow-wrap: break-word; }
   .rtable td:first-child::before { display: none !important; }
   .rtable td[data-label=""], .rtable td[colspan] { grid-column: 1 / -1; }
   .rtable td:empty { display: none; }
+  /* status badge beside the title (Td badge) */
+  .rtable tr:has(> td[data-card=badge]) > td:first-child { grid-column: 1; }
+  .rtable td[data-card=badge] { grid-row: 1; grid-column: 2; justify-self: end; align-self: center; }
+  .rtable td[data-card=badge]::before { display: none !important; }
+  /* a cell holding only actions sits flush with the card text, not indented by a ghost button's padding */
+  .rtable td[data-label=""]:not(:first-child) { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+  .rtable td[data-label=""]:not(:first-child) > :first-child:is(button, a):not([class*="border"]):not([class*="bg-primary"]) { margin-inline-start: -12px; }
 }
 .print-only { display: none; }
 @media print {
