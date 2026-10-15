@@ -2,6 +2,8 @@ import type { Config } from 'tailwindcss'
 const v = (n: string) => `hsl(var(--${n}) / <alpha-value>)`
 export default {
   darkMode: ['class'],
+  // hover styles only on devices that can hover, so a tapped row or button doesn't stay highlighted on phones
+  future: { hoverOnlyWhenSupported: true },
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
   theme: {
     extend: {
