@@ -1,7 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { setTaskStatus } from '@/app/actions/operations'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'

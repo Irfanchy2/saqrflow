@@ -1,7 +1,7 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, Download, Mail, Plus, Printer, Wallet } from 'lucide-react'
+import { ArrowLeft, Download, Mail, Plus, Printer, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat } from '@/lib/queries'
 import { buildLedger } from '@/lib/ledger'

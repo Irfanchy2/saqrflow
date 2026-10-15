@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle } from 'lucide-react'
+import { CheckCircle2, Circle } from '@/components/icons'
 import { Card, CardHeader, Field, Input, Select } from '@/components/ui/primitives'
 import { LinkGone, PublicShell } from '@/components/public/shell'
 import { PublicForm } from '@/components/public/public-form'

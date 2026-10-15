@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, History } from 'lucide-react'
+import { ArrowLeft, History } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { brandingFor } from '@/lib/sales/data'
 import { DOC_META, type SalesType } from '@/lib/sales/docs'

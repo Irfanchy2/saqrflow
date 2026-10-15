@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from '@/components/icons'
 
 /** Header + width for public pages. The company's own name is shown; Averiqo appears only as the small "secured by" line. */
 export function PublicShell({ company, title, sub, children, isPublic }: { company: string; title: string; sub?: string; children: ReactNode; isPublic?: boolean }) {

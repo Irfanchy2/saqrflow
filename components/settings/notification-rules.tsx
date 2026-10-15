@@ -1,4 +1,4 @@
-import { BellPlus } from 'lucide-react'
+import { BellPlus } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { Badge, Card, CardHeader, Field, Input, Select } from '@/components/ui/primitives'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Info, X } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { AnimatePresence, m } from 'framer-motion'
 import { T } from '@/components/motion'

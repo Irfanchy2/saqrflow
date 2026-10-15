@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useState } from 'react'
-import { UploadCloud } from 'lucide-react'
+import { UploadCloud } from '@/components/icons'
 import { ACCEPT_ATTR } from '@/lib/file-types'
 import { cn } from '@/lib/utils'
 

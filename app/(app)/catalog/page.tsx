@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { Archive, ArchiveRestore, Download, Package, Pencil, Plus, Sparkles, Upload } from 'lucide-react'
+import { Archive, ArchiveRestore, Download, Package, Pencil, Plus, Sparkles, Upload } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, LinkButton, PageHeader, Pagination, Td, Th, TableWrap } from '@/components/ui/primitives'

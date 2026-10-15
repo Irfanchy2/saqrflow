@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MessageCircle, Paperclip } from 'lucide-react'
+import { MessageCircle, Paperclip } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { Badge, Card, CardHeader } from '@/components/ui/primitives'
 import { KINDS, maskPhone } from '@/lib/whatsapp/messages'

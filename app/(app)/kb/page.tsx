@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BookOpen, Pin, Plus } from 'lucide-react'
+import { BookOpen, Pin, Plus } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui/primitives'

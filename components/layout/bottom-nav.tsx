@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu } from 'lucide-react'
+import { ListIcon } from '@phosphor-icons/react/dist/ssr'
 import { cn } from '@/lib/utils'
 import { ICONS, type NavItem } from '@/components/layout/sidebar'
 
@@ -21,8 +21,8 @@ export function BottomNav({ items }: { items: NavItem[] }) {
   return <nav aria-label="Quick navigation" className="no-print fixed inset-x-0 bottom-0 z-nav flex border-t border-border bg-surface/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
     {list.map(i => { const I = ICONS[i.key], a = on(i.href)
       return <Link key={i.key} href={i.href} aria-current={a ? 'page' : undefined} className={cn(cell, a ? 'text-primary' : 'text-muted active:text-fg')}>
-        <span className={cn('grid h-7 w-9 place-items-center rounded-lg transition-colors', a && 'bg-primary text-primary-fg')}><I size={18} strokeWidth={a ? 2.2 : 1.8} aria-hidden /></span>
+        <span className={cn('grid h-7 w-10 place-items-center rounded-full transition-[background-color,transform] duration-200 active:scale-90', a && 'bg-primary text-primary-fg')}><I size={19} weight={a ? 'fill' : 'regular'} aria-hidden /></span>
         <span className="max-w-full truncate px-1">{short[i.key] ?? i.label}</span></Link> })}
-    <button type="button" onClick={() => dispatchEvent(new Event('averiqo:menu'))} className={cn(cell, 'cursor-pointer text-muted active:text-fg')}><span className="grid h-7 w-9 place-items-center"><Menu size={18} strokeWidth={1.8} aria-hidden /></span><span>More</span></button>
+    <button type="button" onClick={() => dispatchEvent(new Event('averiqo:menu'))} className={cn(cell, 'cursor-pointer text-muted active:text-fg')}><span className="grid h-7 w-9 place-items-center"><ListIcon size={19} aria-hidden /></span><span>More</span></button>
   </nav>
 }

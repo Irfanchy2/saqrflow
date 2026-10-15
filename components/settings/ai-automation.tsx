@@ -1,4 +1,4 @@
-import { BrainCircuit, KeyRound, ScanText, Send } from 'lucide-react'
+import { BrainCircuit, KeyRound, ScanText, Send } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { Alert, Badge, Card, CardHeader, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'

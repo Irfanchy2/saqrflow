@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useEffect } from 'react'
-import { AlertTriangle, RotateCcw } from 'lucide-react'
+import { AlertTriangle, RotateCcw } from '@/components/icons'
 import { Button } from '@/components/ui/primitives'
 
 /** Friendly fallback instead of a blank "Application error" page. The technical detail goes to the console / server log only. */

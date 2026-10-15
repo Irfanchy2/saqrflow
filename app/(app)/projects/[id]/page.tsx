@@ -1,7 +1,7 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { AlertTriangle, ArrowLeft, CalendarCheck, ClipboardCheck, ClipboardList, ListTodo, Camera, CheckCircle2, Circle, Clock, FileText, MapPin, Paperclip, Pencil, Plus, Receipt, Trash2, Upload, UserPlus, Users, Wallet } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CalendarCheck, ClipboardCheck, ClipboardList, ListTodo, Camera, CheckCircle2, Circle, Clock, FileText, MapPin, Paperclip, Pencil, Plus, Receipt, Trash2, Upload, UserPlus, Users, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, EmptyState, Field, Input, Select, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils'
 import { flat } from '@/lib/queries'
 import { RecordActivity } from '@/components/record-activity'
 import { CustomFieldsCard } from '@/components/custom-fields-card'
-import { QrCode } from 'lucide-react'
+import { QrCode } from '@/components/icons'
 
 export const metadata = { title: 'Project' }
 const PAY_METHODS: Record<string, string> = { bank_transfer: 'Bank transfer', cash: 'Cash', cheque: 'Cheque', pdc: 'Post-dated cheque (cleared)', card: 'Card', other: 'Other' }

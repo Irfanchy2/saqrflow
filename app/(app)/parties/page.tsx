@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowUpRight, Download, Eye, Handshake, Mail, MapPin, MessageCircle, Phone, Plus, Upload, X } from 'lucide-react'
+import { ArrowUpRight, Download, Eye, Handshake, Mail, MapPin, MessageCircle, Phone, Plus, Upload, X } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, CardHeader, CardLink, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'

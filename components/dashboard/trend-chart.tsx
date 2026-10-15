@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowUp } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import type { TrendMonth } from '@/lib/dashboard-trend'
 

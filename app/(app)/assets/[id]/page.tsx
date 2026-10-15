@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Archive, ArchiveRestore, ArrowLeft, BellRing, FileText, History, MapPin, Pencil, Plus, Trash2, Undo2, Upload, UserRound, Wrench } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, BellRing, FileText, History, MapPin, Pencil, Plus, Trash2, Undo2, Upload, UserRound, Wrench } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Alert, Badge, Card, CardHeader, EmptyState, Field, Input, Metrics, Select, StatCard, Td, Th, TableWrap, Textarea } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
 import { CustomFieldsCard } from '@/components/custom-fields-card'
-import { QrCode } from 'lucide-react'
+import { QrCode } from '@/components/icons'
 
 export const metadata = { title: 'Vehicle / asset' }
 const TABS = [['overview', 'Overview'], ['documents', 'Documents'], ['maintenance', 'Maintenance'], ['expenses', 'Expenses'], ['assignments', 'Assignments'], ['reminders', 'Reminders'], ['timeline', 'Timeline']] as const

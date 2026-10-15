@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { AlertTriangle, ArrowLeft, Download, RefreshCw, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Download, RefreshCw, Sparkles, X } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Alert, Badge, Card, CardHeader, Field, Input, Select } from '@/components/ui/primitives'
 import { ActionButton, ActionForm, SubmitButton } from '@/components/ui/action-form'

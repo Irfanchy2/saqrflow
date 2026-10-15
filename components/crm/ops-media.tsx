@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Camera, FileText, Paperclip } from 'lucide-react'
+import { Camera, FileText, Paperclip } from '@/components/icons'
 import { Card, CardHeader, EmptyState, Field, Input, Select } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionForm } from '@/components/ui/action-form'

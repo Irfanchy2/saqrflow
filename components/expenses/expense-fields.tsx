@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useState } from 'react'
-import { Loader2, ScanText } from 'lucide-react'
+import { Loader2, ScanText } from '@/components/icons'
 import { Field, Input, Select, Textarea, Button } from '@/components/ui/primitives'
 import { EXPENSE_CATS, PAYMENT_METHODS } from '@/lib/projects'
 import { ACCEPT_ATTR } from '@/lib/file-types'

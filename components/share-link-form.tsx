@@ -1,6 +1,6 @@
 'use client'
 import { startTransition, useActionState, useState } from 'react'
-import { Check, Copy, Loader2, Mail, MessageCircle } from 'lucide-react'
+import { Check, Copy, Loader2, Mail, MessageCircle } from '@/components/icons'
 import { Button, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import type { ActionState } from '@/lib/utils'
 

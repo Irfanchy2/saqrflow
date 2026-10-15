@@ -1,7 +1,7 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CalendarClock, Hourglass, Landmark, Plus, Undo2 } from 'lucide-react'
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CalendarClock, Hourglass, Landmark, Plus, Undo2 } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Alert, Badge, Card, EmptyState, Field, Input, LinkButton, PageHeader, Pagination, Select, SortTh, Metrics, StatCard, Td, Th, TableWrap, Textarea, type Tone } from '@/components/ui/primitives'

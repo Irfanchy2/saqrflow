@@ -1,4 +1,4 @@
-import { Laptop, Smartphone } from 'lucide-react'
+import { Laptop, Smartphone } from '@/components/icons'
 import { Badge, Td, Th } from '@/components/ui/primitives'
 import { ActionButton } from '@/components/ui/action-form'
 import { revokeOtherSessions, revokeSession } from '@/app/actions/platform'

@@ -53,11 +53,21 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
 - **Deleting:** important records go to **Trash** (restorable). Removing money records always asks first.
 - **Touch:** hover styles apply only on devices that can hover.
 
+## Icons
+
+- One family everywhere: **Phosphor Icons** (MIT), through `components/icons.ts`. It keeps the names the code already uses, so a screen never mixes styles.
+- Regular weight by default; **fill** marks the active item (sidebar, tab bar).
+- The SSR entry needs no React context and is tree-shaken, so a page only ships the icons it draws.
+- Navigation icons are picked per module in `components/layout/sidebar.tsx` (`ICONS`).
+
 ## Motion
 
 Framer Motion through `components/motion.tsx` (LazyMotion, `reducedMotion="user"`, 140 / 200 / 280 ms, decelerating).
 
-Used for: sidebar width, the mobile drawer, menus, toasts, tabs and page enter.
+Used for:
+- **Sidebar:** the current-page highlight slides between items; collapse animates the width while icons stay fixed and labels fade; sections fold with a height animation; rail tooltips appear after 90 ms.
+- **Interactions:** a hover wash plus a 1 px icon lift on hover, and a 1.5% press scale.
+- **Elsewhere:** the mobile drawer, menus, toasts, tabs and page enter.
 
 ## 3D
 

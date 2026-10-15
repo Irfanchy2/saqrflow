@@ -1,4 +1,4 @@
-import { Plus, FileText, Tags } from 'lucide-react'
+import { Plus, FileText, Tags } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat } from '@/lib/queries'
 import { listDocs } from '@/lib/doc-queries'

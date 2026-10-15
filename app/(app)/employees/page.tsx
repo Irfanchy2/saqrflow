@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Plus, Users } from 'lucide-react'
+import { Plus, Users } from '@/components/icons'
 import { redirect } from 'next/navigation'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'

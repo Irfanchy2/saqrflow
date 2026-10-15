@@ -1,6 +1,6 @@
 'use client'
 import { startTransition, useActionState, useMemo, useState } from 'react'
-import { Loader2, RotateCcw } from 'lucide-react'
+import { Loader2, RotateCcw } from '@/components/icons'
 import { Alert, Button, Field, Input } from '@/components/ui/primitives'
 import { SalesPaper, type Branding, type PaperDoc, type PaperItem } from '@/components/sales/paper'
 import { FitPaper } from '@/components/sales/preview'

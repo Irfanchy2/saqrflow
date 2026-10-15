@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { WifiOff } from 'lucide-react'
+import { WifiOff } from '@/components/icons'
 import { clearAllDrafts } from '@/lib/drafts'
 
 /** Registers the service worker, shows an offline banner, and wipes device drafts on sign-out (shared devices). */

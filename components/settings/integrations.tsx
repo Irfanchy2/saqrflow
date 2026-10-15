@@ -1,4 +1,4 @@
-import { KeyRound, Webhook } from 'lucide-react'
+import { KeyRound, Webhook } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { Badge, Card, CardHeader, Field, Input, Select, Td, Th } from '@/components/ui/primitives'
 import { ActionButton } from '@/components/ui/action-form'

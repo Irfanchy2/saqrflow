@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { ShieldCheck, UserPlus } from 'lucide-react'
+import { ShieldCheck, UserPlus } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Alert, Badge, Card, Field, Input, LinkButton, PageHeader, Select, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'

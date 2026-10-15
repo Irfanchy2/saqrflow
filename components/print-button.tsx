@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import { Printer } from 'lucide-react'
+import { Printer } from '@/components/icons'
 import { Button } from '@/components/ui/primitives'
 
 const loaded = (img: HTMLImageElement) => new Promise<void>(res => {

@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useTransition } from 'react'
-import { FilePlus2, HardHat, Loader2, PackageCheck, Receipt, ScrollText, Target, Upload, UserPlus, Users, Wallet, ListPlus } from 'lucide-react'
+import { FilePlus2, HardHat, Loader2, PackageCheck, Receipt, ScrollText, Target, Upload, UserPlus, Users, Wallet, ListPlus } from '@/components/icons'
 import { newSalesDoc } from '@/app/actions/sales'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'

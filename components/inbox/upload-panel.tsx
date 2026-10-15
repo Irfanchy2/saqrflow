@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Loader2, UploadCloud, XCircle } from 'lucide-react'
+import { CheckCircle2, Loader2, UploadCloud, XCircle } from '@/components/icons'
 import { Button } from '@/components/ui/primitives'
 import { StatusPill } from './bits'
 import { useDialog } from '@/components/ui/dialog'

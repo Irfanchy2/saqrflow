@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Upload, Vault as VaultIcon } from 'lucide-react'
+import { Upload, Vault as VaultIcon } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat } from '@/lib/queries'
 import { listDocs } from '@/lib/doc-queries'

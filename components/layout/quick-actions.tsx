@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, Loader2, Plus } from 'lucide-react'
+import { ChevronDown, Loader2, Plus } from '@/components/icons'
 import { newSalesDoc } from '@/app/actions/sales'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'

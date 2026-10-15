@@ -1,4 +1,4 @@
-import { Hash } from 'lucide-react'
+import { Hash } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { Badge, Card, CardHeader, Field, Input, Select } from '@/components/ui/primitives'
 import { ActionForm } from '@/components/ui/action-form'

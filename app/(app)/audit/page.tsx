@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { History } from 'lucide-react'
+import { History } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat, pageOf } from '@/lib/queries'
 import { Badge, Card, EmptyState, LinkButton, PageHeader, Pagination, Td, Th, TableWrap } from '@/components/ui/primitives'

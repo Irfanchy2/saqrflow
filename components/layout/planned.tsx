@@ -1,4 +1,4 @@
-import { Hammer } from 'lucide-react'
+import { Hammer } from '@/components/icons'
 import { Badge, Card, PageHeader } from '@/components/ui/primitives'
 
 /** Honest placeholder: states what is planned and which phase delivers it. Never shows fake data. */

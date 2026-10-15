@@ -105,7 +105,7 @@ export function SteelHero() {
   return <div ref={host} className="absolute inset-0">
     {/* static art: shown until WebGL is ready, and instead of it on mobile / reduced motion */}
     <svg viewBox="0 0 200 200" aria-hidden className={`absolute left-[66%] top-[28%] h-56 w-56 -translate-x-1/2 -translate-y-1/2 text-white/10 transition-opacity duration-700 ${live ? 'opacity-0' : 'opacity-100'}`}>
-      <path fill="currentColor" d={Array.from({ length: 56 }, (_, i) => { const a = (i / 56) * Math.PI * 2, r = i % 4 < 2 ? 92 : 78; return `${i ? 'L' : 'M'}${100 + Math.cos(a) * r} ${100 + Math.sin(a) * r}` }).join(' ') + 'Z M130 100 A30 30 0 1 0 70 100 A30 30 0 1 0 130 100Z'} fillRule="evenodd" />
+      <path fill="currentColor" d={Array.from({ length: 56 }, (_, i) => { const a = (i / 56) * Math.PI * 2, r = i % 4 < 2 ? 92 : 78; return `${i ? 'L' : 'M'}${(100 + Math.cos(a) * r).toFixed(2)} ${(100 + Math.sin(a) * r).toFixed(2)}` }   /* fixed decimals: server and browser trig differ in the last digits */).join(' ') + 'Z M130 100 A30 30 0 1 0 70 100 A30 30 0 1 0 130 100Z'} fillRule="evenodd" />
     </svg>
   </div>
 }

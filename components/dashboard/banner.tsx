@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight } from '@/components/icons'
 
 /** Steel-frame line drawing (columns, beams, a truss) used as background art (dashboard banner, phone sign-in). */
 export function SteelFrameArt() {

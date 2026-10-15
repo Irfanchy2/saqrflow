@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Plus, ShieldCheck, Wrench } from 'lucide-react'
+import { Plus, ShieldCheck, Wrench } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard } from '@/components/ui/primitives'

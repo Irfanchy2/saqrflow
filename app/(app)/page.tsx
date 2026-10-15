@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Banknote, CalendarDays, CheckCircle2, FileText, HardHat, Landmark, Receipt, ScrollText, ShieldCheck, Truck, Flag, Users, Wallet } from 'lucide-react'
+import { Banknote, CalendarDays, CheckCircle2, FileText, HardHat, Landmark, Receipt, ScrollText, ShieldCheck, Truck, Flag, Users, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, MiniBars, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { buildAlerts } from '@/lib/dashboard'

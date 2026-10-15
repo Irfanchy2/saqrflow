@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Archive, CarFront, Download, Plus, Truck, Wrench } from 'lucide-react'
+import { Archive, CarFront, Download, Plus, Truck, Wrench } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'

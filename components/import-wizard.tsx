@@ -2,7 +2,7 @@
 import { startTransition, useActionState, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, FileSpreadsheet, Loader2, Upload } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, FileSpreadsheet, Loader2, Upload } from '@/components/icons'
 import { Alert, Badge, Button, Card, CardHeader, Field, Select } from '@/components/ui/primitives'
 import { IMPORT_ENTITIES } from '@/lib/import-spec'
 import { previewImport, runImport } from '@/app/actions/import-wizard'

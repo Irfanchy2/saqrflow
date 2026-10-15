@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Search, Sparkles } from 'lucide-react'
+import { Search, Sparkles } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from '@/components/ui/primitives'

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle,
   MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, HardHat, Wallet,
-} from 'lucide-react'
+} from '@/components/icons'
 import { SalesPaper, docDiscount, vatOn, type Branding, type PaperItem } from './paper'
 import { FitPaper } from './preview'
 import { RichTextField } from './rich-field'

@@ -1,4 +1,4 @@
-import { WifiOff } from 'lucide-react'
+import { WifiOff } from '@/components/icons'
 
 export const metadata = { title: 'Offline', robots: { index: false } }
 export const dynamic = 'force-static'

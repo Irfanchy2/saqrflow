@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MapPin, Search, Settings } from 'lucide-react'
+import { MapPin, Search, Settings } from '@/components/icons'
 import { supabaseConfigured } from '@/lib/env'
 import { SetupRequired } from '@/components/layout/setup-required'
 import { getCtx } from '@/lib/auth'

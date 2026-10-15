@@ -1,7 +1,7 @@
 'use client'
 import { createContext, startTransition, useActionState, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useFormStatus } from 'react-dom'
-import { Loader2 } from 'lucide-react'
+import { Loader2 } from '@/components/icons'
 import { Button, Alert } from './primitives'
 import { useDialog } from './dialog'
 import { toast } from './toast'
