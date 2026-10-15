@@ -14,10 +14,10 @@ import { Inbox } from 'lucide-react'
 const button = cva('inline-flex cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 active:translate-y-px whitespace-nowrap select-none', {
   variants: {
     variant: {
-      primary: 'bg-primary text-primary-fg hover:bg-primary/90',
-      secondary: 'border border-border bg-surface text-fg hover:border-border-strong hover:bg-surface-2',
+      primary: 'bg-primary text-primary-fg shadow-btn hover:bg-primary/[.92]',
+      secondary: 'border border-border bg-surface text-fg shadow-sm hover:border-border-strong hover:bg-surface-2/70',
       ghost: 'text-muted hover:bg-surface-2 hover:text-fg',
-      danger: 'bg-danger text-white hover:bg-danger/90',
+      danger: 'bg-danger text-white shadow-btn hover:bg-danger/90',
     },
     size: { sm: 'h-10 px-3 sm:h-8', md: 'h-11 px-4 sm:h-9 sm:px-3.5', icon: 'h-11 w-11 sm:h-9 sm:w-9' },
   },
@@ -31,7 +31,7 @@ export const LinkButton = ({ href, className, variant, size, children, target }:
     ? <a href={href} className={cn(button({ variant, size }), className)} target={target} rel={target ? 'noopener noreferrer' : undefined}>{children}</a>
     : <Link href={href} className={cn(button({ variant, size }), className)} target={target} rel={target ? 'noopener noreferrer' : undefined}>{children}</Link>
 
-const field = 'w-full rounded-md border border-border bg-surface px-3 text-sm text-fg placeholder:text-muted/55 transition-colors hover:border-border-strong focus:border-primary/60 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70'
+const field = 'w-full rounded-md border border-border bg-surface px-3 text-sm text-fg shadow-sm placeholder:text-muted/55 transition-[border-color,box-shadow] hover:border-border-strong focus:border-primary focus-visible:ring-4 focus-visible:ring-primary/[.12] focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70'
 // dir="auto" + unicode-bidi:plaintext: typed text takes its own direction per line (an English name stays left-aligned inside the
 // Arabic UI, an Arabic address line aligns right inside the English UI) instead of inheriting the page direction.
 const TEXTUAL = new Set([undefined, 'text', 'search', 'email', 'tel', 'url', 'password'])
@@ -55,9 +55,9 @@ export function FormSection({ title, sub, children, className }: { title: string
     <div className="clear-left">{children}</div></fieldset>
 }
 
-export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('rounded-lg border border-border bg-surface', className)} {...p} />
+export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('rounded-lg border border-border bg-surface shadow-card', className)} {...p} />
 export const CardHeader = ({ title, action, sub }: { title: string; action?: ReactNode; sub?: string }) =>
-  <div className="flex min-h-[48px] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border px-4 py-2.5"><div className="min-w-0 flex-1 basis-48"><h3 className="text-sm font-semibold">{title}</h3>{sub && <p className="text-xs text-muted">{sub}</p>}</div>{action}</div>
+  <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border px-4 py-3"><div className="min-w-0 flex-1 basis-48"><h3 className="text-[14px] font-semibold tracking-[-0.01em]">{title}</h3>{sub && <p className="mt-px text-xs text-muted">{sub}</p>}</div>{action}</div>
 
 // one status palette for the whole product: subtle tint + readable text, never a saturated fill
 const tone = {
@@ -66,7 +66,7 @@ const tone = {
 }
 export type Tone = keyof typeof tone
 export const Badge = ({ tone: t = 'neutral', children, className }: { tone?: Tone; children: ReactNode; className?: string }) =>
-  <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-sm px-1.5 py-px text-xs font-medium ring-1 ring-inset', tone[t], className)}>{children}</span>
+  <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-[5px] px-1.5 py-px text-xs font-medium leading-5 ring-1 ring-inset', tone[t], className)}>{children}</span>
 
 // only a problem colours a number; other tones are informational and stay neutral so colour keeps its meaning
 const valueTone: Partial<Record<Tone, string>> = { red: 'text-danger' }
@@ -92,20 +92,20 @@ export function Metrics({ children, className, cols }: { children: ReactNode; cl
 
 export function EmptyState({ title, body, action, icon: Icon = Inbox }: { title: string; body?: string; action?: ReactNode; icon?: LucideIcon }) {
   return <div className="flex flex-col items-center justify-center gap-1.5 px-6 py-12 text-center">
-    <Icon size={20} className="mb-1 text-muted/70" aria-hidden />
-    <p className="text-sm font-medium">{title}</p>{body && <p className="max-w-sm text-sm text-muted">{body}</p>}{action && <div className="mt-3">{action}</div>}
+    <span className="mb-2 grid h-10 w-10 place-items-center rounded-lg border border-border bg-surface-2/70 text-muted" aria-hidden><Icon size={18} strokeWidth={1.75} /></span>
+    <p className="text-sm font-semibold">{title}</p>{body && <p className="max-w-sm text-sm text-muted">{body}</p>}{action && <div className="mt-3">{action}</div>}
   </div>
 }
 export const PageHeader = ({ title, sub, actions }: { title: string; sub?: string; actions?: ReactNode }) =>
-  <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-    <div className="min-w-0"><h1 className="text-lg font-semibold tracking-[-0.015em]">{title}</h1>{sub && <p className="mt-0.5 max-w-[72ch] text-sm text-muted">{sub}</p>}</div>
+  <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+    <div className="min-w-0"><h1 className="text-[22px] font-semibold leading-tight tracking-[-0.022em]">{title}</h1>{sub && <p className="mt-1 max-w-[72ch] text-sm text-muted">{sub}</p>}</div>
     <div className="flex flex-wrap items-center gap-2">{actions}</div></div>
 
 export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: ReactNode }) =>
   <div role={t === 'red' ? 'alert' : undefined} className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/25 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/25 bg-warning/5' : t === 'green' ? 'border-success/25 bg-success/5' : t === 'neutral' ? 'border-border bg-surface-2' : 'border-primary/20 bg-primary-soft')}>{children}</div>
 
-export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('whitespace-nowrap border-b border-border bg-surface-2/60 px-3 py-2 text-start text-xs font-medium text-muted first:ps-4 last:pe-4', className)}>{children}</th>
-export const Td = ({ children, className, title, colSpan }: { children?: ReactNode; className?: string; title?: string; colSpan?: number }) => <td title={title} colSpan={colSpan} className={cn('px-3 py-2.5 align-middle first:ps-4 last:pe-4', className)}>{children}</td>
+export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('h-10 whitespace-nowrap border-b border-border bg-surface-2/50 px-3 text-start text-[12px] font-medium text-muted first:ps-4 last:pe-4', className)}>{children}</th>
+export const Td = ({ children, className, title, colSpan }: { children?: ReactNode; className?: string; title?: string; colSpan?: number }) => <td title={title} colSpan={colSpan} className={cn('px-3 py-3 align-middle first:ps-4 last:pe-4', className)}>{children}</td>
 // relative: the scroll box is the containing block, so absolutely positioned children (sr-only labels) cannot widen the page
 export { TableWrap } from './table-wrap'
 

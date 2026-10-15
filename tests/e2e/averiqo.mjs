@@ -197,7 +197,7 @@ try {
   ok(dash.includes('Outstanding receivables') && dash.includes('Needs attention') && dash.includes('Operations'), 'dashboard: financial pulse, needs attention, operations')
   ok(/AED 29,925\.00/.test(dash), 'outstanding shown as AED 29,925.00 (two decimals)')
   await shot('dashboard')
-  await p.getByRole('button', { name: 'New', exact: true }).click(); ok(await p.getByRole('menuitem', { name: 'Vehicle' }).isVisible(), 'quick actions menu includes Vehicle')
+  await p.getByRole('button', { name: 'Create', exact: true }).click(); ok(await p.getByRole('menuitem', { name: 'Vehicle' }).isVisible(), 'quick actions menu includes Vehicle')
   await p.getByRole('menuitem', { name: 'Vehicle' }).click(); await p.waitForURL(/new=vehicle/); await settle(); ok(await dlg().isVisible(), 'quick action opens the Add vehicle form directly')
 } catch (e) {
   ok(false, `aborted: ${e.message.split('\n').slice(0, 12).join(' | ')}`); await shot('abort').catch(() => {})

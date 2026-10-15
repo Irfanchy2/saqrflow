@@ -30,7 +30,7 @@ try {
   await p.goto(`${BASE}/signup`); await p.getByLabel('Work email').fill('sales-owner@alsaqr.test'); await p.getByLabel('Password').fill('correct-horse-battery'); await p.getByRole('button', { name: 'Create account' }).click()
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('Al Saqr Al Ahmar Welding'); await p.getByLabel('Your full name').fill('Sales Owner'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`)
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email='sales-owner@alsaqr.test'`)).company_id
-  ok(await p.getByRole('link', { name: 'Sales & Invoices' }).isVisible() && !(await p.getByRole('link', { name: /Projects/ }).innerText()).includes('Soon'), 'sidebar: Sales & Invoices and Projects are live (no “Soon”)')
+  ok(await p.locator('aside[data-collapsed]').getByRole('link', { name: 'Sales & Invoices' }).isVisible() && !(await p.locator('aside[data-collapsed]').getByRole('link', { name: /Projects/ }).first().innerText()).includes('Soon'), 'sidebar: Sales & Invoices and Projects are live (no “Soon”)')
   ok(/Sales & CRM[\s\S]*Projects & site[\s\S]*Finance[\s\S]*People & documents[\s\S]*Insights[\s\S]*System/.test(await p.locator('aside[data-collapsed]').innerText()), 'sidebar is grouped into sections (Sales & CRM, Projects & site, Finance, People & documents, Insights, System)')
   await p.keyboard.press('Control+k'); await p.waitForTimeout(300)
   ok(await p.getByRole('combobox', { name: 'Command' }).isVisible(), 'Ctrl+K opens the command palette')

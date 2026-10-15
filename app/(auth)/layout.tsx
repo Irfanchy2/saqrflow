@@ -12,16 +12,16 @@ const POINTS = [
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   if (!supabaseConfigured()) return <SetupRequired />
   return <main className="grid min-h-[100dvh] bg-bg lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-    <section aria-label="About Averiqo" className="relative hidden overflow-hidden bg-[#12151b] text-[#e8ebf0] lg:block">
+    <section aria-label="About Averiqo" className="relative hidden overflow-hidden bg-sb text-sb-fg lg:block">
       <SteelHero />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,#12151b_8%,rgba(18,21,27,.55)_50%,rgba(18,21,27,.1))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,hsl(var(--sb))_8%,hsl(var(--sb)/.55)_50%,hsl(var(--sb)/.1))]" />
       <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
         <div className="flex flex-col items-start gap-1.5"><AveriqoLogo height={40} tone="dark" />
-          <div className="text-xs tracking-wide text-[#9aa3b2]">Business OS</div></div>
+          <div className="text-xs tracking-wide text-sb-muted">Business OS</div></div>
         <div className="max-w-md">
           <h2 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em]">Sales, people, documents and assets in one system.</h2>
           <dl className="mt-8 divide-y divide-white/10 border-y border-white/10">{POINTS.map(([t, d]) => <div key={t} className="py-3.5">
-            <dt className="text-sm font-medium">{t}</dt><dd className="mt-0.5 text-[13px] leading-relaxed text-[#9aa3b2]">{d}</dd></div>)}</dl>
+            <dt className="text-sm font-medium">{t}</dt><dd className="mt-0.5 text-[13px] leading-relaxed text-sb-muted">{d}</dd></div>)}</dl>
         </div>
       </div>
     </section>

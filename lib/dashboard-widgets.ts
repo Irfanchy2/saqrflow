@@ -1,9 +1,11 @@
 // Dashboard widgets a user can show, hide, move between columns and reorder (stored in user_preferences 'dashboard.layout').
 export const WIDGETS = {
   finance: { label: 'Financial pulse', col: 'top' },
-  attention: { label: 'Needs attention', col: 'left' },
+  trend: { label: 'Sales & collections (12 months)', col: 'left' },
+  attention: { label: 'Needs attention', col: 'right' },
+  recent: { label: 'Latest documents', col: 'left' },
   projects: { label: 'Projects in progress', col: 'left' },
-  mytasks: { label: 'My tasks', col: 'left' },
+  mytasks: { label: 'My tasks', col: 'right' },
   operations: { label: 'Operations', col: 'right' },
   approvals: { label: 'Waiting for approval', col: 'right' },
   inbox: { label: 'Smart Inbox', col: 'right' },
@@ -13,8 +15,8 @@ export type WidgetKey = keyof typeof WIDGETS
 export type WidgetCol = 'top' | 'left' | 'right'
 export interface DashboardLayout { items: { key: WidgetKey; col: WidgetCol; hidden: boolean }[] }
 
-/** The layout users get until they customise it: exactly the original dashboard (new widgets start hidden). */
-export const DEFAULT_LAYOUT: DashboardLayout = { items: (Object.keys(WIDGETS) as WidgetKey[]).map(k => ({ key: k, col: WIDGETS[k].col, hidden: k === 'mytasks' || k === 'approvals' })) }
+/** The layout users get until they customise it. Saved layouts keep their choices; widgets added later are appended visible. */
+export const DEFAULT_LAYOUT: DashboardLayout = { items: (Object.keys(WIDGETS) as WidgetKey[]).map(k => ({ key: k, col: WIDGETS[k].col, hidden: k === 'approvals' })) }
 
 /** Accepts whatever was stored and returns a complete, valid layout (unknown keys dropped, new widgets appended). */
 export function normalizeLayout(raw: unknown): DashboardLayout {

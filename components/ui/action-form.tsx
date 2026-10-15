@@ -96,7 +96,7 @@ export function ActionForm({ action, children, submit: label = 'Save', className
     {children}
     {state?.error && <Alert tone="red">{state.error}{state.fieldErrors && Object.keys(state.fieldErrors).length > 1 && <ul className="mt-1 list-disc ps-5 text-xs">{Object.entries(state.fieldErrors).map(([k, m]) => <li key={k}>{m}</li>)}</ul>}</Alert>}
     {state?.ok && state.message && <Alert tone="green">{state.message}</Alert>}
-    {!hideSubmit && <div className="flex justify-end gap-2 pt-1"><Button type="submit" variant={variant} disabled={pending} aria-busy={pending}>{pending && <Loader2 size={14} className="animate-spin" />}{label}</Button></div>}
+    {!hideSubmit && <div className="form-actions flex justify-end gap-2 pt-1"><Button type="submit" variant={variant} disabled={pending} aria-busy={pending}>{pending && <Loader2 size={14} className="animate-spin" />}{label}</Button></div>}
   </form></PendingCtx.Provider>
 }
 

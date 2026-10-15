@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AnimatePresence, m } from 'framer-motion'
+import { T } from '@/components/motion'
 
 type Tone = 'success' | 'error' | 'info'
 interface Toast { id: number; msg: string; tone: Tone }
@@ -29,14 +31,14 @@ export function Toaster() {
   return <div className="no-print pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:end-4 sm:items-end lg:bottom-4">
     <div aria-live="polite" className="sr-only">{items.filter(t => t.tone !== 'error').map(t => t.msg).join('. ')}</div>
     <div aria-live="assertive" className="sr-only">{items.filter(t => t.tone === 'error').map(t => t.msg).join('. ')}</div>
-    {items.map(t => {
+    <AnimatePresence initial={false}>{items.map(t => {
       const Icon = t.tone === 'success' ? CheckCircle2 : t.tone === 'error' ? AlertTriangle : Info
-      return <div key={t.id} className={cn('toast-in pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-lg border bg-surface px-3.5 py-3 text-sm shadow-lg',
+      return <m.div key={t.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: T.fast }} transition={T.base} className={cn('pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-lg border bg-surface px-3.5 py-3 text-sm shadow-lg',
         t.tone === 'error' ? 'border-danger/40' : t.tone === 'success' ? 'border-success/40' : 'border-border')}>
         <Icon size={17} className={cn('mt-0.5 shrink-0', t.tone === 'error' ? 'text-danger' : t.tone === 'success' ? 'text-success' : 'text-primary')} aria-hidden />
         <span className="flex-1">{t.msg}</span>
         <button aria-label="Dismiss" className="cursor-pointer rounded p-0.5 text-muted hover:text-fg" onClick={() => setItems(x => x.filter(y => y.id !== t.id))}><X size={14} /></button>
-      </div>
-    })}
+      </m.div>
+    })}</AnimatePresence>
   </div>
 }
