@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { ArrowDown, ArrowUp } from '@/components/icons'
+import { m } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import type { TrendMonth } from '@/lib/dashboard-trend'
 
@@ -48,8 +49,11 @@ export function TrendChart({ months, change = {}, title = 'Sales overview', acti
           {delta !== undefined && delta !== null && <span className={cn('inline-flex items-center gap-0.5 text-sm font-semibold tabular-nums', delta >= 0 ? 'text-success' : 'text-danger')}>{delta >= 0 ? <ArrowUp size={14} strokeWidth={2.5} aria-hidden /> : <ArrowDown size={14} strokeWidth={2.5} aria-hidden />}{Math.abs(delta)}%<span className="ms-1 font-normal text-muted">this month vs last</span></span>}
         </div><p className="mt-1 text-xs text-muted">Last 12 months · {s.note}</p></div>
       <div className="flex items-center gap-2">
-        <div role="tablist" aria-label="Series" className="inline-flex gap-1">{SERIES.map(x => <button key={x.key} role="tab" type="button" aria-selected={key === x.key} onClick={() => setKey(x.key)}
-          className={cn('h-8 cursor-pointer rounded-lg px-3 text-[13px] font-medium transition-colors', key === x.key ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-2 hover:text-fg')}>{x.label}</button>)}</div>
+        {/* segmented control: a raised thumb glides to the chosen series */}
+        <div role="tablist" aria-label="Series" className="inline-flex rounded-[10px] bg-surface-2 p-[3px] shadow-[inset_0_0_0_1px_hsl(var(--border)/.7)]">{SERIES.map(x => <button key={x.key} role="tab" type="button" aria-selected={key === x.key} onClick={() => setKey(x.key)}
+          className={cn('relative h-8 cursor-pointer rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 sm:h-7', key === x.key ? 'text-fg' : 'text-muted hover:text-fg')}>
+          {key === x.key && <m.span layoutId="series-thumb" transition={{ type: 'spring', stiffness: 520, damping: 40 }} aria-hidden className="absolute inset-0 rounded-[inherit] bg-surface shadow-key ring-1 ring-border/70" />}
+          <span className="relative">{x.label}</span></button>)}</div>
         {action}</div>
     </div>
     <div className="relative mt-5 h-[230px] pb-7 ps-11" onMouseLeave={() => setHover(null)}>

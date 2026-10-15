@@ -20,7 +20,7 @@ export function DashboardCustomize({ layout, available }: { layout: DashboardLay
   const cols: [WidgetCol, string][] = [['top', 'Top'], ['left', 'Left column'], ['right', 'Right column']]
   return <>
     <Button variant="secondary" onClick={() => { setItems(layout.items); dlg.current?.showModal() }}><LayoutGrid size={15} />Customize</Button>
-    <dialog ref={dlg} onClick={e => { if (e.target === dlg.current) dlg.current?.close() }} className="mx-0 mb-0 mt-auto max-h-[92dvh] w-full max-w-none flex-col rounded-t-xl border border-border bg-surface p-0 text-fg shadow-pop open:flex sm:m-auto sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-lg">
+    <dialog ref={dlg} onClick={e => { if (e.target === dlg.current) dlg.current?.close() }} className="mx-0 mb-0 mt-auto max-h-[92dvh] w-full max-w-none flex-col rounded-t-2xl border border-border bg-surface p-0 text-fg shadow-pop open:flex sm:m-auto sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-2xl">
       <div className="border-b border-border px-5 py-3"><h2 className="text-[15px] font-semibold">Customize dashboard</h2><p className="text-xs text-muted">Only you see this layout. Widgets you have no access to are not listed.</p></div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">{cols.map(([col, label]) => { const list = shown.filter(i => i.col === col); return list.length ? <div key={col} className="mb-4 last:mb-0">
         <h3 className="mb-1.5 text-xs font-medium text-muted">{label}</h3>

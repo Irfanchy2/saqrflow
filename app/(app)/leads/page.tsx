@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ArrowRightLeft, BarChart3, CheckCircle2, Columns3, List, Mail, MapPinned, MessageCircle, Phone, Plus, ScrollText, StickyNote, Target, Users } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
-import { Badge, Card, CardHeader, CardLink, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, SEG, segItem, CardHeader, CardLink, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionForm } from '@/components/ui/action-form'
 import { LeadFields } from '@/components/crm/fields'
@@ -73,14 +73,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       <StatCard label="Pipeline value" value={formatAed(sum.value)} hint="Open leads, excl. VAT" />
       <StatCard label="Weighted pipeline" value={formatAed(sum.weighted)} hint="Value × win probability" />
       <StatCard label="Follow-ups due" value={due} tone={due ? 'red' : 'neutral'} hint="Today or overdue" href={qs({ view: 'list', due: '1' })} />
-      <StatCard label="Win rate" value={sum.winRate == null ? 'No decided leads' : `${sum.winRate}%`} hint={`${sum.won} won · ${sum.lost} lost`} />
+      <StatCard label="Win rate" value={sum.winRate == null ? '—' : `${sum.winRate}%`} hint={sum.winRate == null ? 'No decided leads yet' : `${sum.won} won · ${sum.lost} lost`} />
     </Metrics>
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-border">
       <nav aria-label="Lead views" className="tabstrip -mb-px flex min-w-0 max-w-full gap-1 overflow-x-auto">{TABS.map(([k, l, o]) => { const on = tabOf === k
         return <Link key={k} href={qs({ view: 'list', stage: '', owner: '', ...o })} aria-current={on ? 'page' : undefined}
           className={cn('shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm transition-colors', on ? 'border-primary font-semibold text-primary' : 'border-transparent text-muted hover:text-fg')}>{l}</Link> })}</nav>
-      <div className="mb-2 hidden items-center gap-1 rounded-lg bg-surface p-1 shadow-sm ring-1 ring-border sm:flex">{VIEWS.map(([k, l, I]) => <Link key={k} href={qs({ view: k })} aria-current={view === k ? 'page' : undefined} title={l}
-        className={cn('inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors', view === k ? 'bg-primary text-primary-fg' : 'text-muted hover:bg-surface-2 hover:text-fg')}><I size={14} aria-hidden />{l}</Link>)}</div>
+      <div className={cn(SEG, 'mb-2 hidden sm:inline-flex')}>{VIEWS.map(([k, l, I]) => <Link key={k} href={qs({ view: k })} aria-current={view === k ? 'page' : undefined} title={l}
+        className={segItem(view === k)}><I size={14} aria-hidden />{l}</Link>)}</div>
     </div>
     <form className="mb-4"><input type="hidden" name="view" value={view} />
         <FilterBar active={!!(sp.source || sp.owner)} search={<input name="q" type="search" defaultValue={sp.q} aria-label="Search leads" placeholder="Search name, phone, service…" className={`${cls} h-11 min-w-0 flex-1 sm:h-9 sm:w-56 sm:flex-none`} />}>

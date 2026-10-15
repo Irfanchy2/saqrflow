@@ -58,7 +58,7 @@ export function PipelineBoard({ leads, today, canEdit, hideClosed }: { leads: Bo
           <ol className="flex min-h-24 flex-col gap-2.5 px-2.5 pb-2">
             {list.map(l => { const f = followupState(l, today)
               return <li key={l.id} draggable={canEdit} onDragStart={e => { drag.current = l.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', l.id) }} onDragEnd={() => { drag.current = null; setOver(null) }}
-                data-row-link className={cn('group rounded-xl border border-border bg-surface p-3.5 text-sm shadow-card transition-shadow hover:shadow-md', canEdit && 'cursor-grab active:cursor-grabbing')}>
+                data-row-link className={cn('group rounded-xl border border-border/80 bg-surface p-3.5 text-sm shadow-card transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-px hover:border-border-strong/70 hover:shadow-lift', canEdit && 'cursor-grab active:cursor-grabbing')}>
                 <Link href={`/leads/${l.id}`} data-row-primary className="block min-w-0 font-semibold leading-snug hover:text-primary" draggable={false}>{l.service || l.company_name}</Link>
                 <div className="mt-0.5 truncate text-[13px] text-muted">{l.service ? l.company_name : l.contact_person ?? l.number}</div>
                 {(l.source || f === 'overdue' || f === 'today') && <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -85,7 +85,7 @@ export function PipelineBoard({ leads, today, canEdit, hideClosed }: { leads: Bo
         </section> })}
     </div>
 
-    <dialog ref={dlg} onClose={() => setLostFor(null)} className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-border bg-surface p-0 text-fg shadow-pop">
+    <dialog ref={dlg} onClose={() => setLostFor(null)} className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-border/80 bg-surface p-0 text-start text-fg shadow-pop">
       <form method="dialog" className="space-y-4 p-5" onSubmit={e => {
         const fd = new FormData(e.currentTarget); const reason = String(fd.get('reason') ?? '')
         if (!reason) { e.preventDefault(); return }
@@ -96,7 +96,7 @@ export function PipelineBoard({ leads, today, canEdit, hideClosed }: { leads: Bo
         <label className="block text-sm"><span className="mb-1 block text-xs font-medium text-muted">Reason *</span>
           <Select name="reason" required defaultValue=""><option value="" disabled>Choose…</option>{Object.entries(LOST_REASONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></label>
         <label className="block text-sm"><span className="mb-1 block text-xs font-medium text-muted">Note</span>
-          <input name="note" maxLength={500} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Optional" /></label>
+          <input name="note" maxLength={500} className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm shadow-field transition-[border-color,box-shadow] hover:border-border-strong focus:border-primary/70 focus:shadow-focus focus-visible:ring-0" placeholder="Optional" /></label>
         <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={() => dlg.current?.close()}>Cancel</Button><Button type="submit" variant="danger">Mark as lost</Button></div>
       </form>
     </dialog>

@@ -70,18 +70,18 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
   }
   let lastGroup = ''
   return <dialog ref={dlg} onClose={() => setOpen(false)} onClick={e => { if (e.target === dlg.current) setOpen(false) }} aria-label="Command palette"
-    className="m-auto mt-[12vh] w-[calc(100%-2rem)] max-w-xl rounded-lg border border-border bg-surface p-0 text-fg shadow-pop">
+    className="m-auto mt-[12vh] w-[calc(100%-2rem)] max-w-xl overflow-hidden rounded-2xl border border-border/80 bg-surface p-0 text-start text-fg shadow-pop">
     <div className="flex items-center gap-2 border-b border-border px-4">
       {pending || looking ? <Loader2 size={16} className="animate-spin text-muted" /> : <Search size={16} className="text-muted" aria-hidden />}
       <input ref={input} value={q} onChange={e => { setQ(e.target.value); setSel(0) }} onKeyDown={onKey} placeholder="Type a command, a name or a number…" aria-label="Command" role="combobox" aria-expanded aria-controls="palette-list" aria-activedescendant={list[sel] ? `cmd-${list[sel].id}` : undefined}
-        className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted/70 focus-visible:ring-0" />
-      <kbd className="rounded border border-border px-1.5 text-[10px] text-muted">Esc</kbd>
+        className="h-14 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted/70 focus-visible:ring-0" />
+      <kbd className="inline-flex h-6 items-center rounded-md border border-border bg-surface px-1.5 text-[11px] text-muted shadow-key">Esc</kbd>
     </div>
     <ul id="palette-list" role="listbox" className="max-h-[55vh] overflow-y-auto p-2">
       {list.map((c, i) => { const head = c.group !== lastGroup; lastGroup = c.group
-        return <li key={c.id} role="presentation">{head && <div className="px-2 pb-1 pt-2 text-2xs font-medium text-muted">{c.group}</div>}
+        return <li key={c.id} role="presentation">{head && <div className="px-2.5 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted/80">{c.group}</div>}
           <div id={`cmd-${c.id}`} role="option" aria-selected={i === sel} onMouseMove={() => setSel(i)} onClick={() => c.run()}
-            className={cn('flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm', i === sel && 'bg-primary-soft text-primary')}>
+            className={cn('flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors duration-100', i === sel && 'bg-primary-soft text-primary')}>
             {c.group === 'Create' ? <Plus size={15} aria-hidden /> : c.group === 'Search' ? <Search size={15} aria-hidden /> : <CornerDownLeft size={15} className="opacity-50" aria-hidden />}
             <span className="flex-1">{c.label}</span>{c.hint && <span className="text-xs text-muted">{c.hint}</span>}</div></li> })}
     </ul>
@@ -89,6 +89,6 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
 }
 
 export function PaletteHint() {
-  return <button type="button" onClick={() => dispatchEvent(new Event('saqrflow:palette'))} className="absolute end-1.5 top-1/2 hidden -translate-y-1/2 cursor-pointer items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] font-medium text-muted shadow-sm transition-colors hover:text-fg md:inline-flex" aria-label="Open command palette (Ctrl+K)">
+  return <button type="button" onClick={() => dispatchEvent(new Event('saqrflow:palette'))} className="absolute end-2 top-1/2 hidden h-6 -translate-y-1/2 cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-1.5 text-[11px] font-medium text-muted shadow-key transition-colors hover:text-fg md:inline-flex" aria-label="Open command palette (Ctrl+K)">
     <kbd className="font-sans">Ctrl K</kbd></button>
 }

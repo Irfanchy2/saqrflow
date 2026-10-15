@@ -11,16 +11,18 @@ import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, Cale
  * Sizes: controls 36 px (sm 32 px) · table rows ~40 px · radius md (6 px) for controls, lg (8 px) for containers, sm (4 px) for badges.
  * Surfaces are separated by a 1 px border; shadows are reserved for floating layers (menus, dialogs, toasts).
  */
-const button = cva('inline-flex cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 active:translate-y-px whitespace-nowrap select-none', {
+// Buttons are tactile: filled ones carry a top highlight, a hairline in their own colour and a soft coloured shadow
+// that deepens on hover; outlined ones read as a key (hairline, faint bottom edge). Every button presses in by 2%.
+const button = cva('relative inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg text-[13.5px] font-medium tracking-[-0.006em] select-none transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-150 ease-out active:scale-[.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0', {
   variants: {
     variant: {
-      primary: 'bg-ink text-ink-fg shadow-btn hover:bg-ink/90',
-      secondary: 'border border-border bg-surface text-fg shadow-sm hover:border-border-strong hover:bg-surface-2/70',
-      blue: 'bg-primary text-primary-fg shadow-btn hover:bg-primary/90',
-      ghost: 'text-muted hover:bg-surface-2 hover:text-fg',
-      danger: 'bg-danger text-white shadow-btn hover:bg-danger/90',
+      primary: 'bg-ink bg-[linear-gradient(180deg,hsl(0_0%_100%/.09),hsl(0_0%_100%/0))] text-ink-fg shadow-solid [--b:var(--ink)] hover:bg-ink/[.93] hover:shadow-solid-hover',
+      secondary: 'border border-border bg-surface text-fg shadow-key hover:border-border-strong hover:bg-surface-2/60 active:bg-surface-2',
+      blue: 'bg-primary bg-[linear-gradient(180deg,hsl(0_0%_100%/.12),hsl(0_0%_100%/0))] text-primary-fg shadow-solid [--b:var(--primary)] hover:bg-primary/[.93] hover:shadow-solid-hover',
+      ghost: 'text-muted hover:bg-fg/[.05] hover:text-fg active:bg-fg/[.08]',
+      danger: 'bg-danger bg-[linear-gradient(180deg,hsl(0_0%_100%/.1),hsl(0_0%_100%/0))] text-white shadow-solid [--b:var(--danger)] hover:bg-danger/[.93] hover:shadow-solid-hover',
     },
-    size: { sm: 'h-10 px-3 sm:h-8', md: 'h-11 px-4 sm:h-10 sm:px-4', icon: 'h-11 w-11 sm:h-10 sm:w-10' },
+    size: { sm: 'h-10 gap-1.5 px-3 text-[13px] sm:h-8 sm:px-2.5', md: 'h-11 px-4 sm:h-10 sm:px-4', icon: 'h-11 w-11 sm:h-10 sm:w-10' },
   },
   defaultVariants: { variant: 'primary', size: 'md' },
 })
@@ -32,13 +34,14 @@ export const LinkButton = ({ href, className, variant, size, children, target }:
     ? <a href={href} className={cn(button({ variant, size }), className)} target={target} rel={target ? 'noopener noreferrer' : undefined}>{children}</a>
     : <Link href={href} className={cn(button({ variant, size }), className)} target={target} rel={target ? 'noopener noreferrer' : undefined}>{children}</Link>
 
-const field = 'w-full rounded-md border border-border bg-surface px-3 text-sm text-fg shadow-sm placeholder:text-muted/55 transition-[border-color,box-shadow] hover:border-border-strong focus:border-primary focus-visible:ring-4 focus-visible:ring-primary/[.12] focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70'
+// fields: a recessed well (faint inner shadow), a hairline that darkens on hover, a soft blue halo on focus
+const field = 'w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg shadow-field placeholder:text-muted/60 transition-[border-color,box-shadow,background-color] duration-150 hover:border-border-strong focus:border-primary/70 focus:shadow-focus focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70'
 // dir="auto" + unicode-bidi:plaintext: typed text takes its own direction per line (an English name stays left-aligned inside the
 // Arabic UI, an Arabic address line aligns right inside the English UI) instead of inheriting the page direction.
 const TEXTUAL = new Set([undefined, 'text', 'search', 'email', 'tel', 'url', 'password'])
 export const Input = ({ className, dir, type, ...p }: InputHTMLAttributes<HTMLInputElement>) =>
   <input type={type} dir={dir ?? (TEXTUAL.has(type) ? 'auto' : undefined)} className={cn(field, 'h-11 text-start sm:h-10', className)} {...p} />
-export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'h-11 cursor-pointer pe-8 sm:h-10', className)} {...p} />
+export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'field-select h-11 cursor-pointer pe-9 sm:h-10', className)} {...p} />
 export const Textarea = ({ className, dir, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) =>
   <textarea dir={dir ?? 'auto'} className={cn(field, 'min-h-[84px] resize-y px-3 py-2 text-start leading-[1.55] [overflow-wrap:anywhere] [unicode-bidi:plaintext] whitespace-pre-wrap', className)} {...p} />
 
@@ -46,7 +49,7 @@ export const Textarea = ({ className, dir, ...p }: TextareaHTMLAttributes<HTMLTe
 export function Field({ label, hint, children, className }: { label: string; hint?: string; children: ReactNode; className?: string }) {
   const req = label.endsWith(' *'), text = req ? label.slice(0, -2) : label
   return <label className={cn('flex min-w-0 flex-col gap-1.5 text-sm', className)}>
-    <span className="text-[13px] font-medium text-fg">{text}{req && <span className="text-danger"> *</span>}</span>
+    <span className="text-[13px] font-medium tracking-[-0.005em] text-fg/90">{text}{req && <span className="text-danger"> *</span>}</span>
     {children}{hint && <span className="text-xs leading-snug text-muted">{hint}</span>}</label>
 }
 /** Groups related fields inside a form without another box: a heading, an optional line of help, then the fields. */
@@ -56,21 +59,28 @@ export function FormSection({ title, sub, children, className }: { title: string
     <div className="clear-left">{children}</div></fieldset>
 }
 
-export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('rounded-xl border border-border bg-surface shadow-card', className)} {...p} />
+export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('rounded-xl border border-border/80 bg-surface shadow-card', className)} {...p} />
+/** Segmented control (view switchers): a recessed track with a raised thumb on the current option. */
+export const SEG = 'inline-flex items-center gap-0.5 rounded-[10px] bg-surface-2 p-[3px] shadow-[inset_0_0_0_1px_hsl(var(--border)/.7)]'
+export const segItem = (on: boolean) => cn('inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-[color,background-color,box-shadow] duration-150 sm:h-7', on ? 'bg-surface text-fg shadow-key ring-1 ring-border/70' : 'text-muted hover:text-fg')
 /** Card title row: 15 px title, optional line of help, an action (usually a "View all" link) on the right. No divider: content follows directly. */
 export const CardHeader = ({ title, action, sub }: { title: string; action?: ReactNode; sub?: string }) =>
-  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pb-3 pt-4"><div className="min-w-0 flex-1 basis-48"><h3 className="text-[15px] font-semibold tracking-[-0.012em]">{title}</h3>{sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}</div>{action}</div>
+  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pb-3 pt-[18px]"><div className="min-w-0 flex-1 basis-48"><h3 className="text-[15px] font-semibold leading-tight tracking-[-0.015em]">{title}</h3>{sub && <p className="mt-1 text-[12.5px] leading-snug text-muted">{sub}</p>}</div>{action}</div>
 /** The "View all" link used in card headers. */
-export const CardLink = ({ href, children = 'View all' }: { href: string; children?: ReactNode }) => <Link href={href} className="-my-2 inline-flex min-h-10 shrink-0 items-center text-[13px] font-medium text-primary hover:underline">{children}</Link>
+export const CardLink = ({ href, children = 'View all' }: { href: string; children?: ReactNode }) => <Link href={href} className="card-link -my-2 inline-flex min-h-10 shrink-0 items-center text-[13px] font-medium text-primary">{children}</Link>
 
 // one status palette for the whole product: subtle tint + readable text, never a saturated fill
+// a status reads as tint + inset hairline + (for plain text) a leading dot in the same colour
 const tone = {
-  neutral: 'bg-surface-2 text-muted', blue: 'bg-primary-soft text-primary', green: 'bg-success/10 text-success',
-  amber: 'bg-warning/10 text-warning', red: 'bg-danger/10 text-danger',
+  neutral: 'bg-surface-2 text-muted ring-border', blue: 'bg-primary-soft text-primary ring-primary/15', green: 'bg-success/[.08] text-success ring-success/20',
+  amber: 'bg-warning/[.08] text-warning ring-warning/20', red: 'bg-danger/[.07] text-danger ring-danger/20',
 }
 export type Tone = keyof typeof tone
-export const Badge = ({ tone: t = 'neutral', children, className }: { tone?: Tone; children: ReactNode; className?: string }) =>
-  <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium leading-5', tone[t], className)}>{children}</span>
+export const Badge = ({ tone: t = 'neutral', children, className }: { tone?: Tone; children: ReactNode; className?: string }) => {
+  const dot = t !== 'neutral' && (typeof children === 'string' || typeof children === 'number')
+  return <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-px text-xs font-medium leading-5 ring-1 ring-inset', tone[t], className)}>
+    {dot && <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80" />}{children}</span>
+}
 
 // KPI cards: a tinted icon tile (colour rotates along the row, red when the card signals a problem), label, value,
 // optional change vs the previous period and an optional mini bar series. The whole card opens the list behind it.
@@ -99,10 +109,11 @@ export function StatCard({ label, value, hint, href, tone: t = 'neutral', icon, 
   const Icon = icon ?? iconFor(label), tile = t === 'red' ? RED_TILE : TILES[index % TILES.length]
   const showChange = change !== undefined && change !== null
   // layout is CSS (globals.css .kpi): stacked on narrow cards, icon tile on the left with bars bottom-right once the card is wide enough
-  const inner = <div className={cn('stat kpi-in h-full min-w-0 rounded-xl border border-border bg-surface p-3.5 shadow-card sm:p-[18px]', href && 'transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-md')}>
-    <span className={cn('kpi-tile grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11', tile)} aria-hidden><Icon size={19} strokeWidth={1.9} /></span>
+  // resting: hairline + soft shadow; a card that links somewhere lifts 1 px with a deeper shadow on hover
+  const inner = <div className={cn('stat kpi-in h-full min-w-0 rounded-xl border border-border/80 bg-surface p-3.5 shadow-card sm:p-[18px]', href && 'transition-[border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px hover:border-border-strong/80 hover:shadow-lift')}>
+    <span className={cn('kpi-tile grid h-9 w-9 shrink-0 place-items-center rounded-lg shadow-[inset_0_0_0_1px_hsl(var(--fg)/.04)] sm:h-11 sm:w-11 sm:rounded-xl', tile)} aria-hidden><Icon size={19} strokeWidth={1.9} /></span>
     <span className="kpi-label min-w-0 text-[12.5px] font-medium leading-snug text-muted sm:text-[13px]">{label}</span>
-    <div className={cn('kpi-value text-[19px] font-bold leading-tight tabular-nums tracking-[-0.025em] [overflow-wrap:anywhere] sm:text-[22px]', valueTone[t])}>{value}</div>
+    <div className={cn('kpi-value text-[19px] font-semibold leading-tight tabular-nums tracking-[-0.03em] [overflow-wrap:anywhere] sm:text-[23px]', valueTone[t])}>{value}</div>
     {(showChange || hint) && <div className="kpi-hint flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted">
       {showChange && <span className={cn('inline-flex shrink-0 items-center gap-0.5 font-semibold tabular-nums', change >= 0 ? 'text-success' : 'text-danger')}>{change >= 0 ? <ArrowUp size={12} strokeWidth={2.5} aria-hidden /> : <ArrowDown size={12} strokeWidth={2.5} aria-hidden />}{Math.abs(change)}%</span>}
       {hint && <span className="min-w-0">{hint}</span>}</div>}
@@ -121,10 +132,11 @@ export function Metrics({ children, className, cols }: { children: ReactNode; cl
     {kids.map(k => isValidElement(k) && k.type === StatCard ? cloneElement(k as React.ReactElement<{ index?: number }>, { index: (k.props as { index?: number }).index ?? i++ }) : k)}</div>
 }
 
+/** Nothing here yet: the icon sits in a raised tile inside two fading rings, then a title, one line of help and the next step. */
 export function EmptyState({ title, body, action, icon: Icon = Inbox }: { title: string; body?: string; action?: ReactNode; icon?: LucideIcon }) {
-  return <div className="flex flex-col items-center justify-center gap-1.5 px-6 py-12 text-center">
-    <span className="mb-2 grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary" aria-hidden><Icon size={20} strokeWidth={1.75} /></span>
-    <p className="text-sm font-semibold">{title}</p>{body && <p className="max-w-sm text-sm text-muted">{body}</p>}{action && <div className="mt-3">{action}</div>}
+  return <div className="flex flex-col items-center justify-center px-6 py-12 text-center sm:py-14">
+    <span className="empty-rings relative mb-5 mt-2 grid h-12 w-12 place-items-center rounded-xl border border-border/80 bg-surface text-primary shadow-lift" aria-hidden><Icon size={21} strokeWidth={1.75} /></span>
+    <p className="text-[15px] font-semibold tracking-[-0.012em]">{title}</p>{body && <p className="mt-1.5 max-w-sm text-[13.5px] leading-relaxed text-muted">{body}</p>}{action && <div className="mt-5">{action}</div>}
   </div>
 }
 /** Page title row: optional breadcrumb trail, 24 px title, one line of context, actions on the right. */
@@ -132,14 +144,14 @@ export const PageHeader = ({ title, sub, actions, crumbs }: { title: string; sub
   <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
     <div className="min-w-0">
       {crumbs && crumbs.length > 0 && <nav aria-label="Breadcrumb" className="mb-1.5 hidden flex-wrap sm:flex items-center gap-1.5 text-[13px] text-muted">{crumbs.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span aria-hidden className="text-muted/60">›</span>}{c.href ? <Link href={c.href} className="hover:text-fg">{c.label}</Link> : <span className="text-fg">{c.label}</span>}</span>)}</nav>}
-      <h1 className="text-[24px] font-bold leading-tight tracking-[-0.025em]">{title}</h1>{sub && <p className="mt-1 hidden max-w-[72ch] text-sm text-muted sm:block">{sub}</p>}</div>
+      <h1 className="text-[24px] font-bold leading-[1.15] tracking-[-0.028em] sm:text-[26px] sm:font-semibold sm:tracking-[-0.032em]">{title}</h1>{sub && <p className="mt-1.5 hidden max-w-[72ch] text-[13.5px] text-muted sm:block">{sub}</p>}</div>
     {/* actions wrap onto a second line on phones rather than scrolling, so none is ever off-screen */}
     {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto [&>*]:shrink-0">{actions}</div>}</div>
 
 export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: ReactNode }) =>
   <div role={t === 'red' ? 'alert' : undefined} className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/25 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/25 bg-warning/5' : t === 'green' ? 'border-success/25 bg-success/5' : t === 'neutral' ? 'border-border bg-surface-2' : 'border-primary/20 bg-primary-soft')}>{children}</div>
 
-export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('h-11 whitespace-nowrap border-b border-border bg-surface-2/60 px-3 text-start text-[12.5px] font-medium text-muted first:ps-5 last:pe-5', className)}>{children}</th>
+export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('h-10 whitespace-nowrap border-b border-border bg-surface-2/50 px-3 text-start text-[12.5px] font-medium tracking-[0.005em] text-muted first:ps-5 last:pe-5', className)}>{children}</th>
 /** `badge`: on phone cards this cell (a status) sits at the top right, beside the record's title, instead of on its own line. */
 export const Td = ({ children, className, title, colSpan, badge }: { children?: ReactNode; className?: string; title?: string; colSpan?: number; badge?: boolean }) => <td title={title} colSpan={colSpan} data-card={badge ? 'badge' : undefined} className={cn('px-3 py-3 align-middle first:ps-5 last:pe-5', className)}>{children}</td>
 // relative: the scroll box is the containing block, so absolutely positioned children (sr-only labels) cannot widen the page

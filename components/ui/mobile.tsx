@@ -16,7 +16,7 @@ export function MList({ children, className }: { children: ReactNode; className?
 export function MRow({ href, lead, title, sub, line, right, rightSub, className }: {
   href?: string; lead?: ReactNode; title: ReactNode; sub?: ReactNode; line?: ReactNode; right?: ReactNode; rightSub?: ReactNode; className?: string
 }) {
-  return <li data-row-link={href ? '' : undefined} className={cn('flex items-center gap-3 px-4 py-3.5 active:bg-surface-2/70', className)}>
+  return <li data-row-link={href ? '' : undefined} className={cn('flex items-center gap-3 px-4 py-3.5 transition-colors duration-100 active:bg-surface-2/80', className)}>
     {lead && <span className="shrink-0">{lead}</span>}
     <div className="min-w-0 flex-1">
       {href ? <Link href={href} data-row-primary className="block truncate text-[15px] font-semibold leading-snug">{title}</Link> : <div className="truncate text-[15px] font-semibold leading-snug">{title}</div>}
@@ -45,8 +45,8 @@ export type TintKey = keyof typeof TINTS
 export function FilterTabs({ tabs, label, className }: { tabs: { href: string; label: string; active: boolean; count?: number }[]; label: string; className?: string }) {
   return <nav aria-label={label} className={cn('tabstrip flex gap-1 overflow-x-auto border-b border-border', className)}>
     {tabs.map(t => <Link key={t.href} href={t.href} aria-current={t.active ? 'page' : undefined} scroll={false}
-      className={cn('-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm transition-colors', t.active ? 'border-primary font-semibold text-primary' : 'border-transparent text-muted hover:text-fg')}>
-      {t.label}{t.count !== undefined && <span className={cn('ms-1.5 rounded-md px-1.5 text-[11px] tabular-nums', t.active ? 'bg-primary-soft' : 'bg-surface-2')}>{t.count}</span>}</Link>)}
+      className={cn('-mb-px inline-flex shrink-0 items-center whitespace-nowrap border-b-2 px-3 py-2.5 text-[13.5px] font-medium transition-[color,border-color] duration-150', t.active ? 'border-primary text-primary' : 'border-transparent text-muted hover:border-border-strong hover:text-fg')}>
+      {t.label}{t.count !== undefined && <span className={cn('ms-1.5 min-w-[20px] rounded-full px-1.5 text-center text-[11px] font-semibold leading-[18px] tabular-nums', t.active ? 'bg-primary text-primary-fg' : 'bg-surface-2 text-muted ring-1 ring-inset ring-border')}>{t.count}</span>}</Link>)}
   </nav>
 }
 
