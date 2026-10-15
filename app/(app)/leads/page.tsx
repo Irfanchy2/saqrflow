@@ -48,7 +48,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const lostCount: Record<string, number> = {}
   for (const l of leads as any[]) if (l.stage === 'lost' && l.lost_reason) lostCount[l.lost_reason] = (lostCount[l.lost_reason] ?? 0) + 1
   const lostBy = Object.entries(lostCount).sort((a, b) => b[1] - a[1])
-  const board: BoardLead[] = leads.map((l: any) => ({ id: l.id, number: l.number, company_name: l.company_name, contact_person: l.contact_person, phone: l.phone, service: l.service, estimated_value: l.estimated_value == null ? null : Number(l.estimated_value), stage: l.stage, next_followup: l.next_followup, salesperson: l.salesperson_id ? (names.get(l.salesperson_id)?.split(' ')[0] ?? null) : null }))
+  const board: BoardLead[] = leads.map((l: any) => ({ id: l.id, number: l.number, company_name: l.company_name, contact_person: l.contact_person, phone: l.phone, service: l.service, estimated_value: l.estimated_value == null ? null : Number(l.estimated_value), stage: l.stage, next_followup: l.next_followup, source: l.source, salesperson: l.salesperson_id ? (names.get(l.salesperson_id) ?? null) : null }))
   const userOpts = (users ?? []).map((u: any) => ({ id: u.id, name: u.full_name }))
   const filtered = !!(term || sp.source || sp.owner || sp.due || sp.stage)
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm hover:border-border-strong'
@@ -57,7 +57,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const maxLeads = Math.max(1, ...src.map(s => s.leads))
 
   return <>
-    <PageHeader title="Leads & Pipeline" sub="Every enquiry from first call to won job. Follow-ups remind you automatically." actions={<><SavedViews page="/leads" />{edit && add}</>} />
+    <PageHeader crumbs={[{ label: 'Sales' }, { label: 'CRM & Leads' }]} title="CRM & Leads" sub="Every enquiry from first call to won job. Follow-ups remind you automatically." actions={<><SavedViews page="/leads" />{edit && add}</>} />
     <Metrics className="mb-5" cols={5}>
       <StatCard label="Open leads" value={sum.open} hint={sum.unvalued ? `${sum.unvalued} without an estimated value` : undefined} />
       <StatCard label="Pipeline value" value={formatAed(sum.value)} hint="Open leads, excl. VAT" />

@@ -1,10 +1,10 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import Link from 'next/link'
-import { Children, type Ref } from 'react'
+import { Children, cloneElement, isValidElement, type Ref } from 'react'
 import { cn } from '@/lib/utils'
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Inbox } from 'lucide-react'
+import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, CalendarClock, Users, FileText, Truck, Landmark, TrendingUp, BarChart3, Receipt, Clock, CheckCircle2, ShieldCheck, Package, Wrench, MapPinned, ArrowUp, ArrowDown } from 'lucide-react'
 
 /*
  * Averiqo design system primitives.
@@ -14,12 +14,13 @@ import { Inbox } from 'lucide-react'
 const button = cva('inline-flex cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 active:translate-y-px whitespace-nowrap select-none', {
   variants: {
     variant: {
-      primary: 'bg-primary text-primary-fg shadow-btn hover:bg-primary/[.92]',
+      primary: 'bg-ink text-ink-fg shadow-btn hover:bg-ink/90',
       secondary: 'border border-border bg-surface text-fg shadow-sm hover:border-border-strong hover:bg-surface-2/70',
+      blue: 'bg-primary text-primary-fg shadow-btn hover:bg-primary/90',
       ghost: 'text-muted hover:bg-surface-2 hover:text-fg',
       danger: 'bg-danger text-white shadow-btn hover:bg-danger/90',
     },
-    size: { sm: 'h-10 px-3 sm:h-8', md: 'h-11 px-4 sm:h-9 sm:px-3.5', icon: 'h-11 w-11 sm:h-9 sm:w-9' },
+    size: { sm: 'h-10 px-3 sm:h-8', md: 'h-11 px-4 sm:h-10 sm:px-4', icon: 'h-11 w-11 sm:h-10 sm:w-10' },
   },
   defaultVariants: { variant: 'primary', size: 'md' },
 })
@@ -36,8 +37,8 @@ const field = 'w-full rounded-md border border-border bg-surface px-3 text-sm te
 // Arabic UI, an Arabic address line aligns right inside the English UI) instead of inheriting the page direction.
 const TEXTUAL = new Set([undefined, 'text', 'search', 'email', 'tel', 'url', 'password'])
 export const Input = ({ className, dir, type, ...p }: InputHTMLAttributes<HTMLInputElement>) =>
-  <input type={type} dir={dir ?? (TEXTUAL.has(type) ? 'auto' : undefined)} className={cn(field, 'h-11 text-start sm:h-9', className)} {...p} />
-export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'h-11 cursor-pointer pe-8 sm:h-9', className)} {...p} />
+  <input type={type} dir={dir ?? (TEXTUAL.has(type) ? 'auto' : undefined)} className={cn(field, 'h-11 text-start sm:h-10', className)} {...p} />
+export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'h-11 cursor-pointer pe-8 sm:h-10', className)} {...p} />
 export const Textarea = ({ className, dir, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) =>
   <textarea dir={dir ?? 'auto'} className={cn(field, 'min-h-[84px] resize-y px-3 py-2 text-start leading-[1.55] [overflow-wrap:anywhere] [unicode-bidi:plaintext] whitespace-pre-wrap', className)} {...p} />
 
@@ -55,58 +56,92 @@ export function FormSection({ title, sub, children, className }: { title: string
     <div className="clear-left">{children}</div></fieldset>
 }
 
-export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('rounded-lg border border-border bg-surface shadow-card', className)} {...p} />
+export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('rounded-xl border border-border bg-surface shadow-card', className)} {...p} />
+/** Card title row: 15 px title, optional line of help, an action (usually a "View all" link) on the right. No divider: content follows directly. */
 export const CardHeader = ({ title, action, sub }: { title: string; action?: ReactNode; sub?: string }) =>
-  <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border px-4 py-3"><div className="min-w-0 flex-1 basis-48"><h3 className="text-[14px] font-semibold tracking-[-0.01em]">{title}</h3>{sub && <p className="mt-px text-xs text-muted">{sub}</p>}</div>{action}</div>
+  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pb-3 pt-4"><div className="min-w-0 flex-1 basis-48"><h3 className="text-[15px] font-semibold tracking-[-0.012em]">{title}</h3>{sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}</div>{action}</div>
+/** The "View all" link used in card headers. */
+export const CardLink = ({ href, children = 'View all' }: { href: string; children?: ReactNode }) => <Link href={href} className="shrink-0 text-[13px] font-medium text-primary hover:underline">{children}</Link>
 
 // one status palette for the whole product: subtle tint + readable text, never a saturated fill
 const tone = {
-  neutral: 'bg-surface-2 text-muted ring-border', blue: 'bg-primary-soft text-primary ring-primary/15', green: 'bg-success/10 text-success ring-success/15',
-  amber: 'bg-warning/10 text-warning ring-warning/20', red: 'bg-danger/10 text-danger ring-danger/15',
+  neutral: 'bg-surface-2 text-muted', blue: 'bg-primary-soft text-primary', green: 'bg-success/10 text-success',
+  amber: 'bg-warning/10 text-warning', red: 'bg-danger/10 text-danger',
 }
 export type Tone = keyof typeof tone
 export const Badge = ({ tone: t = 'neutral', children, className }: { tone?: Tone; children: ReactNode; className?: string }) =>
-  <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-[5px] px-1.5 py-px text-xs font-medium leading-5 ring-1 ring-inset', tone[t], className)}>{children}</span>
+  <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium leading-5', tone[t], className)}>{children}</span>
 
-// only a problem colours a number; other tones are informational and stay neutral so colour keeps its meaning
-const valueTone: Partial<Record<Tone, string>> = { red: 'text-danger' }
-/**
- * A single metric. `tone` only colours the value when it signals a problem (red); icons are accepted for
- * compatibility but not drawn: a label already says what the number is. Place several inside <Metrics> for a ruled strip.
- */
-export function StatCard({ label, value, hint, href, tone: t = 'neutral' }: { label: string; value: ReactNode; hint?: string; icon?: LucideIcon; href?: string; tone?: Tone }) {
-  const inner = <div className={cn('stat h-full rounded-lg border border-border bg-surface px-3.5 py-3 sm:px-4 sm:py-3.5', href && 'transition-colors hover:border-border-strong hover:bg-surface-2/40')}>
-    <div className="text-xs font-medium text-muted">{label}</div>
-    <div className={cn('mt-1 break-words text-lg font-semibold leading-tight tabular-nums tracking-[-0.01em] sm:text-xl', valueTone[t])}>{value}</div>
-    {hint && <div className="mt-0.5 truncate text-xs text-muted" title={hint}>{hint}</div>}
-  </div>
-  return href ? <Link href={href} className="block h-full rounded-lg focus-visible:ring-offset-0">{inner}</Link> : inner
+// KPI cards: a tinted icon tile (colour rotates along the row, red when the card signals a problem), label, value,
+// optional change vs the previous period and an optional mini bar series. The whole card opens the list behind it.
+const TILES = ['bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300', 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300',
+  'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300', 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
+  'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300', 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300']
+const BARS = ['bg-blue-500', 'bg-orange-400', 'bg-emerald-500', 'bg-violet-500', 'bg-sky-500', 'bg-amber-500']
+const RED_TILE = 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300'
+// a sensible icon from the label when the caller passes none
+const ICON_RULES: [RegExp, LucideIcon][] = [[/overdue|late|expired|risk|blocked/i, AlertTriangle], [/expir|renewal|due/i, CalendarClock], [/collect|paid|payment|received/i, Banknote],
+  [/receivable|outstanding|balance|owed|cost|spend|expense|budget/i, Wallet], [/invoice|sales|revenue|billed|quot/i, Receipt], [/lead|pipeline|opportunit/i, Target], [/project|job/i, HardHat],
+  [/task|to.?do/i, ListTodo], [/employee|staff|people|user|team|member/i, Users], [/document|file|record|page/i, FileText], [/vehicle|asset|fleet|equipment/i, Truck],
+  [/cheque|bank/i, Landmark], [/rate|%|margin|growth|conversion|win/i, TrendingUp], [/hour|time|day|week/i, Clock], [/done|complete|closed|approved|resolved|won/i, CheckCircle2],
+  [/compliance|permit|licen|warranty/i, ShieldCheck], [/item|catalog|stock|product/i, Package], [/ticket|service|repair|maint/i, Wrench], [/visit|site|location/i, MapPinned]]
+const iconFor = (label: string) => ICON_RULES.find(([r]) => r.test(label))?.[1] ?? BarChart3
+
+/** Small bar series for a KPI card (e.g. last 8 months). Server-rendered, decorative: the card's text carries the numbers. */
+export function MiniBars({ values, className }: { values: number[]; className?: string }) {
+  const max = Math.max(...values, 0)
+  if (!values.length || max <= 0) return null
+  return <span aria-hidden className="flex h-8 shrink-0 items-end gap-[3px]">{values.map((v, i) => <span key={i} className={cn('w-[5px] rounded-sm', className, i === values.length - 1 ? 'opacity-100' : 'opacity-35')} style={{ height: `${Math.max(10, (v / max) * 100)}%` }} />)}</span>
 }
-/** Ruled strip of metrics in one container (instead of a field of floating cards). Columns follow the number of metrics. */
+
+const valueTone: Partial<Record<Tone, string>> = { red: 'text-danger' }
+export function StatCard({ label, value, hint, href, tone: t = 'neutral', icon, change, bars, index = 0 }: { label: string; value: ReactNode; hint?: ReactNode; icon?: LucideIcon; href?: string; tone?: Tone; change?: number | null; bars?: number[]; index?: number }) {
+  const Icon = icon ?? iconFor(label), tile = t === 'red' ? RED_TILE : TILES[index % TILES.length]
+  const showChange = change !== undefined && change !== null
+  const inner = <div className={cn('stat flex h-full min-w-0 flex-col rounded-xl border border-border bg-surface p-3.5 shadow-card sm:p-[18px]', href && 'transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-md')}>
+    <div className="flex min-w-0 items-center gap-3">
+      <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10', tile)} aria-hidden><Icon size={18} strokeWidth={1.9} /></span>
+      <span className="min-w-0 flex-1 text-[12.5px] font-medium leading-snug text-muted sm:text-[13px]">{label}</span></div>
+    <div className={cn('mt-2.5 text-[19px] font-bold leading-tight sm:mt-3 sm:text-[22px] tabular-nums tracking-[-0.025em] [overflow-wrap:anywhere]', valueTone[t])}>{value}</div>
+    {(showChange || hint || bars) && <div className="mt-auto flex min-w-0 items-end justify-between gap-3 pt-1.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted">
+        {showChange && <span className={cn('inline-flex shrink-0 items-center gap-0.5 font-semibold tabular-nums', change >= 0 ? 'text-success' : 'text-danger')}>{change >= 0 ? <ArrowUp size={12} strokeWidth={2.5} aria-hidden /> : <ArrowDown size={12} strokeWidth={2.5} aria-hidden />}{Math.abs(change)}%</span>}
+        {hint && <span className="min-w-0">{hint}</span>}</div>
+      {bars && <MiniBars values={bars} className={t === 'red' ? 'bg-rose-500' : BARS[index % BARS.length]} />}
+    </div>}
+  </div>
+  return href ? <Link href={href} className="block h-full rounded-xl focus-visible:ring-offset-0">{inner}</Link> : inner
+}
+/** A row of KPI cards. Columns follow the number of cards; each card gets the next tile colour. */
 export function Metrics({ children, className, cols }: { children: ReactNode; className?: string; cols?: 2 | 3 | 4 | 5 | 6 }) {
-  const n = cols ?? (Math.min(6, Math.max(2, Children.toArray(children).filter(Boolean).length)) as 2 | 3 | 4 | 5 | 6)
-  const lg = { 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-5', 6: 'lg:grid-cols-6' }[n]
-  return <div className={cn('metrics overflow-hidden rounded-lg border border-border bg-surface', className)}>
-    <div className={cn('-mb-px -me-px grid grid-cols-2', n >= 3 && 'md:grid-cols-3', lg)}>{children}</div></div>
+  const kids = Children.toArray(children).filter(Boolean)
+  const n = cols ?? (Math.min(6, Math.max(2, kids.length)) as 2 | 3 | 4 | 5 | 6)
+  const lg = { 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-3 xl:grid-cols-5', 6: 'lg:grid-cols-3 2xl:grid-cols-6' }[n]
+  let i = 0
+  return <div className={cn('metrics grid grid-cols-2 gap-3 sm:gap-4', n >= 3 && 'md:grid-cols-3', lg, className)}>
+    {kids.map(k => isValidElement(k) && k.type === StatCard ? cloneElement(k as React.ReactElement<{ index?: number }>, { index: (k.props as { index?: number }).index ?? i++ }) : k)}</div>
 }
 
 export function EmptyState({ title, body, action, icon: Icon = Inbox }: { title: string; body?: string; action?: ReactNode; icon?: LucideIcon }) {
   return <div className="flex flex-col items-center justify-center gap-1.5 px-6 py-12 text-center">
-    <span className="mb-2 grid h-10 w-10 place-items-center rounded-lg border border-border bg-surface-2/70 text-muted" aria-hidden><Icon size={18} strokeWidth={1.75} /></span>
+    <span className="mb-2 grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary" aria-hidden><Icon size={20} strokeWidth={1.75} /></span>
     <p className="text-sm font-semibold">{title}</p>{body && <p className="max-w-sm text-sm text-muted">{body}</p>}{action && <div className="mt-3">{action}</div>}
   </div>
 }
-export const PageHeader = ({ title, sub, actions }: { title: string; sub?: string; actions?: ReactNode }) =>
+/** Page title row: optional breadcrumb trail, 24 px title, one line of context, actions on the right. */
+export const PageHeader = ({ title, sub, actions, crumbs }: { title: string; sub?: string; actions?: ReactNode; crumbs?: { label: string; href?: string }[] }) =>
   <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-    <div className="min-w-0"><h1 className="text-[22px] font-semibold leading-tight tracking-[-0.022em]">{title}</h1>{sub && <p className="mt-1 max-w-[72ch] text-sm text-muted">{sub}</p>}</div>
+    <div className="min-w-0">
+      {crumbs && crumbs.length > 0 && <nav aria-label="Breadcrumb" className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[13px] text-muted">{crumbs.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span aria-hidden className="text-muted/60">›</span>}{c.href ? <Link href={c.href} className="hover:text-fg">{c.label}</Link> : <span className="text-fg">{c.label}</span>}</span>)}</nav>}
+      <h1 className="text-[22px] font-bold leading-tight tracking-[-0.025em] sm:text-[24px]">{title}</h1>{sub && <p className="mt-1 max-w-[72ch] text-sm text-muted">{sub}</p>}</div>
     <div className="flex flex-wrap items-center gap-2">{actions}</div></div>
 
 export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: ReactNode }) =>
   <div role={t === 'red' ? 'alert' : undefined} className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/25 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/25 bg-warning/5' : t === 'green' ? 'border-success/25 bg-success/5' : t === 'neutral' ? 'border-border bg-surface-2' : 'border-primary/20 bg-primary-soft')}>{children}</div>
 
-export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('h-10 whitespace-nowrap border-b border-border bg-surface-2/50 px-3 text-start text-[12px] font-medium text-muted first:ps-4 last:pe-4', className)}>{children}</th>
+export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('h-11 whitespace-nowrap border-b border-border bg-surface-2/60 px-3 text-start text-[12.5px] font-medium text-muted first:ps-5 last:pe-5', className)}>{children}</th>
 /** `badge`: on phone cards this cell (a status) sits at the top right, beside the record's title, instead of on its own line. */
-export const Td = ({ children, className, title, colSpan, badge }: { children?: ReactNode; className?: string; title?: string; colSpan?: number; badge?: boolean }) => <td title={title} colSpan={colSpan} data-card={badge ? 'badge' : undefined} className={cn('px-3 py-3 align-middle first:ps-4 last:pe-4', className)}>{children}</td>
+export const Td = ({ children, className, title, colSpan, badge }: { children?: ReactNode; className?: string; title?: string; colSpan?: number; badge?: boolean }) => <td title={title} colSpan={colSpan} data-card={badge ? 'badge' : undefined} className={cn('px-3 py-3 align-middle first:ps-5 last:pe-5', className)}>{children}</td>
 // relative: the scroll box is the containing block, so absolutely positioned children (sr-only labels) cannot widen the page
 export { TableWrap } from './table-wrap'
 

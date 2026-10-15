@@ -18,7 +18,9 @@ export function RowNavigator() {
       const row = t.closest('.rtable tbody tr, [data-row-link]')
       if (!row || row.closest('[data-rows-off]')) return null
       if (window.getSelection()?.toString()) return null
-      return row.querySelector<HTMLAnchorElement>('a[data-row-primary]') ?? row.querySelector<HTMLAnchorElement>('a[href]:not([href^="/api/"]):not([target]):not([download])')
+      // a primary link can be hidden at some widths (e.g. "preview" only on wide screens): use the first one that is visible
+      const shown = (a: HTMLAnchorElement) => a.getClientRects().length > 0
+      return [...row.querySelectorAll<HTMLAnchorElement>('a[data-row-primary]')].find(shown) ?? row.querySelector<HTMLAnchorElement>('a[href]:not([href^="/api/"]):not([target]):not([download])')
     }
     const click = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0) return

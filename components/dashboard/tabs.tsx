@@ -10,10 +10,10 @@ export function CardTabs({ tabs, action, id }: { tabs: { key: string; label: str
   const cur = tabs.find(t => t.key === on) ?? tabs[0]
   if (!cur) return null
   return <div>
-    <div className="flex min-h-[52px] items-end justify-between gap-3 border-b border-border px-4">
-      <div role="tablist" className="-mb-px flex min-w-0 gap-5 overflow-x-auto">
+    <div className="flex min-h-[54px] items-end justify-between gap-3 border-b border-border px-5">
+      <div role="tablist" className="tabstrip -mb-px flex min-w-0 gap-6 overflow-x-auto">
         {tabs.map(t => <button key={t.key} role="tab" type="button" aria-selected={t.key === cur.key} aria-controls={`${id}-${t.key}`} onClick={() => setOn(t.key)}
-          className={cn('relative shrink-0 cursor-pointer whitespace-nowrap pb-3 pt-3.5 text-[13.5px] font-medium transition-colors', t.key === cur.key ? 'text-fg' : 'text-muted hover:text-fg')}>
+          className={cn('relative shrink-0 cursor-pointer whitespace-nowrap pb-3 pt-4 text-[14px] font-medium transition-colors', t.key === cur.key ? 'font-semibold text-primary' : 'text-muted hover:text-fg')}>
           {t.label}{t.count ? <span className="ms-1.5 rounded bg-surface-2 px-1 text-[11px] tabular-nums text-muted">{t.count}</span> : null}
           {t.key === cur.key && <m.span layoutId={`${id}-ul`} transition={T.base} className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-primary" aria-hidden />}
         </button>)}

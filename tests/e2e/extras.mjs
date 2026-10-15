@@ -135,7 +135,7 @@ try {
   console.log('\n[6] Sign-out wipes device drafts')
   await p.goto(`${BASE}/tickets?new=ticket`); await settle(); await dlg().getByLabel('Issue *').fill('Draft that must not survive sign-out'); await p.waitForTimeout(700); await p.keyboard.press('Escape')
   ok((await drafts(p)).length > 0, 'a draft exists before signing out')
-  await p.locator('form[data-signout] button >> visible=true').first().click(); await p.waitForURL(/\/login/); await settle()
+  await p.getByRole('button', { name: /^Account:/ }).click(); await p.locator('form[data-signout] button >> visible=true').first().click(); await p.waitForURL(/\/login/); await settle()
   ok((await drafts(p)).length === 0, 'signing out removes every draft from this device')
 } catch (e) {
   ok(false, `aborted: ${e.message.split('\n').slice(0, 12).join(' | ')}`); await p.screenshot({ path: `${OUT}/abort.png`, fullPage: true }).catch(() => {})
