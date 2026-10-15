@@ -36,13 +36,12 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     c.supabase.from('profiles').select('id,full_name').eq('is_active', true).order('full_name'),
     w.quotation_id && c.can('finance.view') ? c.supabase.from('invoices').select('id,number').eq('id', w.quotation_id).maybeSingle() : Promise.resolve({ data: null }),
     edit ? Promise.all([
-      c.supabase.from('customers').select('id,name').order('name').limit(2000),
       c.supabase.from('projects').select('id,name').order('name').limit(500),
       c.supabase.from('employees').select('id,full_name').neq('status', 'archived').order('full_name').limit(1000),
       c.supabase.from('assets').select('id,name,plate_or_serial').is('archived_at', null).not('status', 'in', '(sold,disposed,retired)').order('name').limit(1000),
     ]) : Promise.resolve(null),
   ])
-  const [customers, projects, employees, assets] = opts ? opts.map(r => r.data ?? []) : [[], [], [], []]
+  const [projects, employees, assets] = opts ? opts.map(r => r.data ?? []) : [[], [], []]
   const o = (rows: any[], label: (r: any) => string) => rows.map(r => ({ id: r.id, name: label(r) }))
   const names = new Map((users ?? []).map((u: any) => [u.id, u.full_name as string]))
   const pct = tasksCompletion(tasks ?? []), st = WO_STATUS[w.status]
@@ -69,7 +68,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         {edit && next && <ActionButton size="md" variant="primary" action={setWorkOrderStatus.bind(null, id, next)}>Move to {WO_STATUS[next].label}</ActionButton>}
         {edit && !['on_hold', 'completed', 'cancelled'].includes(w.status) && <ActionButton size="md" action={setWorkOrderStatus.bind(null, id, 'on_hold')}>Put on hold</ActionButton>}
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit work order" icon={<Pencil size={14} />}><ActionForm action={updateWorkOrder.bind(null, id)} resetOnSuccess={false}>
-          <WorkOrderFields w={w} customers={o(customers, (x: any) => x.name)} projects={o(projects, (x: any) => x.name)} users={userOpts} /></ActionForm></DialogButton>}
+          <WorkOrderFields w={w} projects={o(projects, (x: any) => x.name)} users={userOpts} /></ActionForm></DialogButton>}
         {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'work_order', id)} confirm="Move this work order to the trash? Its tasks stay with it and it can be restored."><Trash2 size={14} />Delete</ActionButton>}
       </div>
     </div>

@@ -52,6 +52,8 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
 }) {
   const t = doc.doc_type as SalesType, meta = DOC_META[t], isTax = isTaxDoc(t), isInv = t === 'invoice', isQtn = t === 'quotation', isDn = t === 'delivery_note', isCn = t === 'credit_note'
   const draft = doc.status === 'draft'
+  // customers this document knows about (its own + the open projects'); picking a searched one adds it
+  const [known, setKnown] = useState<CustomerOpt[]>(customers)
   const [head, setHead] = useState<Head>(() => ({
     customer_id: doc.customer_id, new_customer: false, project_id: doc.project_id, salesperson_id: doc.salesperson_id ?? null,
     issue_date: doc.issue_date, due_date: doc.due_date ?? '', valid_until: doc.valid_until ?? '',
@@ -195,6 +197,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   }
   // picking a customer copies their details into THIS document; edits here never change the customer record unless “update” is ticked
   const pickCustomer = (cu: CustomerOpt | null) => {
+    if (cu) setKnown(k => k.some(x => x.id === cu.id) ? k : [...k, cu])
     setHead(h => cu ? { ...h, customer_id: cu.id, new_customer: false, update_customer: false, customer_name: cu.name, customer_address: cu.address ?? '', customer_trn: cu.trn ?? '', customer_phone: cu.phone ?? '', customer_email: cu.email ?? '', attention: cu.contact_person ?? h.attention }
       : { ...h, customer_id: null, update_customer: false })
     touch()
@@ -202,7 +205,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const pickProject = (id: string) => {
     const p = projects.find(x => x.id === id)
     setHead(h => ({ ...h, project_id: id || null, site: p?.location && !h.site ? p.location : h.site }))
-    if (p?.customer_id && !head.customer_id) pickCustomer(customers.find(c => c.id === p.customer_id) ?? null)
+    if (p?.customer_id && !head.customer_id) pickCustomer(known.find(c => c.id === p.customer_id) ?? null)
     touch()
   }
   const addFromCatalog = (c: CatalogOpt) => {
@@ -215,7 +218,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
     if (cur.trim() && !window.confirm(`Replace the current ${kind === 'terms' ? 'terms and conditions' : 'payment terms'} with “${tpl.name}”?`)) return
     set(kind === 'terms' ? 'termsText' : 'paymentText', tpl.lines.join('\n'))
   }
-  const customer = customers.find(c => c.id === head.customer_id)
+  const customer = known.find(c => c.id === head.customer_id)
   const amountTxt = meta.priced ? ` for AED ${fmtMoney(tot.total)}` : ''
   const mail = `mailto:${encodeURIComponent(head.customer_email || customer?.email || '')}?subject=${encodeURIComponent(`${meta.label} ${doc.number}${head.subject ? ': ' + head.subject : ''}`)}&body=${encodeURIComponent(
     `Dear ${head.attention || 'Sir/Madam'},\n\nPlease find attached our ${meta.label.toLowerCase()} ${doc.number}${amountTxt}.\n\nKind regards,\n${branding.companyName}`)}`
@@ -302,7 +305,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
         <fieldset disabled={!editable} className="contents">
           <Section icon={Building2} title={isDn ? 'Customer & delivery' : 'Customer'} sub={`${meta.label} recipient`}>
             <F label="Customer">
-              <CustomerPicker customers={customers} value={head.customer_id} onPick={pickCustomer} disabled={!editable} />
+              <CustomerPicker customers={known} value={head.customer_id} onPick={pickCustomer} disabled={!editable} />
             </F>
             <div className="grid gap-3 sm:grid-cols-2">
               <F label="Customer / company name" error={err('customer_name')}><Input value={head.customer_name ?? ''} onChange={e => set('customer_name', e.target.value)} placeholder="e.g. ABC Contracting LLC" /></F>

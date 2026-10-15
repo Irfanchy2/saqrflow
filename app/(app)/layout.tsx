@@ -17,6 +17,7 @@ import { Suspense } from 'react'
 import { MotionRoot } from '@/components/motion'
 import { MenuButton } from '@/components/layout/menu-button'
 import { StripEdges } from '@/components/layout/strip-edges'
+import { NavPending } from '@/components/layout/nav-pending'
 import { RowNavigator } from '@/components/layout/row-navigator'
 import { UserMenu, TopThemeToggle } from '@/components/layout/user-menu'
 import { AveriqoMark } from '@/components/brand/logo'
@@ -91,7 +92,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="mx-1.5 hidden h-7 w-px bg-border sm:block" aria-hidden />
           <UserMenu name={c.profile.full_name} role={c.profile.role} company={c.company.name} />
         </div></header>
-      <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 has-[.fab]:pb-[calc(10rem+env(safe-area-inset-bottom))] has-[.dock]:pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:px-8 lg:!pb-10">{children}</main>
+      <main id="main" tabIndex={-1} className="relative mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 has-[.fab]:pb-[calc(10rem+env(safe-area-inset-bottom))] has-[.dock]:pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:px-8 lg:!pb-10"><Suspense><NavPending /></Suspense>{children}</main>
     </div><BottomNav items={visible} /><Suspense><NavProgress /></Suspense><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
       ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),

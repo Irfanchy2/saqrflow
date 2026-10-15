@@ -1,3 +1,4 @@
+import { CustomerSelect, RemoteSelect } from '@/components/ui/customer-select'
 import { Field, FormSection, Input, Select, Textarea } from '@/components/ui/primitives'
 import { LEAD_SOURCES, LEAD_STAGES, LOST_REASONS, PRIORITY, SERVICES, TASK_STATUS, VISIT_STATUS, WO_STATUS } from '@/lib/crm'
 
@@ -62,12 +63,12 @@ export function VisitFields({ v = {}, leads, customers, projects, employees, fix
   </div>
 }
 
-export function WorkOrderFields({ w = {}, customers, projects, users, fixedProject }: { w?: Record<string, any>; customers: Opt[]; projects: Opt[]; users: Opt[]; fixedProject?: string }) {
+export function WorkOrderFields({ w = {}, customers, projects, users, fixedProject }: { w?: Record<string, any>; customers?: Opt[]; projects: Opt[]; users: Opt[]; fixedProject?: string }) {
   return <div className="space-y-5">
     <FormSection title="Job"><div className="grid gap-4 sm:grid-cols-2">
       <Field label="Title *" className="sm:col-span-2"><Input name="title" required maxLength={200} defaultValue={w.title} placeholder="e.g. Fabricate and install main staircase" /></Field>
       {fixedProject ? <input type="hidden" name="project_id" value={fixedProject} /> : <Field label="Project"><Select name="project_id" defaultValue={w.project_id ?? ''}>{opts(projects, 'None')}</Select></Field>}
-      <Field label="Customer" hint={fixedProject ? 'Taken from the project when blank' : undefined}><Select name="customer_id" defaultValue={w.customer_id ?? ''}>{opts(customers, 'None')}</Select></Field>
+      <Field label="Customer" hint={fixedProject ? 'Taken from the project when blank' : undefined}>{customers ? <Select name="customer_id" defaultValue={w.customer_id ?? ''}>{opts(customers, 'None')}</Select> : <CustomerSelect defaultValue={w.customer_id} defaultLabel={w.customer_name ?? w.customer?.name} none="None" />}</Field>
       {w.quotation_id && <input type="hidden" name="quotation_id" value={w.quotation_id} />}
       <Field label="Site location"><Input name="site_location" maxLength={300} defaultValue={w.site_location ?? ''} /></Field>
       <Field label="Responsible manager"><Select name="manager_id" defaultValue={w.manager_id ?? ''}>{opts(users, 'Me')}</Select></Field>
@@ -84,15 +85,15 @@ export function WorkOrderFields({ w = {}, customers, projects, users, fixedProje
   </div>
 }
 
-export function TaskFields({ t = {}, users, employees, projects, fixed, canAssign = true }: { t?: Record<string, any>; users: Opt[]; employees: Opt[]; projects: Opt[]; fixed?: { project_id?: string; work_order_id?: string; related_type?: string; related_id?: string }; canAssign?: boolean }) {
+export function TaskFields({ t = {}, users, employees, projects, fixed, canAssign = true }: { t?: Record<string, any>; users?: Opt[]; employees?: Opt[]; projects: Opt[]; fixed?: { project_id?: string; work_order_id?: string; related_type?: string; related_id?: string }; canAssign?: boolean }) {
   const f = fixed ?? {}
   return <div className="grid gap-4 sm:grid-cols-2">
     <Field label="Task *" className="sm:col-span-2"><Input name="title" required maxLength={200} defaultValue={t.title} placeholder="e.g. Cut and weld stringers" /></Field>
     {f.project_id ? <input type="hidden" name="project_id" value={f.project_id} /> : <Field label="Project"><Select name="project_id" defaultValue={t.project_id ?? ''}>{opts(projects, 'None')}</Select></Field>}
     {f.work_order_id && <input type="hidden" name="work_order_id" value={f.work_order_id} />}
     {(f.related_type ?? t.related_type) && <><input type="hidden" name="related_type" value={f.related_type ?? t.related_type} /><input type="hidden" name="related_id" value={f.related_id ?? t.related_id} /></>}
-    {canAssign ? <Field label="Assigned to (user)" hint="Gets an in-app notification"><Select name="owner_id" defaultValue={t.owner_id ?? ''}>{opts(users, 'Me')}</Select></Field> : <input type="hidden" name="owner_id" value={t.owner_id ?? ''} />}
-    <Field label="Worker / employee" hint="Field staff without a login"><Select name="employee_id" defaultValue={t.employee_id ?? ''}>{opts(employees)}</Select></Field>
+    {canAssign ? <Field label="Assigned to (user)" hint="Gets an in-app notification">{users ? <Select name="owner_id" defaultValue={t.owner_id ?? ''}>{opts(users, 'Me')}</Select> : <RemoteSelect kind="users" name="owner_id" defaultValue={t.owner_id} defaultLabel={t.owner?.full_name} none="Me" />}</Field> : <input type="hidden" name="owner_id" value={t.owner_id ?? ''} />}
+    <Field label="Worker / employee" hint="Field staff without a login">{employees ? <Select name="employee_id" defaultValue={t.employee_id ?? ''}>{opts(employees)}</Select> : <RemoteSelect kind="employees" name="employee_id" defaultValue={t.employee_id} defaultLabel={t.employee?.full_name} none="Not set" />}</Field>
     <Field label="Start date"><Input name="start_date" type="date" defaultValue={t.start_date ?? ''} /></Field>
     <Field label="Due date"><Input name="due_date" type="date" defaultValue={t.due_date ?? ''} /></Field>
     <Field label="Priority"><Select name="priority" defaultValue={t.priority ?? 'normal'}>{Object.entries(PRIORITY).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}</Select></Field>

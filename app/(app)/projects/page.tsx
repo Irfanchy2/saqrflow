@@ -24,7 +24,8 @@ export default async function Projects({ searchParams }: { searchParams: Promise
   if (status === 'open') q = q.in('status', ['planning', 'active', 'on_hold']); else if (status) q = q.eq('status', status)
   if (term) q = q.or(`name.ilike.%${term}%,code.ilike.%${term}%,location.ilike.%${term}%`)
   // only the figures for the projects on screen (not every invoice / expense in the company)
-  const [{ data: projects }, { data: customers }] = await Promise.all([q, c.supabase.from('customers').select('id,name').order('name').limit(1000)])
+  // the New project form loads its customer list when it is opened (CustomerSelect), not with the list page
+  const { data: projects } = await q
   const pids = (projects ?? []).map((p: any) => p.id)
   const [{ data: invs }, { data: exps }, { data: ms }] = pids.length ? await Promise.all([
     fin ? c.supabase.from('invoices').select('id,project_id,doc_type,status,total').in('project_id', pids).eq('doc_type', 'invoice') : Promise.resolve({ data: [] as any[] }),
@@ -42,7 +43,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
 
   return <>
     <PageHeader title="Projects" sub="Fabrication & site progress, milestones, costs and billing for every job."
-      actions={<><SavedViews page="/projects" />{c.can('records.edit') ? <DialogButton wide openParam="project" label="New project" title="New project" icon={<Plus size={15} />}><ActionForm action={createProject} submit="Create project"><ProjectFields customers={customers ?? []} /></ActionForm></DialogButton> : null}</>} />
+      actions={<><SavedViews page="/projects" />{c.can('records.edit') ? <DialogButton wide openParam="project" label="New project" title="New project" icon={<Plus size={15} />}><ActionForm action={createProject} submit="Create project"><ProjectFields /></ActionForm></DialogButton> : null}</>} />
     <Metrics className="mb-5" cols={4}>
       <StatCard label="Active projects" value={active.length} hint={`${rows.length} shown`} icon={HardHat} tone="blue" />
       {fin && <StatCard label="Active contract value" value={formatAed(active.reduce((s, r) => s + Number(r.contract_value ?? 0), 0))} icon={Briefcase} />}

@@ -36,15 +36,14 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
     c.supabase.from('work_orders').select('id', head).in('status', ACTIVE).lt('target_date', c.today),
     c.supabase.from('work_orders').select('id', head).in('status', ACTIVE).eq('priority', 'urgent'),
     edit ? Promise.all([
-      c.supabase.from('customers').select('id,name').order('name').limit(2000),
       c.supabase.from('projects').select('id,name').in('status', ['planning', 'active', 'on_hold']).order('name').limit(500),
       c.supabase.from('profiles').select('id,full_name').eq('is_active', true).order('full_name'),
     ]) : Promise.resolve(null),
   ])
-  const [customers, projects, users] = opts ? opts.map(r => r.data ?? []) : [[], [], []]
+  const [projects, users] = opts ? opts.map(r => r.data ?? []) : [[], []]
   const names = new Map(users.map((u: any) => [u.id, u.full_name as string]))
   const add = <DialogButton wide label="New work order" title="New work order" icon={<Plus size={15} />} openParam="work_order"><ActionForm action={createWorkOrder} submit="Create work order" idempotent>
-    <WorkOrderFields customers={customers.map((x: any) => ({ id: x.id, name: x.name }))} projects={projects.map((x: any) => ({ id: x.id, name: x.name }))} users={users.map((u: any) => ({ id: u.id, name: u.full_name }))} w={{ start_date: c.today }} /></ActionForm></DialogButton>
+    <WorkOrderFields projects={projects.map((x: any) => ({ id: x.id, name: x.name }))} users={users.map((u: any) => ({ id: u.id, name: u.full_name }))} w={{ start_date: c.today }} /></ActionForm></DialogButton>
 
   return <>
     <PageHeader title="Work Orders" sub="Job cards for the workshop and site crews. Create one from an accepted quotation to copy its scope." actions={<><SavedViews page="/work-orders" />{edit && add}</>} />

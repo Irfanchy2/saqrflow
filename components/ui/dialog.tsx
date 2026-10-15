@@ -19,7 +19,13 @@ export function DialogButton({ label, title, children, icon, variant = 'primary'
   openParam?: string
 }) {
   const ref = useRef<HTMLDialogElement>(null)
-  useEffect(() => { if (openParam && new URLSearchParams(location.search).get('new') === openParam && !ref.current?.open) ref.current?.showModal() }, [openParam])
+  // ?new=<openParam> opens the form once: the parameter is then taken out of the address, so a refresh or a re-render
+  // after saving does not open it again
+  useEffect(() => {
+    if (!openParam || new URLSearchParams(location.search).get('new') !== openParam) return
+    if (!ref.current?.open) ref.current?.showModal()
+    const u = new URL(location.href); u.searchParams.delete('new'); history.replaceState(history.state, '', u)
+  }, [openParam])
   // the phone "+" button (components/ui/mobile Fab) opens the form for its openParam
   useEffect(() => {
     if (!openParam) return

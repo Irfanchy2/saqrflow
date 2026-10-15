@@ -1,3 +1,4 @@
+import { RemoteSelect } from '@/components/ui/customer-select'
 import { Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { TICKET_CATEGORY, TICKET_PRIORITY, TICKET_SOURCE } from '@/lib/service'
 
@@ -6,7 +7,7 @@ const opts = (list: Opt[], none = 'Not set') => [<option key="" value="">{none}<
 
 /** Service ticket add / edit. The warranty is found automatically from the customer / project when left empty. */
 export function TicketFields({ t = {}, customers, projects, assets, users, employees, warranties, fixedCustomer }: {
-  t?: Record<string, any>; customers: Opt[]; projects: Opt[]; assets: Opt[]; users: Opt[]; employees: Opt[]; warranties: Opt[]; fixedCustomer?: string
+  t?: Record<string, any>; customers: Opt[]; projects: Opt[]; assets: Opt[]; users?: Opt[]; employees?: Opt[]; warranties: Opt[]; fixedCustomer?: string
 }) {
   return <div className="grid gap-4 sm:grid-cols-2">
     <Field label="Issue *" className="sm:col-span-2"><Input name="title" required minLength={3} maxLength={200} defaultValue={t.title} placeholder="e.g. Sliding gate not closing fully" /></Field>
@@ -20,8 +21,8 @@ export function TicketFields({ t = {}, customers, projects, assets, users, emplo
     <Field label="Contact name"><Input name="contact_name" maxLength={120} defaultValue={t.contact_name ?? ''} /></Field>
     <Field label="Contact phone"><Input name="contact_phone" type="tel" maxLength={40} defaultValue={t.contact_phone ?? ''} /></Field>
     <Field label="Site / location" className="sm:col-span-2"><Input name="site_location" maxLength={300} defaultValue={t.site_location ?? ''} /></Field>
-    <Field label="Assigned to (user)"><Select name="assigned_to" defaultValue={t.assigned_to ?? ''}>{opts(users)}</Select></Field>
-    <Field label="Technician (employee)"><Select name="employee_id" defaultValue={t.employee_id ?? ''}>{opts(employees)}</Select></Field>
+    <Field label="Assigned to (user)">{users ? <Select name="assigned_to" defaultValue={t.assigned_to ?? ''}>{opts(users)}</Select> : <RemoteSelect kind="users" name="assigned_to" defaultValue={t.assigned_to} none="Not set" />}</Field>
+    <Field label="Technician (employee)">{employees ? <Select name="employee_id" defaultValue={t.employee_id ?? ''}>{opts(employees)}</Select> : <RemoteSelect kind="employees" name="employee_id" defaultValue={t.employee_id} none="Not set" />}</Field>
     <Field label="Visit date"><Input name="scheduled_date" type="date" defaultValue={t.scheduled_date ?? ''} /></Field>
     <Field label="Due date"><Input name="due_date" type="date" defaultValue={t.due_date ?? ''} /></Field>
     <Field label="Warranty" hint="found automatically when left empty"><Select name="warranty_id" defaultValue={t.warranty_id ?? ''}>{opts(warranties, 'Find automatically')}</Select></Field>

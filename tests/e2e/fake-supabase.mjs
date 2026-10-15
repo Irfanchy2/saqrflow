@@ -27,8 +27,14 @@ const json = (res, code, o) => { res.writeHead(code, { 'content-type': 'applicat
 const ocrFixtures = new Map(), geminiFixtures = [], mockCalls = { ocrspace: [], gemini: [], graph: [] }, graphTemplates = new Map()
 const UNKNOWN_DOC = { document_type: 'unknown', category: 'other', document_owner_type: 'unknown', company_name: null, employee_name: null, document_number: null, issue_date: null, expiry_date: null, issuing_authority: null, confidence: 0.3, fields: [], requires_manual_review: true }
 
+// Optional realism for performance runs: FAKE_LATENCY_MS delays every request like a real network hop would, and
+// GET /__stats returns how many database (PostgREST) requests were made, so a page's query count can be measured.
+const LATENCY = Number(process.env.FAKE_LATENCY_MS ?? 0); let restCalls = 0
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'); const path = url.pathname
+  if (path === '/__stats') { const n = restCalls; if (url.searchParams.has('reset')) restCalls = 0; return json(res, 200, { rest: n }) }
+  if (LATENCY) await new Promise(r => setTimeout(r, LATENCY))
+  if (path.startsWith('/rest/v1/')) restCalls++
   try {
     if (path.startsWith('/rest/v1/')) {                                   // ── PostgREST proxy
       const buf = await body(req); const headers = { ...req.headers }; delete headers.host; delete headers.connection

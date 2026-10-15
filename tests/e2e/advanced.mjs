@@ -103,8 +103,8 @@ try {
   await pd.getByLabel('Name *').fill('Painting'); await pd.locator('select[name=base_status]').selectOption('active'); await pd.getByRole('button', { name: 'Add status' }).click(); await settle()
   const cs = await one(`select id from custom_statuses where company_id=$1 and label='Painting'`, [co])
   ok(!!cs, 'custom project status “Painting” (counts as Active) created')
-  await p.goto(`${BASE}/projects/${proj}`); await settle()
-  ok((await main()).includes('Additional details'), 'project page shows “Additional details”')
+  await p.goto(`${BASE}/projects/${proj}?tab=activity`); await settle()
+  ok((await main()).includes('Additional details'), 'project page (Activity tab) shows “Additional details”')
   await p.locator('input[name=cf_site_supervisor]').fill('Rashid Khan'); await p.locator('select[name=cf_paint_system]').selectOption('Epoxy'); await p.getByRole('button', { name: 'Save details' }).click(); await settle()
   const cv = (await one(`select data from custom_field_values where record_id=$1`, [proj]))?.data ?? {}
   ok(cv.site_supervisor === 'Rashid Khan' && cv.paint_system === 'Epoxy', 'custom values saved')
