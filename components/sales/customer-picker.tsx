@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Check, ChevronsUpDown, Search, UserPlus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Search, UserPlus, X } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
 export interface CustomerOpt { id: string; name: string; address: string | null; trn: string | null; phone: string | null; contact_person: string | null; email: string | null }

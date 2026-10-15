@@ -1,7 +1,7 @@
 'use client'
 import { useActionState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles } from '@/components/icons'
 import { Badge, Button } from '@/components/ui/primitives'
 import { runAiSearch } from '@/app/actions/ai'
 import type { SearchAnswer } from '@/lib/ai/search'

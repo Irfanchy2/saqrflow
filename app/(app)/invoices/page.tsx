@@ -1,7 +1,7 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, ScrollText, Target, Truck, Wallet } from 'lucide-react'
+import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, ScrollText, Target, Truck, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'

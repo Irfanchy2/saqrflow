@@ -1,6 +1,6 @@
 'use client'
 import { startTransition, useActionState, useRef, useState, type ReactNode } from 'react'
-import { FileText, Loader2, MessageCircle, X } from 'lucide-react'
+import { FileText, Loader2, MessageCircle, X } from '@/components/icons'
 import { Alert, Badge, Button, Field, Input, Textarea } from '@/components/ui/primitives'
 import { prepareWhatsApp, sendViaWhatsApp } from '@/app/actions/whatsapp'
 import type { ActionState } from '@/lib/utils'

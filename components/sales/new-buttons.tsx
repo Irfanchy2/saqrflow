@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { ChevronDown, Loader2, Plus, Receipt, ScrollText, Truck } from 'lucide-react'
+import { ChevronDown, Loader2, Plus, Receipt, ScrollText, Truck } from '@/components/icons'
 import { Button } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
 import { newSalesDoc } from '@/app/actions/sales'

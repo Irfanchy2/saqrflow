@@ -1,5 +1,5 @@
 'use client'
-import { Menu } from 'lucide-react'
+import { Menu } from '@/components/icons'
 
 /** Opens the navigation drawer on phones and tablets (the sidebar listens for averiqo:menu). */
 export function MenuButton() {

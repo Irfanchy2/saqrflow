@@ -1,6 +1,6 @@
 'use client'
 import { useRef, type KeyboardEvent } from 'react'
-import { Bold, Italic, List, ListOrdered, Underline } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Underline } from '@/components/icons'
 import { Textarea } from '@/components/ui/primitives'
 import { hasMarkup } from '@/lib/sales/rich'
 import { RichBlocks } from './rich-text'

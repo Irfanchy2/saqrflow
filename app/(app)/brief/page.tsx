@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BadgeCheck, CheckCircle2, FileWarning, HardHat, Landmark, ListTodo, Receipt, Target, Wrench } from 'lucide-react'
+import { BadgeCheck, CheckCircle2, FileWarning, HardHat, Landmark, ListTodo, Receipt, Target, Wrench } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { loadBrief } from '@/lib/brief'
 import { Badge, Card, CardHeader, Metrics, PageHeader, StatCard } from '@/components/ui/primitives'

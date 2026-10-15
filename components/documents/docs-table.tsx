@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { FileText, Paperclip } from 'lucide-react'
+import { FileText, Paperclip } from '@/components/icons'
 import { Card, EmptyState, Pagination, SortTh, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { StatusBadge } from './status-badge'
 import { PAGE_SIZE, type SP } from '@/lib/queries'

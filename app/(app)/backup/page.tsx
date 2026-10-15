@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertTriangle, ArrowLeft, CheckCircle2, DatabaseBackup, Download, ExternalLink } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CheckCircle2, DatabaseBackup, Download, ExternalLink } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Alert, Badge, Card, CardHeader, Metrics, PageHeader, StatCard, Td, Th } from '@/components/ui/primitives'

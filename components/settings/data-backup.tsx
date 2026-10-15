@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { DatabaseBackup, Download, ExternalLink, HardDrive } from 'lucide-react'
+import { DatabaseBackup, Download, ExternalLink, HardDrive } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { Card, CardHeader } from '@/components/ui/primitives'
 

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ListTodo, Play, Plus, Square, SquareCheck, X } from 'lucide-react'
+import { ListTodo, Play, Plus, Square, SquareCheck, X } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, CardHeader, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard } from '@/components/ui/primitives'

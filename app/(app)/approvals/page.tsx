@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CheckCircle2, Plus, X } from 'lucide-react'
+import { CheckCircle2, Plus, X } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, CardHeader, EmptyState, Field, Input, LinkButton, Metrics, PageHeader, Pagination, Select, StatCard, Textarea } from '@/components/ui/primitives'

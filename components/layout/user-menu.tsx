@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, LogOut, Moon, Settings, Sun, UserRound } from 'lucide-react'
+import { ChevronDown, LogOut, Moon, Settings, Sun, UserRound } from '@/components/icons'
 import { signOut } from '@/app/actions/auth'
 import { cn } from '@/lib/utils'
 

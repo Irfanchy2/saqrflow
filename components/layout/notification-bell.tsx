@@ -1,8 +1,8 @@
-import { Bell } from 'lucide-react'
+import { Bell } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { ActionButton } from '@/components/ui/action-form'
 import { markAllRead, markRead } from '@/app/actions/notifications'
-import { Check } from 'lucide-react'
+import { Check } from '@/components/icons'
 
 export interface Notif { id: string; title: string; body: string | null; link: string | null; severity: string; read_at: string | null; created_at: string }
 export function NotificationBell({ items, unread }: { items: Notif[]; unread: number }) {

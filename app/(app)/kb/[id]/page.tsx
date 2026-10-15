@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, History, Pin } from 'lucide-react'
+import { ArrowLeft, History, Pin } from '@/components/icons'
 import { PrintButton } from '@/components/print-button'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader } from '@/components/ui/primitives'

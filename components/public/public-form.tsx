@@ -1,6 +1,6 @@
 'use client'
 import { startTransition, useActionState, useEffect, useRef, type ReactNode } from 'react'
-import { CheckCircle2, Loader2 } from 'lucide-react'
+import { CheckCircle2, Loader2 } from '@/components/icons'
 import { Button } from '@/components/ui/primitives'
 import type { ActionState } from '@/lib/utils'
 

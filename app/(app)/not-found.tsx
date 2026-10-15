@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { SearchX } from 'lucide-react'
+import { SearchX } from '@/components/icons'
 
 export default function NotFound() {
   return <div className="mx-auto mt-16 max-w-md rounded-lg border border-border bg-surface p-6 text-center shadow-card">

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { ArchiveRestore, Trash2 } from 'lucide-react'
+import { ArchiveRestore, Trash2 } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Alert, Badge, Card, EmptyState, PageHeader, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { ActionButton } from '@/components/ui/action-form'

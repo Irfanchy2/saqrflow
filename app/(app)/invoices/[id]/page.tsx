@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowRightLeft, BellRing, CheckCircle2, Clock, FileMinus, FolderOpen, History, Link2, Paperclip, Plus, ShieldCheck, Trash2, Truck, Wallet } from 'lucide-react'
+import { ArrowRightLeft, BellRing, CheckCircle2, Clock, FileMinus, FolderOpen, History, Link2, Paperclip, Plus, ShieldCheck, Trash2, Truck, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { brandingFor, loadSalesDoc, salesSettings } from '@/lib/sales/data'
 import { APPROVAL_LABEL, DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'

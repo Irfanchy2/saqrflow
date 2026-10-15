@@ -1,6 +1,6 @@
 'use client'
 import { startTransition, useActionState, useState, type ReactNode } from 'react'
-import { Check, Copy, KeyRound, Loader2 } from 'lucide-react'
+import { Check, Copy, KeyRound, Loader2 } from '@/components/icons'
 import { Alert, Button } from '@/components/ui/primitives'
 import type { ActionState } from '@/lib/utils'
 

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRightLeft, BarChart3, CheckCircle2, Columns3, List, Mail, MapPinned, MessageCircle, Phone, Plus, ScrollText, StickyNote, Target, Users } from 'lucide-react'
+import { ArrowRightLeft, BarChart3, CheckCircle2, Columns3, List, Mail, MapPinned, MessageCircle, Phone, Plus, ScrollText, StickyNote, Target, Users } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, CardHeader, CardLink, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'

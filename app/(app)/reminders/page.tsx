@@ -1,7 +1,7 @@
 import { KINDS, maskPhone } from '@/lib/whatsapp/messages'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { BellRing, Play, Plus, Send, UserPlus } from 'lucide-react'
+import { BellRing, Play, Plus, Send, UserPlus } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat } from '@/lib/queries'
 import { Alert, Badge, Card, CardHeader, EmptyState, Field, Input, Metrics, PageHeader, Select, StatCard, TableWrap, Td, Textarea, Th, type Tone } from '@/components/ui/primitives'

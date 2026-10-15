@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CornerDownLeft, Loader2, Plus, Search } from 'lucide-react'
+import { CornerDownLeft, Loader2, Plus, Search } from '@/components/icons'
 import { newSalesDoc } from '@/app/actions/sales'
 import { paletteSearch, type PaletteHit } from '@/app/actions/palette'
 import { toast } from '@/components/ui/toast'

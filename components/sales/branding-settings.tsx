@@ -1,4 +1,4 @@
-import { ImageIcon } from 'lucide-react'
+import { ImageIcon } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { brandingFor, salesSettings } from '@/lib/sales/data'
 import { Badge, Card, CardHeader, Field, Input, Select, Textarea } from '@/components/ui/primitives'

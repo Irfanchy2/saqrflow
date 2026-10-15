@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useOptimistic, useRef, useState, useTransition } from 'react'
-import { CalendarClock, Phone, Plus } from 'lucide-react'
+import { CalendarClock, Phone, Plus } from '@/components/icons'
 import { setLeadStage } from '@/app/actions/crm'
 import { toast } from '@/components/ui/toast'
 import { Button, Select } from '@/components/ui/primitives'

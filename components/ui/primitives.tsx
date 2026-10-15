@@ -3,8 +3,8 @@ import Link from 'next/link'
 import { Children, cloneElement, isValidElement, type Ref } from 'react'
 import { cn } from '@/lib/utils'
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
-import type { LucideIcon } from 'lucide-react'
-import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, CalendarClock, Users, FileText, Truck, Landmark, TrendingUp, BarChart3, Receipt, Clock, CheckCircle2, ShieldCheck, Package, Wrench, MapPinned, ArrowUp, ArrowDown } from 'lucide-react'
+import type { LucideIcon } from '@/components/icons'
+import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, CalendarClock, Users, FileText, Truck, Landmark, TrendingUp, BarChart3, Receipt, Clock, CheckCircle2, ShieldCheck, Package, Wrench, MapPinned, ArrowUp, ArrowDown } from '@/components/icons'
 
 /*
  * Averiqo design system primitives.

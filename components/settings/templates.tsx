@@ -1,4 +1,4 @@
-import { FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { FileText, Pencil, Plus, Trash2 } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { Badge, Card, CardHeader, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'

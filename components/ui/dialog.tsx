@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { Button } from './primitives'
 import type { VariantProps } from 'class-variance-authority'
 

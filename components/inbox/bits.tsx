@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight } from '@/components/icons'
 import { Badge, type Tone } from '@/components/ui/primitives'
 import { cn } from '@/lib/utils'
 

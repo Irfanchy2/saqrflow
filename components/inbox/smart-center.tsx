@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, Inbox } from 'lucide-react'
+import { ArrowRight, Inbox } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
 import { Card, CardHeader } from '@/components/ui/primitives'
 import { addDays, zonedToUtc } from '@/lib/time'

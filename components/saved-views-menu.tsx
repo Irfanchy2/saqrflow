@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { Bookmark, Trash2, Users } from 'lucide-react'
+import { Bookmark, Trash2, Users } from '@/components/icons'
 import { Button, Field, Input } from '@/components/ui/primitives'
 import { ActionForm } from '@/components/ui/action-form'
 import { saveView, deleteView } from '@/app/actions/views'

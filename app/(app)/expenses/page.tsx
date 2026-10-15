@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Download, Fuel, HardHat, Home, Package, Paperclip, Pencil, Plus, Trash2, Truck, Users, Utensils, Wallet, Wrench } from 'lucide-react'
+import { Download, Fuel, HardHat, Home, Package, Paperclip, Pencil, Plus, Trash2, Truck, Users, Utensils, Wallet, Wrench } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, LinkButton, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'

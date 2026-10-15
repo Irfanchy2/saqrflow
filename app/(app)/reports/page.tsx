@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { BarChart3, Download, FileText } from 'lucide-react'
+import { BarChart3, Download, FileText } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat } from '@/lib/queries'
 import { Card, CardHeader, EmptyState, LinkButton, Metrics, PageHeader, StatCard } from '@/components/ui/primitives'

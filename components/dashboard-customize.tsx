@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useState, useTransition } from 'react'
-import { ArrowDown, ArrowUp, LayoutGrid, Loader2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, LayoutGrid, Loader2 } from '@/components/icons'
 import { Button } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
 import { saveDashboardLayout } from '@/app/actions/preferences'

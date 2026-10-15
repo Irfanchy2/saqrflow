@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertTriangle, Briefcase, HardHat, MapPin, Plus, Wallet } from 'lucide-react'
+import { AlertTriangle, Briefcase, HardHat, MapPin, Plus, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, PageHeader, Metrics, StatCard } from '@/components/ui/primitives'

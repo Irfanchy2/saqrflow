@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, CloudSun, Pencil, Printer, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, CloudSun, Pencil, Printer, Trash2, Users } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, LinkButton } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'

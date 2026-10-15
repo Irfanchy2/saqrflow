@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState, type ReactNode } from 'react'
-import { Plus, SlidersHorizontal } from 'lucide-react'
+import { Plus, SlidersHorizontal } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
 /**

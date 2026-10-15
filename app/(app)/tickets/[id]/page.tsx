@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, MapPin, Phone, ShieldCheck, ShieldOff } from 'lucide-react'
+import { ArrowLeft, MapPin, Phone, ShieldCheck, ShieldOff } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, Field, Select, Textarea } from '@/components/ui/primitives'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'

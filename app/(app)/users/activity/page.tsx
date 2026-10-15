@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, Laptop, Smartphone } from 'lucide-react'
+import { ArrowLeft, Laptop, Smartphone } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, Metrics, PageHeader, Select, StatCard, Td, Th } from '@/components/ui/primitives'
 import { ActionButton } from '@/components/ui/action-form'

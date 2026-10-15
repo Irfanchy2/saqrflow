@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, CalendarClock, CalendarPlus, CheckSquare, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, ScrollText, Trash2, UserCheck } from 'lucide-react'
+import { ArrowLeft, CalendarClock, CalendarPlus, CheckSquare, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, ScrollText, Trash2, UserCheck } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, EmptyState, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'

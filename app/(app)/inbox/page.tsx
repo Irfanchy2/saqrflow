@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertOctagon, CheckCheck, FileSearch, Inbox, Sparkles, Upload, UploadCloud } from 'lucide-react'
+import { AlertOctagon, CheckCheck, FileSearch, Inbox, Sparkles, Upload, UploadCloud } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat } from '@/lib/queries'
 import { Alert, Card, EmptyState, PageHeader, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'

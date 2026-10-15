@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { PackagePlus, Search } from 'lucide-react'
+import { PackagePlus, Search } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { fmtMoney } from '@/lib/sales/money'
 
