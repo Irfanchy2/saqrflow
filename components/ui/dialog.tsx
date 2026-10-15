@@ -20,6 +20,12 @@ export function DialogButton({ label, title, children, icon, variant = 'primary'
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { if (openParam && new URLSearchParams(location.search).get('new') === openParam && !ref.current?.open) ref.current?.showModal() }, [openParam])
+  // the phone "+" button (components/ui/mobile Fab) opens the form for its openParam
+  useEffect(() => {
+    if (!openParam) return
+    const on = (e: Event) => { if ((e as CustomEvent).detail === openParam && !ref.current?.open) ref.current?.showModal() }
+    addEventListener('averiqo:open', on); return () => removeEventListener('averiqo:open', on)
+  }, [openParam])
   return <>
     <Button variant={variant} size={size} onClick={() => ref.current?.showModal()}>{icon}{label}</Button>
     <dialog ref={ref} onClick={e => { if (e.target === ref.current) ref.current?.close() }}

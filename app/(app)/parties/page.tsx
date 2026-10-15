@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ArrowUpRight, Download, Eye, Handshake, Mail, MapPin, MessageCircle, Phone, Plus, Upload, X } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
-import { Badge, Card, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, CardLink, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionForm } from '@/components/ui/action-form'
 import { PartyFields } from '@/components/parties/party-fields'
@@ -15,7 +15,9 @@ import { importParties } from '@/app/actions/imports'
 import { formatAed } from '@/lib/time'
 import { fmtMoney } from '@/lib/sales/money'
 import { cn } from '@/lib/utils'
+import { ACTION_LABEL, TABLE_LABEL } from '@/lib/audit'
 import { SavedViews } from '@/components/saved-views'
+import { Fab, MList, MRow } from '@/components/ui/mobile'
 
 export const metadata = { title: 'Customers & Suppliers' }
 const AVATAR = ['bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300', 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
@@ -55,7 +57,14 @@ export default async function Parties({ searchParams }: { searchParams: Promise<
   const yearSales = (salesYear?.data ?? []).reduce((a, i) => a + Number(i.total) - Number(i.vat_amount ?? 0), 0)
   const activeYear = new Set((salesYear?.data ?? []).map(i => i.customer_id).filter(Boolean)).size
 
-  const sel = /^[0-9a-f-]{36}$/.test(sp.c ?? '') ? sp.c! : null
+  const picked = /^[0-9a-f-]{36}$/.test(sp.c ?? '') ? sp.c! : null
+  // wide screens always show a client in the preview panel (the first on the page until one is picked)
+  const byCust = new Map<string, number>(); for (const i of salesYear?.data ?? []) if (i.customer_id) byCust.set(i.customer_id, (byCust.get(i.customer_id) ?? 0) + Number(i.total) - Number(i.vat_amount ?? 0))
+  const top = [...byCust.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const [topRes, recentAct] = await Promise.all([top.length ? c.supabase.from('customers').select('id,name').in('id', top.map(t => t[0])) : null,
+    isC && c.can('audit.view') ? c.supabase.from('audit_logs').select('id,action,table_name,created_at').in('table_name', ['customers', 'invoices', 'payments']).order('created_at', { ascending: false }).limit(6) : null])
+  const topNames = new Map((topRes?.data ?? []).map(r => [r.id, r.name as string]))
+  const sel = picked ?? (isC && data?.length ? data[0].id : null)
   const selRow = sel ? (data ?? []).find(p => p.id === sel) ?? (await c.supabase.from(kind).select('id,name,contact_person,phone,email,trn,address,created_at').eq('id', sel).maybeSingle()).data : null
   const selExtra = isC && selRow ? await c.supabase.from('customers').select('whatsapp,notes').eq('id', selRow.id).maybeSingle() : null
   const qs = (o: Record<string, string | undefined>) => `/parties?${new URLSearchParams(Object.entries({ tab: kind, q: sp.q, page: sp.page, ...o }).filter(([, v]) => v) as [string, string][])}`
@@ -82,8 +91,13 @@ export default async function Parties({ searchParams }: { searchParams: Promise<
         <form className="flex flex-wrap gap-2 border-b border-border p-3"><input type="hidden" name="tab" value={kind} />
           <input name="q" type="search" defaultValue={sp.q} aria-label="Search" placeholder="Search name, contact, phone, email, TRN…" className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm sm:max-w-md" /></form>
         {!data?.length ? <EmptyState icon={Handshake} title={q ? 'No matches' : `No ${isC ? 'clients' : 'suppliers'} yet`} body="Add the companies you trade with so cheques, invoices and projects can be linked to them." /> :
-          <TableWrap><thead><tr><Th>Company</Th><Th>Contact person</Th><Th>Phone</Th><Th>Email</Th>{isC && fin ? <><Th className="text-right">Total sales (AED)</Th><Th>Status</Th></> : <Th>TRN</Th>}{isC && <Th><span className="sr-only">Preview</span></Th>}</tr></thead><tbody className="divide-y divide-border">
-            {data.map(p => { const e = per.get(p.id); return <tr key={p.id} className={cn(sel === p.id && 'bg-primary-soft/50')}>
+          <><MList>{data.map(p => { const e = per.get(p.id); return <MRow key={p.id} href={isC ? `/parties/${p.id}` : undefined}
+            lead={<span className={cn('grid h-11 w-11 place-items-center rounded-xl text-[13px] font-bold', tint(p.name))} aria-hidden>{initials(p.name)}</span>}
+            title={<span className="text-primary">{p.name}</span>} sub={[p.contact_person, p.phone].filter(Boolean).join(' · ') || p.email || '—'}
+            right={isC && fin ? (e?.overdue ? <Badge tone="red">Overdue</Badge> : e?.owed ? <Badge tone="amber">Balance due</Badge> : e ? <Badge tone="green">Active</Badge> : <Badge tone="blue">Prospect</Badge>) : undefined}
+            rightSub={isC && fin && e ? `AED ${fmtMoney(e.sales)}` : undefined} /> })}</MList>
+          <div className="hidden sm:block"><TableWrap><thead><tr><Th>Company</Th><Th>Contact person</Th><Th>Phone</Th><Th>Email</Th>{isC && fin ? <><Th className="text-right">Total sales (AED)</Th><Th>Status</Th></> : <Th>TRN</Th>}{isC && <Th><span className="sr-only">Preview</span></Th>}</tr></thead><tbody className="divide-y divide-border">
+            {data.map(p => { const e = per.get(p.id); return <tr key={p.id} className={cn(sel === p.id && 'xl:bg-primary-soft/50')}>
               <Td className="max-w-[260px]"><div className="flex min-w-0 items-center gap-3"><span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[12px] font-bold', tint(p.name))} aria-hidden>{initials(p.name)}</span>
                 <span className="min-w-0">{isC ? <Link href={`/parties/${p.id}`} className="block truncate font-semibold hover:text-primary">{p.name}</Link> : <span className="block truncate font-semibold">{p.name}</span>}{p.trn && isC && <span className="block truncate font-mono text-[11px] text-muted">TRN {p.trn}</span>}</span></div></Td>
               <Td className="text-muted">{p.contact_person ?? '—'}</Td><Td className="whitespace-nowrap text-muted">{p.phone ?? '—'}</Td><Td className="max-w-[220px] truncate text-muted">{p.email ?? '—'}</Td>
@@ -91,11 +105,11 @@ export default async function Parties({ searchParams }: { searchParams: Promise<
                 <Td badge>{e?.overdue ? <Badge tone="red">Overdue</Badge> : e?.owed ? <Badge tone="amber">Balance due</Badge> : e ? <Badge tone="green">Active</Badge> : <Badge tone="blue">Prospect</Badge>}</Td></>
                 : <Td className="font-mono text-xs text-muted">{p.trn ?? '—'}</Td>}
               {isC && <Td className="text-right"><Link href={qs({ c: p.id })} scroll={false} data-row-primary aria-label={`Preview ${p.name}`} className="hidden h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg xl:inline-grid"><Eye size={15} /></Link></Td>}
-            </tr> })}</tbody></TableWrap>}
+            </tr> })}</tbody></TableWrap></div></>}
         <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/parties" />
       </Card>
 
-      {selRow && <aside aria-label={`${selRow.name} preview`} className="min-w-0 xl:sticky xl:top-20">
+      {selRow && <aside aria-label={`${selRow.name} preview`} className={cn('min-w-0 xl:sticky xl:top-20', !picked && 'max-xl:hidden')}>
         <Card className="overflow-hidden">
           <div className="flex items-start gap-3 p-5">
             <span className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-xl text-base font-bold', tint(selRow.name))} aria-hidden>{initials(selRow.name)}</span>
@@ -122,5 +136,18 @@ export default async function Parties({ searchParams }: { searchParams: Promise<
           {selExtra?.data?.notes && <div className="border-t border-border px-5 py-4"><h3 className="text-[13px] font-semibold">Notes</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted">{selExtra.data.notes}</p></div>}
         </Card>
       </aside>}
-    </div></>
+    </div>
+    {isC && fin && top.length > 0 && <div className="mt-5 grid gap-5 lg:grid-cols-2"><Card><CardHeader title="Top customers" sub="Invoiced in the last 12 months, excl. VAT" action={<CardLink href="/reports" />} />
+      <ol className="space-y-3 px-5 pb-5">{top.map(([id, v], i) => <li key={id} className="flex items-center gap-3 text-sm">
+        <span className="w-4 text-xs font-semibold tabular-nums text-muted">{i + 1}</span>
+        <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[11px] font-bold', tint(topNames.get(id) ?? '?'))} aria-hidden>{initials(topNames.get(id) ?? '?')}</span>
+        <Link href={`/parties/${id}`} className="w-40 shrink-0 truncate font-medium hover:text-primary sm:w-48">{topNames.get(id) ?? 'Customer'}</Link>
+        <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2"><span className="block h-full rounded-full bg-primary" style={{ width: `${(v / top[0][1]) * 100}%` }} /></span>
+        <span className="w-28 shrink-0 text-end font-semibold tabular-nums">{formatAed(v).replace('.00', '')}</span></li>)}</ol></Card>
+      <Card><CardHeader title="Recent customer activity" action={c.can('audit.view') ? <CardLink href="/audit">Audit log</CardLink> : undefined} />
+        {!(recentAct?.data ?? []).length ? <EmptyState title="No recent activity" /> : <ul className="px-2 pb-2 text-sm">{(recentAct!.data ?? []).map((a: any) => <li key={a.id} className="flex items-center gap-3 rounded-lg px-3 py-2">
+          <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg', a.table_name === 'payments' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300' : a.table_name === 'invoices' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300' : 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300')} aria-hidden><Handshake size={15} /></span>
+          <span className="min-w-0 flex-1 truncate"><span className="font-medium">{TABLE_LABEL[a.table_name] ?? a.table_name}</span> <span className="text-muted">{(ACTION_LABEL[a.action] ?? a.action).toLowerCase()}</span></span>
+          <time className="shrink-0 text-xs tabular-nums text-muted">{new Date(a.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: c.company.timezone })}</time></li>)}</ul>}</Card></div>}
+    {edit && <Fab label={`Quick create: ${isC ? "client" : "supplier"}`} open={label} />}</>
 }

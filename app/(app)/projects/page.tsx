@@ -12,6 +12,7 @@ import { PROJECT_STATUS, projectFinancials } from '@/lib/projects'
 import { formatAed } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
+import { Fab, FilterBar, FilterTabs, MList, MRow } from '@/components/ui/mobile'
 
 export const metadata = { title: 'Projects' }
 
@@ -48,11 +49,15 @@ export default async function Projects({ searchParams }: { searchParams: Promise
       {fin && <StatCard label="Outstanding on projects" value={formatAed(rows.reduce((s, r) => s + r.f.outstanding, 0))} icon={Wallet} tone="amber" href="/invoices?tab=receivables" />}
       <StatCard label="Overdue milestones" value={overdueMs} icon={AlertTriangle} tone={overdueMs ? 'red' : 'neutral'} href="/reminders" />
     </Metrics>
-    <form className="mb-4 flex flex-wrap gap-2"><input name="q" type="search" defaultValue={sp.q} aria-label="Search projects" placeholder="Search name, code, location…" className={`${cls} min-w-52 flex-1`} />
-      <select name="status" defaultValue={sp.status ?? 'open'} aria-label="Status" className={cls}><option value="open">Open (planning, active, on hold)</option><option value="all">All</option>{Object.entries(PROJECT_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
-      <button className="h-9 cursor-pointer rounded-md border border-border px-3 text-sm hover:bg-surface-2">Filter</button></form>
+    <FilterTabs label="Project status" className="mb-3" tabs={[['open', 'In progress'], ['active', 'Active'], ['on_hold', 'On hold'], ['completed', 'Completed'], ['all', 'All']].map(([k, l]) => ({ href: `/projects?status=${k}${sp.q ? `&q=${encodeURIComponent(sp.q)}` : ''}`, label: l, active: (status ?? 'all') === k }))} />
+    <form className="mb-4"><input type="hidden" name="status" value={sp.status ?? 'open'} /><FilterBar search={<input name="q" type="search" defaultValue={sp.q} aria-label="Search projects" placeholder="Search name, code, location…" className={`${cls} h-11 min-w-0 flex-1 sm:h-10`} />} /></form>
     {!rows.length ? <Card><EmptyState icon={HardHat} title={term ? 'No projects match' : 'No projects yet'} body="Create a project to track its progress, milestones, expenses, drawings, quotations and invoices in one place." /></Card>
-      : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{rows.map(p => {
+      : <><Card className="overflow-hidden sm:hidden"><MList>{rows.map(p => { const pct = Math.round(((p.fabrication_progress ?? 0) + (p.site_progress ?? 0)) / 2), st = PROJECT_STATUS[p.status]
+          return <MRow key={p.id} href={`/projects/${p.id}`} lead={<span className="grid h-14 w-14 place-items-center rounded-xl bg-[linear-gradient(135deg,hsl(var(--sb))_0%,hsl(217_70%_35%)_100%)] text-white" aria-hidden><HardHat size={22} /></span>}
+            title={p.name} sub={p.customer?.name ?? p.location ?? p.code ?? 'No customer'}
+            line={<span className="flex w-full items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><span className={cn('block h-full rounded-full', pct >= 75 ? 'bg-success' : pct >= 40 ? 'bg-primary' : 'bg-warning')} style={{ width: `${pct}%` }} /></span><span className="w-9 text-end text-xs font-semibold tabular-nums">{pct}%</span></span>}
+            right={<Badge tone={st.tone}>{st.label}</Badge>} /> })}</MList></Card>
+      <div className="hidden gap-4 sm:grid md:grid-cols-2 2xl:grid-cols-3">{rows.map(p => {
         const st = PROJECT_STATUS[p.status], late = p.next && p.next.due_date < c.today
         return <Link key={p.id} href={`/projects/${p.id}`} className="group">
           <Card className="flex h-full flex-col gap-3 p-4 transition-colors group-hover:border-border-strong">
@@ -68,6 +73,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
               <div><div className="text-muted">Margin</div><div className={cn('font-medium tabular-nums', p.f.margin !== null && p.f.margin < 0 && 'text-danger')}>{p.f.margin === null ? '—' : `${p.f.margin}%`}</div></div></div>}
             {p.next && <div className={cn('mt-auto rounded-md px-2.5 py-1.5 text-xs', late ? 'bg-danger/10 text-danger' : 'bg-surface-2 text-muted')}>Next: {p.next.title} · {p.next.due_date}{late ? ' (overdue)' : ''}</div>}
           </Card></Link>
-      })}</div>}
+      })}</div></>}
+    {c.can('records.edit') && <Fab label="Quick create: project" open="project" />}
   </>
 }

@@ -1,7 +1,8 @@
 import { supabaseConfigured } from '@/lib/env'
 import { SetupRequired } from '@/components/layout/setup-required'
 import { SteelHero } from '@/components/auth/steel-hero'
-import { AveriqoLogo } from '@/components/brand/logo'
+import { AveriqoLogo, AveriqoMark } from '@/components/brand/logo'
+import { SteelFrameArt } from '@/components/dashboard/banner'
 
 const POINTS = [
   ['Quotations to payments', 'Your letterhead, stamp and terms. Convert, invoice, collect and follow ageing.'],
@@ -25,11 +26,21 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
       </div>
     </section>
-    <div className="grid place-items-center px-4 py-10 sm:px-8">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-start gap-1.5 lg:hidden"><AveriqoLogo height={32} />
-          <div className="text-xs tracking-wide text-muted">Business OS</div></div>
-        {children}
-        <p className="mt-8 text-xs leading-relaxed text-muted">Files stay in your company’s private, encrypted storage. Two-step verification is available.</p>
-      </div></div></main>
+    <div className="flex flex-col lg:grid lg:place-items-center lg:px-8 lg:py-10">
+      {/* phones and tablets: a dark welcome panel above the form */}
+      <section aria-label="Averiqo" className="relative overflow-hidden bg-[linear-gradient(160deg,hsl(var(--sb))_0%,hsl(223_55%_18%)_60%,hsl(217_70%_28%)_100%)] px-6 pb-16 pt-10 text-white lg:hidden">
+        <div className="absolute inset-0 opacity-40"><SteelFrameArt /></div>
+        <div className="relative">
+          <div className="flex items-center gap-3"><AveriqoMark size={44} /><span className="leading-tight"><span className="block text-[28px] font-bold tracking-[-0.02em]">Averiqo</span><span className="block text-xs text-white/70">Business Operating System</span></span></div>
+          <h2 className="mt-14 text-[32px] font-bold leading-[1.12] tracking-[-0.025em]">Manage your business smarter</h2>
+          <p className="mt-3 max-w-xs text-[15px] leading-relaxed text-white/80">Projects, sales, documents, team and more. All in one place.</p>
+        </div>
+      </section>
+      <div className="relative -mt-8 flex-1 rounded-t-3xl bg-bg px-4 pb-10 pt-6 sm:px-8 lg:mt-0 lg:w-full lg:max-w-sm lg:flex-none lg:rounded-none lg:bg-transparent lg:p-0">
+        <div className="mx-auto w-full max-w-sm">
+          <div className="mb-8 hidden flex-col items-start gap-1.5 lg:flex"><AveriqoLogo height={32} />
+            <div className="text-xs tracking-wide text-muted">Business OS</div></div>
+          {children}
+          <p className="mt-8 text-center text-xs leading-relaxed text-muted lg:text-start">Files stay in your company’s private, encrypted storage. Two-step verification is available.</p>
+        </div></div></div></main>
 }

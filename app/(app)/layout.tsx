@@ -18,6 +18,7 @@ import { MotionRoot } from '@/components/motion'
 import { MenuButton } from '@/components/layout/menu-button'
 import { RowNavigator } from '@/components/layout/row-navigator'
 import { UserMenu, TopThemeToggle } from '@/components/layout/user-menu'
+import { AveriqoMark } from '@/components/brand/logo'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,11 +73,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const city = tz.split('/').pop()!.replace(/_/g, ' '), place = tz === 'Asia/Dubai' ? 'Dubai, UAE' : city
   return <MotionRoot><div className="flex min-h-screen">
     <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
-    <Suspense><Sidebar items={visible} company={c.company.name} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} /></Suspense>
+    <Suspense><Sidebar items={visible} company={c.company.name} user={c.profile.full_name} role={c.profile.role} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} /></Suspense>
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
       <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-surface/90 px-2 backdrop-blur-md sm:gap-3 sm:px-5 lg:px-8">
         <MenuButton />
-        <div className="min-w-0 flex-1 truncate text-[15px] font-semibold sm:hidden">{c.company.name}</div>
+        <Link href="/" className="flex min-w-0 flex-1 items-center gap-2 sm:hidden" aria-label={`Averiqo · ${c.company.name}`}><AveriqoMark size={28} /><span className="text-[18px] font-bold tracking-[-0.02em]">Averiqo</span></Link>
         <form action="/search" role="search" className="relative hidden max-w-[540px] flex-1 sm:block"><Search size={16} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
           <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-10 w-full rounded-lg border border-border bg-surface-2/70 pe-[72px] ps-10 text-sm transition-[border-color,background-color,box-shadow] placeholder:text-muted/80 hover:border-border-strong focus:border-primary focus:bg-surface focus-visible:ring-4 focus-visible:ring-primary/[.12] focus-visible:ring-offset-0" />
           <PaletteHint /></form>
@@ -90,11 +91,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <UserMenu name={c.profile.full_name} role={c.profile.role} company={c.company.name} />
         </div></header>
       <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-24 pt-5 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-10">{children}</main>
-    </div><BottomNav items={[
-      { href: '/', label: 'Home', icon: 'home' as const }, { href: '/tasks', label: 'Tasks', icon: 'tasks' as const },
-      c.can('crm.view') ? { href: '/leads', label: 'Leads', icon: 'leads' as const } : c.can('finance.view') ? { href: '/invoices', label: 'Sales', icon: 'sales' as const } : null,
-      c.can('documents.view') ? { href: '/projects', label: 'Projects', icon: 'projects' as const } : null,
-    ].filter(x => !!x)} /><Suspense><NavProgress /></Suspense><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
+    </div><BottomNav items={visible} /><Suspense><NavProgress /></Suspense><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
       ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
       ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings#integrations', group: 'Settings' }] : []),

@@ -55,8 +55,17 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 .skeleton { @apply relative overflow-hidden rounded-md bg-surface-2; }
 .skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .05), transparent); animation: shimmer 1.4s infinite; }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
+/* KPI card (StatCard): stacked when narrow; from 250 px wide the icon tile sits on the left and the bars bottom-right */
+.kpi { container-type: inline-size; }
+.kpi-in { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "tile label label" "value value value" "hint hint bars"; column-gap: 12px; align-items: center; }
+.kpi-tile { grid-area: tile; } .kpi-label { grid-area: label; } .kpi-value { grid-area: value; margin-top: 10px; }
+.kpi-hint { grid-area: hint; margin-top: 6px; align-self: end; } .kpi-bars { grid-area: bars; justify-self: end; align-self: end; margin-top: 6px; }
+@container (min-width: 250px) {
+  .kpi-in { grid-template-areas: "tile label label" "tile value value" "tile hint bars"; column-gap: 14px; align-items: start; }
+  .kpi-value { margin-top: 2px; } .kpi-label { align-self: center; padding-top: 2px; }
+}
 /* odd number of metric cards on the 2-column phone grid: the last one spans the row instead of leaving an empty cell */
-@media (max-width: 767px) { .metrics > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
+@media (min-width: 640px) and (max-width: 767px) { .metrics > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
 
 /* data tables: quiet hover; a row that leads somewhere is clickable as a whole (components/layout/row-navigator) */
 .rtable tbody tr { transition: background-color .12s ease; }
@@ -65,8 +74,9 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 [data-row-link] { cursor: pointer; }
 
 /* scrollable tab rows (components/ui/tab-strip): no scrollbar; the edges fade while more tabs are hidden that way */
-.tabstrip { --fs: 0px; --fe: 0px; scrollbar-width: none; mask-image: linear-gradient(to right, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
-[dir=rtl] .tabstrip { mask-image: linear-gradient(to left, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
+.tabstrip { --fs: 0px; --fe: 0px; scrollbar-width: none; }
+.tabstrip[data-fade-start], .tabstrip[data-fade-end] { mask-image: linear-gradient(to right, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
+[dir=rtl] .tabstrip[data-fade-start], [dir=rtl] .tabstrip[data-fade-end] { mask-image: linear-gradient(to left, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
 .tabstrip::-webkit-scrollbar { display: none; }
 .tabstrip[data-fade-start=true] { --fs: 28px; } .tabstrip[data-fade-end=true] { --fe: 28px; }
 

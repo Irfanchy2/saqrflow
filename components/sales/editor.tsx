@@ -237,9 +237,16 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
     ...(t === 'invoice' && ['sent', 'partially_paid', 'overdue'].includes(doc.status) ? [['payment_reminder', 'Reminder'] as [string, string]] : []),
   ] : []
 
-  return <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
+  const waMain = waKinds[0]
+  return <div className="-mx-4 -mt-4 pb-20 sm:-mx-6 sm:-mt-6 lg:pb-0">
+    {/* phones: the two things people do with a finished document, always within thumb reach */}
+    <div className="no-print fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-nav flex gap-2 border-t border-border bg-surface/95 p-3 backdrop-blur-md lg:hidden">
+      {waMain && <WhatsAppSend kind={waMain[0]} recordId={doc.id} label={waMain[1]}
+        trigger={open => <button type="button" onClick={() => (dirty ? save(open) : open())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#16a34a] text-[15px] font-semibold text-white active:scale-[.99]"><MessageCircle size={18} aria-hidden />Send via WhatsApp</button>} />}
+      <button type="button" onClick={() => (dirty ? save(download) : download())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-[1.5px] border-primary text-[15px] font-semibold text-primary active:scale-[.99]"><Download size={18} aria-hidden />Download PDF</button>
+    </div>
     {/* toolbar */}
-    <div className="no-print sticky top-14 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-surface/90 px-4 py-2.5 backdrop-blur sm:px-6">
+    <div className="no-print sticky top-16 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-surface/90 px-4 py-2.5 backdrop-blur sm:px-6">
       <Link href="/invoices" aria-label="Back to sales documents" className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-fg"><ArrowLeft size={17} /></Link>
       <span className="hidden rounded-md bg-primary-soft p-1.5 text-primary sm:inline-flex"><Icon size={16} aria-hidden /></span>
       <div className="min-w-0 leading-tight">

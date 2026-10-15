@@ -5,12 +5,13 @@ import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, Scrol
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
-import { NewSalesButtons } from '@/components/sales/new-buttons'
+import { NewDocFab, NewSalesButtons } from '@/components/sales/new-buttons'
+import { FilterBar, FilterTabs, MList, MRow, Tile, TINTS } from '@/components/ui/mobile'
 import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
 import { AGE_BUCKETS, receivablesAgeing, type InvRow } from '@/lib/sales/summary'
 import { loadSalesKpis } from '@/lib/sales/kpis'
-import { formatAed } from '@/lib/time'
+import { formatAed, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
 import { TabStrip } from '@/components/ui/tab-strip'
@@ -21,6 +22,7 @@ const TABS = [
   { k: 'credit_note', label: 'Credit notes', icon: FileMinus }, { k: 'followups', label: 'Follow-ups', icon: BellRing },
   { k: 'payments', label: 'Payments', icon: Banknote }, { k: 'receivables', label: 'Receivables ageing', icon: FileClock },
 ] as const
+const TONE_TINT = { neutral: 'slate', blue: 'blue', green: 'green', amber: 'amber', red: 'rose' } as const
 const METHOD: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank transfer', cheque: 'Cheque', pdc: 'PDC cheque', card: 'Card', other: 'Other' }
 
 export default async function Invoices({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -82,17 +84,23 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   const isInv = t === 'invoice'
   return <Card>
-    <form className="flex flex-wrap gap-2 border-b border-border p-3"><input type="hidden" name="tab" value={t} />
-      <input name="q" type="search" defaultValue={sp.q} aria-label={`Search ${meta.plural.toLowerCase()}`} placeholder="Search number, customer, site, LPO…" className={`${cls} w-full sm:w-auto sm:min-w-52 sm:flex-1`} />
-      <select name="status" defaultValue={sp.status ?? ''} aria-label="Status" className={`${cls} min-w-0 flex-1 sm:flex-none`}><option value="">Any status</option>{meta.statuses.map(s => <option key={s} value={s}>{statusLabel(t, s)}</option>)}</select>
-      <button className="h-9 cursor-pointer rounded-md border border-border px-3 text-sm hover:bg-surface-2">Filter</button></form>
+    <FilterTabs label="Status" className="px-2 sm:hidden" tabs={[{ href: `/invoices?tab=${t}`, label: 'All', active: !sp.status }, ...meta.statuses.filter(x => x !== 'cancelled').slice(0, 4).map(x => ({ href: `/invoices?tab=${t}&status=${x}`, label: statusLabel(t, x), active: sp.status === x }))]} />
+    <form className="border-b border-border p-3"><input type="hidden" name="tab" value={t} />
+      <FilterBar active={!!sp.status} search={<input name="q" type="search" defaultValue={sp.q} aria-label={`Search ${meta.plural.toLowerCase()}`} placeholder="Search number, customer, site, LPO…" className={`${cls} h-11 min-w-0 flex-1 sm:h-10`} />}>
+        <select name="status" defaultValue={sp.status ?? ''} aria-label="Status" className={`${cls} min-w-0 sm:flex-none`}><option value="">Any status</option>{meta.statuses.map(s => <option key={s} value={s}>{statusLabel(t, s)}</option>)}</select>
+        <button className="h-10 cursor-pointer rounded-lg border border-border px-4 text-sm hover:bg-surface-2">Filter</button></FilterBar></form>
     {(sp.due || sp.issued || sp.won || sp.from || sp.to || sp.customer || sp.project) && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-primary-soft/50 px-4 py-2 text-sm">
       <span>Filtered list{sp.due === 'overdue' ? ': overdue (past due date, not fully paid)' : sp.due === 'open' ? ': open invoices' : ''}{sp.won ? ': accepted or converted' : ''}{sp.from || sp.to ? ` · issued ${sp.from ?? '…'} to ${sp.to ?? '…'}` : ''}{sp.customer ? ' · one customer' : ''}{sp.project ? ' · one project' : ''}</span>
       <Link href={`/invoices?tab=${t}`} className="text-xs font-medium text-primary hover:underline">Clear filter</Link></div>}
     {!data?.length ? <EmptyState icon={t === 'invoice' ? Receipt : t === 'quotation' ? ScrollText : t === 'credit_note' ? FileMinus : Truck} title={term || sp.status ? `No ${meta.plural.toLowerCase()} match` : `No ${meta.plural.toLowerCase()} yet`}
       body={term || sp.status ? 'Try a different search or status.' : t === 'credit_note' ? 'Credit notes are created from an issued tax invoice (⋯ → Create credit note). They reduce the invoice balance.' : `Create your first ${meta.label.toLowerCase()}. It uses your letterhead, stamp and terms automatically.`}
       action={edit && !term && !sp.status && t !== 'credit_note' ? <NewSalesButtons only={[t]} /> : undefined} />
-      : <TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Customer</Th><Th>Subject / project</Th><Th>Date</Th>{t !== 'delivery_note' && <Th>{isInv ? 'Due' : 'Valid until'}</Th>}{meta.priced && <Th className="text-right">Total (AED)</Th>}{isInv && <Th className="text-right">Balance</Th>}<Th>Status</Th></tr></thead>
+      : <><MList>{data.map((r: any) => { const bal = Number(r.total) - (paidOf.get(r.id) ?? 0), tone = STATUS_TONE[r.status] ?? 'neutral'
+          return <MRow key={r.id} href={`/invoices/${r.id}`} lead={<Tile icon={t === 'quotation' ? ScrollText : t === 'invoice' ? Receipt : t === 'credit_note' ? FileMinus : Truck} tint={TINTS[TONE_TINT[tone]]} />}
+            title={r.number} sub={r.customer_name ?? r.subject ?? '—'}
+            line={meta.priced ? <span className="font-bold tabular-nums">AED {fmtMoney(r.total)}{isInv && bal > 0.005 && !['draft', 'cancelled', 'paid'].includes(r.status) && <span className="ms-2 text-xs font-medium text-muted">{fmtMoney(bal)} due</span>}</span> : undefined}
+            right={<Badge tone={tone}>{statusLabel(t, r.status)}</Badge>} rightSub={formatShortDate(r.issue_date)} /> })}</MList>
+        <div className="hidden sm:block"><TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Customer</Th><Th>Subject / project</Th><Th>Date</Th>{t !== 'delivery_note' && <Th>{isInv ? 'Due' : 'Valid until'}</Th>}{meta.priced && <Th className="text-right">Total (AED)</Th>}{isInv && <Th className="text-right">Balance</Th>}<Th>Status</Th></tr></thead>
         <tbody className="divide-y divide-border">{data.map((r: any) => {
           const bal = Number(r.total) - (paidOf.get(r.id) ?? 0)
           return <tr key={r.id} className="hover:bg-surface-2/50">
@@ -104,7 +112,8 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
             {meta.priced && <Td className="text-right tabular-nums">{fmtMoney(r.total)}</Td>}
             {isInv && <Td className={cn('text-right tabular-nums', bal > 0 && !['draft', 'cancelled'].includes(r.status) ? 'font-medium' : 'text-muted')}>{['draft', 'cancelled'].includes(r.status) ? '—' : fmtMoney(bal)}</Td>}
             <Td badge><Badge tone={STATUS_TONE[r.status]}>{statusLabel(t, r.status)}</Badge></Td></tr>
-        })}</tbody></TableWrap>}
+        })}</tbody></TableWrap></div></>}
+    {edit && t !== 'credit_note' && <NewDocFab type={t} label={`Quick create: ${meta.label.toLowerCase()}`} />}
     <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/invoices" />
   </Card>
 }

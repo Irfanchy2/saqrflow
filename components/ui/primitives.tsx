@@ -98,19 +98,17 @@ const valueTone: Partial<Record<Tone, string>> = { red: 'text-danger' }
 export function StatCard({ label, value, hint, href, tone: t = 'neutral', icon, change, bars, index = 0 }: { label: string; value: ReactNode; hint?: ReactNode; icon?: LucideIcon; href?: string; tone?: Tone; change?: number | null; bars?: number[]; index?: number }) {
   const Icon = icon ?? iconFor(label), tile = t === 'red' ? RED_TILE : TILES[index % TILES.length]
   const showChange = change !== undefined && change !== null
-  const inner = <div className={cn('stat flex h-full min-w-0 flex-col rounded-xl border border-border bg-surface p-3.5 shadow-card sm:p-[18px]', href && 'transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-md')}>
-    <div className="flex min-w-0 items-center gap-3">
-      <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10', tile)} aria-hidden><Icon size={18} strokeWidth={1.9} /></span>
-      <span className="min-w-0 flex-1 text-[12.5px] font-medium leading-snug text-muted sm:text-[13px]">{label}</span></div>
-    <div className={cn('mt-2.5 text-[19px] font-bold leading-tight sm:mt-3 sm:text-[22px] tabular-nums tracking-[-0.025em] [overflow-wrap:anywhere]', valueTone[t])}>{value}</div>
-    {(showChange || hint || bars) && <div className="mt-auto flex min-w-0 items-end justify-between gap-3 pt-1.5">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted">
-        {showChange && <span className={cn('inline-flex shrink-0 items-center gap-0.5 font-semibold tabular-nums', change >= 0 ? 'text-success' : 'text-danger')}>{change >= 0 ? <ArrowUp size={12} strokeWidth={2.5} aria-hidden /> : <ArrowDown size={12} strokeWidth={2.5} aria-hidden />}{Math.abs(change)}%</span>}
-        {hint && <span className="min-w-0">{hint}</span>}</div>
-      {bars && <MiniBars values={bars} className={t === 'red' ? 'bg-rose-500' : BARS[index % BARS.length]} />}
-    </div>}
+  // layout is CSS (globals.css .kpi): stacked on narrow cards, icon tile on the left with bars bottom-right once the card is wide enough
+  const inner = <div className={cn('stat kpi-in h-full min-w-0 rounded-xl border border-border bg-surface p-3.5 shadow-card sm:p-[18px]', href && 'transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-md')}>
+    <span className={cn('kpi-tile grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11', tile)} aria-hidden><Icon size={19} strokeWidth={1.9} /></span>
+    <span className="kpi-label min-w-0 text-[12.5px] font-medium leading-snug text-muted sm:text-[13px]">{label}</span>
+    <div className={cn('kpi-value text-[19px] font-bold leading-tight tabular-nums tracking-[-0.025em] [overflow-wrap:anywhere] sm:text-[22px]', valueTone[t])}>{value}</div>
+    {(showChange || hint) && <div className="kpi-hint flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted">
+      {showChange && <span className={cn('inline-flex shrink-0 items-center gap-0.5 font-semibold tabular-nums', change >= 0 ? 'text-success' : 'text-danger')}>{change >= 0 ? <ArrowUp size={12} strokeWidth={2.5} aria-hidden /> : <ArrowDown size={12} strokeWidth={2.5} aria-hidden />}{Math.abs(change)}%</span>}
+      {hint && <span className="min-w-0">{hint}</span>}</div>}
+    {bars && <span className="kpi-bars"><MiniBars values={bars} className={t === 'red' ? 'bg-rose-500' : BARS[index % BARS.length]} /></span>}
   </div>
-  return href ? <Link href={href} className="block h-full rounded-xl focus-visible:ring-offset-0">{inner}</Link> : inner
+  return href ? <Link href={href} className="kpi block h-full rounded-xl focus-visible:ring-offset-0">{inner}</Link> : <div className="kpi h-full">{inner}</div>
 }
 /** A row of KPI cards. Columns follow the number of cards; each card gets the next tile colour. */
 export function Metrics({ children, className, cols }: { children: ReactNode; className?: string; cols?: 2 | 3 | 4 | 5 | 6 }) {
@@ -118,7 +116,8 @@ export function Metrics({ children, className, cols }: { children: ReactNode; cl
   const n = cols ?? (Math.min(6, Math.max(2, kids.length)) as 2 | 3 | 4 | 5 | 6)
   const lg = { 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-3 xl:grid-cols-5', 6: 'lg:grid-cols-3 2xl:grid-cols-6' }[n]
   let i = 0
-  return <div className={cn('metrics grid grid-cols-2 gap-3 sm:gap-4', n >= 3 && 'md:grid-cols-3', lg, className)}>
+  // phones: one swipeable strip of compact cards, so the list below starts near the top of the screen
+  return <div className={cn('metrics tabstrip -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:w-[46%] [&>*]:min-w-[158px] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto sm:[&>*]:min-w-0', n >= 3 && 'md:grid-cols-3', lg, className)}>
     {kids.map(k => isValidElement(k) && k.type === StatCard ? cloneElement(k as React.ReactElement<{ index?: number }>, { index: (k.props as { index?: number }).index ?? i++ }) : k)}</div>
 }
 
@@ -132,9 +131,9 @@ export function EmptyState({ title, body, action, icon: Icon = Inbox }: { title:
 export const PageHeader = ({ title, sub, actions, crumbs }: { title: string; sub?: string; actions?: ReactNode; crumbs?: { label: string; href?: string }[] }) =>
   <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
     <div className="min-w-0">
-      {crumbs && crumbs.length > 0 && <nav aria-label="Breadcrumb" className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[13px] text-muted">{crumbs.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span aria-hidden className="text-muted/60">›</span>}{c.href ? <Link href={c.href} className="hover:text-fg">{c.label}</Link> : <span className="text-fg">{c.label}</span>}</span>)}</nav>}
-      <h1 className="text-[22px] font-bold leading-tight tracking-[-0.025em] sm:text-[24px]">{title}</h1>{sub && <p className="mt-1 max-w-[72ch] text-sm text-muted">{sub}</p>}</div>
-    <div className="flex flex-wrap items-center gap-2">{actions}</div></div>
+      {crumbs && crumbs.length > 0 && <nav aria-label="Breadcrumb" className="mb-1.5 hidden flex-wrap sm:flex items-center gap-1.5 text-[13px] text-muted">{crumbs.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span aria-hidden className="text-muted/60">›</span>}{c.href ? <Link href={c.href} className="hover:text-fg">{c.label}</Link> : <span className="text-fg">{c.label}</span>}</span>)}</nav>}
+      <h1 className="text-[24px] font-bold leading-tight tracking-[-0.025em]">{title}</h1>{sub && <p className="mt-1 hidden max-w-[72ch] text-sm text-muted sm:block">{sub}</p>}</div>
+    {actions && <div className="tabstrip -mx-4 flex w-[calc(100%+2rem)] items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">{actions}</div>}</div>
 
 export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: ReactNode }) =>
   <div role={t === 'red' ? 'alert' : undefined} className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/25 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/25 bg-warning/5' : t === 'green' ? 'border-success/25 bg-success/5' : t === 'neutral' ? 'border-border bg-surface-2' : 'border-primary/20 bg-primary-soft')}>{children}</div>
