@@ -33,8 +33,8 @@ try {
   const welder = (await one(`insert into employees(company_id,employee_no,full_name,designation) values ($1,'E-101','Anil Thomas','Welder') returning id`, [co])).id
   const fitter = (await one(`insert into employees(company_id,employee_no,full_name,designation) values ($1,'E-102','Rashid Khan','Fitter') returning id`, [co])).id
   const nav = await p.locator('aside[data-collapsed]').innerText()
-  for (const l of ['Leads & Pipeline', 'Site Visits', 'Work Orders', 'Daily Site Reports', 'Tasks']) ok(nav.includes(l), `sidebar: ${l}`)
-  ok(nav.includes('Sales & CRM') && nav.includes('Projects & site'), 'sidebar grouped: Sales & CRM, Projects & site')
+  for (const l of ['CRM & Leads', 'Site Visits', 'Work Orders', 'Daily Site Reports', 'Tasks']) ok(nav.includes(l), `sidebar: ${l}`)
+  ok(/SALES/.test(nav) && /OPERATIONS/.test(nav), 'sidebar grouped: Sales, Operations')
   ok(!/inventory|stock|warehouse/i.test(nav), 'no inventory / stock / warehouse module anywhere in navigation')
 
   console.log('\n[1a] Lead (double-click save → one lead, numbered)')

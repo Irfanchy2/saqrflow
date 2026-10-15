@@ -6,23 +6,25 @@
    Status colours are tint + readable text only. Radius: chips 4 px · controls 6 px · containers 8 px.
    Elevation: borders separate surfaces; shadows only for floating layers, plus a 1 px hairline lift on containers. */
 :root {
-  --bg: 216 26% 97%; --surface: 0 0% 100%; --surface-2: 216 24% 95.5%; --border: 216 18% 89.5%; --border-strong: 216 14% 79%;
-  --fg: 218 34% 11%; --muted: 217 12% 40%;
-  --primary: 216 80% 46%; --primary-fg: 0 0% 100%; --primary-soft: 216 90% 96%;
-  --success: 156 58% 29%; --warning: 30 88% 36%; --danger: 0 68% 45%;
-  --nav: 216 26% 97%;
-  --sb: 220 42% 11%; --sb-2: 220 34% 16%; --sb-line: 220 26% 21%; --sb-fg: 216 30% 94%; --sb-muted: 217 18% 66%; --sb-accent: 212 92% 68%;
-  --shadow: 220 40% 20%;
+  --bg: 220 33% 97.5%; --surface: 0 0% 100%; --surface-2: 220 33% 96.5%; --border: 220 22% 91%; --border-strong: 220 16% 82%;
+  --fg: 222 47% 11%; --muted: 220 11% 44%;
+  --primary: 217 85% 51%; --primary-fg: 0 0% 100%; --primary-soft: 217 100% 96.5%;
+  --ink: 223 55% 14%; --ink-fg: 0 0% 100%;
+  --success: 152 60% 32%; --warning: 28 90% 40%; --danger: 354 70% 48%;
+  --nav: 220 33% 97.5%;
+  --sb: 223 60% 12%; --sb-2: 223 45% 18%; --sb-line: 223 38% 19%; --sb-fg: 220 30% 95%; --sb-muted: 221 22% 70%; --sb-accent: 217 85% 56%;
+  --shadow: 222 45% 25%;
   /* chart series: validated categorical slots 1-3 (CVD ΔE ≥ 9 adjacent); dark mode uses its own steps */
   --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
 }
 .dark {
-  --bg: 221 28% 7%; --surface: 221 24% 10%; --surface-2: 221 20% 13.5%; --border: 221 16% 19%; --border-strong: 221 12% 29%;
-  --fg: 216 24% 93%; --muted: 217 12% 64%;
-  --primary: 214 86% 64%; --primary-fg: 221 40% 8%; --primary-soft: 218 40% 17%;
-  --success: 152 45% 55%; --warning: 36 85% 60%; --danger: 0 72% 68%;
-  --nav: 221 28% 7%;
-  --sb: 222 34% 6%; --sb-2: 221 28% 11%; --sb-line: 221 22% 15%; --sb-fg: 216 26% 92%; --sb-muted: 217 14% 60%; --sb-accent: 212 92% 70%;
+  --bg: 223 30% 7%; --surface: 223 26% 10.5%; --surface-2: 223 22% 14%; --border: 223 18% 19%; --border-strong: 223 14% 29%;
+  --fg: 220 26% 94%; --muted: 220 12% 64%;
+  --primary: 215 90% 64%; --primary-fg: 223 40% 8%; --primary-soft: 218 45% 18%;
+  --ink: 215 90% 64%; --ink-fg: 223 40% 8%;
+  --success: 152 45% 55%; --warning: 36 85% 60%; --danger: 354 75% 68%;
+  --nav: 223 30% 7%;
+  --sb: 223 40% 6%; --sb-2: 223 32% 12%; --sb-line: 223 26% 15%; --sb-fg: 220 26% 93%; --sb-muted: 221 14% 62%; --sb-accent: 215 90% 62%;
   --shadow: 222 50% 2%;
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
 }
@@ -53,11 +55,8 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 .skeleton { @apply relative overflow-hidden rounded-md bg-surface-2; }
 .skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .05), transparent); animation: shimmer 1.4s infinite; }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
-/* metrics inside a ruled strip: cells share hairlines instead of floating as separate cards */
-.metrics .stat { border-width: 0; border-bottom-width: 1px; border-inline-end-width: 1px; border-radius: 0; }
-.metrics a { border-radius: 0; }
-/* odd number of metrics on the 2-column phone grid: the last one spans the row instead of leaving an empty cell */
-@media (max-width: 767px) { .metrics > div > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
+/* odd number of metric cards on the 2-column phone grid: the last one spans the row instead of leaving an empty cell */
+@media (max-width: 767px) { .metrics > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
 
 /* data tables: quiet hover; a row that leads somewhere is clickable as a whole (components/layout/row-navigator) */
 .rtable tbody tr { transition: background-color .12s ease; }

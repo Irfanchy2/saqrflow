@@ -1,15 +1,14 @@
 import Link from 'next/link'
-import { ArrowRight, CheckCircle2, HardHat } from 'lucide-react'
+import { Banknote, CalendarDays, CheckCircle2, FileText, HardHat, Landmark, Receipt, ShieldCheck, Truck, Flag, Users, Wallet } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
-import { Card, CardHeader, EmptyState } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { buildAlerts } from '@/lib/dashboard'
 import { summarizeCheques } from '@/lib/cheques'
 import { addDays, formatAed, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SmartInboxPanel } from '@/components/inbox/smart-center'
-import { Progress } from '@/components/projects/project-fields'
 import { loadSalesKpis } from '@/lib/sales/kpis'
-import { AGE_BUCKETS, receivablesAgeing } from '@/lib/sales/summary'
+import { receivablesAgeing } from '@/lib/sales/summary'
 import { PROJECT_STATUS } from '@/lib/projects'
 import { ACTION_LABEL, TABLE_LABEL } from '@/lib/audit'
 import { QuickActions } from '@/components/layout/quick-actions'
@@ -17,10 +16,12 @@ import { DashboardCustomize } from '@/components/dashboard-customize'
 import { normalizeLayout, type WidgetKey } from '@/lib/dashboard-widgets'
 import { canDecide } from '@/lib/approvals'
 import { buildTrend, greeting } from '@/lib/dashboard-trend'
-import { Spark } from '@/components/dashboard/spark'
 import { TrendChart } from '@/components/dashboard/trend-chart'
 import { CardTabs } from '@/components/dashboard/tabs'
-import { Badge, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { QuickGrid } from '@/components/dashboard/quick-grid'
+import { MiniCalendar } from '@/components/dashboard/mini-calendar'
+import { DashboardBanner } from '@/components/dashboard/banner'
+import { TaskCheck } from '@/components/dashboard/task-check'
 import { STATUS_TONE, statusLabel } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
 
@@ -48,7 +49,7 @@ export default async function Dashboard() {
   const layout = normalizeLayout(prefs.data?.value)
   const on = (k: WidgetKey) => layout.items.some(i => i.key === k && !i.hidden)
   const extras = Promise.all([
-    on('mytasks') ? c.supabase.from('tasks').select('id,title,due_date').eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).is('deleted_at', null).order('due_date', { nullsFirst: false }).limit(8) : null,
+    on('mytasks') ? c.supabase.from('tasks').select('id,title,due_date,project:projects(name)').eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).is('deleted_at', null).order('due_date', { nullsFirst: false }).limit(8) : null,
     on('approvals') ? c.supabase.from('approval_requests').select('id,title,amount,entity_type').eq('status', 'pending').order('requested_at').limit(20) : null,
   ])
   const [sources, cheques, activity, salesData, monthInv, monthExp, dueSoon, followDue, activeProjects, activeCount, exp30, expired, visas, vehicles, emp, docsAny, people] = await Promise.all([
@@ -71,10 +72,16 @@ export default async function Dashboard() {
     c.can('audit.view') ? sb.from('profiles').select('id,full_name') : null,
   ])
   const [myTasksRes, apprRes] = await extras
+  const since8 = (() => { const d = new Date(`${c.today.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() - 7); return d.toISOString().slice(0, 10) })()
+  const [projMonths, quoteMonths, recentE] = await Promise.all([
+    c.can('documents.view') ? sb.from('projects').select('created_at').gte('created_at', since8).limit(5000) : null,
+    canFin ? sb.from('invoices').select('issue_date').eq('doc_type', 'quotation').is('deleted_at', null).gte('issue_date', since8).limit(5000) : null,
+    canFin && on('recent') ? sb.from('project_expenses').select('id,spent_on,amount,description,category,project:projects(id,name)').order('spent_on', { ascending: false }).order('created_at', { ascending: false }).limit(6) : null,
+  ])
   const [payYear, recentQ, recentI, recentP] = canFin ? await Promise.all([
     sb.from('payments').select('paid_on,amount').gte('paid_on', yearStart).lte('paid_on', c.today).limit(20000),
-    on('recent') ? sb.from('invoices').select('id,number,customer_name,issue_date,valid_until,total,status,doc_type').eq('doc_type', 'quotation').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
-    on('recent') ? sb.from('invoices').select('id,number,customer_name,issue_date,due_date,total,status,doc_type').eq('doc_type', 'invoice').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
+    on('recent') ? sb.from('invoices').select('id,number,customer_name,subject,site,issue_date,valid_until,total,status,doc_type,project:projects(name)').eq('doc_type', 'quotation').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
+    on('recent') ? sb.from('invoices').select('id,number,customer_name,subject,site,issue_date,due_date,total,status,doc_type,project:projects(name)').eq('doc_type', 'invoice').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
     on('recent') ? sb.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name),customer:customers(id,name)').order('paid_on', { ascending: false }).order('created_at', { ascending: false }).limit(6) : null,
   ]) : [null, null, null, null]
   const trend = canFin ? buildTrend(c.today, (monthInv?.data ?? []) as any, (payYear?.data ?? []) as any, (monthExp?.data ?? []) as any) : null
@@ -110,111 +117,140 @@ export default async function Dashboard() {
   ].filter(x => x.v !== undefined && x.v !== null)
   const opsNow = ops.filter(o => (o.v ?? 0) > 0)
 
+  const months8 = trend ? trend.months.slice(-8) : []
+  const bucket = (dates: string[]) => { const keys = months8.map(m => m.key); return keys.map(k => dates.filter(d => d.slice(0, 7) === k).length) }
+  const projBars = months8.length ? bucket((projMonths?.data ?? []).map((r: any) => String(r.created_at).slice(0, 10))) : []
+  const quoteBars = months8.length ? bucket((quoteMonths?.data ?? []).map((r: any) => r.issue_date)) : []
+  const dueMap = new Map<string, number>(); for (const s of sources.data ?? []) dueMap.set(s.due_date, (dueMap.get(s.due_date) ?? 0) + 1)
+  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: c.company.timezone || 'Asia/Dubai' }).format(new Date())
+  const tz = c.company.timezone || 'Asia/Dubai', place = tz === 'Asia/Dubai' ? 'Dubai, UAE' : tz.split('/').pop()!.replace(/_/g, ' ')
+  const can = { sales: canFin && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }
+  const ALERT_ICON: Record<string, [typeof FileText, string]> = { document: [FileText, 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300'], cheque: [Landmark, 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300'], followup: [CalendarDays, 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'], lead_followup: [CalendarDays, 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300'], task: [CheckCircle2, 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300'],
+    invoice: [Receipt, 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'], milestone: [Flag, 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300'], asset: [Truck, 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'] }
+  const alertIcon = (key: string) => { const t = key.split(':')[0]; return ALERT_ICON[t.startsWith('asset_') ? 'asset' : t] ?? [ShieldCheck, 'bg-surface-2 text-muted'] }
+  const ACT: Record<string, [typeof FileText, string]> = { invoices: [Receipt, 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'], payments: [Banknote, 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300'], projects: [HardHat, 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'], cheques: [Landmark, 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300'], documents: [FileText, 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300'],
+    customers: [Users, 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300'], employees: [Users, 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300'],
+    assets: [Truck, 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'], project_expenses: [Wallet, 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300'] }
+  const ago = (iso: string) => { const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : m < 2880 ? 'yesterday' : formatShortDate(iso.slice(0, 10)) }
+  const tone = (st: string): 'green' | 'amber' | 'red' | 'blue' | 'neutral' => st === 'active' ? 'green' : st === 'on_hold' ? 'amber' : st === 'planning' ? 'blue' : 'neutral'
+
   const W: Partial<Record<WidgetKey, React.ReactNode>> = {
-    finance: (sk && ageing && cs && trend) ? <section aria-label="Financial pulse" className="mb-5 overflow-hidden rounded-lg border border-border bg-surface shadow-card">
-      <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 [&>*]:border-border sm:[&>*:nth-child(odd)]:border-e xl:[&>*]:border-e xl:[&>*:last-child]:border-e-0 sm:[&>*:nth-child(-n+2)]:border-b xl:[&>*:nth-child(-n+2)]:border-b-0">
-        <Pulse href="/reports?period=month" label="Sales this month" value={formatAed(salesNet)} delta={trend.change.sales} note="excl. VAT · vs same days last month"
-          spark={<Spark values={trend.months.map(m => m.sales)} label="Sales, last 12 months" />} />
-        <Pulse href="/invoices?tab=receivables" label="Outstanding receivables" value={formatAed(sk.outstanding)}
-          note={<>{sk.openCount} open invoice{sk.openCount === 1 ? '' : 's'}{sk.overdueCount > 0 && <> · <span className="font-medium text-danger">{formatAed(sk.overdue)} overdue</span></>}</>}
-          foot={ageing.grand > 0 ? <div className="mt-3"><div className="flex h-1.5 gap-px overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`Ageing: ${AGE_BUCKETS.map((b, i) => `${b} ${formatAed(ageing.totals[i])}`).join(', ')}`}>
-            {ageing.totals.map((v, i) => v > 0 && <span key={i} style={{ flexGrow: v }} className={['bg-primary/70', 'bg-warning/60', 'bg-warning', 'bg-danger/70', 'bg-danger'][i]} />)}</div>
-            <div className="mt-1.5 flex justify-between text-[11px] text-muted"><span>Not due</span><span>90+ days</span></div></div> : null} />
-        <Pulse href="/invoices?tab=payments" label="Collected this month" value={formatAed(trend.mtd.collected)} delta={trend.change.collected} note={`Invoiced ${formatAed(sk.invoicedThisMonth)} incl. VAT`}
-          spark={<Spark values={trend.months.map(m => m.collected)} className="text-success" label="Collections, last 12 months" />} />
-        <Pulse href="/invoices?tab=quotation" label="Open quotations" value={formatAed(sk.pipeline)}
-          note={<>{sk.pipelineCount} open{sk.winRate !== null ? ` · ${sk.winRate}% accepted` : ''} · {(followDue?.count ?? 0) > 0 ? <span className="font-medium text-warning">{followDue!.count} follow-up{followDue!.count === 1 ? '' : 's'} due</span> : 'no follow-ups due'}</>} />
-      </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border bg-surface-2/40 px-4 py-2 text-xs text-muted">
-        <Link href="/cheques" className="hover:text-fg">Cheques this week <span className="font-medium tabular-nums text-fg">In {formatAed(amt(weekIn))}</span> · <span className="font-medium tabular-nums text-fg">Out {formatAed(amt(weekOut))}</span></Link>
-        {expenses > 0 && <Link href="/expenses" className="hover:text-fg" title="Sales excluding VAT minus recorded expenses; labour and overheads count only if recorded">Recorded expenses this month <span className="font-medium tabular-nums text-fg">{formatAed(expenses)}</span> · Estimated margin <span className="font-medium tabular-nums text-fg">{formatAed(salesNet - expenses)}</span></Link>}
-        {(dueSoon?.count ?? 0) > 0 && <Link href="/invoices?tab=invoice&status=sent" className="hover:text-fg"><span className="font-medium tabular-nums text-fg">{dueSoon!.count}</span> invoice{dueSoon!.count === 1 ? '' : 's'} due in 7 days</Link>}
+    banner: <DashboardBanner company={c.company.name} stats={[
+      ...(activeCount ? [{ label: 'Active projects', value: activeCount.count ?? 0, href: '/projects' }] : []),
+      ...(visitsToday.count !== undefined && visitsToday.count !== null ? [{ label: 'Site visits today', value: visitsToday.count, href: '/site-visits' }] : []),
+      { label: 'My tasks due', value: myDue.count ?? 0, href: '/tasks?view=mine' },
+    ]} />,
+    finance: (sk && ageing && cs && trend) ? <section aria-label="Key figures" className="mb-5">
+      <Metrics cols={4}>
+        <StatCard label="Sales this month" value={formatAed(salesNet)} change={trend.change.sales} hint="vs same days last month" bars={months8.map(m => m.sales)} href="/reports?period=month" icon={Receipt} />
+        <StatCard label="Outstanding receivables" value={formatAed(sk.outstanding)} hint={sk.overdueCount > 0 ? <span className="font-medium text-danger">{formatAed(sk.overdue)} overdue</span> : `${sk.openCount} open invoice${sk.openCount === 1 ? '' : 's'}`} bars={ageing.grand > 0 ? ageing.totals : undefined} href="/invoices?tab=receivables" />
+        <StatCard label="Collected this month" value={formatAed(trend.mtd.collected)} change={trend.change.collected} hint="vs same days last month" bars={months8.map(m => m.collected)} href="/invoices?tab=payments" icon={Banknote} />
+        <StatCard label="Open quotations" value={formatAed(sk.pipeline)} hint={(followDue?.count ?? 0) > 0 ? <span className="font-medium text-warning">{followDue!.count} follow-up{followDue!.count === 1 ? '' : 's'} due</span> : `${sk.pipelineCount} open · no follow-ups due`} bars={quoteBars} href="/invoices?tab=quotation" />
+      </Metrics>
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-xl border border-border bg-surface px-5 py-2.5 text-[13px] text-muted shadow-card">
+        <Link href="/cheques" className="hover:text-fg">Cheques this week <span className="font-semibold tabular-nums text-fg">In {formatAed(amt(weekIn))}</span> · <span className="font-semibold tabular-nums text-fg">Out {formatAed(amt(weekOut))}</span></Link>
+        {expenses > 0 && <Link href="/expenses" className="hover:text-fg" title="Sales excluding VAT minus recorded expenses; labour and overheads count only if recorded">Recorded expenses this month <span className="font-semibold tabular-nums text-fg">{formatAed(expenses)}</span> · Estimated margin <span className="font-semibold tabular-nums text-fg">{formatAed(salesNet - expenses)}</span></Link>}
+        {(dueSoon?.count ?? 0) > 0 && <Link href="/invoices?tab=invoice&status=sent" className="hover:text-fg"><span className="font-semibold tabular-nums text-fg">{dueSoon!.count}</span> invoice{dueSoon!.count === 1 ? '' : 's'} due in 7 days</Link>}
+        {sk.winRate !== null && <span>Quotation win rate <span className="font-semibold tabular-nums text-fg">{sk.winRate}%</span></span>}
       </div>
     </section> : null,
-    trend: trend ? <Card><CardHeader title="Sales & collections" sub="Last 12 months. Hover a month for its value" action={<Link href="/reports" className="text-xs font-medium text-primary hover:underline">Reports</Link>} />
-      <TrendChart months={trend.months} /></Card> : null,
-    recent: canFin && recentQ ? <Card><CardTabs id="recent" action={<Link href="/invoices" className="text-xs font-medium text-primary hover:underline">All documents</Link>} tabs={[
-      { key: 'q', label: 'Quotations', panel: <DocTable rows={recentQ.data ?? []} dateCol="Valid until" date={(r: any) => r.valid_until} empty="No quotations yet" /> },
-      { key: 'i', label: 'Invoices', panel: <DocTable rows={recentI?.data ?? []} dateCol="Due" date={(r: any) => r.due_date} empty="No invoices yet" /> },
-      { key: 'p', label: 'Payments', panel: !(recentP?.data ?? []).length ? <EmptyState title="No payments yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Received from</Th><Th>Against</Th><Th className="text-right">Amount</Th></tr></thead>
-        <tbody className="divide-y divide-border">{(recentP!.data ?? []).map((x: any) => <tr key={x.id}><Td className="whitespace-nowrap tabular-nums text-muted">{formatShortDate(x.paid_on)}</Td>
+    trend: trend ? <Card><TrendChart months={trend.months} change={{ sales: trend.change.sales, collected: trend.change.collected }} action={<CardLink href="/reports">Reports</CardLink>} /></Card> : null,
+    quick: <Card className="h-full"><CardHeader title="Quick actions" /><QuickGrid can={{ sales: can.sales, crm: c.can('crm.view') && c.can('records.edit'), docs: can.docs, people: can.people, projects: c.can('documents.view') && c.can('records.edit') }} /></Card>,
+    recent: canFin && recentQ ? <Card><CardTabs id="recent" action={<CardLink href="/invoices">All documents</CardLink>} tabs={[
+      { key: 'q', label: 'Recent quotations', panel: <DocTable rows={recentQ.data ?? []} dateCol="Valid until" date={(r: any) => r.valid_until} empty="No quotations yet" /> },
+      { key: 'i', label: 'Recent invoices', panel: <DocTable rows={recentI?.data ?? []} dateCol="Due" date={(r: any) => r.due_date} empty="No invoices yet" /> },
+      { key: 'p', label: 'Recent payments', panel: !(recentP?.data ?? []).length ? <EmptyState title="No payments yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Received from</Th><Th>Against</Th><Th>Method</Th><Th className="text-right">Amount</Th></tr></thead>
+        <tbody className="divide-y divide-border">{(recentP!.data ?? []).map((x: any) => <tr key={x.id}><Td className="whitespace-nowrap tabular-nums">{formatShortDate(x.paid_on)}</Td>
           <Td className="max-w-[240px] truncate font-medium">{x.invoice?.customer_name ?? x.customer?.name ?? '—'}</Td>
-          <Td>{x.invoice ? <Link href={`/invoices/${x.invoice.id}`} className="font-mono text-[13px] text-primary hover:underline">{x.invoice.number}</Link> : x.customer ? <Link href={`/parties/${x.customer.id}`} className="text-muted hover:text-fg">On account</Link> : <span className="text-muted">On account</span>}</Td>
-          <Td className="text-right font-medium tabular-nums text-success">{fmtMoney(x.amount)}</Td></tr>)}</tbody></TableWrap> },
+          <Td>{x.invoice ? <Link href={`/invoices/${x.invoice.id}`} className="font-medium text-primary hover:underline">{x.invoice.number}</Link> : x.customer ? <Link href={`/parties/${x.customer.id}`} className="text-muted hover:text-fg">On account</Link> : <span className="text-muted">On account</span>}</Td>
+          <Td className="capitalize text-muted">{String(x.method ?? '—').replace(/_/g, ' ')}</Td>
+          <Td className="text-right font-semibold tabular-nums text-success">{fmtMoney(x.amount)}</Td></tr>)}</tbody></TableWrap> },
+      ...(activeProjects ? [{ key: 'pr', label: 'Ongoing projects', panel: !(activeProjects.data ?? []).length ? <EmptyState title="No open projects" /> : <TableWrap><thead><tr><Th>Project</Th><Th>Customer</Th><Th>Fabrication</Th><Th>Site</Th><Th>Status</Th></tr></thead>
+        <tbody className="divide-y divide-border">{(activeProjects.data ?? []).map((p: any) => <tr key={p.id}><Td className="max-w-[260px] truncate font-medium"><Link href={`/projects/${p.id}`} className="hover:text-primary">{p.name}</Link></Td>
+          <Td className="max-w-[200px] truncate text-muted">{p.customer?.name ?? '—'}</Td><Td className="tabular-nums">{p.fabrication_progress ?? 0}%</Td><Td className="tabular-nums">{p.site_progress ?? 0}%</Td>
+          <Td badge><Badge tone={tone(p.status)}>{PROJECT_STATUS[p.status]?.label ?? p.status}</Badge></Td></tr>)}</tbody></TableWrap> }] : []),
+      ...(recentE ? [{ key: 'e', label: 'Recent expenses', panel: !(recentE.data ?? []).length ? <EmptyState title="No expenses yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Description</Th><Th>Project</Th><Th>Category</Th><Th className="text-right">Amount</Th></tr></thead>
+        <tbody className="divide-y divide-border">{(recentE.data ?? []).map((x: any) => <tr key={x.id}><Td className="whitespace-nowrap tabular-nums">{formatShortDate(x.spent_on)}</Td>
+          <Td className="max-w-[260px] truncate font-medium">{x.description}</Td><Td className="max-w-[200px] truncate">{x.project ? <Link href={`/projects/${x.project.id}`} className="text-muted hover:text-fg">{x.project.name}</Link> : '—'}</Td>
+          <Td className="capitalize text-muted">{x.category}</Td><Td className="text-right tabular-nums">{fmtMoney(x.amount)}</Td></tr>)}</tbody></TableWrap> }] : []),
     ]} /></Card> : null,
-    attention: <Card><CardHeader title="Needs attention" sub="Overdue or due within 30 days" action={c.can('reminders.create') ? <Link href="/reminders" className="text-xs font-medium text-primary hover:underline">All reminders</Link> : undefined} />
+    attention: <Card><CardHeader title="Needs attention" sub="Overdue or due within 30 days" action={c.can('reminders.create') ? <CardLink href="/reminders" /> : undefined} />
         {!alerts.length ? <EmptyState icon={CheckCircle2} title="Nothing is due" body="No documents, cheques, invoices or renewals fall due in the next 30 days." /> :
-          <ul className="max-h-[420px] divide-y divide-border overflow-y-auto overscroll-contain">{alerts.slice(0, 20).map(a => <li key={a.key}><Link href={a.href} className="group flex items-start gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2/50">
-            <span className={cn('mt-0.5 w-[72px] shrink-0 text-xs font-medium tabular-nums', a.severity === 'critical' ? 'text-danger' : a.severity === 'warning' ? 'text-warning' : 'text-muted')}>{a.days < 0 ? `${-a.days}d late` : a.days === 0 ? 'Today' : `In ${a.days}d`}</span>
-            <span className="min-w-0 flex-1"><span className="block truncate font-medium" title={a.text}>{a.text}</span><span className="block truncate text-xs text-muted">{a.sub}</span></span></Link></li>)}</ul>}</Card>,
+          <ul className="max-h-[440px] overflow-y-auto overscroll-contain px-2 pb-2">{alerts.slice(0, 20).map(a => { const [I, tint] = alertIcon(a.key); return <li key={a.key}><Link href={a.href} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-surface-2/70">
+            <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-lg', tint)} aria-hidden><I size={16} /></span>
+            <span className="min-w-0 flex-1"><span className="block truncate font-medium" title={a.text}>{a.text}</span><span className="block truncate text-xs text-muted">{a.sub}</span></span>
+            <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums', a.severity === 'critical' ? 'bg-danger/10 text-danger' : a.severity === 'warning' ? 'bg-warning/10 text-warning' : 'bg-surface-2 text-muted')}>{a.days < 0 ? `${-a.days}d late` : a.days === 0 ? 'Today' : `${a.days} days`}</span></Link></li> })}</ul>}</Card>,
+    calendar: <Card className="hidden md:block"><MiniCalendar today={c.today} due={dueMap} /></Card>,
     operations: ops.length > 0 && <Card><CardHeader title="Operations" sub={opsNow.length ? 'Counts that need someone today' : undefined} />
-          {!opsNow.length ? <p className="flex items-center gap-2 px-4 py-4 text-sm text-muted"><CheckCircle2 size={15} className="text-success" aria-hidden />All clear: no tasks, follow-ups, renewals or cheques waiting.</p> :
-          <ul className="divide-y divide-border">{opsNow.map(o => <li key={o.l}><Link href={o.href} className="flex items-center justify-between gap-3 px-4 py-2 text-sm hover:bg-surface-2/50">
+          {!opsNow.length ? <p className="flex items-center gap-2 px-5 pb-4 text-sm text-muted"><CheckCircle2 size={15} className="text-success" aria-hidden />All clear: no tasks, follow-ups, renewals or cheques waiting.</p> :
+          <ul className="px-2 pb-2">{opsNow.map(o => <li key={o.l}><Link href={o.href} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm hover:bg-surface-2/70">
             <span className="min-w-0 truncate text-muted">{o.l}</span>
-            <span className={cn('font-semibold tabular-nums', !o.v ? 'text-muted/60' : o.bad ? 'text-danger' : o.warn ? 'text-warning' : 'text-fg')}>{o.v}</span></Link></li>)}</ul>}</Card> || null,
+            <span className={cn('min-w-7 rounded-md px-1.5 text-center text-xs font-semibold leading-6 tabular-nums', o.bad ? 'bg-danger/10 text-danger' : o.warn ? 'bg-warning/10 text-warning' : 'bg-surface-2 text-fg')}>{o.v}</span></Link></li>)}</ul>}</Card> || null,
     inbox: (c.can('documents.upload') || c.can('employees.view_sensitive')) ? <SmartInboxPanel c={c} /> : null,
-    projects: activeProjects && <Card><CardHeader title="Projects in progress" sub={`${activeCount?.count ?? 0} active`} action={<Link href="/projects" className="text-xs font-medium text-primary hover:underline">All projects</Link>} />
+    projects: activeProjects && <Card className="h-full"><CardHeader title="Projects in progress" sub={`${activeCount?.count ?? 0} active`} action={<CardLink href="/projects" />} />
         {!(activeProjects.data ?? []).length ? <EmptyState icon={HardHat} title="No open projects" body="Create a project to follow fabrication and site progress, costs and billing." /> :
-          <ul className="divide-y divide-border">{(activeProjects.data ?? []).map((p: any) => <li key={p.id}><Link href={`/projects/${p.id}`} className="grid gap-2 px-4 py-3 hover:bg-surface-2/50 sm:grid-cols-[minmax(0,1fr)_130px_130px] sm:items-center">
-            <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}</span><span className="block truncate text-xs text-muted">{p.customer?.name ?? 'No customer'} · {PROJECT_STATUS[p.status]?.label}</span></span>
-            <Progress label="Fabrication" value={p.fabrication_progress} /><Progress label="Site" value={p.site_progress} tone="bg-success" /></Link></li>)}</ul>}</Card> || null,
-    activity: <Card><CardHeader title="Recent activity" action={c.can('audit.view') ? <Link href="/audit" className="text-xs font-medium text-primary hover:underline">Audit log</Link> : undefined} />
+          <ul className="px-2 pb-2">{(activeProjects.data ?? []).map((p: any) => { const pct = Math.round(((p.fabrication_progress ?? 0) + (p.site_progress ?? 0)) / 2); return <li key={p.id}><Link href={`/projects/${p.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-lg px-3 py-2.5 hover:bg-surface-2/70 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]">
+            <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}</span><span className="block truncate text-xs text-muted">{p.customer?.name ?? 'No customer'}</span></span>
+            <span className="col-span-2 flex items-center gap-2.5 sm:col-span-1" title={`Fabrication ${p.fabrication_progress ?? 0}% · Site ${p.site_progress ?? 0}%`}><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><span className={cn('block h-full rounded-full', pct >= 75 ? 'bg-success' : pct >= 40 ? 'bg-primary' : 'bg-warning')} style={{ width: `${pct}%` }} /></span><span className="w-9 text-end text-xs font-medium tabular-nums">{pct}%</span></span>
+            <span className="row-start-1 col-start-2 sm:col-start-3"><Badge tone={tone(p.status)}>{PROJECT_STATUS[p.status]?.label ?? p.status}</Badge></span></Link></li> })}</ul>}</Card> || null,
+    activity: <Card className="h-full"><CardHeader title="Recent activity" action={c.can('audit.view') ? <CardLink href="/audit">Audit log</CardLink> : undefined} />
         {activity ? ((activity.data?.length ?? 0) === 0 ? <EmptyState title="No activity yet" /> :
-          <ul className="divide-y divide-border text-sm">{activity.data!.map(a => <li key={a.id} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
-            <span className="min-w-0 truncate"><span className="font-medium">{TABLE_LABEL[a.table_name] ?? a.table_name.replace(/_/g, ' ')}</span> <span className="text-muted">{(ACTION_LABEL[a.action] ?? a.action).toLowerCase()} by {a.user_id ? who.get(a.user_id) ?? 'a former user' : 'the system'}</span></span>
-            <time className="shrink-0 text-xs tabular-nums text-muted">{new Date(a.created_at).toLocaleString('en-GB', { timeZone: c.company.timezone, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</time></li>)}</ul>)
+          <ul className="px-2 pb-2 text-sm">{activity.data!.map(a => { const [I, tint] = ACT[a.table_name] ?? [FileText, 'bg-surface-2 text-muted']; return <li key={a.id} className="flex items-center gap-3 rounded-lg px-3 py-2">
+            <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg', tint)} aria-hidden><I size={15} /></span>
+            <span className="min-w-0 flex-1 truncate"><span className="font-medium">{TABLE_LABEL[a.table_name] ?? a.table_name.replace(/_/g, ' ')}</span> <span className="text-muted">{(ACTION_LABEL[a.action] ?? a.action).toLowerCase()} by {a.user_id ? who.get(a.user_id) ?? 'a former user' : 'the system'}</span></span>
+            <time dateTime={a.created_at} title={new Date(a.created_at).toLocaleString('en-GB', { timeZone: c.company.timezone })} className="shrink-0 text-xs tabular-nums text-muted">{ago(a.created_at)}</time></li> })}</ul>)
           : <EmptyState title="Activity is visible to owners" body="Ask an owner for access to the audit trail." />}</Card>,
-    mytasks: myTasks ? <Card><CardHeader title="My tasks" sub="Open, by due date" action={<Link href="/tasks?view=mine" className="text-xs font-medium text-primary hover:underline">All my tasks</Link>} />
-      {!myTasks.length ? <EmptyState icon={CheckCircle2} title="No open tasks" /> : <ul className="divide-y divide-border text-sm">{myTasks.map((t: any) => <li key={t.id}><Link href={`/tasks?view=mine&open=${t.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/50">
-        <span className="min-w-0 flex-1 truncate">{t.title}</span>{t.due_date && <span className={cn('shrink-0 text-xs tabular-nums', t.due_date < c.today ? 'font-medium text-danger' : 'text-muted')}>{t.due_date === c.today ? 'Today' : formatShortDate(t.due_date)}</span>}</Link></li>)}</ul>}</Card> : null,
-    approvals: pendingApprovals ? <Card><CardHeader title="Waiting for approval" action={<Link href="/approvals" className="text-xs font-medium text-primary hover:underline">Approvals</Link>} />
-      {!pendingApprovals.length ? <EmptyState icon={CheckCircle2} title="Nothing to approve" /> : <ul className="divide-y divide-border text-sm">{pendingApprovals.map((a: any) => <li key={a.id}><Link href={`/approvals?open=${a.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/50">
+    mytasks: myTasks ? <Card><CardHeader title="My tasks" sub="Open, by due date" action={<CardLink href="/tasks?view=mine" />} />
+      {!myTasks.length ? <EmptyState icon={CheckCircle2} title="No open tasks" /> : <ul className="px-2 pb-2 text-sm">{myTasks.map((t: any) => <li key={t.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">
+        <TaskCheck id={t.id} title={t.title} />
+        <Link href={`/tasks?view=mine&open=${t.id}`} className="min-w-0 flex-1"><span className="block truncate font-medium">{t.title}</span>{t.project?.name && <span className="block truncate text-xs text-muted">{t.project.name}</span>}</Link>
+        {t.due_date && <span className={cn('shrink-0 text-xs tabular-nums', t.due_date < c.today ? 'font-semibold text-danger' : t.due_date === c.today ? 'font-semibold text-warning' : 'text-muted')}>{t.due_date === c.today ? 'Today' : formatShortDate(t.due_date)}</span>}</li>)}</ul>}</Card> : null,
+    approvals: pendingApprovals ? <Card><CardHeader title="Waiting for approval" action={<CardLink href="/approvals" />} />
+      {!pendingApprovals.length ? <EmptyState icon={CheckCircle2} title="Nothing to approve" /> : <ul className="px-2 pb-2 text-sm">{pendingApprovals.map((a: any) => <li key={a.id}><Link href={`/approvals?open=${a.id}`} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">
         <span className="min-w-0 flex-1 truncate">{a.title}</span>{a.amount !== null && <span className="shrink-0 text-xs tabular-nums text-muted">{formatAed(a.amount)}</span>}</Link></li>)}</ul>}</Card> : null,
   }
   const visible = layout.items.filter(i => !i.hidden && W[i.key])
-  const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className="min-w-0">{W[i.key]}</div>)
+  const shown = new Set(visible.map(i => i.key))
+  const SPAN: Partial<Record<WidgetKey, string>> = {
+    trend: shown.has('quick') ? 'lg:col-span-8' : 'lg:col-span-12', quick: shown.has('trend') ? 'lg:col-span-4' : 'lg:col-span-12',
+    activity: shown.has('projects') ? 'lg:col-span-6' : 'lg:col-span-12', projects: shown.has('activity') ? 'lg:col-span-6' : 'lg:col-span-12',
+  }
+  const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className={cn('min-w-0', k === 'left' && cn('col-span-12', SPAN[i.key] ?? 'lg:col-span-12'))}>{W[i.key]}</div>)
 
   return <>
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-      <div className="min-w-0"><h1 className="text-[22px] font-semibold leading-tight tracking-[-0.022em]">{greeting(c.company.timezone || 'Asia/Dubai')}{firstName ? `, ${firstName}` : ''}</h1>
-        <p className="mt-1 text-sm text-muted"><span className="sr-only">Dashboard · </span>{c.company.name} · {date}</p></div>
-      <div className="flex flex-wrap items-center gap-2"><DashboardCustomize layout={layout} available={(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))} />
-        <span className="sm:hidden"><QuickActions can={{ sales: canFin && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }} /></span></div>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0"><h1 className="text-[24px] font-bold leading-tight tracking-[-0.025em] sm:text-[26px]">{greeting(tz)}{firstName ? `, ${firstName}` : ''}</h1>
+        <p className="mt-1 text-sm text-muted"><span className="sr-only">Dashboard · {c.company.name} · </span>Here’s your business overview for today.</p></div>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="hidden items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-2 shadow-card md:flex">
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-soft text-primary" aria-hidden><CalendarDays size={17} /></span>
+          <span className="leading-tight"><span className="block text-[13.5px] font-semibold">{date}</span><span className="block text-xs text-muted">{time} · {place}</span></span></div>
+        <DashboardCustomize layout={layout} available={(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))} />
+        <QuickActions label="Create new" can={can} /></div>
     </div>
 
-    {isNew && <Card className="mb-5 p-5"><h2 className="text-sm font-semibold">Set up Averiqo</h2><p className="mt-0.5 text-sm text-muted">Four steps to a useful dashboard. Each one fills part of this page.</p>
-      <ol className="mt-4 grid gap-px overflow-hidden rounded-md border border-border bg-border text-sm sm:grid-cols-2 lg:grid-cols-4">{[['Add company documents', '/documents', 'Trade licence, VAT certificate, tenancy'], ['Add employees', '/employees', 'Passports, visas, Emirates IDs'], ['Create a quotation', '/invoices', 'Your letterhead, stamp and terms'], ['Set up reminders', '/reminders', 'Recipients and WhatsApp opt-in']].map(([t, h, s], i) =>
-        <li key={h} className="bg-surface"><Link href={h} className="block h-full p-3 hover:bg-surface-2/60"><div className="font-medium"><span className="me-1.5 tabular-nums text-muted">{i + 1}.</span>{t}</div><div className="mt-0.5 text-xs text-muted">{s}</div></Link></li>)}</ol></Card>}
+    {isNew && <Card className="mb-5 p-5"><h2 className="text-[15px] font-semibold">Set up Averiqo</h2><p className="mt-0.5 text-sm text-muted">Four steps to a useful dashboard. Each one fills part of this page.</p>
+      <ol className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">{[['Add company documents', '/documents', 'Trade licence, VAT certificate, tenancy'], ['Add employees', '/employees', 'Passports, visas, Emirates IDs'], ['Create a quotation', '/invoices', 'Your letterhead, stamp and terms'], ['Set up reminders', '/reminders', 'Recipients and WhatsApp opt-in']].map(([t, h, s], i) =>
+        <li key={h}><Link href={h} className="flex h-full gap-3 rounded-xl border border-border p-3.5 transition-colors hover:border-border-strong hover:bg-surface-2/50"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">{i + 1}</span><span><span className="block font-medium">{t}</span><span className="mt-0.5 block text-xs text-muted">{s}</span></span></Link></li>)}</ol></Card>}
 
-    {col('top')}
-    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] [&>*]:min-w-0">
-      <div className="flex min-w-0 flex-col gap-5">{col('left')}</div>
-      <div className="flex min-w-0 flex-col gap-5">{col('right')}</div>
+    <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-rows-[auto_1fr]">
+      <div className="min-w-0 2xl:col-start-1 2xl:row-start-1">{col('top')}</div>
+      <div className="grid min-w-0 grid-cols-1 content-start items-start gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:col-start-2 2xl:row-span-2 2xl:row-start-1 2xl:grid-cols-1">{col('right')}</div>
+      <div className="grid min-w-0 grid-cols-12 content-start items-stretch gap-5 self-start 2xl:col-start-1 2xl:row-start-2">{col('left')}</div>
     </div>
   </>
 }
 
-/** One pulse metric: the number, how it moved, what it means; the whole cell opens the list behind it. */
-function Pulse({ href, label, value, delta, note, spark, foot }: { href: string; label: string; value: string; delta?: number | null; note?: React.ReactNode; spark?: React.ReactNode; foot?: React.ReactNode }) {
-  return <Link href={href} className="group block min-w-0 px-4 py-4 transition-colors hover:bg-surface-2/40 sm:px-5">
-    <div className="flex items-start justify-between gap-2"><span className="text-[13px] font-medium text-muted">{label}</span>
-      {spark ? <span className="-mt-1 shrink-0 opacity-90">{spark}</span> : <ArrowRight size={14} className="text-muted opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" aria-hidden />}</div>
-    <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-      <span className="text-[24px] font-semibold leading-tight tracking-[-0.025em] tabular-nums">{value}</span>
-      {delta !== undefined && delta !== null && <span className={cn('inline-flex items-center gap-0.5 rounded px-1 text-xs font-medium tabular-nums', delta >= 0 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger')} title="Month to date vs the same days last month">{delta >= 0 ? '↑' : '↓'} {Math.abs(delta)}%</span>}
-    </div>
-    {note && <div className="mt-1 truncate text-xs text-muted">{note}</div>}
-    {foot}
-  </Link>
-}
-
+/** Latest sales documents: number (with issue date), customer, project or subject, the relevant date, amount, status. */
 function DocTable({ rows, dateCol, date, empty }: { rows: any[]; dateCol: string; date: (r: any) => string | null; empty: string }) {
   if (!rows.length) return <EmptyState title={empty} />
-  return <TableWrap><thead><tr><Th>No.</Th><Th>Customer</Th><Th>{dateCol}</Th><Th className="text-right">Amount</Th><Th>Status</Th></tr></thead>
+  return <TableWrap><thead><tr><Th>No.</Th><Th>Customer</Th><Th>Project / subject</Th><Th>Date</Th><Th>{dateCol}</Th><Th className="text-right">Amount (AED)</Th><Th>Status</Th></tr></thead>
     <tbody className="divide-y divide-border">{rows.map(r => <tr key={r.id}>
-      <Td className="whitespace-nowrap"><Link href={`/invoices/${r.id}`} className="font-mono text-[12.5px] text-primary hover:underline">{r.number}</Link><span className="block text-xs text-muted">{formatShortDate(r.issue_date)}</span></Td>
-      <Td className="max-w-[220px] truncate font-medium">{r.customer_name ?? '—'}</Td>
+      <Td className="whitespace-nowrap"><Link href={`/invoices/${r.id}`} className="font-medium text-primary hover:underline">{r.number}</Link></Td>
+      <Td className="max-w-[200px] truncate font-medium">{r.customer_name ?? '—'}</Td>
+      <Td className="max-w-[200px] truncate text-muted">{r.project?.name ?? r.subject ?? r.site ?? '—'}</Td>
+      <Td className="whitespace-nowrap tabular-nums text-muted">{formatShortDate(r.issue_date)}</Td>
       <Td className="whitespace-nowrap tabular-nums text-muted">{date(r) ? formatShortDate(date(r)!) : '—'}</Td>
-      <Td className="text-right tabular-nums">{fmtMoney(r.total)}</Td>
-      <Td><Badge tone={STATUS_TONE[r.status]}>{statusLabel(r.doc_type, r.status)}</Badge></Td></tr>)}</tbody></TableWrap>
+      <Td className="text-right font-medium tabular-nums">{fmtMoney(r.total)}</Td>
+      <Td badge><Badge tone={STATUS_TONE[r.status]}>{statusLabel(r.doc_type, r.status)}</Badge></Td></tr>)}</tbody></TableWrap>
 }

@@ -1,15 +1,18 @@
 // Dashboard widgets a user can show, hide, move between columns and reorder (stored in user_preferences 'dashboard.layout').
 export const WIDGETS = {
-  finance: { label: 'Financial pulse', col: 'top' },
-  trend: { label: 'Sales & collections (12 months)', col: 'left' },
-  attention: { label: 'Needs attention', col: 'right' },
+  banner: { label: 'Today at a glance (banner)', col: 'top' },
+  finance: { label: 'Key figures', col: 'top' },
+  trend: { label: 'Sales overview (12 months)', col: 'left' },
+  quick: { label: 'Quick actions', col: 'left' },
   recent: { label: 'Latest documents', col: 'left' },
-  projects: { label: 'Projects in progress', col: 'left' },
+  activity: { label: 'Recent activity', col: 'left' },
+  projects: { label: 'Project progress', col: 'left' },
+  inbox: { label: 'Smart Inbox', col: 'left' },
   mytasks: { label: 'My tasks', col: 'right' },
+  attention: { label: 'Needs attention', col: 'right' },
+  calendar: { label: 'Calendar', col: 'right' },
   operations: { label: 'Operations', col: 'right' },
   approvals: { label: 'Waiting for approval', col: 'right' },
-  inbox: { label: 'Smart Inbox', col: 'right' },
-  activity: { label: 'Recent activity', col: 'right' },
 } as const
 export type WidgetKey = keyof typeof WIDGETS
 export type WidgetCol = 'top' | 'left' | 'right'
@@ -26,7 +29,7 @@ export function normalizeLayout(raw: unknown): DashboardLayout {
     const k = it?.key
     if (typeof k !== 'string' || !(k in WIDGETS) || seen.has(k)) continue
     seen.add(k)
-    const col: WidgetCol = k === 'finance' ? 'top' : it.col === 'left' || it.col === 'right' ? it.col : WIDGETS[k as WidgetKey].col
+    const col: WidgetCol = k === 'finance' || k === 'banner' ? 'top' : it.col === 'left' || it.col === 'right' ? it.col : WIDGETS[k as WidgetKey].col
     items.push({ key: k as WidgetKey, col, hidden: it.hidden === true })
   }
   for (const d of DEFAULT_LAYOUT.items) if (!seen.has(d.key)) items.push({ ...d })

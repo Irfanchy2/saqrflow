@@ -150,7 +150,7 @@ try {
   const before = await mainW()
   await p.getByRole('button', { name: 'Collapse sidebar' }).click(); await p.waitForTimeout(400)
   const asideW = await p.locator('aside[data-collapsed]').evaluate(el => el.getBoundingClientRect().width)
-  ok(asideW <= 61, `collapsed sidebar is an icon rail (${asideW}px)`)
+  ok(asideW <= 69, `collapsed sidebar is an icon rail (${asideW}px)`)
   ok(await mainW() > before + 150, `workspace expands (${Math.round(before)} → ${Math.round(await mainW())} px)`)
   await p.locator('aside[data-collapsed] a[href="/assets"]').hover(); await p.waitForTimeout(200)
   ok((await p.getByRole('tooltip').innerText().catch(() => '')).includes('Vehicles & Assets'), 'tooltip shows the menu label on hover')

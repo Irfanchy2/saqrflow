@@ -1,4 +1,5 @@
-import { CalendarDays, Search } from 'lucide-react'
+import Link from 'next/link'
+import { MapPin, Search, Settings } from 'lucide-react'
 import { supabaseConfigured } from '@/lib/env'
 import { SetupRequired } from '@/components/layout/setup-required'
 import { getCtx } from '@/lib/auth'
@@ -16,7 +17,7 @@ import { Suspense } from 'react'
 import { MotionRoot } from '@/components/motion'
 import { MenuButton } from '@/components/layout/menu-button'
 import { RowNavigator } from '@/components/layout/row-navigator'
-import { QuickActions } from '@/components/layout/quick-actions'
+import { UserMenu, TopThemeToggle } from '@/components/layout/user-menu'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,30 +28,33 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // grouped by job; the first group needs no label. Every entry is enforced again on the server (pages + RLS), hiding is only convenience.
   const items: (NavItem & { show: boolean })[] = [
     { key: 'overview', group: '', href: '/', show: true },
-    { key: 'inbox', group: '', href: '/inbox', show: c.can('documents.upload') || c.can('employees.view_sensitive') },
     { key: 'brief', group: '', href: '/brief', show: true },
-    { key: 'tasks', group: '', href: '/tasks', show: true },
-    { key: 'approvals', group: '', href: '/approvals', show: c.can('records.edit') || c.can('approvals.decide') || c.can('sales.approve') || c.can('finance.view') },
-    { key: 'reminders', group: '', href: '/reminders', show: c.can('reminders.create') },
+    { key: 'inbox', group: '', href: '/inbox', show: c.can('documents.upload') || c.can('employees.view_sensitive') },
     { key: 'calendar', group: '', href: '/calendar', show: c.can('documents.view') },
-    { key: 'leads', group: 'Sales & CRM', href: '/leads', show: c.can('crm.view') },
-    { key: 'site_visits', group: 'Sales & CRM', href: '/site-visits', show: c.can('documents.view') },
-    { key: 'invoices', group: 'Sales & CRM', href: '/invoices', show: c.can('finance.view') },
-    { key: 'parties', group: 'Sales & CRM', href: '/parties', show: c.can('documents.view') },
-    { key: 'catalog', group: 'Sales & CRM', href: '/catalog', show: c.can('finance.view') },
-    { key: 'projects', group: 'Projects & site', href: '/projects', show: c.can('documents.view') },
-    { key: 'work_orders', group: 'Projects & site', href: '/work-orders', show: c.can('documents.view') },
-    { key: 'site_reports', group: 'Projects & site', href: '/site-reports', show: c.can('documents.view') },
-    { key: 'assets', group: 'Projects & site', href: '/assets', show: c.can('documents.view') },
-    { key: 'tickets', group: 'Projects & site', href: '/tickets', show: true },
-    { key: 'cheques', group: 'Finance', href: '/cheques', show: c.can('finance.view') },
+    { key: 'leads', group: 'Sales', href: '/leads', show: c.can('crm.view') },
+    { key: 'parties', group: 'Sales', href: '/parties', show: c.can('documents.view') },
+    { key: 'site_visits', group: 'Sales', href: '/site-visits', show: c.can('documents.view') },
+    { key: 'quotations', group: 'Sales', href: '/invoices?tab=quotation', tab: 'quotation', fallback: true, show: c.can('finance.view') },
+    { key: 'tax_invoices', group: 'Sales', href: '/invoices?tab=invoice', tab: 'invoice', show: c.can('finance.view') },
+    { key: 'delivery_notes', group: 'Sales', href: '/invoices?tab=delivery_note', tab: 'delivery_note', show: c.can('finance.view') },
+    { key: 'payments', group: 'Sales', href: '/invoices?tab=payments', tab: 'payments', show: c.can('finance.view') },
+    { key: 'catalog', group: 'Sales', href: '/catalog', show: c.can('finance.view') },
+    { key: 'projects', group: 'Operations', href: '/projects', show: c.can('documents.view') },
+    { key: 'work_orders', group: 'Operations', href: '/work-orders', show: c.can('documents.view') },
+    { key: 'site_reports', group: 'Operations', href: '/site-reports', show: c.can('documents.view') },
+    { key: 'tasks', group: 'Operations', href: '/tasks', show: true },
+    { key: 'assets', group: 'Operations', href: '/assets', show: c.can('documents.view') },
+    { key: 'tickets', group: 'Operations', href: '/tickets', show: true },
     { key: 'expenses', group: 'Finance', href: '/expenses', show: c.can('finance.view') },
+    { key: 'cheques', group: 'Finance', href: '/cheques', show: c.can('finance.view') },
     { key: 'employees', group: 'People & documents', href: '/employees', show: true },
     { key: 'documents', group: 'People & documents', href: '/documents', show: c.can('documents.view') },
     { key: 'vault', group: 'People & documents', href: '/vault', show: c.can('documents.view') },
+    { key: 'reminders', group: 'People & documents', href: '/reminders', show: c.can('reminders.create') },
     { key: 'kb', group: 'People & documents', href: '/kb', show: true },
-    { key: 'reports', group: 'Insights', href: '/reports', show: c.can('finance.view') || c.can('documents.view') || c.can('employees.view') },
-    { key: 'assistant', group: 'Insights', href: '/assistant', show: true },
+    { key: 'reports', group: 'Reports', href: '/reports', show: c.can('finance.view') || c.can('documents.view') || c.can('employees.view') },
+    { key: 'approvals', group: 'Reports', href: '/approvals', show: c.can('records.edit') || c.can('approvals.decide') || c.can('sales.approve') || c.can('finance.view') },
+    { key: 'assistant', group: 'Reports', href: '/assistant', show: true },
     { key: 'users', group: 'System', href: '/users', show: c.can('users.manage') },
     { key: 'audit', group: 'System', href: '/audit', show: c.can('audit.view') },
     { key: 'trash', group: 'System', href: '/trash', show: c.can('records.delete') },
@@ -65,22 +69,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const visible = items.filter(i => i.show)
   const tz = c.company.timezone || 'Asia/Dubai'
   const today = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz }).format(new Date())
-  const city = tz.split('/').pop()!.replace(/_/g, ' ')
+  const city = tz.split('/').pop()!.replace(/_/g, ' '), place = tz === 'Asia/Dubai' ? 'Dubai, UAE' : city
   return <MotionRoot><div className="flex min-h-screen">
     <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
-    <Sidebar items={visible} company={c.company.name} user={c.profile.full_name} role={c.profile.role} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} />
+    <Suspense><Sidebar items={visible} company={c.company.name} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} /></Suspense>
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
-      <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-surface/85 px-2 backdrop-blur-md sm:gap-3 sm:px-4 lg:px-6">
+      <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-surface/90 px-2 backdrop-blur-md sm:gap-3 sm:px-5 lg:px-8">
         <MenuButton />
         <div className="min-w-0 flex-1 truncate text-[15px] font-semibold sm:hidden">{c.company.name}</div>
-        <form action="/search" role="search" className="relative hidden max-w-[560px] flex-1 sm:block"><Search size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
-          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-9 w-full rounded-md border border-transparent bg-surface-2 pe-[72px] ps-9 text-sm transition-[border-color,background-color,box-shadow] placeholder:text-muted/70 hover:border-border focus:border-primary focus:bg-surface focus-visible:ring-4 focus-visible:ring-primary/[.12] focus-visible:ring-offset-0" />
+        <form action="/search" role="search" className="relative hidden max-w-[540px] flex-1 sm:block"><Search size={16} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
+          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-10 w-full rounded-lg border border-border bg-surface-2/70 pe-[72px] ps-10 text-sm transition-[border-color,background-color,box-shadow] placeholder:text-muted/80 hover:border-border-strong focus:border-primary focus:bg-surface focus-visible:ring-4 focus-visible:ring-primary/[.12] focus-visible:ring-offset-0" />
           <PaletteHint /></form>
-        <div className="ms-auto flex items-center gap-1 sm:gap-2">
-          <span className="hidden items-center gap-1.5 rounded-md px-2 text-[13px] text-muted xl:inline-flex" title={tz}><CalendarDays size={14} aria-hidden /><span className="font-medium text-fg">{today}</span><span aria-hidden>·</span>{city}</span>
-          <a href="/search" aria-label="Search" className="grid h-10 w-10 place-items-center rounded-md text-muted hover:bg-surface-2 sm:hidden"><Search size={19} /></a>
+        <div className="ms-auto flex items-center gap-0.5 sm:gap-1">
+          <span className="me-1 hidden items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium xl:inline-flex" title={`${today} · ${tz}`}>{tz === 'Asia/Dubai' ? <UaeFlag /> : <MapPin size={15} className="text-muted" aria-hidden />}{place}</span>
+          <a href="/search" aria-label="Search" className="grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-surface-2 sm:hidden"><Search size={19} /></a>
           <NotificationBell items={notes ?? []} unread={unread ?? 0} />
-          <span className="hidden sm:block"><QuickActions can={{ sales: c.can('finance.view') && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }} /></span>
+          <Link href="/settings" aria-label="Settings" title="Settings" className="hidden h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg sm:grid"><Settings size={18} /></Link>
+          <TopThemeToggle />
+          <span className="mx-1.5 hidden h-7 w-px bg-border sm:block" aria-hidden />
+          <UserMenu name={c.profile.full_name} role={c.profile.role} company={c.company.name} />
         </div></header>
       <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-24 pt-5 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-10">{children}</main>
     </div><BottomNav items={[
@@ -95,3 +102,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       { label: 'My devices & sign-in history', href: '/settings#account', group: 'Security' }]} canSales={c.can('records.edit') && c.can('finance.view')} /><RowNavigator /></div></MotionRoot>
 }
 
+
+/** UAE flag (shown next to the company location when the company runs on Dubai time). */
+function UaeFlag() {
+  return <svg width="20" height="14" viewBox="0 0 12 8" className="shrink-0 overflow-hidden rounded-[3px] ring-1 ring-black/10" aria-hidden>
+    <rect width="12" height="8" fill="#fff" /><rect width="12" height="2.67" fill="#00732f" /><rect y="5.33" width="12" height="2.67" fill="#000" /><rect width="3" height="8" fill="#ff0000" /></svg>
+}
