@@ -52,10 +52,13 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
       <StatCard label="Open quotations" value={formatAed(k.pipeline)} hint={`${k.pipelineCount} open${k.winRate !== null ? ` · ${k.winRate}% win rate` : ''}`} icon={Target} tone="amber" href={`${base}?tab=quotation&status=sent`} />
     </Metrics>
 
-    <TabStrip label="Sales sections" className="mb-4">
-      {TABS.map(t => <Link key={t.k} href={tabHref(t.k)} aria-current={tab === t.k ? 'page' : undefined}
-        className={cn('-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm transition-colors', tab === t.k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted hover:text-fg')}>
-        <t.icon size={14} aria-hidden />{t.label}{t.k in counts && <span className="rounded-sm bg-surface-2 px-1.5 text-[11px] tabular-nums text-muted">{counts[t.k]}</span>}</Link>)}
+    {/* phones: section pills (distinct from the status tabs under them); from sm: underline tabs */}
+    <TabStrip label="Sales sections" className="mb-4 gap-2 py-0.5 max-sm:-mx-4 max-sm:border-b-0 max-sm:px-4 sm:gap-1 sm:py-0">
+      {TABS.map(t => { const a = tab === t.k
+        return <Link key={t.k} href={tabHref(t.k)} aria-current={a ? 'page' : undefined}
+        className={cn('inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[13.5px] font-medium transition-colors sm:-mb-px sm:h-auto sm:rounded-none sm:border-0 sm:border-b-2 sm:bg-transparent sm:px-3.5 sm:py-2 sm:text-sm sm:font-normal sm:shadow-none',
+          a ? 'border-primary bg-primary text-primary-fg shadow-sm sm:border-primary sm:font-medium sm:text-primary' : 'border-border bg-surface text-fg/80 active:bg-surface-2 sm:border-transparent sm:text-muted sm:hover:text-fg')}>
+        <t.icon size={15} aria-hidden />{t.label}{t.k in counts && <span className={cn('rounded-full px-1.5 text-[11px] tabular-nums sm:rounded-sm sm:bg-surface-2 sm:text-muted', a ? 'bg-white/20' : 'bg-surface-2 text-muted')}>{counts[t.k]}</span>}</Link> })}
     </TabStrip>
 
     {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'followups' ? <FollowupsTab /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} /> : <DocsTab t={tab as SalesType} sp={sp} edit={edit} />}

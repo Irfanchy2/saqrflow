@@ -70,7 +70,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
       <StatCard label="In maintenance or repair" value={nMaint} href={`/assets?tab=${isV || tab === 'archived' ? 'vehicles' : 'assets'}&status=in_maintenance`} />
       <StatCard label="Equipment available" value={nFree} hint="Not assigned to anyone" href="/assets?tab=assets&unassigned=1" />
     </Metrics>
-    <nav aria-label="Asset lists" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l, I]) => <Link key={k} href={`/assets?tab=${k}`} aria-current={tab === k ? 'page' : undefined}
+    <nav aria-label="Asset lists" className="tabstrip mb-4 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l, I]) => <Link key={k} href={`/assets?tab=${k}`} aria-current={tab === k ? 'page' : undefined}
       className={cn('-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors', tab === k ? 'border-primary font-medium text-fg' : 'border-transparent text-muted hover:text-fg')}><I size={14} aria-hidden />{l}</Link>)}</nav>
     <Card>
       <form className="flex flex-wrap gap-2 border-b border-border p-3"><input type="hidden" name="tab" value={tab} />{sp.sort && <input type="hidden" name="sort" value={sp.sort} />}

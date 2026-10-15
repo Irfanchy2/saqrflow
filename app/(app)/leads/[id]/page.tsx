@@ -55,7 +55,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   ]
 
   return <>
-    <Link href="/leads" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Leads</Link>
+    <Link href="/leads" className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Leads</Link>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-semibold tracking-tight">{l.company_name}</h1><Badge tone={st?.tone}>{st?.label}</Badge></div>

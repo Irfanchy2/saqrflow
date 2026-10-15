@@ -58,14 +58,14 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const when = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { timeZone: c.company.timezone, day: '2-digit', month: 'short', year: 'numeric' })
 
   return <>
-    <Link href="/parties" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Customers & Suppliers</Link>
+    <Link href="/parties" className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Customers & Suppliers</Link>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-3">
         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-primary-soft text-lg font-semibold text-primary" aria-hidden>{cu.name.slice(0, 1).toUpperCase()}</div>
         <div className="min-w-0"><h1 className="text-xl font-semibold tracking-tight">{cu.name}</h1>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
             {cu.contact_person && <span>{cu.contact_person}</span>}
-            {cu.phone && <a href={`tel:${cu.phone}`} className="inline-flex items-center gap-1 hover:text-primary"><Phone size={13} aria-hidden />{cu.phone}</a>}
+            {cu.phone && <a href={`tel:${cu.phone}`} className="-my-2 inline-flex items-center gap-1 py-2 hover:text-primary"><Phone size={13} aria-hidden />{cu.phone}</a>}
             {wa.length >= 9 && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary"><MessageCircle size={13} aria-hidden />WhatsApp</a>}
             {cu.email && <a href={`mailto:${cu.email}`} className="inline-flex items-center gap-1 hover:text-primary"><Mail size={13} aria-hidden />{cu.email}</a>}
             {cu.address && <span className="inline-flex items-center gap-1 whitespace-pre-line"><MapPin size={13} aria-hidden />{cu.address}</span>}
@@ -104,7 +104,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         {!ev.length ? <p className="px-4 py-5 text-sm text-muted">Nothing yet.</p> : <ol className="max-h-[520px] divide-y divide-border overflow-y-auto text-sm">{ev.map((e, i) => <li key={i}>
           {e.href ? <Link href={e.href} className="flex gap-3 px-4 py-2.5 hover:bg-surface-2/60"><e.icon size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden /><span className="min-w-0 flex-1">{e.text}<span className="block text-xs text-muted">{when(e.at)}</span></span></Link>
             : <div className="flex gap-3 px-4 py-2.5"><e.icon size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden /><span className="min-w-0 flex-1">{e.text}<span className="block text-xs text-muted">{when(e.at)}</span></span></div>}</li>)}</ol>}</Card>
-      {fin && <Card><CardHeader title="Payments" action={<Link href={`/parties/${id}/ledger`} className="text-xs text-primary hover:underline">Ledger</Link>} />
+      {fin && <Card><CardHeader title="Payments" action={<Link href={`/parties/${id}/ledger`} className="-my-2 inline-flex min-h-10 items-center text-[13px] font-medium text-primary hover:underline">Ledger</Link>} />
         {!(pays ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No payments yet.</p> :
           <ul className="divide-y divide-border text-sm">{(pays ?? []).slice(0, 10).map((p: any) => <li key={p.id} className="flex items-center gap-3 px-4 py-2.5"><span className="tabular-nums text-xs text-muted">{p.paid_on}</span><span className="min-w-0 flex-1 truncate">{p.invoice?.number ?? 'On account'}{p.reference ? ` · ${p.reference}` : ''}</span><span className="font-medium tabular-nums text-success">{fmtMoney(p.amount)}</span></li>)}</ul>}</Card>}
       <Card><CardHeader title="Projects" />

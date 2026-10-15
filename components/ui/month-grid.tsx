@@ -18,8 +18,8 @@ export function MonthGrid({ month, today, items, base, extraParams = '' }: { mon
   const link = (m: string) => `${base}?${extraParams}${extraParams ? '&' : ''}m=${m}`
   return <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-card">
     <div className="flex items-center justify-between border-b border-border px-4 py-3"><h3 className="text-sm font-semibold">{title}</h3>
-      <div className="flex gap-1"><Link aria-label="Previous month" href={link(shift(month, -1))} className="rounded p-1.5 hover:bg-surface-2"><ChevronLeft size={16} /></Link>
-        <Link href={link(today.slice(0, 7))} className="rounded px-2 py-1.5 text-xs hover:bg-surface-2">Today</Link><Link aria-label="Next month" href={link(shift(month, 1))} className="rounded p-1.5 hover:bg-surface-2"><ChevronRight size={16} /></Link></div></div>
+      <div className="flex items-center gap-1"><Link aria-label="Previous month" href={link(shift(month, -1))} className="grid h-10 w-10 place-items-center rounded-lg hover:bg-surface-2 sm:h-8 sm:w-8"><ChevronLeft size={16} className="rtl:rotate-180" /></Link>
+        <Link href={link(today.slice(0, 7))} className="inline-flex h-10 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-2 sm:h-8 sm:px-2.5">Today</Link><Link aria-label="Next month" href={link(shift(month, 1))} className="grid h-10 w-10 place-items-center rounded-lg hover:bg-surface-2 sm:h-8 sm:w-8"><ChevronRight size={16} className="rtl:rotate-180" /></Link></div></div>
     <div className="grid grid-cols-7 border-b border-border text-center text-[11px] font-medium uppercase tracking-wide text-muted">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <div key={d} className="py-2">{d}</div>)}</div>
     <div className="grid grid-cols-7">{days.map((d, i) => { const its = d ? items.filter(x => x.date === d) : []
       return <div key={i} className={cn('min-h-[88px] border-b border-e border-border p-1.5 text-xs [&:nth-child(7n)]:border-e-0', !d && 'bg-surface-2/40')}>

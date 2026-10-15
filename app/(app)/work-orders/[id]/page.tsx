@@ -51,7 +51,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const empOpts = o(employees, (e: any) => e.full_name), userOpts = o(users ?? [], (u: any) => u.full_name)
 
   return <>
-    <Link href="/work-orders" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Work orders</Link>
+    <Link href="/work-orders" className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Work orders</Link>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-semibold tracking-tight">{w.title}</h1><Badge tone={st?.tone}>{st?.label}</Badge>{w.priority !== 'normal' && <Badge tone={PRIORITY[w.priority]?.tone}>{PRIORITY[w.priority]?.label}</Badge>}</div>

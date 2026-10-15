@@ -9,7 +9,7 @@ const EXPORTS: [string, string][] = [['customers', 'Customers'], ['suppliers', '
 /** Settings → Data & backup. Shows how the data is actually protected — no fake "backup" button. */
 export function DataBackup({ c }: { c: Ctx }) {
   const ref = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1]
-  return <Card id="data"><CardHeader title="Data & backup" sub="Where your data lives, how it is backed up and how to take your own copy" action={<div className="flex flex-wrap gap-3 text-sm">{c.can('records.edit') && <Link href="/import" className="text-primary hover:underline">Import wizard</Link>}<Link href="/backup" className="inline-flex items-center gap-1 text-primary hover:underline"><DatabaseBackup size={14} aria-hidden />Backup status</Link></div>} />
+  return <Card id="data"><CardHeader title="Data & backup" sub="Where your data lives, how it is backed up and how to take your own copy" action={<div className="flex flex-wrap gap-3 text-sm">{c.can('records.edit') && <Link href="/import" className="-my-2 inline-flex min-h-10 items-center text-primary hover:underline">Import wizard</Link>}<Link href="/backup" className="-my-2 inline-flex min-h-10 items-center gap-1 text-primary hover:underline"><DatabaseBackup size={14} aria-hidden />Backup status</Link></div>} />
     <div className="grid gap-5 p-4 text-sm lg:grid-cols-3">
       <div className="space-y-2"><h3 className="font-medium">Database backups</h3>
         <p className="text-muted">Records are stored in a managed Supabase Postgres database. Supabase takes the database backups; how many days are kept (and whether point-in-time recovery is on) depends on your Supabase plan. Check it on the project’s Backups page.</p>
@@ -21,7 +21,7 @@ export function DataBackup({ c }: { c: Ctx }) {
       <div className="space-y-2"><h3 className="font-medium">Restore procedure</h3>
         <ol className="list-decimal space-y-1 ps-5 text-muted"><li>Single record deleted by mistake → Settings → <Link href="/trash" className="text-primary hover:underline">Trash</Link> → Restore.</li><li>Wrong edit → open the <Link href="/audit" className="text-primary hover:underline">Audit log</Link> to see the previous values; sales documents keep every revision.</li><li>Full database restore → Supabase dashboard → Backups (owner of the Supabase project). Steps are in <code>docs/BACKUP.md</code>.</li></ol></div>
       {c.can('data.export') && <div className="lg:col-span-3"><h3 className="mb-2 flex items-center gap-1.5 font-medium"><Download size={14} aria-hidden />Your own copy (Excel)</h3>
-        <div className="flex flex-wrap gap-2">{EXPORTS.map(([k, l]) => <a key={k} href={`/api/export/${k}?format=xlsx`} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-surface-2">{l}</a>)}</div>
+        <div className="flex flex-wrap gap-2">{EXPORTS.map(([k, l]) => <a key={k} href={`/api/export/${k}?format=xlsx`} className="inline-flex h-10 items-center rounded-md border border-border px-3 text-[13px] hover:bg-surface-2 sm:h-8 sm:px-2.5 sm:text-xs">{l}</a>)}</div>
         <p className="mt-2 text-xs text-muted">Every export is recorded in the audit log. CSV is also available from each list.</p></div>}
     </div></Card>
 }

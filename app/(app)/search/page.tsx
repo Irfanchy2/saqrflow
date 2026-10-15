@@ -61,7 +61,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     <form className="mb-4 flex max-w-xl gap-2"><input name="q" type="search" defaultValue={sp.q} autoFocus aria-label="Search everything" placeholder="e.g. AS0025180, Mohammed, ABC Contracting, Villa Fujairah, INV-102" className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm" />
       
       <button className="h-10 shrink-0 cursor-pointer rounded-md bg-primary px-4 text-sm font-medium text-primary-fg">Search</button></form>
-    {run && <Link href={`/assistant?q=${encodeURIComponent(sp.q ?? '')}`} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"><Sparkles size={14} />Ask Averiqo AI: “{sp.q}”</Link>}
+    {run && <Link href={`/assistant?q=${encodeURIComponent(sp.q ?? '')}`} className="mb-3 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-primary hover:underline"><Sparkles size={14} />Ask Averiqo AI: “{sp.q}”</Link>}
     {run && total === 0 ? <Card><EmptyState icon={Search} title="No results" body="Try a different spelling, or part of a name, number or reference." /></Card> :
       <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">{groups.filter(([, h]) => h.length).map(([title, hits]) => <Card key={title}><CardHeader title={title} />
         <ul className="divide-y divide-border text-sm">{hits.map(h => <li key={h.href}><Link href={h.href} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/60">

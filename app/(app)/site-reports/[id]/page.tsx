@@ -33,7 +33,7 @@ export default async function SiteReportPage({ params }: { params: Promise<{ id:
   const blocks: [string, string | null, boolean?][] = [['Work completed', r.work_done], ['Planned for next day', r.work_planned], ['Issues', r.issues, true], ['Delays', r.delays, true], ['Safety observations', r.safety_notes], ['Customer instructions', r.customer_instructions], ['Materials delivered to site', r.materials_delivered], ['Equipment used', r.equipment_used], ['Notes', r.notes]]
 
   return <>
-    <Link href={`/site-reports?project=${r.project_id}`} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Daily site reports</Link>
+    <Link href={`/site-reports?project=${r.project_id}`} className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Daily site reports</Link>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-semibold tracking-tight">{formatLongDate(r.report_date)}</h1>{r.progress != null && <Badge tone="blue">{r.progress}% progress</Badge>}{(r.issues || r.delays) && <Badge tone="red">{r.issues && r.delays ? 'Issues & delays' : r.issues ? 'Issues' : 'Delays'}</Badge>}</div>

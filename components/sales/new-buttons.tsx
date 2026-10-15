@@ -45,6 +45,6 @@ export function NewSalesButtons({ customerId, projectId, leadId, siteVisitId, on
 export function NewDocFab({ type, label }: { type: SalesType; label: string }) {
   const [pending, start] = useTransition(), token = useRef(crypto.randomUUID())
   return <button type="button" aria-label={label} disabled={pending} onClick={() => start(async () => { const r = await newSalesDoc(type, { token: token.current }); if (r?.error) toast(r.error, 'error') })}
-    className="no-print fixed bottom-[calc(76px+env(safe-area-inset-bottom))] end-4 z-nav grid h-14 w-14 cursor-pointer place-items-center rounded-full bg-primary text-primary-fg shadow-[0_10px_24px_-6px_hsl(var(--primary)/.6)] transition-transform active:scale-95 disabled:opacity-70 lg:hidden">
+    className="fab no-print fixed bottom-[calc(76px+env(safe-area-inset-bottom))] end-4 z-nav grid h-14 w-14 cursor-pointer place-items-center rounded-full bg-primary text-primary-fg shadow-[0_10px_24px_-6px_hsl(var(--primary)/.6)] transition-transform active:scale-95 disabled:opacity-70 lg:hidden">
     {pending ? <Loader2 size={22} className="animate-spin" /> : <Plus size={24} strokeWidth={2.4} />}</button>
 }

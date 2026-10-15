@@ -53,7 +53,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
       <StatCard label="Past target date" value={late.count ?? 0} tone={late.count ? 'red' : 'neutral'} href="/work-orders?tab=active" />
       <StatCard label="Urgent" value={urgent.count ?? 0} href="/work-orders?tab=active&priority=urgent" />
     </Metrics>
-    <nav aria-label="Work order lists" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l]) => <Link key={k} href={`/work-orders?tab=${k}`} aria-current={tab === k ? 'page' : undefined}
+    <nav aria-label="Work order lists" className="tabstrip mb-4 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l]) => <Link key={k} href={`/work-orders?tab=${k}`} aria-current={tab === k ? 'page' : undefined}
       className={cn('-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition-colors', tab === k ? 'border-primary font-medium text-fg' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</nav>
     <Card>
       <form className="flex flex-wrap gap-2 border-b border-border p-3"><input type="hidden" name="tab" value={tab} />

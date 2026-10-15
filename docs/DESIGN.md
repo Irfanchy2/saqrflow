@@ -53,6 +53,16 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
 - **Deleting:** important records go to **Trash** (restorable). Removing money records always asks first.
 - **Touch:** hover styles apply only on devices that can hover.
 
+## Phones
+
+- **Bars:** top bar (menu, logo, search, alerts, account) and the bottom tab bar (Home, Sales, Projects, Tasks, More). Any other module you open takes the second slot under a short name; every tab has the same width.
+- **Header actions** wrap onto a second line instead of scrolling, so the main action is never off-screen.
+- **Scrolling rows** (tabs, filters, KPI strips) carry the `tabstrip` class. `components/layout/strip-edges.tsx` fades the side that has more and scrolls the current tab into view.
+- **Sales** sections are pills on phones, so they read differently from the status tabs under them; from 640 px they are underline tabs.
+- **Settings** sections are a sticky row of chips under the top bar; Users, Audit log and Trash sit at its end.
+- **Floating "+" and action bars:** `main` adds bottom room when the page has a `.fab` (floating +) or a `.dock` (the document editor's WhatsApp/PDF bar), so nothing ends up under them.
+- **Touch targets:** 40 px or more for anything tappable, including text links such as "View all", back links, calendar arrows and report periods. Negative margins keep the layout unchanged.
+
 ## Icons
 
 - One family everywhere: **Phosphor Icons** (MIT), through `components/icons.ts`. It keeps the names the code already uses, so a screen never mixes styles.

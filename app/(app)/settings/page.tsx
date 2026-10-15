@@ -36,16 +36,20 @@ export default async function Settings() {
     ['integrations', 'API & webhooks', admin], ['account', 'Account & security', true], ['data', 'Data & backup', true]]
   return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
     <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
-    <nav aria-label="Settings sections" className="lg:sticky lg:top-20 lg:self-start">
-      <ul className="flex gap-1 overflow-x-auto pb-1 text-sm lg:flex-col lg:overflow-visible lg:pb-0">
-        {sections.filter(x => x[2]).map(([id, l]) => <li key={id} className="shrink-0"><a href={`#${id}`} className="block rounded-md px-2.5 py-1.5 text-muted hover:bg-surface-2 hover:text-fg">{l}</a></li>)}
+    {/* phones and tablets: a sticky row of section chips under the top bar (with the admin pages at the end); lg: a side list */}
+    <nav aria-label="Settings sections" className="sticky top-16 z-10 -mx-4 border-b border-border bg-bg/95 px-4 py-2 backdrop-blur-md sm:-mx-6 sm:px-6 lg:top-20 lg:mx-0 lg:self-start lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+      <ul className="tabstrip flex gap-2 overflow-x-auto text-sm lg:flex-col lg:gap-1 lg:overflow-visible">
+        {sections.filter(x => x[2]).map(([id, l]) => <li key={id} className="shrink-0"><a href={`#${id}`} className="flex h-9 items-center rounded-full border border-border bg-surface px-3.5 text-fg/80 active:bg-surface-2 lg:block lg:h-auto lg:rounded-md lg:border-0 lg:bg-transparent lg:px-2.5 lg:py-1.5 lg:text-muted lg:hover:bg-surface-2 lg:hover:text-fg">{l}</a></li>)}
+        {c.can('users.manage') && <li className="shrink-0 lg:hidden"><Link href="/users" className="flex h-9 items-center rounded-full border border-border bg-surface px-3.5 text-primary">Users & permissions</Link></li>}
+        {c.can('audit.view') && <li className="shrink-0 lg:hidden"><Link href="/audit" className="flex h-9 items-center rounded-full border border-border bg-surface px-3.5 text-primary">Audit log</Link></li>}
+        {c.can('records.delete') && <li className="shrink-0 lg:hidden"><Link href="/trash" className="flex h-9 items-center rounded-full border border-border bg-surface px-3.5 text-primary">Trash</Link></li>}
       </ul>
       {(c.can('users.manage') || c.can('records.delete') || c.can('audit.view')) && <ul className="mt-3 hidden border-t border-border pt-3 text-sm lg:block">
         {c.can('users.manage') && <li><Link href="/users" className="block rounded-md px-2.5 py-1.5 text-muted hover:bg-surface-2 hover:text-fg">Users & permissions</Link></li>}
         {c.can('audit.view') && <li><Link href="/audit" className="block rounded-md px-2.5 py-1.5 text-muted hover:bg-surface-2 hover:text-fg">Audit log</Link></li>}
         {c.can('records.delete') && <li><Link href="/trash" className="block rounded-md px-2.5 py-1.5 text-muted hover:bg-surface-2 hover:text-fg">Trash</Link></li>}</ul>}
     </nav>
-    <div className="flex min-w-0 max-w-4xl flex-col gap-5 [&>*]:scroll-mt-20">
+    <div className="flex min-w-0 max-w-4xl flex-col gap-5 [&>*]:scroll-mt-32 lg:[&>*]:scroll-mt-20">
       {admin && <Card id="company"><CardHeader title="Company, tax & currency" sub="The legal company name prints on quotations, invoices and delivery notes." /><div className="p-4"><ActionForm action={saveCompany} resetOnSuccess={false}>
         <Field label="Company name"><Input name="name" defaultValue={c.company.name} required /></Field><Field label="Trade name"><Input name="trade_name" /></Field>
         <p className="text-xs text-muted">Time zone: {c.company.timezone} · Currency: {c.company.currency} (fixed in this version).</p></ActionForm></div></Card>}

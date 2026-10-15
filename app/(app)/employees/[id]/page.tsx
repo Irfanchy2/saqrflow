@@ -45,7 +45,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const stateTone: Record<string, Tone> = { valid: 'green', expiring_soon: 'amber', expired: 'red', missing: 'red', no_expiry: 'green', renewal_in_progress: 'blue', cancelled: 'neutral' }
 
   return <>
-    <Link href="/employees" className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Employees</Link>
+    <Link href="/employees" className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Employees</Link>
     <div className="mb-5 flex flex-wrap items-center gap-4">
       <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-primary-soft text-primary">
         {e.photo_path ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/api/employees/${id}/photo?w=160`} alt="" loading="lazy" className="h-full w-full object-cover" /> : <UserRound size={28} />}</div>
@@ -53,7 +53,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         <p className="text-sm text-muted">{[e.designation, e.department].filter(Boolean).join(' · ') || 'No designation'} · <span className="font-mono">{e.employee_no}</span></p>
         <div className="mt-1 flex gap-2"><Badge tone={e.status === 'active' ? 'green' : 'amber'}>{e.status.replace('_', ' ')}</Badge>{canSens && <Badge tone={checklist.issues ? 'red' : 'green'}>{checklist.score}% documents complete</Badge>}</div></div>
       {c.can('records.delete') && <div className="ms-auto"><ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'employee', id)} confirm={`Move ${e.full_name} to the trash? Their documents, salary history and assignments are kept and they can be restored from Trash.`}><Trash2 size={14} />Move to trash</ActionButton></div>}</div>
-    <div className="mb-5 flex gap-1 overflow-x-auto border-b border-border">
+    <div className="tabstrip mb-5 flex gap-1 overflow-x-auto border-b border-border">
       {tabs.map(([k, label]) => <Link key={k} href={`/employees/${id}?tab=${k}`} className={cn('-mb-px border-b-2 px-4 py-2 text-sm', tab === k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted hover:text-fg')}>{label}</Link>)}</div>
 
     {tab === 'personal' && <div className="grid gap-5 lg:grid-cols-3">

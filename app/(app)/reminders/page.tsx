@@ -30,7 +30,7 @@ export default async function Reminders({ searchParams }: { searchParams: Promis
     <div className="mb-5"><Alert tone={wa.mode === 'live' ? 'green' : 'amber'}><b>{wa.mode === 'live' ? 'WhatsApp: LIVE' : 'WhatsApp: SANDBOX'}</b>: {wa.reason}
       {wa.mode === 'sandbox' && ' Messages are recorded in the log but never sent, and are never reported as delivered.'}
       {' '}Email: <b>{wa.emailLive ? 'live' : 'sandbox'}</b>. The scheduler runs automatically (see README → Scheduler); you do not need to open this page.</Alert></div>
-    <div className="mb-5 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l]) => <Link key={k} href={`/reminders?tab=${k}`} className={cn('-mb-px border-b-2 px-4 py-2 text-sm', tab === k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</div>
+    <div className="tabstrip mb-5 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l]) => <Link key={k} href={`/reminders?tab=${k}`} className={cn('-mb-px border-b-2 px-4 py-2 text-sm', tab === k ? 'border-primary font-medium text-primary' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</div>
     {tab === 'upcoming' && <Upcoming c={c} />}{tab === 'custom' && <Custom c={c} />}{tab === 'recipients' && <Recipients c={c} wa={wa.mode} />}{tab === 'log' && <Log c={c} sp={sp} />}</>
 }
 type C = Awaited<ReturnType<typeof getCtx>>

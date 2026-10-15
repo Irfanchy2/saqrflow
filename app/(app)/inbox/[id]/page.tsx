@@ -48,7 +48,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
   const filed = item.status === 'filed'
 
   return <>
-    <Link href="/inbox" className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Smart Inbox</Link>
+    <Link href="/inbox" className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Smart Inbox</Link>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-xl font-semibold tracking-tight">{item.file_name}</h1>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm"><StatusPill s={item.status} /><ConfidenceBand v={item.confidence} />{engineInfo && <span className="text-xs text-muted">{engineInfo}{item.processing_ms ? ` · ${(item.processing_ms / 1000).toFixed(1)}s` : ''}</span>}</div></div>

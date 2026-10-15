@@ -16,6 +16,7 @@ import { NavProgress } from '@/components/layout/nav-progress'
 import { Suspense } from 'react'
 import { MotionRoot } from '@/components/motion'
 import { MenuButton } from '@/components/layout/menu-button'
+import { StripEdges } from '@/components/layout/strip-edges'
 import { RowNavigator } from '@/components/layout/row-navigator'
 import { UserMenu, TopThemeToggle } from '@/components/layout/user-menu'
 import { AveriqoMark } from '@/components/brand/logo'
@@ -77,7 +78,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
       <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-surface/90 px-2 backdrop-blur-md sm:gap-3 sm:px-5 lg:px-8">
         <MenuButton />
-        <Link href="/" className="flex min-w-0 flex-1 items-center gap-2 sm:hidden" aria-label={`Averiqo · ${c.company.name}`}><AveriqoMark size={28} /><span className="text-[18px] font-bold tracking-[-0.02em]">Averiqo</span></Link>
+        <Link href="/" className="flex h-11 min-w-0 flex-1 items-center gap-2 sm:hidden" aria-label={`Averiqo · ${c.company.name}`}><AveriqoMark size={28} /><span className="text-[18px] font-bold tracking-[-0.02em]">Averiqo</span></Link>
         <form action="/search" role="search" className="relative hidden max-w-[540px] flex-1 sm:block"><Search size={16} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
           <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-10 w-full rounded-lg border border-border bg-surface-2/70 pe-[72px] ps-10 text-sm transition-[border-color,background-color,box-shadow] placeholder:text-muted/80 hover:border-border-strong focus:border-primary focus:bg-surface focus-visible:ring-4 focus-visible:ring-primary/[.12] focus-visible:ring-offset-0" />
           <PaletteHint /></form>
@@ -90,13 +91,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="mx-1.5 hidden h-7 w-px bg-border sm:block" aria-hidden />
           <UserMenu name={c.profile.full_name} role={c.profile.role} company={c.company.name} />
         </div></header>
-      <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-24 pt-5 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-10">{children}</main>
+      <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 has-[.fab]:pb-[calc(10rem+env(safe-area-inset-bottom))] has-[.dock]:pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:px-8 lg:!pb-10">{children}</main>
     </div><BottomNav items={visible} /><Suspense><NavProgress /></Suspense><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
       ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
       ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings#integrations', group: 'Settings' }] : []),
       ...(c.can('users.manage') ? [{ label: 'Sign-in activity', href: '/users/activity', group: 'Security' }] : []),
-      { label: 'My devices & sign-in history', href: '/settings#account', group: 'Security' }]} canSales={c.can('records.edit') && c.can('finance.view')} /><RowNavigator /></div></MotionRoot>
+      { label: 'My devices & sign-in history', href: '/settings#account', group: 'Security' }]} canSales={c.can('records.edit') && c.can('finance.view')} /><RowNavigator /><StripEdges /></div></MotionRoot>
 }
 
 
