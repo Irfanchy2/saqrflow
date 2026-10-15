@@ -13,7 +13,7 @@ import { FitPaper } from './preview'
 import { RichTextField } from './rich-field'
 import { CustomerPicker, type CustomerOpt } from './customer-picker'
 import { CatalogPicker, type CatalogOpt } from './catalog-picker'
-import { Badge, Button, Input, Select, Textarea } from '@/components/ui/primitives'
+import { Badge, Button, Input, SEG, Select, Textarea, segItem } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { APPROVAL_LABEL, APPROVAL_TONE, CONVERSIONS, DOC_META, STATUS_TONE, UNITS, isTaxDoc, manualStatuses, statusLabel, type SalesType } from '@/lib/sales/docs'
@@ -256,8 +256,8 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
         <div className={cn('text-[11px]', errors && editable ? 'text-danger' : 'text-muted')} aria-live="polite" data-testid="save-status">{errors && editable && !saving ? 'Not saved. See the message below' : status}</div>
       </div>
       <div className="ms-auto flex items-center gap-1.5 max-lg:w-full">
-        <div className="me-auto flex rounded-lg border border-border bg-surface p-0.5 lg:hidden" role="tablist" aria-label="Editor view">
-          {(['edit', 'preview'] as const).map(v => <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn('flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1 text-[13px] font-medium capitalize', view === v ? 'bg-primary text-primary-fg' : 'text-muted')}>{v === 'edit' ? <PenLine size={13} /> : <Eye size={13} />}{v}</button>)}
+        <div className={cn(SEG, 'me-auto lg:hidden')} role="tablist" aria-label="Editor view">
+          {(['edit', 'preview'] as const).map(v => <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn(segItem(view === v), 'min-h-9 cursor-pointer capitalize')}>{v === 'edit' ? <PenLine size={13} /> : <Eye size={13} />}{v}</button>)}
         </div>
         {editable && <Button size="sm" onClick={() => save()} disabled={saving || !dirty}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}Save</Button>}
         <Button size="sm" variant="secondary" onClick={() => (dirty ? save(openPrint) : openPrint())}><Printer size={14} /><span className="hidden sm:inline">Print</span></Button>
@@ -448,7 +448,7 @@ function DeliveryDialog({ items, delivery, onClose, onCreate, busy }: { items: I
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { ref.current?.showModal() }, [])
   const bad = rows.find(r => Number(qty[r.id!]) > r.left + 1e-9 || Number(qty[r.id!]) < 0)
-  return <dialog ref={ref} onClose={onClose} aria-labelledby="dn-title" className="m-auto w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-border bg-surface p-0 text-fg shadow-pop backdrop:bg-black/40">
+  return <dialog ref={ref} onClose={onClose} aria-labelledby="dn-title" className="m-auto w-[calc(100%-2rem)] max-w-2xl rounded-2xl border border-border/80 bg-surface text-start p-0 text-fg shadow-pop backdrop:bg-black/40">
     <div className="flex items-center justify-between border-b border-border px-5 py-3"><h2 id="dn-title" className="font-semibold">Create delivery note</h2><button type="button" onClick={() => ref.current?.close()} aria-label="Close" className="rounded p-1 text-muted hover:bg-surface-2"><X size={16} /></button></div>
     <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
       <p className="mb-3 text-sm text-muted">Enter the quantity delivered now. Remaining quantities stay open for the next delivery.</p>

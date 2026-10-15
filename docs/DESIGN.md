@@ -15,13 +15,30 @@ Averiqo is the software brand. Company identity (letterhead, stamp, legal name) 
 
 | Role | Size and weight |
 |---|---|
-| Page title | 24 px bold |
+| Page title | 26 px semibold (24 px bold on phones) |
 | Card title | 15 px semibold |
-| KPI value | 22 px bold |
+| KPI value | 23 px semibold |
 | Table header | 12.5 px medium |
 | Body | 14 px |
 
-- **Radius:** 6 px chips · 8 px controls · 10 px small containers · 12 px cards.
+- **Radius:** 6 px chips · 8 px small controls · 10 px buttons, inputs and tiles · 14 px cards · 18 px sheets and dialogs.
+- **Elevation:** one light source from above. Each layer is a hairline plus a short contact shadow and a long soft one, tinted navy (`shadow-card` at rest, `shadow-lift` on hover, `shadow-pop` for menus, dialogs and toasts). Dark mode adds a faint top highlight.
+
+## Components
+
+- **Buttons:** tactile.
+  - Filled (`primary` navy ink, `blue`, `danger`): a top highlight, a hairline in their own colour and a soft coloured shadow that deepens on hover.
+  - `secondary`: reads as a key (hairline, faint bottom edge).
+  - Every button presses in by 2%.
+  - The dashboard banner's main action is a pill with its arrow in a nested disc that nudges forward on hover.
+- **Fields:** a recessed well with a hairline that darkens on hover and a soft blue halo on focus. Every single-choice dropdown uses the same chevron. File pickers get a small secondary button.
+- **Cards and KPI cards:** a hairline and the card shadow. A card that links somewhere lifts 1 px on hover.
+- **Status badges:** a tint, an inset hairline and a leading dot in the same colour (for plain-text statuses).
+- **Tabs:** underline tabs for sections and filters (counts sit in a small pill). A segmented control (`SEG` / `segItem`) is used for view switches: a recessed track with a raised thumb. The chart series switch glides its thumb.
+- **Menus and notifications:** 12 px radius, the pop shadow and an entrance that rises 4 px. The notifications panel spans the width on phones.
+- **Dialogs:** 18 px radius with a pinned Save bar. Phones get a bottom sheet with a grab handle that rises into place.
+- **Empty states:** the icon sits in a raised tile inside two hairline rings that fade out downwards, followed by a title, one line of help and the next step.
+- **Phone tab bar:** the active pill glides to the tab you open; tabs press in.
 
 Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`. **Print and PDF are separate:** `.sales-paper` has its own variables and never uses app tokens.
 
@@ -72,7 +89,7 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
 
 ## Motion
 
-Framer Motion through `components/motion.tsx` (LazyMotion, `reducedMotion="user"`, 140 / 200 / 280 ms, decelerating).
+Framer Motion through `components/motion.tsx` (LazyMotion with layout animations, `reducedMotion="user"`, 140 / 200 / 280 ms, decelerating). CSS transitions use the same curve (`cubic-bezier(.2,.8,.2,1)`); nothing is linear or bouncy.
 
 Used for:
 - **Sidebar:** the current-page highlight slides between items; collapse animates the width while icons stay fixed and labels fade; sections fold with a height animation; rail tooltips appear after 90 ms.

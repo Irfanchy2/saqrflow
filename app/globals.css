@@ -13,7 +13,7 @@
   --success: 152 60% 32%; --warning: 28 90% 40%; --danger: 354 70% 48%;
   --nav: 220 33% 97.5%;
   --sb: 223 60% 12%; --sb-2: 223 45% 18%; --sb-line: 223 38% 19%; --sb-fg: 220 30% 95%; --sb-muted: 221 22% 70%; --sb-accent: 217 85% 56%; --sb-accent-soft: 214 100% 80%;
-  --shadow: 222 45% 25%;
+  --shadow: 222 45% 25%; --hi: 0 0% 100% / 0;
   /* chart series: validated categorical slots 1-3 (CVD ΔE ≥ 9 adjacent); dark mode uses its own steps */
   --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
 }
@@ -25,7 +25,7 @@
   --success: 152 45% 55%; --warning: 36 85% 60%; --danger: 354 75% 68%;
   --nav: 223 30% 7%;
   --sb: 223 40% 6%; --sb-2: 223 32% 12%; --sb-line: 223 26% 15%; --sb-fg: 220 26% 93%; --sb-muted: 221 14% 62%; --sb-accent: 215 90% 62%; --sb-accent-soft: 214 100% 82%;
-  --shadow: 222 50% 2%;
+  --shadow: 222 50% 2%; --hi: 220 40% 100% / .045;
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
 }
 html { color-scheme: light; -webkit-text-size-adjust: 100%; } html.dark { color-scheme: dark; }
@@ -44,16 +44,20 @@ body { @apply bg-bg text-fg antialiased; font-size: 14px; line-height: 1.5; font
 table, .num { font-variant-numeric: tabular-nums; }
 h1, h2, h3 { text-wrap: balance; } p { text-wrap: pretty; }
 html:has(dialog[open]:modal) { overflow: hidden; }   /* the page behind a modal does not scroll */
-dialog::backdrop { background: hsl(222 30% 6% / .45); }
-dialog[open] { animation: pop .16s cubic-bezier(.2,0,0,1); }
+dialog::backdrop { background: hsl(223 40% 8% / .42); -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); animation: fade .2s ease-out; }
+dialog[open] { animation: pop .2s cubic-bezier(.2,.8,.2,1); }
+/* phones: dialogs are bottom sheets that rise into place */
+@media (max-width: 639px) { dialog[open] { animation: sheet-in .28s cubic-bezier(.32,.72,0,1); } }
+@keyframes sheet-in { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @media (min-width: 1024px) { dialog[data-drawer][open] { animation: drawer-in .22s cubic-bezier(.2,0,0,1); } }
 @keyframes drawer-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 [dir=rtl] dialog[data-drawer][open] { animation-name: pop; }
 /* the Save bar of a form inside a dialog stays visible while the form scrolls */
 dialog .form-actions { position: sticky; bottom: -1rem; z-index: 1; margin: .25rem -1rem -1rem; padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom)); background: hsl(var(--surface)); border-top: 1px solid hsl(var(--border)); }
-@media (min-width: 640px) { dialog .form-actions { bottom: -1.25rem; margin: .25rem -1.25rem -1.25rem; padding: .75rem 1.25rem; } }
+@media (min-width: 640px) { dialog .form-actions { bottom: -1.5rem; margin: .5rem -1.5rem -1.5rem; padding: .875rem 1.5rem; background: hsl(var(--surface-2) / .5); } }
 dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin: 0; padding: 0; background: none; }
-@keyframes pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .toast-in { animation: toast-in .16s ease-out; }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
@@ -71,6 +75,34 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 }
 /* odd number of metric cards on the 2-column phone grid: the last one spans the row instead of leaving an empty cell */
 @media (min-width: 640px) and (max-width: 767px) { .metrics > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
+
+/* ── components (one look everywhere) ── */
+/* selects: our own chevron instead of the browser's, so every dropdown matches */
+/* every single-choice dropdown (Select and the hand-built filter selects) */
+select:not([multiple]):not([size]):not(.appearance-auto), .field-select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238891a5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4.5 6.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .7rem center; background-size: 16px; }
+select:not([multiple]):not([size]):not(.appearance-auto) { padding-inline-end: 2.25rem; }
+[dir=rtl] select:not([multiple]):not([size]), [dir=rtl] .field-select { background-position: left .7rem center; }
+select.field-select[multiple] { background-image: none; }
+/* "View all ›": the chevron is decoration, so it lives in CSS and nudges forward on hover */
+.card-link::after { content: '›'; margin-inline-start: 4px; font-size: 15px; line-height: 1; transition: transform .2s cubic-bezier(.2,.8,.2,1); }
+@media (hover: hover) { .card-link:hover::after { transform: translateX(2px); } [dir=rtl] .card-link:hover::after { transform: translateX(-2px); } }
+[dir=rtl] .card-link::after { content: '‹'; }
+/* empty states: two hairline rings fading out around the icon tile */
+.empty-rings::before, .empty-rings::after { content: ''; position: absolute; left: 50%; top: 50%; border-radius: 9999px; border: 1px solid hsl(var(--border-strong) / .55); transform: translate(-50%, -50%); pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 20%, transparent 62%); mask-image: linear-gradient(to bottom, #000 20%, transparent 62%); }
+.empty-rings::before { width: 80px; height: 80px; } .empty-rings::after { width: 120px; height: 120px; opacity: .5; }
+/* menus (row actions, "More", saved views, account): one surface, one item style, one entrance */
+[role=menu] { border-radius: 12px !important; border-color: hsl(var(--border) / .9) !important; box-shadow: 0 0 0 1px hsl(var(--shadow) / .03), 0 4px 8px -2px hsl(var(--shadow) / .08), 0 18px 40px -12px hsl(var(--shadow) / .28) !important; transform-origin: top; }
+[role=menu]:not([style]), .pop-in { animation: menu-in .16s cubic-bezier(.2,.8,.2,1); transform-origin: top; }
+[role=menu] [role=menuitem] { border-radius: 8px; transition: background-color .12s ease-out, color .12s ease-out; }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+/* file pickers: the browser's "Choose File" becomes a small secondary button */
+input[type=file] { font-size: 13px; color: hsl(var(--muted)); }
+input[type=file]::file-selector-button { margin-inline-end: 10px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--surface)); color: hsl(var(--fg)); font: 500 13px var(--font-geist-sans), ui-sans-serif, system-ui; cursor: pointer;
+  box-shadow: inset 0 -1px 0 hsl(var(--shadow) / .06), 0 1px 2px hsl(var(--shadow) / .06); transition: background-color .15s, border-color .15s; }
+@media (hover: hover) { input[type=file]::file-selector-button:hover { background: hsl(var(--surface-2)); border-color: hsl(var(--border-strong)); } }
+/* keyboard hint chips (Ctrl K, Ctrl \) */
+kbd { font-family: var(--font-geist-sans), ui-sans-serif, system-ui; }
 
 /* data tables: quiet hover; a row that leads somewhere is clickable as a whole (components/layout/row-navigator) */
 .rtable tbody tr { transition: background-color .12s ease; }

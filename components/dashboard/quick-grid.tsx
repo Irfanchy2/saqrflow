@@ -7,7 +7,8 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
 type Can = { sales: boolean; crm: boolean; docs: boolean; people: boolean; projects: boolean }
-const TINT = ['bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-violet-500', 'bg-rose-500', 'bg-sky-500', 'bg-teal-500', 'bg-amber-500', 'bg-indigo-500'].map(c => `${c} text-white shadow-[0_6px_14px_-6px_currentColor]`)
+// solid tiles with a top highlight and a shadow in their own colour (the same recipe as filled buttons)
+const TINT = ['bg-blue-500 [--t:217_91%_60%]', 'bg-emerald-500 [--t:160_84%_39%]', 'bg-orange-500 [--t:25_95%_53%]', 'bg-violet-500 [--t:258_90%_66%]', 'bg-rose-500 [--t:350_89%_60%]', 'bg-sky-500 [--t:199_89%_48%]', 'bg-teal-500 [--t:173_80%_40%]', 'bg-amber-500 [--t:38_92%_50%]', 'bg-indigo-500 [--t:239_84%_67%]'].map(c => `${c} bg-[linear-gradient(180deg,hsl(0_0%_100%/.2),hsl(0_0%_100%/0))] text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/.3),0_6px_14px_-6px_hsl(var(--t)/.8)]`)
 
 /** The things people start every day, one tap each. Sales documents are created as numbered drafts and open in the builder. */
 export function QuickGrid({ can }: { can: Can }) {
@@ -27,9 +28,9 @@ export function QuickGrid({ can }: { can: Can }) {
     { label: 'Smart document', icon: FilePlus2, href: '/documents?new=document', show: can.docs },
   ]
   const list = items.filter(i => i.show).slice(0, 9)
-  const tile = 'group flex min-h-[92px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-border bg-surface px-2 py-3 text-center text-[12.5px] font-medium transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:border-border-strong hover:shadow-md disabled:opacity-60'
+  const tile = 'group flex min-h-[96px] cursor-pointer flex-col items-center justify-center gap-2.5 rounded-xl border border-border/80 bg-surface px-2 py-3 text-center text-[12.5px] font-medium leading-tight shadow-card transition-[border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-border-strong/80 hover:shadow-lift active:translate-y-0 active:scale-[.98] disabled:opacity-60'
   return <div className="grid grid-cols-3 gap-2.5 px-5 pb-5">{list.map((i, n) => {
-    const body = <><span className={cn('grid h-10 w-10 place-items-center rounded-xl', TINT[n % TINT.length])} aria-hidden>{pending && i.run ? <Loader2 size={18} className="animate-spin" /> : <i.icon size={18} strokeWidth={1.9} />}</span><span className="leading-tight">{i.label}</span></>
+    const body = <><span className={cn('grid h-10 w-10 place-items-center rounded-xl transition-transform duration-200 ease-out group-hover:scale-105', TINT[n % TINT.length])} aria-hidden>{pending && i.run ? <Loader2 size={18} className="animate-spin" /> : <i.icon size={18} strokeWidth={1.9} />}</span><span className="leading-tight">{i.label}</span></>
     return i.href ? <Link key={i.label} href={i.href} className={tile}>{body}</Link>
       : <button key={i.label} type="button" disabled={pending} onClick={i.run} className={tile}>{body}</button>
   })}</div>

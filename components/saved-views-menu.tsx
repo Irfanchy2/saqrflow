@@ -34,7 +34,7 @@ export function SavedViewsMenu({ page, views, canShare, canRemoveShared }: { pag
         </li>)}</ul>}
       <div className="border-t border-border p-2"><Button variant="ghost" className="w-full justify-start" onClick={() => { setOpen(false); dlg.current?.showModal() }}>Save current filters as a view…</Button></div>
     </div>}
-    <dialog ref={dlg} onClick={e => { if (e.target === dlg.current) dlg.current?.close() }} className="mx-0 mb-0 mt-auto w-full max-w-none rounded-t-xl border border-border bg-surface p-0 text-fg shadow-pop sm:m-auto sm:w-[calc(100%-2rem)] sm:max-w-md sm:rounded-lg">
+    <dialog ref={dlg} onClick={e => { if (e.target === dlg.current) dlg.current?.close() }} className="mx-0 mb-0 mt-auto w-full max-w-none rounded-t-2xl border border-border bg-surface p-0 text-fg shadow-pop sm:m-auto sm:w-[calc(100%-2rem)] sm:max-w-md sm:rounded-2xl">
       <div className="border-b border-border px-5 py-3"><h2 className="text-[15px] font-semibold">Save view</h2></div>
       <div className="p-5"><ActionForm action={saveView.bind(null, page)} submit="Save view">
         <input type="hidden" name="query" value={current} />

@@ -76,17 +76,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
     <Suspense><Sidebar items={visible} company={c.company.name} user={c.profile.full_name} role={c.profile.role} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} /></Suspense>
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
-      <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-surface/90 px-2 backdrop-blur-md sm:gap-3 sm:px-5 lg:px-8">
+      <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border/70 bg-surface/85 px-2 backdrop-blur-md backdrop-saturate-150 sm:gap-3 sm:px-5 lg:px-8">
         <MenuButton />
         <Link href="/" className="flex h-11 min-w-0 flex-1 items-center gap-2 sm:hidden" aria-label={`Averiqo · ${c.company.name}`}><AveriqoMark size={28} /><span className="text-[18px] font-bold tracking-[-0.02em]">Averiqo</span></Link>
         <form action="/search" role="search" className="relative hidden max-w-[540px] flex-1 sm:block"><Search size={16} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
-          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-10 w-full rounded-lg border border-border bg-surface-2/70 pe-[72px] ps-10 text-sm transition-[border-color,background-color,box-shadow] placeholder:text-muted/80 hover:border-border-strong focus:border-primary focus:bg-surface focus-visible:ring-4 focus-visible:ring-primary/[.12] focus-visible:ring-offset-0" />
+          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-10 w-full rounded-xl border border-transparent bg-surface-2/80 pe-[76px] ps-10 text-sm shadow-[inset_0_0_0_1px_hsl(var(--border)/.6)] transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-muted/80 hover:bg-surface-2 focus:border-primary/60 focus:bg-surface focus:shadow-focus focus-visible:ring-0 focus-visible:ring-offset-0" />
           <PaletteHint /></form>
         <div className="ms-auto flex items-center gap-0.5 sm:gap-1">
           <span className="me-1 hidden items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium xl:inline-flex" title={`${today} · ${tz}`}>{tz === 'Asia/Dubai' ? <UaeFlag /> : <MapPin size={15} className="text-muted" aria-hidden />}{place}</span>
-          <a href="/search" aria-label="Search" className="grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-surface-2 sm:hidden"><Search size={19} /></a>
+          <a href="/search" aria-label="Search" className="grid h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-fg/[.05] active:bg-fg/[.08] sm:hidden"><Search size={19} /></a>
           <NotificationBell items={notes ?? []} unread={unread ?? 0} />
-          <Link href="/settings" aria-label="Settings" title="Settings" className="hidden h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg sm:grid"><Settings size={18} /></Link>
+          <Link href="/settings" aria-label="Settings" title="Settings" className="hidden h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-fg/[.05] hover:text-fg sm:grid"><Settings size={18} /></Link>
           <TopThemeToggle />
           <span className="mx-1.5 hidden h-7 w-px bg-border sm:block" aria-hidden />
           <UserMenu name={c.profile.full_name} role={c.profile.role} company={c.company.name} />

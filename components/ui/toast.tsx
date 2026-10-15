@@ -33,11 +33,10 @@ export function Toaster() {
     <div aria-live="assertive" className="sr-only">{items.filter(t => t.tone === 'error').map(t => t.msg).join('. ')}</div>
     <AnimatePresence initial={false}>{items.map(t => {
       const Icon = t.tone === 'success' ? CheckCircle2 : t.tone === 'error' ? AlertTriangle : Info
-      return <m.div key={t.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: T.fast }} transition={T.base} className={cn('pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-lg border bg-surface px-3.5 py-3 text-sm shadow-lg',
-        t.tone === 'error' ? 'border-danger/40' : t.tone === 'success' ? 'border-success/40' : 'border-border')}>
-        <Icon size={17} className={cn('mt-0.5 shrink-0', t.tone === 'error' ? 'text-danger' : t.tone === 'success' ? 'text-success' : 'text-primary')} aria-hidden />
-        <span className="flex-1">{t.msg}</span>
-        <button aria-label="Dismiss" className="cursor-pointer rounded p-0.5 text-muted hover:text-fg" onClick={() => setItems(x => x.filter(y => y.id !== t.id))}><X size={14} /></button>
+      return <m.div key={t.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: T.fast }} transition={T.base} className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border border-border/80 bg-surface py-3 pe-3 ps-3 text-[13.5px] shadow-pop">
+        <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', t.tone === 'error' ? 'bg-danger/10 text-danger' : t.tone === 'success' ? 'bg-success/10 text-success' : 'bg-primary-soft text-primary')} aria-hidden><Icon size={16} /></span>
+        <span className="flex-1 self-center font-medium leading-snug">{t.msg}</span>
+        <button aria-label="Dismiss" className="grid h-7 w-7 cursor-pointer place-items-center rounded-md text-muted transition-colors hover:bg-fg/[.05] hover:text-fg" onClick={() => setItems(x => x.filter(y => y.id !== t.id))}><X size={14} /></button>
       </m.div>
     })}</AnimatePresence>
   </div>
