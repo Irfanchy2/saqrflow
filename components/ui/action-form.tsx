@@ -21,8 +21,8 @@ function guard<A extends unknown[]>(fn: (...a: A) => Promise<ActionState>) {
 }
 
 /** <form> bound to a server action with pending / error / success states. Closes the surrounding dialog on success. */
-export function ActionForm({ action, children, submit: label = 'Save', className, resetOnSuccess = true, variant = 'primary', hideSubmit, idempotent, draftKey }: {
-  action: Action; children: ReactNode; submit?: string; className?: string; resetOnSuccess?: boolean; variant?: 'primary' | 'danger' | 'secondary'; hideSubmit?: boolean
+export function ActionForm({ action, children, submit: label = 'Save', className, resetOnSuccess = true, variant = 'primary', hideSubmit, idempotent, draftKey, block }: {
+  action: Action; children: ReactNode; submit?: string; className?: string; resetOnSuccess?: boolean; variant?: 'primary' | 'danger' | 'secondary' | 'blue'; hideSubmit?: boolean; /** full-width submit (sign-in style) */ block?: boolean
   /** adds a per-submission idempotency key: a double click or a network retry is recorded once (server must honour `idempotency_key`) */
   idempotent?: boolean
   /** keeps what was typed on this device until it is saved (offline / closed tab); restored next time the form opens */
@@ -96,7 +96,7 @@ export function ActionForm({ action, children, submit: label = 'Save', className
     {children}
     {state?.error && <Alert tone="red">{state.error}{state.fieldErrors && Object.keys(state.fieldErrors).length > 1 && <ul className="mt-1 list-disc ps-5 text-xs">{Object.entries(state.fieldErrors).map(([k, m]) => <li key={k}>{m}</li>)}</ul>}</Alert>}
     {state?.ok && state.message && <Alert tone="green">{state.message}</Alert>}
-    {!hideSubmit && <div className="form-actions flex justify-end gap-2 pt-1"><Button type="submit" variant={variant} disabled={pending} aria-busy={pending}>{pending && <Loader2 size={14} className="animate-spin" />}{label}</Button></div>}
+    {!hideSubmit && <div className="form-actions flex justify-end gap-2 pt-1"><Button type="submit" variant={variant} disabled={pending} aria-busy={pending} className={block ? 'h-12 w-full text-[15px] sm:h-11' : undefined}>{pending && <Loader2 size={14} className="animate-spin" />}{label}</Button></div>}
   </form></PendingCtx.Provider>
 }
 

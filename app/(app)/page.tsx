@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { Banknote, CalendarDays, CheckCircle2, FileText, HardHat, Landmark, Receipt, ShieldCheck, Truck, Flag, Users, Wallet } from 'lucide-react'
+import { Banknote, CalendarDays, CheckCircle2, FileText, HardHat, Landmark, Receipt, ScrollText, ShieldCheck, Truck, Flag, Users, Wallet } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
-import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, MiniBars, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { buildAlerts } from '@/lib/dashboard'
 import { summarizeCheques } from '@/lib/cheques'
 import { addDays, formatAed, formatShortDate } from '@/lib/time'
@@ -215,10 +215,37 @@ export default async function Dashboard() {
     trend: shown.has('quick') ? 'lg:col-span-8' : 'lg:col-span-12', quick: shown.has('trend') ? 'lg:col-span-4' : 'lg:col-span-12',
     activity: shown.has('projects') ? 'lg:col-span-6' : 'lg:col-span-12', projects: shown.has('activity') ? 'lg:col-span-6' : 'lg:col-span-12',
   }
-  const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className={cn('min-w-0', k === 'left' && cn('col-span-12', SPAN[i.key] ?? 'lg:col-span-12'))}>{W[i.key]}</div>)
+  const PHONE_HIDDEN = new Set<WidgetKey>(['banner', 'finance', 'calendar', 'trend', 'inbox'])
+  const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className={cn('min-w-0', k === 'left' && cn('col-span-12', SPAN[i.key] ?? 'lg:col-span-12'), PHONE_HIDDEN.has(i.key) && 'max-sm:hidden')}>{W[i.key]}</div>)
+
+  const dateShort = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: tz }).format(new Date())
+  const mobile = <section aria-label="Today" className="mb-5 sm:hidden">
+    <h1 className="text-[26px] font-bold leading-[1.15] tracking-[-0.025em]">{greeting(tz)}{firstName && <><br />{c.profile.full_name}</>}</h1>
+    <p className="mt-1.5 text-sm text-muted">{dateShort}</p>
+    {sk && trend && <div className="mt-5 grid gap-3">
+      <Link href="/reports?period=month" className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-card">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-500 text-white" aria-hidden><Receipt size={22} /></span>
+        <span className="min-w-0 flex-1"><span className="block text-[13px] text-muted">Sales this month</span><span className="block text-[22px] font-bold tabular-nums tracking-[-0.02em]">{formatAed(salesNet)}</span>
+          {trend.change.sales !== null && <span className={cn('text-[13px] font-semibold tabular-nums', trend.change.sales >= 0 ? 'text-success' : 'text-danger')}>{trend.change.sales >= 0 ? '↑' : '↓'} {Math.abs(trend.change.sales)}% <span className="font-normal text-muted">vs last month</span></span>}</span>
+        <MiniBars values={months8.map(m => m.sales)} className="bg-blue-500" /></Link>
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/invoices?tab=receivables" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 shadow-card"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300" aria-hidden><Wallet size={18} /></span>
+          <span className="min-w-0"><span className="block text-xs text-muted">Receivables</span><span className="block truncate text-[15px] font-bold tabular-nums">{formatAed(sk.outstanding)}</span></span></Link>
+        <Link href="/invoices?tab=quotation" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 shadow-card"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300" aria-hidden><FileText size={18} /></span>
+          <span className="min-w-0"><span className="block text-xs text-muted">Pending quotes</span><span className="block truncate text-[15px] font-bold tabular-nums">{formatAed(sk.pipeline)}</span></span></Link>
+      </div>
+      <div className="grid grid-cols-3 gap-3">{[
+        ['Quotations', sk.pipelineCount, '/invoices?tab=quotation', ScrollText, 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300'],
+        ['Unpaid invoices', sk.openCount, '/invoices?tab=invoice', Receipt, 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'],
+        ['Projects', activeCount?.count ?? 0, '/projects', HardHat, 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'],
+      ].map(([l, v, h, I, t]: any) => <Link key={l} href={h} className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface px-2 py-3.5 text-center shadow-card">
+        <span className={cn('grid h-11 w-11 place-items-center rounded-xl', t)} aria-hidden><I size={20} /></span><span className="text-xs leading-tight text-muted">{l}</span><span className="text-[17px] font-bold tabular-nums leading-none">{v}</span></Link>)}</div>
+    </div>}
+  </section>
 
   return <>
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+    {mobile}
+    <div className="mb-6 hidden flex-wrap items-center justify-between gap-x-4 gap-y-3 sm:flex">
       <div className="min-w-0"><h1 className="text-[24px] font-bold leading-tight tracking-[-0.025em] sm:text-[26px]">{greeting(tz)}{firstName ? `, ${firstName}` : ''}</h1>
         <p className="mt-1 text-sm text-muted"><span className="sr-only">Dashboard · {c.company.name} · </span>Here’s your business overview for today.</p></div>
       <div className="flex flex-wrap items-center gap-2.5">

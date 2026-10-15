@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CheckCircle2, Circle, ListTodo, Play, Plus, X } from 'lucide-react'
+import { ListTodo, Play, Plus, Square, SquareCheck, X } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, CardHeader, EmptyState, LinkButton, Metrics, PageHeader, Pagination, StatCard } from '@/components/ui/primitives'
@@ -12,6 +12,7 @@ import { PRIORITY, TASK_STATUS, isOverdue } from '@/lib/crm'
 import { addDays, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
+import { Fab, FilterBar, FilterTabs } from '@/components/ui/mobile'
 import { CustomFieldsCard } from '@/components/custom-fields-card'
 import { RecordActivity } from '@/components/record-activity'
 
@@ -72,19 +73,17 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           {c.can('records.delete') && <ActionButton variant="ghost" action={trashRecord.bind(null, 'task', focus.id)} confirm="Move this task to the trash?">Delete task</ActionButton>}</div></div></Card>}
     {focus && <div className="-mt-1 mb-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0"><CustomFieldsCard c={c} entity="task" recordId={focus.id} customStatusId={focus.custom_status_id} /><RecordActivity c={c} table="tasks" id={focus.id} limit={15} /></div>}
 
-    <nav aria-label="Task views" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">{VIEWS.map(([k, l]) => <Link key={k} href={qs({ view: k })} aria-current={view === k ? 'page' : undefined}
-      className={cn('-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition-colors', view === k ? 'border-primary font-medium text-fg' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</nav>
+    <FilterTabs label="Task views" className="mb-4" tabs={VIEWS.map(([k, l]) => ({ href: qs({ view: k }), label: l, active: view === k }))} />
     <Card>
-      <form className="flex flex-wrap gap-2 border-b border-border p-3"><input type="hidden" name="view" value={view} />
-        <input name="q" type="search" defaultValue={sp.q} aria-label="Search tasks" placeholder="Search tasks…" className="h-9 min-w-48 flex-1 rounded-md border border-border bg-surface px-3 text-sm" />
+      <form className="border-b border-border p-3"><input type="hidden" name="view" value={view} /><FilterBar active={!!(sp.project || sp.priority)} search={<input name="q" type="search" defaultValue={sp.q} aria-label="Search tasks" placeholder="Search tasks…" className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 text-sm sm:h-10" />}>
         {projOpts.length > 0 && <select name="project" defaultValue={sp.project ?? ''} aria-label="Project" className="h-9 max-w-56 rounded-md border border-border bg-surface px-3 text-sm"><option value="">All projects</option>{projOpts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}
         <select name="priority" defaultValue={sp.priority ?? ''} aria-label="Priority" className="h-9 rounded-md border border-border bg-surface px-3 text-sm"><option value="">Any priority</option>{Object.entries(PRIORITY).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}</select>
-        <button className="h-9 cursor-pointer rounded-md border border-border bg-surface px-3 text-sm">Filter</button>{(term || sp.project || sp.priority) && <LinkButton href={`/tasks?view=${view}`} variant="ghost">Clear</LinkButton>}</form>
+        <button className="h-9 cursor-pointer rounded-md border border-border bg-surface px-3 text-sm">Filter</button>{(term || sp.project || sp.priority) && <LinkButton href={`/tasks?view=${view}`} variant="ghost">Clear</LinkButton>}</FilterBar></form>
       {!rows?.length ? <EmptyState icon={ListTodo} title={view === 'overdue' ? 'Nothing overdue' : view === 'mine' ? 'No open tasks assigned to you' : 'No tasks here'} action={edit && view !== 'done' ? add : undefined} />
         : <ul className="divide-y divide-border">{rows.map((t: any) => { const od = isOverdue(t, c.today), done = t.status === 'completed', mineOrEdit = edit || t.owner_id === c.userId
-          return <li key={t.id} className={cn('flex items-center gap-3 px-3 py-2.5 text-sm sm:px-4', sp.open === t.id && 'bg-primary-soft/40')}>
-            {mineOrEdit ? <ActionButton variant="ghost" action={setTaskStatus.bind(null, t.id, done ? 'todo' : 'completed')} className="h-10 w-10 shrink-0 px-0">{done ? <CheckCircle2 size={19} className="text-success" /> : <Circle size={19} />}<span className="sr-only">{done ? 'Reopen' : 'Mark done'}: {t.title}</span></ActionButton>
-              : <span className="grid h-10 w-10 shrink-0 place-items-center">{done ? <CheckCircle2 size={19} className="text-success" /> : <Circle size={19} className="text-muted" />}</span>}
+          return <li key={t.id} className={cn('flex items-center gap-3 px-3 py-3 text-sm sm:px-4', sp.open === t.id && 'bg-primary-soft/40')}>
+            {mineOrEdit ? <ActionButton variant="ghost" action={setTaskStatus.bind(null, t.id, done ? 'todo' : 'completed')} className="h-10 w-10 shrink-0 px-0">{done ? <SquareCheck size={20} className="text-success" /> : <Square size={20} className="text-border-strong" />}<span className="sr-only">{done ? 'Reopen' : 'Mark done'}: {t.title}</span></ActionButton>
+              : <span className="grid h-10 w-10 shrink-0 place-items-center">{done ? <SquareCheck size={20} className="text-success" /> : <Square size={20} className="text-muted" />}</span>}
             <Link href={qs({ open: t.id })} scroll={false} className="min-w-0 flex-1">
               <span className={cn('block truncate font-medium hover:text-primary', done && 'text-muted line-through')}>{t.title}</span>
               <span className="block truncate text-xs text-muted">{[t.project?.name, t.work_order?.number, t.related_type && !['project', 'work_order'].includes(t.related_type) ? REL_LABEL[t.related_type] : null, t.employee?.full_name, names.get(t.owner_id)].filter(Boolean).join(' · ') || 'General'}</span>
@@ -96,5 +95,6 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           </li> })}</ul>}
       <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/tasks" />
     </Card>
+    {edit && <Fab label="Quick create: task" open="task" />}
   </>
 }

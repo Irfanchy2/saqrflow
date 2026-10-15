@@ -12,6 +12,7 @@ import { LinkButton, Card, CardHeader } from '@/components/ui/primitives'
 import { documentTimeline } from '@/lib/timeline'
 import { Timeline } from '@/components/timeline'
 import { SavedViews } from '@/components/saved-views'
+import { Fab } from '@/components/ui/mobile'
 
 export const metadata = { title: 'Company Documents' }
 export default async function CompanyDocuments({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -44,5 +45,6 @@ export default async function CompanyDocuments({ searchParams }: { searchParams:
       empty={<EmptyState icon={FileText} title={sp.q || sp.category || sp.status ? 'No documents match your filters' : 'No company documents yet'}
         body={sp.q || sp.category || sp.status ? 'Try clearing the filters.' : 'Add your Trade License, VAT certificate, tenancy contract and other documents to start tracking expiry dates automatically.'} />} />
     </>}
+    {c.can('documents.upload') && <Fab label="Quick create: document" open="document" />}
   </>
 }

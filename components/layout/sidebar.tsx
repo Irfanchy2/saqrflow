@@ -9,7 +9,7 @@ import { AveriqoMark } from '@/components/brand/logo'
 import { SIDEBAR_COOKIE } from '@/lib/ui-prefs'
 import { T } from '@/components/motion'
 
-const ICONS = { approvals: BadgeCheck, brief: Sunrise, tickets: Wrench, kb: BookOpen, inbox: Inbox, overview: LayoutDashboard, documents: FileText, employees: Users, vault: Vault, cheques: Landmark, invoices: Receipt, projects: HardHat, parties: Handshake, assets: Truck, reminders: BellRing, calendar: CalendarDays, reports: BarChart3, assistant: Sparkles, users: ShieldCheck, settings: Settings, expenses: Wallet, catalog: Package, audit: History, trash: Trash2, leads: Target, site_visits: MapPinned, work_orders: ClipboardList, tasks: ListTodo, site_reports: ClipboardCheck, quotations: ScrollText, tax_invoices: Receipt, delivery_notes: PackageCheck, payments: Banknote }
+export const ICONS = { approvals: BadgeCheck, brief: Sunrise, tickets: Wrench, kb: BookOpen, inbox: Inbox, overview: LayoutDashboard, documents: FileText, employees: Users, vault: Vault, cheques: Landmark, invoices: Receipt, projects: HardHat, parties: Handshake, assets: Truck, reminders: BellRing, calendar: CalendarDays, reports: BarChart3, assistant: Sparkles, users: ShieldCheck, settings: Settings, expenses: Wallet, catalog: Package, audit: History, trash: Trash2, leads: Target, site_visits: MapPinned, work_orders: ClipboardList, tasks: ListTodo, site_reports: ClipboardCheck, quotations: ScrollText, tax_invoices: Receipt, delivery_notes: PackageCheck, payments: Banknote }
 /** `tab`: the item opens one tab of a page (/invoices?tab=…) and is active only there. `fallback`: also active on that page when no tab is chosen. */
 export interface NavItem { key: keyof typeof ICONS; href: string; label: string; group: string; tab?: string; fallback?: boolean }
 
@@ -20,7 +20,7 @@ const W_OPEN = 256, W_RAIL = 68
  * the current page as a filled blue pill. Desktop: full sidebar ↔ 68 px icon rail with tooltips; the choice is a cookie,
  * so the server renders the right width (no flash). Phone / tablet: the same navigation in a slide-in drawer. Ctrl+\ toggles.
  */
-export function Sidebar({ items, company, rtl, initialCollapsed = false }: { items: NavItem[]; company: string; rtl: boolean; initialCollapsed?: boolean }) {
+export function Sidebar({ items, company, rtl, initialCollapsed = false, user = '', role = '' }: { items: NavItem[]; company: string; rtl: boolean; initialCollapsed?: boolean; user?: string; role?: string }) {
   const path = usePathname(), params = useSearchParams()
   const [collapsed, setCollapsed] = useState(initialCollapsed)
   const [open, setOpen] = useState(false)
@@ -86,8 +86,11 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false }: { ite
       className="sb fixed inset-y-0 start-0 z-drawer flex w-[300px] max-w-[86vw] flex-col bg-sb text-sb-fg shadow-pop lg:hidden">
       <div className="flex h-16 shrink-0 items-center gap-2.5 ps-4 pe-2">{brand}
         <button aria-label="Close menu" className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-sb-muted hover:bg-white/[.06] hover:text-sb-fg" onClick={() => setOpen(false)}><X size={18} /></button></div>
+      <Link href="/settings#account" className="mx-3 mb-2 flex items-center gap-3 rounded-xl bg-sb-2/70 p-3 ring-1 ring-inset ring-sb-line">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-[hsl(var(--sb-accent))] text-[13px] font-semibold text-white" aria-hidden>{user.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('')}</span>
+        <span className="min-w-0 leading-tight"><span className="block truncate text-[14px] font-semibold text-white">{user}</span><span className="block truncate text-xs capitalize text-sb-muted">{role.replace(/_/g, ' ')} · {company}</span></span></Link>
       {nav(true)}
-      <div className="shrink-0 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2"><div className="mb-2 truncate text-xs text-sb-muted" title={company}>{company}</div></div>
+      <div className="shrink-0 pb-[env(safe-area-inset-bottom)]" />
     </m.aside>
 
     <m.aside aria-label="Navigation" data-collapsed={collapsed} initial={false} animate={{ width: collapsed ? W_RAIL : W_OPEN }} transition={T.base} style={{ width: collapsed ? W_RAIL : W_OPEN }}

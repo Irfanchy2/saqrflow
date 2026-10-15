@@ -7,9 +7,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
 type Can = { sales: boolean; crm: boolean; docs: boolean; people: boolean; projects: boolean }
-const TINT = ['bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300', 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300', 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300',
-  'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300', 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300', 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300',
-  'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300', 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300', 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300']
+const TINT = ['bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-violet-500', 'bg-rose-500', 'bg-sky-500', 'bg-teal-500', 'bg-amber-500', 'bg-indigo-500'].map(c => `${c} text-white shadow-[0_6px_14px_-6px_currentColor]`)
 
 /** The things people start every day, one tap each. Sales documents are created as numbered drafts and open in the builder. */
 export function QuickGrid({ can }: { can: Can }) {

@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
-/** Steel-frame line drawing (columns, beams, a truss) used as the banner's background art. */
-function Frame() {
+/** Steel-frame line drawing (columns, beams, a truss) used as background art (dashboard banner, phone sign-in). */
+export function SteelFrameArt() {
   const cols = [560, 680, 800, 920, 1040]
   return <svg viewBox="0 0 1100 220" preserveAspectRatio="xMaxYMid slice" className="absolute inset-0 h-full w-full" aria-hidden>
     <defs><linearGradient id="bn-fade" x1="0" x2="1"><stop offset="0.35" stopColor="#fff" stopOpacity="0" /><stop offset="1" stopColor="#fff" stopOpacity=".55" /></linearGradient></defs>
@@ -20,7 +20,7 @@ function Frame() {
 /** Company banner: name, today's workload in plain numbers, the two places people go next. */
 export function DashboardBanner({ company, stats }: { company: string; stats: { label: string; value: number; href: string }[] }) {
   return <section aria-label="Today at a glance" className="relative mb-5 overflow-hidden rounded-xl bg-[linear-gradient(110deg,hsl(var(--sb))_0%,hsl(223_55%_20%)_55%,hsl(217_70%_32%)_100%)] text-white shadow-card">
-    <Frame />
+    <SteelFrameArt />
     <div className="relative flex flex-col gap-5 p-6 sm:p-7 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0 max-w-xl">
         <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">{company}</div>

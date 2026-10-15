@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Download, Paperclip, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { Download, Fuel, HardHat, Home, Package, Paperclip, Pencil, Plus, Trash2, Truck, Users, Utensils, Wallet, Wrench } from 'lucide-react'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, LinkButton, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
@@ -10,10 +10,12 @@ import { ExpenseFields } from '@/components/expenses/expense-fields'
 import { deleteExpense, saveExpense } from '@/app/actions/projects'
 import { EXPENSE_CATS, PAYMENT_METHODS } from '@/lib/projects'
 import { fmtMoney } from '@/lib/sales/money'
-import { formatAed } from '@/lib/time'
+import { formatAed, formatShortDate } from '@/lib/time'
 import { SavedViews } from '@/components/saved-views'
+import { Fab, FilterBar, FilterTabs, MList, MRow, Tile, TINTS, type TintKey } from '@/components/ui/mobile'
 
 export const metadata = { title: 'Expenses' }
+const CAT_ICON: Record<string, [typeof Wallet, TintKey]> = { material: [Package, 'orange'], labour: [HardHat, 'blue'], subcontract: [Users, 'violet'], transport: [Truck, 'rose'], fuel: [Fuel, 'rose'], equipment: [Wrench, 'amber'], accommodation: [Home, 'teal'], food: [Utensils, 'green'], maintenance: [Wrench, 'sky'], other: [Wallet, 'slate'] }
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const c = await getCtx(); if (!c.can('finance.view')) redirect('/')
   const sp = await flat(searchParams), page = pageOf(sp.page), term = sanitizeQ(sp.q), edit = c.can('records.edit')
@@ -48,16 +50,20 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
       {top.map(([k, v]) => <StatCard key={k} label={`${EXPENSE_CATS[k]} this month`} value={formatAed(v)} />)}
     </Metrics>
     <Card>
-      <form className="flex flex-wrap gap-2 border-b border-border p-3">
-        <input name="q" type="search" defaultValue={sp.q} aria-label="Search expenses" placeholder="Search description, supplier, reference…" className={`${cls} min-w-52 flex-1`} />
+      <FilterTabs label="Category" className="px-2" tabs={[['', 'All'], ['material', 'Materials'], ['labour', 'Labour'], ['transport', 'Transport'], ['fuel', 'Fuel'], ['equipment', 'Equipment'], ['other', 'Other']].map(([k, l]) => ({ href: k ? `/expenses?category=${k}` : '/expenses', label: l, active: (sp.category ?? '') === k }))} />
+      <form className="border-b border-border p-3"><FilterBar active={!!(sp.project || from || to)} search={<input name="q" type="search" defaultValue={sp.q} aria-label="Search expenses" placeholder="Search description, supplier, reference…" className={`${cls} h-11 min-w-0 flex-1 sm:h-10`} />}>
         <select name="category" defaultValue={sp.category ?? ''} aria-label="Category" className={cls}><option value="">All categories</option>{Object.entries(EXPENSE_CATS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         <select name="project" defaultValue={sp.project ?? ''} aria-label="Project" className={cls}><option value="">All projects</option><option value="none">General (no project)</option>{projs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <input type="date" name="from" defaultValue={from} aria-label="From" className={cls} /><input type="date" name="to" defaultValue={to} aria-label="To" className={cls} />
         <button className="h-9 cursor-pointer rounded-md border border-border px-3 text-sm hover:bg-surface-2">Filter</button>
-        {(term || sp.category || sp.project || from || to) && <LinkButton href="/expenses" variant="ghost">Clear</LinkButton>}</form>
+        {(term || sp.category || sp.project || from || to) && <LinkButton href="/expenses" variant="ghost">Clear</LinkButton>}</FilterBar></form>
       {!data?.length ? <EmptyState icon={Wallet} title={term || sp.category || sp.project || from ? 'No matching expenses' : 'No expenses yet'} body="Record costs here (or on a project page) to see real project profit."
           action={edit && !term ? <DialogButton wide label="Add first expense" title="Add expense" icon={<Plus size={15} />}><ActionForm action={saveExpense.bind(null, null, null)} submit="Save expense" idempotent><ExpenseFields today={c.today} projects={projs} assets={assetOpts} employees={emps} suppliers={sups} /></ActionForm></DialogButton> : undefined} />
-        : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Description</Th><Th>Category</Th><Th>Project</Th><Th>Payment</Th><Th className="text-right">Amount</Th><Th className="text-right">VAT</Th>{edit && <Th />}</tr></thead>
+        : <><MList>{data.map((e: any) => { const [I, t] = CAT_ICON[e.category] ?? CAT_ICON.other
+          return <MRow key={e.id} lead={<Tile icon={I} tint={TINTS[t]} />} title={e.description} sub={[e.supplier_name, e.project?.name ?? 'General'].filter(Boolean).join(' · ')}
+            line={edit ? <DialogButton wide size="sm" variant="ghost" label={<><Pencil size={13} />Edit</>} title="Edit expense"><ActionForm action={saveExpense.bind(null, e.id, null)} resetOnSuccess={false}><ExpenseFields e={e} today={c.today} projects={projs} assets={assetOpts} employees={emps} suppliers={sups} /></ActionForm></DialogButton> : undefined}
+            right={<span className="text-[15px] font-bold tabular-nums">AED {fmtMoney(e.amount)}</span>} rightSub={formatShortDate(e.spent_on)} /> })}</MList>
+        <div className="hidden sm:block"><TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Description</Th><Th>Category</Th><Th>Project</Th><Th>Payment</Th><Th className="text-right">Amount</Th><Th className="text-right">VAT</Th>{edit && <Th />}</tr></thead>
           <tbody className="divide-y divide-border">{data.map((e: any) => <tr key={e.id} className="hover:bg-surface-2/50">
             <Td className="whitespace-nowrap tabular-nums">{e.spent_on}</Td>
             <Td><div className="max-w-[320px] truncate font-medium">{e.description}{e.approval_status && e.approval_status !== 'approved' && <Badge tone={e.approval_status === 'pending' ? 'amber' : 'red'} className="ms-2">{e.approval_status === 'pending' ? 'Awaiting approval' : e.approval_status === 'rejected' ? 'Rejected' : 'Changes requested'}</Badge>}</div><div className="text-xs text-muted">{[e.supplier_name, e.reference, e.employee?.full_name].filter(Boolean).join(' · ') || '—'}
@@ -67,8 +73,9 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
             <Td className="text-right font-medium tabular-nums">{fmtMoney(e.amount)}</Td><Td className="text-right tabular-nums text-muted">{Number(e.vat_amount) ? fmtMoney(e.vat_amount) : '—'}</Td>
             {edit && <Td className="text-right"><div className="flex justify-end gap-1">
               <DialogButton wide size="sm" variant="ghost" label={<><Pencil size={13} /><span className="sr-only">Edit</span></>} title="Edit expense"><ActionForm action={saveExpense.bind(null, e.id, null)} resetOnSuccess={false}><ExpenseFields e={e} today={c.today} projects={projs} assets={assetOpts} employees={emps} suppliers={sups} /></ActionForm></DialogButton>
-              {c.can('records.delete') && <ActionButton variant="ghost" action={deleteExpense.bind(null, e.id)} confirm="Delete this expense? (The receipt stays in the Vault.)"><Trash2 size={13} /><span className="sr-only">Delete</span></ActionButton>}</div></Td>}</tr>)}</tbody></TableWrap>}
+              {c.can('records.delete') && <ActionButton variant="ghost" action={deleteExpense.bind(null, e.id)} confirm="Delete this expense? (The receipt stays in the Vault.)"><Trash2 size={13} /><span className="sr-only">Delete</span></ActionButton>}</div></Td>}</tr>)}</tbody></TableWrap></div></>}
       <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/expenses" />
     </Card>
+    {edit && <Fab label="Quick create: expense" open="expense" />}
   </>
 }
