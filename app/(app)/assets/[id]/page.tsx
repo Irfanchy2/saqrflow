@@ -99,7 +99,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
     </div>
     {a.archived_at && <div className="mb-4"><Alert tone="amber">Archived on {formatLongDate(localDate(a.archived_at, c.company.timezone))}. No reminders are sent for archived items.</Alert></div>}
 
-    <nav aria-label={`${isV ? 'Vehicle' : 'Asset'} sections`} className="mb-5 flex gap-1 overflow-x-auto border-b border-border">{TABS.filter(([k]) => k !== 'expenses' || fin).map(([k, l]) => {
+    <nav aria-label={`${isV ? 'Vehicle' : 'Asset'} sections`} className="tabstrip mb-5 flex gap-1 overflow-x-auto border-b border-border">{TABS.filter(([k]) => k !== 'expenses' || fin).map(([k, l]) => {
       const n = k === 'documents' ? docs.size : k === 'maintenance' ? (maint ?? []).length : k === 'expenses' ? (exps ?? []).length : k === 'assignments' ? (assigns ?? []).length : null
       return <Link key={k} href={k === 'overview' ? `/assets/${id}` : `/assets/${id}?tab=${k}`} aria-current={tab === k ? 'page' : undefined} scroll={false}
         className={cn('-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors', tab === k ? 'border-primary font-medium text-fg' : 'border-transparent text-muted hover:text-fg')}>{l}{n ? <span className="rounded-sm bg-surface-2 px-1 text-2xs tabular-nums text-muted">{n}</span> : null}</Link>

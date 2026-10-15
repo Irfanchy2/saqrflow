@@ -83,7 +83,9 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 .tabstrip[data-fade-start], .tabstrip[data-fade-end] { mask-image: linear-gradient(to right, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
 [dir=rtl] .tabstrip[data-fade-start], [dir=rtl] .tabstrip[data-fade-end] { mask-image: linear-gradient(to left, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
 .tabstrip::-webkit-scrollbar { display: none; }
-.tabstrip[data-fade-start=true] { --fs: 28px; } .tabstrip[data-fade-end=true] { --fe: 28px; }
+.tabstrip[data-fade-start=true] { --fs: 36px; } .tabstrip[data-fade-end=true] { --fe: 36px; }
+/* tab labels stay on one line (the row scrolls instead of squeezing them) */
+.tabstrip:not(.metrics) > :where(a, button, li, span) { flex-shrink: 0; white-space: nowrap; }
 
 /* ── phones ── */
 html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }

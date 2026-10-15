@@ -76,7 +76,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         {focus.status === 'pending' && (focus.requested_by === c.userId || c.can('approvals.decide')) && <ActionButton variant="ghost" action={cancelApprovalRequest.bind(null, focus.id)} confirm="Cancel this approval request?">Cancel request</ActionButton>}
       </div></Card>}
 
-    <nav aria-label="Approval views" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l]) => <Link key={k} href={qs({ tab: k })} aria-current={tab === k ? 'page' : undefined}
+    <nav aria-label="Approval views" className="tabstrip mb-4 flex gap-1 overflow-x-auto border-b border-border">{TABS.map(([k, l]) => <Link key={k} href={qs({ tab: k })} aria-current={tab === k ? 'page' : undefined}
       className={cn('-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition-colors', tab === k ? 'border-primary font-medium text-fg' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</nav>
     <Card>
       <form className="flex flex-wrap gap-2 border-b border-border p-3"><input type="hidden" name="tab" value={tab} />

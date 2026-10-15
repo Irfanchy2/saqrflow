@@ -33,7 +33,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const back = employee.data ? `/employees/${employee.data.id}` : doc.owner_type === 'vault' ? '/vault' : '/documents'
 
   return <>
-    <Link href={back} className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Back</Link>
+    <Link href={back} className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Back</Link>
     {doc.deleted_at && <div className="mb-4 flex items-center justify-between rounded-md border border-warning/30 bg-warning/10 px-4 py-2 text-sm"><span>This document is in the recycle bin.</span>
       {c.can('records.delete') && <ActionButton action={setDeleted.bind(null, id, false)} variant="secondary"><Undo2 size={13} />Restore</ActionButton>}</div>}
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">

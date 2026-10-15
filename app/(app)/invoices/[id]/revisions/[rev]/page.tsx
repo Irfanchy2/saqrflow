@@ -25,7 +25,7 @@ export default async function RevisionPage({ params }: { params: Promise<{ id: s
   const snap = r.snapshot as { doc: Record<string, any>; items: any[] }
   const doc = { ...snap.doc, doc_type: cur.doc_type as SalesType, revision: r.revision, terms: snap.doc.terms ?? [], payment_terms: snap.doc.payment_terms ?? [], vat_rate: Number(snap.doc.vat_rate ?? 5) }
   return <>
-    <Link href={`/invoices/${id}`} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Back to current version (Rev.{cur.revision})</Link>
+    <Link href={`/invoices/${id}`} className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Back to current version (Rev.{cur.revision})</Link>
     <div className="grid gap-5 lg:grid-cols-[minmax(300px,380px)_1fr]">
       <div className="flex flex-col gap-4">
         <Alert tone="amber">You are viewing <b>revision {r.revision}</b> of {DOC_META[cur.doc_type as SalesType].label} {cur.number}. It is read-only.</Alert>

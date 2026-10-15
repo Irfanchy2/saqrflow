@@ -61,7 +61,7 @@ export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) 
 export const CardHeader = ({ title, action, sub }: { title: string; action?: ReactNode; sub?: string }) =>
   <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pb-3 pt-4"><div className="min-w-0 flex-1 basis-48"><h3 className="text-[15px] font-semibold tracking-[-0.012em]">{title}</h3>{sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}</div>{action}</div>
 /** The "View all" link used in card headers. */
-export const CardLink = ({ href, children = 'View all' }: { href: string; children?: ReactNode }) => <Link href={href} className="shrink-0 text-[13px] font-medium text-primary hover:underline">{children}</Link>
+export const CardLink = ({ href, children = 'View all' }: { href: string; children?: ReactNode }) => <Link href={href} className="-my-2 inline-flex min-h-10 shrink-0 items-center text-[13px] font-medium text-primary hover:underline">{children}</Link>
 
 // one status palette for the whole product: subtle tint + readable text, never a saturated fill
 const tone = {
@@ -133,7 +133,8 @@ export const PageHeader = ({ title, sub, actions, crumbs }: { title: string; sub
     <div className="min-w-0">
       {crumbs && crumbs.length > 0 && <nav aria-label="Breadcrumb" className="mb-1.5 hidden flex-wrap sm:flex items-center gap-1.5 text-[13px] text-muted">{crumbs.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span aria-hidden className="text-muted/60">›</span>}{c.href ? <Link href={c.href} className="hover:text-fg">{c.label}</Link> : <span className="text-fg">{c.label}</span>}</span>)}</nav>}
       <h1 className="text-[24px] font-bold leading-tight tracking-[-0.025em]">{title}</h1>{sub && <p className="mt-1 hidden max-w-[72ch] text-sm text-muted sm:block">{sub}</p>}</div>
-    {actions && <div className="tabstrip -mx-4 flex w-[calc(100%+2rem)] items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">{actions}</div>}</div>
+    {/* actions wrap onto a second line on phones rather than scrolling, so none is ever off-screen */}
+    {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto [&>*]:shrink-0">{actions}</div>}</div>
 
 export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: ReactNode }) =>
   <div role={t === 'red' ? 'alert' : undefined} className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/25 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/25 bg-warning/5' : t === 'green' ? 'border-success/25 bg-success/5' : t === 'neutral' ? 'border-border bg-surface-2' : 'border-primary/20 bg-primary-soft')}>{children}</div>

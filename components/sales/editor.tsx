@@ -238,31 +238,32 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   ] : []
 
   const waMain = waKinds[0]
-  return <div className="-mx-4 -mt-4 pb-20 sm:-mx-6 sm:-mt-6 lg:pb-0">
+  return <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
     {/* phones: the two things people do with a finished document, always within thumb reach */}
-    <div className="no-print fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-nav flex gap-2 border-t border-border bg-surface/95 p-3 backdrop-blur-md lg:hidden">
+    <div className="dock no-print fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-nav flex gap-2 border-t border-border bg-surface/95 p-3 backdrop-blur-md lg:hidden">
       {waMain && <WhatsAppSend kind={waMain[0]} recordId={doc.id} label={waMain[1]}
-        trigger={open => <button type="button" onClick={() => (dirty ? save(open) : open())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#16a34a] text-[15px] font-semibold text-white active:scale-[.99]"><MessageCircle size={18} aria-hidden />Send via WhatsApp</button>} />}
-      <button type="button" onClick={() => (dirty ? save(download) : download())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-[1.5px] border-primary text-[15px] font-semibold text-primary active:scale-[.99]"><Download size={18} aria-hidden />Download PDF</button>
+        trigger={open => <button type="button" aria-label={`Send ${waMain[1] === 'WhatsApp' ? meta.label.toLowerCase() : waMain[1].toLowerCase()} via WhatsApp`} onClick={() => (dirty ? save(open) : open())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#16a34a] text-[15px] font-semibold text-white active:scale-[.99]"><MessageCircle size={18} aria-hidden /><span className="whitespace-nowrap"><span className="max-[379px]:hidden">Send via </span>WhatsApp</span></button>} />}
+      <button type="button" onClick={() => (dirty ? save(download) : download())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-[1.5px] border-primary text-[15px] font-semibold text-primary active:scale-[.99]"><Download size={18} aria-hidden /><span className="whitespace-nowrap">Download PDF</span></button>
     </div>
     {/* toolbar */}
     <div className="no-print sticky top-16 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-surface/90 px-4 py-2.5 backdrop-blur sm:px-6">
-      <Link href="/invoices" aria-label="Back to sales documents" className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-fg"><ArrowLeft size={17} /></Link>
+      <Link href="/invoices" aria-label="Back to sales documents" className="-ms-2 grid h-10 w-10 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg sm:ms-0 sm:h-9 sm:w-9"><ArrowLeft size={18} className="rtl:rotate-180" /></Link>
       <span className="hidden rounded-md bg-primary-soft p-1.5 text-primary sm:inline-flex"><Icon size={16} aria-hidden /></span>
-      <div className="min-w-0 leading-tight">
-        <div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-sm font-semibold">{meta.label} {doc.number}{doc.revision ? <span className="ms-1 text-muted">Rev.{doc.revision}</span> : null}</h1>
+      {/* phones: back · title on the first row, the view switch and tools on a full second row */}
+      <div className="min-w-0 flex-1 leading-tight lg:flex-none">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><h1 className="min-w-0 truncate text-[15px] font-semibold sm:text-sm">{meta.label} {doc.number}{doc.revision ? <span className="ms-1 text-muted">Rev.{doc.revision}</span> : null}</h1>
           <Badge tone={STATUS_TONE[doc.status]}>{statusLabel(t, doc.status)}</Badge>{approval && <Badge tone={APPROVAL_TONE[approval]}>{APPROVAL_LABEL[approval]}</Badge>}</div>
         <div className={cn('text-[11px]', errors && editable ? 'text-danger' : 'text-muted')} aria-live="polite" data-testid="save-status">{errors && editable && !saving ? 'Not saved. See the message below' : status}</div>
       </div>
-      <div className="ms-auto flex flex-wrap items-center gap-1.5">
-        <div className="flex rounded-md border border-border p-0.5 lg:hidden" role="tablist" aria-label="Editor view">
-          {(['edit', 'preview'] as const).map(v => <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn('flex min-h-8 cursor-pointer items-center gap-1 rounded px-2.5 py-1 text-xs font-medium capitalize', view === v ? 'bg-primary text-primary-fg' : 'text-muted')}>{v === 'edit' ? <PenLine size={13} /> : <Eye size={13} />}{v}</button>)}
+      <div className="ms-auto flex items-center gap-1.5 max-lg:w-full">
+        <div className="me-auto flex rounded-lg border border-border bg-surface p-0.5 lg:hidden" role="tablist" aria-label="Editor view">
+          {(['edit', 'preview'] as const).map(v => <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn('flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1 text-[13px] font-medium capitalize', view === v ? 'bg-primary text-primary-fg' : 'text-muted')}>{v === 'edit' ? <PenLine size={13} /> : <Eye size={13} />}{v}</button>)}
         </div>
         {editable && <Button size="sm" onClick={() => save()} disabled={saving || !dirty}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}Save</Button>}
         <Button size="sm" variant="secondary" onClick={() => (dirty ? save(openPrint) : openPrint())}><Printer size={14} /><span className="hidden sm:inline">Print</span></Button>
-        <Button size="sm" variant="secondary" onClick={() => (dirty ? save(download) : download())}><Download size={14} /><span className="hidden sm:inline">PDF</span></Button>
-        {waKinds.map(([k, l]) => <WhatsAppSend key={k} kind={k} recordId={doc.id} label={l}
-          trigger={open => <Button size="sm" variant="secondary" onClick={() => (dirty ? save(open) : open())} aria-label={`Send ${l === 'WhatsApp' ? meta.label.toLowerCase() : l.toLowerCase()} via WhatsApp`}><MessageCircle size={14} /><span className="hidden sm:inline">{l}</span></Button>} />)}
+        <Button size="sm" variant="secondary" className="max-lg:hidden" onClick={() => (dirty ? save(download) : download())}><Download size={14} /><span className="hidden sm:inline">PDF</span></Button>
+        {waKinds.map(([k, l], n) => <WhatsAppSend key={k} kind={k} recordId={doc.id} label={l}
+          trigger={open => <Button size="sm" variant="secondary" className={n === 0 ? 'max-lg:hidden' : undefined} onClick={() => (dirty ? save(open) : open())} aria-label={`Send ${l === 'WhatsApp' ? meta.label.toLowerCase() : l.toLowerCase()} via WhatsApp`}><MessageCircle size={14} /><span className="hidden sm:inline">{l}</span></Button>} />)}
         <Menu label={<><MoreHorizontal size={15} /><span className="sr-only">More actions</span></>} busy={busy}>
           {canVault && <MenuItem icon={FolderArchive} onClick={() => run(() => archivePdfToVault(doc.id), { saveFirst: true })}>Save PDF to Document Vault</MenuItem>}
           <MenuItem icon={Mail} href={mail} onClick={() => void logSalesEvent(doc.id, 'emailed')}>Email to customer…</MenuItem>
@@ -348,11 +349,11 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
           <Section icon={FileText} title={isDn ? 'Items delivered' : 'Scope of works'} sub={`${items.length} line${items.length === 1 ? '' : 's'}${meta.priced ? ` · AED ${fmtMoney(tot.subtotal)}` : ''}`}>
             <ol className="flex flex-col gap-3">
               {items.map((it, i) => <li key={it.key} className="rounded-lg border border-border bg-surface-2/40 p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-md bg-surface-2 text-[11px] text-muted ring-1 ring-inset ring-border font-semibold">{i + 1}</span>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-surface-2 text-[11px] text-muted ring-1 ring-inset ring-border font-semibold">{i + 1}</span>
                   <span className="text-xs font-medium text-muted">{meta.priced && Number(it.unit_price) > 0 ? `AED ${fmtMoney(lineAmount(it))}` : 'Line ' + (i + 1)}</span>
                   {isQtn && it.id && (delivery[it.id]?.delivered ?? 0) > 0 && <Badge tone={delivery[it.id].delivered >= delivery[it.id].ordered ? 'green' : 'amber'}>Delivered {delivery[it.id].delivered} / {delivery[it.id].ordered}</Badge>}
-                  {editable && <div className="ms-auto flex items-center gap-0.5">
+                  {editable && <div className="ms-auto flex shrink-0 items-center gap-0.5">
                     <IconBtn label="Move up" onClick={() => move(i, -1)} disabled={i === 0}><ArrowUp size={14} /></IconBtn>
                     <IconBtn label="Move down" onClick={() => move(i, 1)} disabled={i === items.length - 1}><ArrowDown size={14} /></IconBtn>
                     <IconBtn label="Duplicate line" onClick={() => { setItems(xs => [...xs.slice(0, i + 1), { ...it, key: key(), id: null, source_item_id: null }, ...xs.slice(i + 1)]); touch() }}><Copy size={14} /></IconBtn>

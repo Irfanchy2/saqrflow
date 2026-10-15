@@ -93,7 +93,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   ].sort((a: any, b: any) => b.at.localeCompare(a.at)).slice(0, 30) as { at: string; text: string; icon: typeof Clock; href?: string }[]
 
   return <>
-    <Link href="/projects" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Projects</Link>
+    <Link href="/projects" className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Projects</Link>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-semibold tracking-tight">{p.name}</h1><Badge tone={st.tone}>{st.label}</Badge></div>

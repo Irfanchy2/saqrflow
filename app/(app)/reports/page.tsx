@@ -55,15 +55,15 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         <PrintButton /></div>} />
 
     <div className="no-print mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-      <nav aria-label="Report period" className="inline-flex flex-wrap rounded-md border border-border bg-surface p-0.5 text-sm">
+      <nav aria-label="Report period" className="tabstrip flex w-full overflow-x-auto rounded-lg border border-border bg-surface p-0.5 text-sm sm:inline-flex sm:w-auto sm:flex-wrap sm:rounded-md">
         {PERIODS.filter(([k]) => k !== 'custom').map(([k, l]) => <Link key={k} href={`/reports?${new URLSearchParams({ section, period: k })}`} aria-current={period.key === k ? 'true' : undefined}
-          className={cn('rounded-[5px] px-2.5 py-1 transition-colors', period.key === k ? 'bg-surface-2 font-medium text-fg ring-1 ring-inset ring-border' : 'text-muted hover:text-fg')}>{l}</Link>)}</nav>
-      <form className="flex flex-wrap items-center gap-1.5 text-sm" aria-label="Custom date range"><input type="hidden" name="section" value={section} /><input type="hidden" name="period" value="custom" />
-        <input type="date" name="from" defaultValue={period.from} aria-label="From" className="h-8 rounded-md border border-border bg-surface px-2 text-sm" /><span className="text-muted">to</span>
-        <input type="date" name="to" defaultValue={period.to} aria-label="To" className="h-8 rounded-md border border-border bg-surface px-2 text-sm" />
-        <button className="h-8 cursor-pointer rounded-md border border-border px-2.5 hover:bg-surface-2">Apply</button></form>
+          className={cn('flex-1 rounded-md px-3 py-2 text-center transition-colors sm:flex-none sm:rounded-[5px] sm:px-2.5 sm:py-1', period.key === k ? 'bg-surface-2 font-medium text-fg ring-1 ring-inset ring-border' : 'text-muted hover:text-fg')}>{l}</Link>)}</nav>
+      <form className="flex w-full flex-wrap items-center gap-1.5 text-sm sm:w-auto" aria-label="Custom date range"><input type="hidden" name="section" value={section} /><input type="hidden" name="period" value="custom" />
+        <input type="date" name="from" defaultValue={period.from} aria-label="From" className="h-10 min-w-0 flex-1 rounded-md sm:h-8 sm:flex-none border border-border bg-surface px-2 text-sm" /><span className="text-muted">to</span>
+        <input type="date" name="to" defaultValue={period.to} aria-label="To" className="h-10 min-w-0 flex-1 rounded-md sm:h-8 sm:flex-none border border-border bg-surface px-2 text-sm" />
+        <button className="h-10 cursor-pointer rounded-md border border-border px-3 hover:bg-surface-2 sm:h-8 sm:px-2.5">Apply</button></form>
     </div>
-    <nav aria-label="Report sections" className="no-print mb-5 flex gap-1 overflow-x-auto border-b border-border">{SECTIONS.filter(([k]) => allowed.includes(k)).map(([k, l]) =>
+    <nav aria-label="Report sections" className="tabstrip no-print mb-5 flex gap-1 overflow-x-auto border-b border-border">{SECTIONS.filter(([k]) => allowed.includes(k)).map(([k, l]) =>
       <Link key={k} href={`/reports?${qs({ section: k })}`} aria-current={section === k ? 'page' : undefined}
         className={cn('-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition-colors', section === k ? 'border-primary font-medium text-fg' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</nav>
 

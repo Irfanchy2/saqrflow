@@ -32,7 +32,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
   const mail = `mailto:${encodeURIComponent(cu.email ?? '')}?subject=${encodeURIComponent(`Statement of account: ${cu.name}`)}&body=${encodeURIComponent(`Dear ${cu.contact_person || 'Sir/Madam'},\n\nPlease find attached your statement of account${f.to ? ` up to ${f.to}` : ''}. The balance due is AED ${fmtMoney(l.outstanding)}${l.overdue ? `, of which AED ${fmtMoney(l.overdue)} is overdue` : ''}.\n\nKind regards,\n${c.company.name}`)}`
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   return <>
-    <Link href={`/parties/${id}`} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />{cu.name}</Link>
+    <Link href={`/parties/${id}`} className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />{cu.name}</Link>
     <PageHeader title="Customer ledger" sub={`${cu.name}. Opening balance, invoices, payments, cheques and credit notes with a running balance.`}
       actions={<>
         <LinkButton href={`/print/statement/${id}?${qs}${qs ? '&' : ''}auto=1`} variant="secondary" target="_blank"><Printer size={14} />Print statement</LinkButton>

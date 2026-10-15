@@ -41,7 +41,7 @@ export default async function SiteVisitPage({ params }: { params: Promise<{ id: 
   const visitForm = (extra?: Record<string, any>) => <VisitFields v={{ ...v, ...extra }} leads={o(leads, (l: any) => `${l.company_name} (${l.number})`)} customers={o(customers, (x: any) => x.name)} projects={o(projects, (x: any) => x.name)} employees={o(employees, (e: any) => e.full_name)} />
 
   return <>
-    <Link href="/site-visits" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} />Site visits</Link>
+    <Link href="/site-visits" className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />Site visits</Link>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-semibold tracking-tight">Site visit <span className="font-mono">{v.number}</span></h1><Badge tone={late ? 'red' : st?.tone}>{late ? 'Overdue' : st?.label}</Badge></div>

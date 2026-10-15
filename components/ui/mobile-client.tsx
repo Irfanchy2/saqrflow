@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
  * that form directly; `href` navigates instead.
  */
 export function Fab({ label, open, href }: { label: string; open?: string; href?: string }) {
-  const cls = 'no-print fixed bottom-[calc(76px+env(safe-area-inset-bottom))] end-4 z-nav grid h-14 w-14 cursor-pointer place-items-center rounded-full bg-primary text-primary-fg shadow-[0_10px_24px_-6px_hsl(var(--primary)/.6)] transition-transform active:scale-95 lg:hidden'
+  const cls = 'fab no-print fixed bottom-[calc(76px+env(safe-area-inset-bottom))] end-4 z-nav grid h-14 w-14 cursor-pointer place-items-center rounded-full bg-primary text-primary-fg shadow-[0_10px_24px_-6px_hsl(var(--primary)/.6)] transition-transform active:scale-95 lg:hidden'
   if (href) return <Link href={href} aria-label={label} className={cls}><Plus size={24} strokeWidth={2.4} /></Link>
   return <button type="button" aria-label={label} className={cls} onClick={() => dispatchEvent(new CustomEvent('averiqo:open', { detail: open }))}><Plus size={24} strokeWidth={2.4} /></button>
 }
