@@ -49,7 +49,7 @@ export default async function SiteReportPage({ params }: { params: Promise<{ id:
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit daily report" icon={<Pencil size={14} />}><ActionForm action={updateSiteReport.bind(null, id)} resetOnSuccess={false}>
           <SiteReportFields r={r} projects={[]} fixedProject={r.project_id} workOrders={wos.map((w: any) => ({ id: w.id, name: `${w.number}: ${w.title}` }))} employees={employees.map((e: any) => ({ id: e.id, name: e.full_name }))} attendance={(att ?? []).map((a: any) => a.employee_id)} today={c.today} /></ActionForm></DialogButton>}
         <LinkButton variant="secondary" href={`/print/report/site_report/${id}`} target="_blank"><Printer size={14} />Print / PDF</LinkButton>
-        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'site_report', id)} confirm="Move this report to the trash?"><Trash2 size={14} />Delete</ActionButton>}
+        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'site_report', id)} confirm="Move this report to the trash?"><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div>
     </div>
     <div className="grid gap-5 xl:grid-cols-3 [&>*]:min-w-0">

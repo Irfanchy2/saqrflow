@@ -16,7 +16,7 @@ export function MonthGrid({ month, today, items, base, extraParams = '' }: { mon
   while (days.length % 7) days.push(null)
   const title = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(first + 'T00:00:00Z'))
   const link = (m: string) => `${base}?${extraParams}${extraParams ? '&' : ''}m=${m}`
-  return <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-card">
+  return <div className="overflow-hidden rounded-xl border border-border/80 bg-surface shadow-card">
     <div className="flex items-center justify-between border-b border-border px-4 py-3"><h3 className="text-sm font-semibold">{title}</h3>
       <div className="flex items-center gap-1"><Link aria-label="Previous month" href={link(shift(month, -1))} className="grid h-10 w-10 place-items-center rounded-lg hover:bg-surface-2 sm:h-8 sm:w-8"><ChevronLeft size={16} className="rtl:rotate-180" /></Link>
         <Link href={link(today.slice(0, 7))} className="inline-flex h-10 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-2 sm:h-8 sm:px-2.5">Today</Link><Link aria-label="Next month" href={link(shift(month, 1))} className="grid h-10 w-10 place-items-center rounded-lg hover:bg-surface-2 sm:h-8 sm:w-8"><ChevronRight size={16} className="rtl:rotate-180" /></Link></div></div>

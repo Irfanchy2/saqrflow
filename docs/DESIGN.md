@@ -26,19 +26,23 @@ Averiqo is the software brand. Company identity (letterhead, stamp, legal name) 
 
 ## Components
 
-- **Buttons:** tactile.
+- **Buttons:** tactile. The button sets its icon size: 14 px small, 16 px regular, 18 px icon-only.
   - Filled (`primary` navy ink, `blue`, `danger`): a top highlight, a hairline in their own colour and a soft coloured shadow that deepens on hover.
   - `secondary`: reads as a key (hairline, faint bottom edge).
   - Every button presses in by 2%.
   - The dashboard banner's main action is a pill with its arrow in a nested disc that nudges forward on hover.
 - **Fields:** a recessed well with a hairline that darkens on hover and a soft blue halo on focus. Every single-choice dropdown uses the same chevron. File pickers get a small secondary button.
-- **Cards and KPI cards:** a hairline and the card shadow. A card that links somewhere lifts 1 px on hover.
+- **Cards and KPI cards:** 14 px radius, a hairline and the card shadow. Popovers and menus use 12 px. A card that links somewhere lifts 1 px on hover and presses in on touch.
+  - KPI icon tiles take their colour from what the figure means: money received or profit green, receivables and balances amber, costs orange, quotations and leads violet, sales and contract value blue. A problem is red. Anything else rotates.
+- **Money:** amounts always show in full, with 2 decimals and never abbreviated or cut off.
+  - `Money` sets the "AED" smaller and quieter and keeps the figure on one line.
+  - KPI values shrink to fit their card (`.kpi-fit`, sized from the figure's length) instead of wrapping.
 - **Status badges:** a tint, an inset hairline and a leading dot in the same colour (for plain-text statuses).
 - **Tabs:** underline tabs for sections and filters (counts sit in a small pill). A segmented control (`SEG` / `segItem`) is used for view switches: a recessed track with a raised thumb. The chart series switch glides its thumb.
 - **Menus and notifications:** 12 px radius, the pop shadow and an entrance that rises 4 px. The notifications panel spans the width on phones.
 - **Dialogs:** 18 px radius with a pinned Save bar. Phones get a bottom sheet with a grab handle that rises into place.
-- **Empty states:** the icon sits in a raised tile inside two hairline rings that fade out downwards, followed by a title, one line of help and the next step.
-- **Phone tab bar:** the active pill glides to the tab you open; tabs press in.
+- **Empty states:** the icon sits in a raised tile inside two hairline rings that fade out downwards, followed by a title, one line of help and the next step. Dashboard widgets use the `compact` version: a smaller tile, no rings, tighter spacing. Both settle in over 260 ms.
+- **Phone tab bar:** a frosted bar. The active tab has a soft blue pill that glides to the tab you open, a filled icon and a blue label; tabs press in.
 
 Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`. **Print and PDF are separate:** `.sales-paper` has its own variables and never uses app tokens.
 
@@ -47,6 +51,7 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
 - **Shell:** `app/(app)/layout.tsx`
   - **Sidebar:** `components/layout/sidebar.tsx`. Brand plus "Business Operating System"; Dashboard group, then Sales (CRM, Customers, Site visits, Quotations, Invoices, Delivery notes, Payments, Catalog), Operations, Finance, People & documents, Reports and System.
     - It collapses from 256 px to a 68 px icon rail with tooltips; the choice is a cookie (Ctrl+\).
+    - Every section can fold: its arrow is always visible, and a folded section shows how many items it holds. The choice is remembered per browser, and the section holding the current page stays open.
     - On phones and tablets it becomes a drawer.
   - **Top bar:** search (Ctrl K), company location, notifications, settings, theme, and the user menu (account, settings, sign out).
 - **Page:** `PageHeader` (optional breadcrumb `crumbs`, title, one line of context, actions on the right).
@@ -74,6 +79,9 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
 
 - **Bars:** top bar (menu, logo, search, alerts, account) and the bottom tab bar (Home, Sales, Projects, Tasks, More). Any other module you open takes the second slot under a short name; every tab has the same width.
 - **Header actions** wrap onto a second line instead of scrolling, so the main action is never off-screen.
+  - On record pages, **Delete** is icon-only on phones (it keeps its accessible name).
+- **List rows** (`MRow`): long names wrap to two lines, then end in an ellipsis, with the full text as a tooltip. Amounts use `Money`. A row darkens slightly while pressed.
+- **Quick actions:** compact, borderless tiles. Phones show 8 in two rows of four; the desktop card shows 9 in three rows of three.
 - **Scrolling rows** (tabs, filters, KPI strips) carry the `tabstrip` class.
   - The side that has more fades out through a CSS scroll-driven animation; no script edits the HTML.
   - `components/layout/strip-edges.tsx` scrolls the current tab into view.

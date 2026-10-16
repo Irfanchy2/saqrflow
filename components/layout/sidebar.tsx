@@ -87,14 +87,14 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false, user = 
     return <Link key={i.key} href={i.href} aria-label={rail ? i.label : undefined} aria-current={on ? 'page' : undefined}
       onMouseEnter={e => { if (rail) showTip(i.label, e.currentTarget) }} onMouseLeave={hideTip}
       onFocus={e => { if (rail) showTip(i.label, e.currentTarget) }} onBlur={hideTip}
-      className={cn('nav-item group/l relative flex h-10 shrink-0 select-none items-center gap-3 rounded-[10px] ps-[10px] pe-2.5 text-[14px] outline-offset-0 transition-[color,transform] duration-150 active:scale-[.985] lg:h-9 lg:text-[13.5px]',
+      className={cn('nav-item group/l relative flex h-10 shrink-0 select-none items-center gap-3 rounded-[10px] ps-[10px] pe-2.5 text-[14px] outline-offset-0 transition-[color,transform] duration-150 active:scale-[.985] lg:h-[34px] lg:text-[13.5px]',
         on ? 'font-medium text-white' : 'text-sb-muted hover:text-sb-fg')}>
       {/* hover wash (static) and the active highlight (slides between items) */}
       {!on && <span aria-hidden className="absolute inset-0 rounded-[inherit] bg-white/[.045] opacity-0 transition-opacity duration-150 group-hover/l:opacity-100" />}
       {on && <m.span layoutId={`nav-on-${where}`} transition={{ duration: 0.26, ease: EASE }} aria-hidden
         className="absolute inset-0 rounded-[inherit] bg-[linear-gradient(90deg,hsl(var(--sb-accent)/.26),hsl(var(--sb-accent)/.10))] ring-1 ring-inset ring-sb-accent/25">
         <span className="absolute inset-y-2 start-0 w-[3px] rounded-e-full bg-sb-accent" /></m.span>}
-      <I size={20} weight={on ? 'fill' : 'regular'} aria-hidden
+      <I size={19} weight={on ? 'fill' : 'regular'} aria-hidden
         className={cn('relative shrink-0 transition-[color,transform] duration-200 ease-out', on ? 'text-[hsl(var(--sb-accent-soft))]' : 'text-sb-muted group-hover/l:-translate-y-px group-hover/l:text-sb-fg')} />
       <m.span initial={false} animate={{ opacity: rail ? 0 : 1 }} transition={rail ? fade : { ...fade, delay: 0.06 }} className="relative min-w-0 flex-1 truncate">{i.label}</m.span>
     </Link>
@@ -102,12 +102,14 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false, user = 
   const nav = (rail: boolean, where: string) => <nav className="sb-scroll flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-3 pb-3 pt-1" aria-label="Main">
     {groups.map(g => {
       const hasActive = g.items.some(i => active(i)), isFolded = !rail && !!g.name && folded.includes(g.name) && !hasActive
-      return <div key={g.name || '_'} className={cn(g.name && 'mt-3')}>
+      return <div key={g.name || '_'} className={cn(g.name && 'mt-2.5')}>
         {g.name && <div className="relative h-7">
           <button type="button" onClick={() => toggleGroup(g.name)} aria-expanded={!isFolded} tabIndex={rail ? -1 : 0} aria-hidden={rail || undefined}
-            className={cn('group/g flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md ps-[10px] pe-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-sb-muted/65 transition-[color,opacity] duration-150 hover:text-sb-fg', rail && 'pointer-events-none opacity-0')}>
+            className={cn('group/g flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md ps-[10px] pe-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-sb-muted/60 transition-[color,opacity,background-color] duration-150 hover:bg-white/[.03] hover:text-sb-fg', rail && 'pointer-events-none opacity-0')}>
             <span className="flex-1 truncate text-start">{g.name}</span>
-            <CaretDownIcon size={11} weight="bold" aria-hidden className={cn('opacity-0 transition-[transform,opacity] duration-200 group-hover/g:opacity-100 group-focus-visible/g:opacity-100', isFolded && '-rotate-90 opacity-100')} /></button>
+            {/* a folded section says how much it holds */}
+            {isFolded && <span className="rounded-full bg-white/[.07] px-1.5 text-[10px] font-semibold leading-4 tracking-normal tabular-nums text-sb-muted">{g.items.length}</span>}
+            <CaretDownIcon size={11} weight="bold" aria-hidden className={cn('opacity-40 transition-[transform,opacity] duration-200 group-hover/g:opacity-100 group-focus-visible/g:opacity-100', isFolded && '-rotate-90 rtl:rotate-90')} /></button>
           {/* in the rail a short rule marks where a section starts */}
           <span aria-hidden className={cn('absolute start-[14px] top-1/2 h-px w-3 bg-sb-line transition-opacity duration-150', rail ? 'opacity-100' : 'opacity-0')} />
         </div>}

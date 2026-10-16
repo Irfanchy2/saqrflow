@@ -16,11 +16,14 @@ export function MList({ children, className }: { children: ReactNode; className?
 export function MRow({ href, lead, title, sub, line, right, rightSub, className }: {
   href?: string; lead?: ReactNode; title: ReactNode; sub?: ReactNode; line?: ReactNode; right?: ReactNode; rightSub?: ReactNode; className?: string
 }) {
-  return <li data-row-link={href ? '' : undefined} className={cn('flex items-center gap-3 px-4 py-3.5 transition-colors duration-100 active:bg-surface-2/80', className)}>
+  // long names wrap onto a second line (then ellipsis) instead of being cut after a few words; the full text is the tooltip
+  const full = typeof title === 'string' ? title : undefined, subFull = typeof sub === 'string' ? sub : undefined
+  const head = 'line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] [overflow-wrap:anywhere]'
+  return <li data-row-link={href ? '' : undefined} className={cn('flex items-center gap-3 px-4 py-3.5 transition-colors duration-150 active:bg-fg/[.045]', className)}>
     {lead && <span className="shrink-0">{lead}</span>}
     <div className="min-w-0 flex-1">
-      {href ? <Link href={href} data-row-primary className="block truncate text-[15px] font-semibold leading-snug">{title}</Link> : <div className="truncate text-[15px] font-semibold leading-snug">{title}</div>}
-      {sub && <div className="mt-0.5 truncate text-[13px] text-muted">{sub}</div>}
+      {href ? <Link href={href} data-row-primary title={full} className={head}>{title}</Link> : <div title={full} className={head}>{title}</div>}
+      {sub && <div title={subFull} className="mt-0.5 truncate text-[13px] text-muted">{sub}</div>}
       {line && <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2 text-[14px]">{line}</div>}
     </div>
     {(right || rightSub) && <div className="flex shrink-0 flex-col items-end gap-1.5 self-stretch justify-between py-0.5 text-end">

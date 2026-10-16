@@ -63,7 +63,7 @@ export default async function SiteVisitPage({ params }: { params: Promise<{ id: 
         <LinkButton variant="secondary" href={`/print/report/site_visit/${id}`} target="_blank"><Printer size={14} />Visit report</LinkButton>
         {edit && fin && <NewSalesButtons siteVisitId={id} customerId={v.customer_id ?? undefined} projectId={v.project_id ?? undefined} only={['quotation']} variant="secondary" />}
         {edit && !v.project_id && <ActionButton size="md" action={createProjectFromVisit.bind(null, id)}><HardHat size={14} />Create project</ActionButton>}
-        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'site_visit', id)} confirm="Move this site visit to the trash?"><Trash2 size={14} />Delete</ActionButton>}
+        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'site_visit', id)} confirm="Move this site visit to the trash?"><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div>
     </div>
 

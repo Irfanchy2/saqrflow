@@ -43,7 +43,7 @@ export function QuickActions({ can, label = 'Create' }: { can: Can; label?: stri
       className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg bg-ink ps-4 pe-3 text-sm font-semibold text-ink-fg shadow-btn transition-colors hover:bg-ink/90 disabled:opacity-60 sm:h-10">
       {pending ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Plus size={16} aria-hidden />}{label}<ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} aria-hidden /></button>
     <AnimatePresence>{open && <m.div role="menu" aria-label="Create new" onKeyDown={move} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={T.fast}
-      className="absolute end-0 z-pop mt-1.5 w-56 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-pop">
+      className="absolute end-0 z-pop mt-1.5 w-56 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-pop">
       {items.map(([l, run]) => <button key={l} role="menuitem" type="button" onClick={() => { setOpen(false); run() }}
         className="block w-full cursor-pointer rounded-md px-2.5 py-1.5 text-start text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none">{l}</button>)}</m.div>}</AnimatePresence>
   </div>

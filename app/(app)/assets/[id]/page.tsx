@@ -94,7 +94,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
         {edit && <DialogButton wide variant="secondary" label="Edit" title={`Edit ${isV ? 'vehicle' : 'asset'}`} icon={<Pencil size={14} />}><ActionForm action={updateAsset.bind(null, id)} resetOnSuccess={false}><AssetFields kind={isV ? 'vehicle' : 'asset'} a={a} employees={emps ?? []} suppliers={(sups ?? []).map(s => s.name)} /></ActionForm></DialogButton>}
         {a.archived_at ? <ActionButton size="md" action={setAssetArchived.bind(null, id, false)}><ArchiveRestore size={14} />Restore</ActionButton>
           : <ActionButton size="md" variant="ghost" action={setAssetArchived.bind(null, id, true)} confirm="Archive this item? Its documents and history are kept; reminders stop."><Archive size={14} />Archive</ActionButton>}
-        {c.can('records.delete') && <ActionButton size="md" variant="ghost" action={trashRecord.bind(null, 'asset', id)} confirm="Move this item to the trash? It can be restored from Trash."><Trash2 size={14} />Delete</ActionButton>}
+        {c.can('records.delete') && <ActionButton size="md" variant="ghost" action={trashRecord.bind(null, 'asset', id)} confirm="Move this item to the trash? It can be restored from Trash."><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div>}</div>
     </div>
     {a.archived_at && <div className="mb-4"><Alert tone="amber">Archived on {formatLongDate(localDate(a.archived_at, c.company.timezone))}. No reminders are sent for archived items.</Alert></div>}

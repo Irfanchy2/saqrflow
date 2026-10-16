@@ -78,7 +78,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         {fin && edit && <WhatsAppSend kind="statement" recordId={id} label="Send statement" size="md" />}
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit client" icon={<Pencil size={14} />}><ActionForm action={updateParty.bind(null, 'customers', id)} resetOnSuccess={false}><PartyFields p={cu} /></ActionForm></DialogButton>}
         {edit && fin && <NewSalesButtons customerId={id} only={['quotation', 'invoice']} />}
-        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'customer', id)} confirm={`Move “${cu.name}” to the trash? Their documents and invoices are kept; an admin can restore the customer from Settings → Trash.`}><Trash2 size={14} />Delete</ActionButton>}
+        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'customer', id)} confirm={`Move “${cu.name}” to the trash? Their documents and invoices are kept; an admin can restore the customer from Settings → Trash.`}><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div>
     </div>
 

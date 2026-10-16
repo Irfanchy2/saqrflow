@@ -62,7 +62,7 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 .toast-in { animation: toast-in .16s ease-out; }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
 .skeleton { @apply relative overflow-hidden rounded-md bg-surface-2; }
-.skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .05), transparent); animation: shimmer 1.4s infinite; }
+.skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .055) 50%, transparent); animation: shimmer 1.6s cubic-bezier(.4,0,.2,1) infinite; }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
 /* KPI card (StatCard): stacked when narrow; from 250 px wide the icon tile sits on the left and the bars bottom-right */
 .kpi { container-type: inline-size; }
@@ -73,6 +73,12 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
   .kpi-in { grid-template-areas: "tile label label" "tile value value" "tile hint bars"; column-gap: 14px; align-items: start; }
   .kpi-value { margin-top: 2px; } .kpi-label { align-self: center; padding-top: 2px; }
 }
+/* KPI figures stay on one line and shrink to fit the card: --len is the figure's length in characters (StatCard).
+   Stacked (narrow) cards use the full inner width; from 250 px the icon tile takes ~58 px beside the value. */
+.kpi .kpi-fit { white-space: nowrap; font-size: clamp(14px, calc((100cqi - 36px) * 1.85 / var(--len)), 19px); }
+@media (min-width: 640px) { .kpi .kpi-fit { font-size: clamp(14px, calc((100cqi - 36px) * 1.85 / var(--len)), 23px); } }
+@container (min-width: 250px) { .kpi .kpi-fit { font-size: clamp(14px, calc((100cqi - 94px) * 1.85 / var(--len)), 23px); } }
+.kpi-cur { font-size: .64em; font-weight: 500; letter-spacing: 0; color: hsl(var(--muted)); }
 /* odd number of metric cards on the 2-column phone grid: the last one spans the row instead of leaving an empty cell */
 @media (min-width: 640px) and (max-width: 767px) { .metrics > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
 
@@ -90,6 +96,9 @@ select.field-select[multiple] { background-image: none; }
 /* empty states: two hairline rings fading out around the icon tile */
 .empty-rings::before, .empty-rings::after { content: ''; position: absolute; left: 50%; top: 50%; border-radius: 9999px; border: 1px solid hsl(var(--border-strong) / .55); transform: translate(-50%, -50%); pointer-events: none;
   -webkit-mask-image: linear-gradient(to bottom, #000 20%, transparent 62%); mask-image: linear-gradient(to bottom, #000 20%, transparent 62%); }
+/* empty states and arriving lists settle in (opacity + 4 px), quickly */
+.empty-in { animation: settle .26s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes settle { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .empty-rings::before { width: 80px; height: 80px; } .empty-rings::after { width: 120px; height: 120px; opacity: .5; }
 /* menus (row actions, "More", saved views, account): one surface, one item style, one entrance */
 [role=menu] { border-radius: 12px !important; border-color: hsl(var(--border) / .9) !important; box-shadow: 0 0 0 1px hsl(var(--shadow) / .03), 0 4px 8px -2px hsl(var(--shadow) / .08), 0 18px 40px -12px hsl(var(--shadow) / .28) !important; transform-origin: top; }
@@ -109,6 +118,11 @@ kbd { font-family: var(--font-geist-sans), ui-sans-serif, system-ui; }
 @media (hover: hover) { .rtable tbody tr:hover { background: hsl(var(--surface-2) / .55); } }
 .rtable tbody tr:has(a[href]:not([href^="/api/"])) { cursor: pointer; }
 [data-row-link] { cursor: pointer; }
+/* touch: a clear pressed state on anything that opens a record (rows, KPI cards, list cards) */
+@media (hover: none) { .rtable tbody tr:has(a[href]):active { background: hsl(var(--fg) / .045); } }
+a.kpi:active > .kpi-in { transform: scale(.985); border-color: hsl(var(--border-strong) / .8); }
+/* navigation skeletons fade in rather than pop (components/ui/skeleton) */
+[data-skeleton] { animation: fade .16s ease-out both; }
 
 /* scrollable tab rows (components/ui/tab-strip): no scrollbar; the edges fade while more tabs are hidden that way */
 /* The fades are pure CSS (a scroll-driven animation of the mask stops), so no script ever changes server-rendered HTML.

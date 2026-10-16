@@ -28,9 +28,11 @@ export function QuickGrid({ can }: { can: Can }) {
     { label: 'Smart document', icon: FilePlus2, href: '/documents?new=document', show: can.docs },
   ]
   const list = items.filter(i => i.show).slice(0, 9)
-  const tile = 'group flex min-h-[96px] cursor-pointer flex-col items-center justify-center gap-2.5 rounded-xl border border-border/80 bg-surface px-2 py-3 text-center text-[12.5px] font-medium leading-tight shadow-card transition-[border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-border-strong/80 hover:shadow-lift active:translate-y-0 active:scale-[.98] disabled:opacity-60'
-  return <div className="grid grid-cols-3 gap-2.5 px-5 pb-5">{list.map((i, n) => {
-    const body = <><span className={cn('grid h-10 w-10 place-items-center rounded-xl transition-transform duration-200 ease-out group-hover:scale-105', TINT[n % TINT.length])} aria-hidden>{pending && i.run ? <Loader2 size={18} className="animate-spin" /> : <i.icon size={18} strokeWidth={1.9} />}</span><span className="leading-tight">{i.label}</span></>
+  // compact, borderless tiles: a small colour tile and a short label; the press and hover states carry the affordance.
+  // Phones show 8 (two full rows of four); the desktop card shows 9 (three rows of three).
+  const tile = 'group flex min-h-[78px] cursor-pointer flex-col items-center justify-start gap-2 rounded-xl px-1 pb-2 pt-2.5 text-center text-[12px] font-medium leading-[1.25] text-fg/85 transition-[background-color,transform] duration-150 ease-out hover:bg-surface-2/80 active:scale-[.96] active:bg-surface-2 disabled:opacity-60 max-sm:[&:nth-child(9)]:hidden'
+  return <div className="grid grid-cols-4 gap-1 px-3 pb-3 sm:grid-cols-3 sm:px-4 sm:pb-4">{list.map((i, n) => {
+    const body = <><span className={cn('grid h-9 w-9 place-items-center rounded-[11px] transition-transform duration-200 ease-out group-hover:-translate-y-0.5', TINT[n % TINT.length])} aria-hidden>{pending && i.run ? <Loader2 size={17} className="animate-spin" /> : <i.icon size={17} strokeWidth={1.9} />}</span><span className="line-clamp-2 max-w-[11ch]">{i.label}</span></>
     return i.href ? <Link key={i.label} href={i.href} className={tile}>{body}</Link>
       : <button key={i.label} type="button" disabled={pending} onClick={i.run} className={tile}>{body}</button>
   })}</div>

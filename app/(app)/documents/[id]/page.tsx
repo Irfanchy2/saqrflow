@@ -54,7 +54,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             <Field label="Fee paid (AED)"><Input type="number" name="fee" step="0.01" min="0" defaultValue={doc.renewal_fee ?? ''} /></Field>
             <Field label="Renewed copy (optional)"><input type="file" name="file" accept={ACCEPT_ATTR} className="text-sm" /></Field>
             <Field label="Notes"><Textarea name="notes" /></Field></ActionForm></DialogButton>}
-        {c.can('records.delete') && !doc.deleted_at && <ActionButton action={setDeleted.bind(null, id, true)} variant="ghost" confirm="Move this document to the recycle bin? It can be restored later."><Trash2 size={14} />Delete</ActionButton>}
+        {c.can('records.delete') && !doc.deleted_at && <ActionButton action={setDeleted.bind(null, id, true)} variant="ghost" confirm="Move this document to the recycle bin? It can be restored later."><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div></div>
 
     <div className="grid gap-5 lg:grid-cols-5">
