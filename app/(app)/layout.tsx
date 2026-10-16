@@ -13,7 +13,6 @@ import { Toaster } from '@/components/ui/toast'
 import { CommandPalette, PaletteHint } from '@/components/layout/command-palette'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { NavProgress } from '@/components/layout/nav-progress'
-import { Suspense } from 'react'
 import { MotionRoot } from '@/components/motion'
 import { MenuButton } from '@/components/layout/menu-button'
 import { StripEdges } from '@/components/layout/strip-edges'
@@ -70,12 +69,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     c.supabase.from('in_app_notifications').select('id', { count: 'exact', head: true }).is('read_at', null),
   ])
   const visible = items.filter(i => i.show)
+  const collapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === '1'
   const tz = c.company.timezone || 'Asia/Dubai'
   const today = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz }).format(new Date())
   const city = tz.split('/').pop()!.replace(/_/g, ' '), place = tz === 'Asia/Dubai' ? 'Dubai, UAE' : city
   return <MotionRoot><div className="flex min-h-screen">
     <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
-    <Suspense><Sidebar items={visible} company={c.company.name} user={c.profile.full_name} role={c.profile.role} rtl={isRtl(l)} initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === '1'} /></Suspense>
+    {/* the shell (sidebar, progress bar, tap skeleton) renders in the first HTML chunk, with no Suspense boundary: a boundary
+        here streamed the sidebar in a later chunk on every load, and when that chunk landed while React was hydrating the
+        page threw React #418 (seen intermittently on any page) */}
+    <Sidebar items={visible} company={c.company.name} user={c.profile.full_name} role={c.profile.role} rtl={isRtl(l)} initialCollapsed={collapsed} />
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
       <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border/70 bg-surface/85 px-2 backdrop-blur-md backdrop-saturate-150 sm:gap-3 sm:px-5 lg:px-8">
         <MenuButton />
@@ -92,8 +95,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="mx-1.5 hidden h-7 w-px bg-border sm:block" aria-hidden />
           <UserMenu name={c.profile.full_name} role={c.profile.role} company={c.company.name} />
         </div></header>
-      <main id="main" tabIndex={-1} className="relative mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 has-[.fab]:pb-[calc(10rem+env(safe-area-inset-bottom))] has-[.dock]:pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:px-8 lg:!pb-10"><Suspense><NavPending /></Suspense>{children}</main>
-    </div><BottomNav items={visible} /><Suspense><NavProgress /></Suspense><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
+      <main id="main" tabIndex={-1} className="relative mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 has-[.fab]:pb-[calc(10rem+env(safe-area-inset-bottom))] has-[.dock]:pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:px-8 lg:!pb-10"><NavPending />{children}</main>
+    </div><BottomNav items={visible} /><NavProgress /><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
       ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
       ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings#integrations', group: 'Settings' }] : []),
