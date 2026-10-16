@@ -4,20 +4,40 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { safe, str } from '@/lib/action'
 import type { ActionState } from '@/lib/utils'
-import { logLogin } from '@/lib/sessions'
+import { checkNewDevice, logLogin, recentFailedSignIns, requestMeta } from '@/lib/sessions'
 import { sessionIdFromJwt } from '@/lib/device'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { alertAdmins, passwordProblem, rateLimit, securityEvent } from '@/lib/security'
 
-const cred = z.object({ email: z.string().email('Enter a valid email'), password: z.string().min(10, 'Use at least 10 characters') })
-const safeNext = (n?: string) => (n && n.startsWith('/') && !n.startsWith('//') ? n : '/')
+const safeNext = (n?: string) => (n && n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/\\') ? n : '/')
+const LOCK_AFTER = 5   // failed sign-ins for one email within 15 minutes
 
 export async function signIn(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const v = z.object({ email: z.string().email('Enter a valid email'), password: z.string().min(1, 'Enter your password') }).parse({ email: str(fd, 'email'), password: fd.get('password') })
+    const v = z.object({ email: z.string().email('Enter a valid email').max(320), password: z.string().min(1, 'Enter your password').max(256) }).parse({ email: str(fd, 'email')?.toLowerCase(), password: fd.get('password') })
+    // brute-force protection shared by all server instances: per network, then per account
+    const { ip } = await requestMeta()
+    if (!(await rateLimit(`signin:ip:${ip ?? 'unknown'}`, 100, 900))) {
+      await securityEvent('rate_limited', { detail: `sign-in attempts from ${ip ?? 'unknown'}` })
+      return { error: 'Too many sign-in attempts from this network. Wait 15 minutes and try again.' }
+    }
+    if ((await recentFailedSignIns(v.email)) >= LOCK_AFTER) {
+      await logLogin('sign_in_locked', { email: v.email, detail: `${LOCK_AFTER}+ failed attempts in 15 minutes` })
+      return { error: 'This account is locked for 15 minutes after repeated failed sign-ins. Wait, or reset your password.' }
+    }
     const sb = await createClient()
     const { data: signed, error } = await sb.auth.signInWithPassword(v)
-    if (error) { await logLogin('sign_in_failed', { email: v.email }); return { error: 'Incorrect email or password.' } }       // same message for unknown user / wrong password
-    await logLogin('sign_in', { userId: signed.user?.id, email: v.email, sessionId: sessionIdFromJwt(signed.session?.access_token) })
+    if (error) {
+      const who = await logLogin('sign_in_failed', { email: v.email })       // same message for an unknown user and a wrong password
+      if ((await recentFailedSignIns(v.email)) >= LOCK_AFTER && who.companyId) {
+        await securityEvent('sign_in_locked', { companyId: who.companyId, userId: who.userId, detail: `${v.email}: ${LOCK_AFTER} failed sign-ins in 15 minutes` })
+        await alertAdmins(who.companyId, { title: 'Repeated failed sign-ins', body: `${v.email} was locked for 15 minutes after ${LOCK_AFTER} failed attempts${ip ? ` (from ${ip})` : ''}.`, throttleKey: `lock:${v.email}`, severity: 'warning' })
+      }
+      return { error: 'Incorrect email or password.' }
+    }
+    const sid = sessionIdFromJwt(signed.session?.access_token)
+    const who = await logLogin('sign_in', { userId: signed.user?.id, email: v.email, sessionId: sid })
+    if (who.userId && who.companyId) await checkNewDevice(who.userId, who.companyId, v.email, sid)
     const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel()
     redirect(aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' ? '/login/mfa' : safeNext(str(fd, 'next')))
   })
@@ -25,6 +45,8 @@ export async function signIn(_: ActionState, fd: FormData): Promise<ActionState>
 export async function verifyMfa(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
     const sb = await createClient()
+    const { data: { user: me } } = await sb.auth.getUser(); if (!me) redirect('/login')
+    if (!(await rateLimit(`mfa:${me.id}`, 5, 300))) return { error: 'Too many codes tried. Wait 5 minutes, then enter the current code from your app.' }
     const { data: f } = await sb.auth.mfa.listFactors()
     const factor = f?.totp.find(x => x.status === 'verified'); if (!factor) return { error: 'No authenticator is enrolled.' }
     const ch = await sb.auth.mfa.challenge({ factorId: factor.id }); if (ch.error) return { error: ch.error.message }
@@ -37,10 +59,14 @@ export async function verifyMfa(_: ActionState, fd: FormData): Promise<ActionSta
 }
 export async function signUp(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const v = cred.parse({ email: str(fd, 'email'), password: fd.get('password') })
+    const v = z.object({ email: z.string().email('Enter a valid email').max(320), password: z.string().max(256) }).parse({ email: str(fd, 'email')?.toLowerCase(), password: fd.get('password') })
+    const weak = passwordProblem(v.password, v.email); if (weak) return { error: weak, fieldErrors: { password: weak } }
+    const { ip } = await requestMeta()
+    if (!(await rateLimit(`signup:ip:${ip ?? 'unknown'}`, 60, 3600))) return { error: 'Too many new accounts from this network. Try again later.' }
     const sb = await createClient()
     const { data, error } = await sb.auth.signUp({ ...v, options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/callback` } })
-    if (error) return { error: error.message }
+    // the same answer whether or not the email already has an account (no account discovery through sign-up)
+    if (error) return /registered|exists/i.test(error.message) ? { ok: true, message: 'Check your inbox to confirm your email, then sign in.' } : { error: 'Could not create the account. Check the details and try again.' }
     if (data.session) redirect('/onboarding')
     return { ok: true, message: 'Check your inbox to confirm your email, then sign in.' }
   })
@@ -62,4 +88,36 @@ export async function signOut() {
     if (sid) { try { await createAdminClient().from('user_sessions').update({ revoked_at: new Date().toISOString(), revoked_by: user.id }).eq('id', sid).eq('user_id', user.id).is('revoked_at', null) } catch {} }
   }
   await sb.auth.signOut(); redirect('/login')
+}
+
+/** Forgot password: always the same answer (it never reveals whether the email has an account). Rate-limited. */
+export async function requestPasswordReset(_: ActionState, fd: FormData): Promise<ActionState> {
+  return safe(async () => {
+    const email = z.string().email('Enter a valid email').max(320).parse(str(fd, 'email')?.toLowerCase())
+    const done = { ok: true, message: 'If an account uses this email, a reset link is on its way. It works once and expires within an hour.' }
+    const { ip } = await requestMeta()
+    if (!(await rateLimit(`reset:ip:${ip ?? 'unknown'}`, 10, 3600)) || !(await rateLimit(`reset:email:${email}`, 3, 3600))) return done
+    const sb = await createClient()
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/callback?next=/login/reset` })
+    if (error) console.warn('[password-reset]', error.message)
+    await logLogin('password_reset_requested', { email })
+    return done
+  })
+}
+/** Sets a new password for the signed-in user (after a reset link), then signs out every other device. */
+export async function resetPassword(_: ActionState, fd: FormData): Promise<ActionState> {
+  return safe(async () => {
+    const sb = await createClient()
+    const { data: { user } } = await sb.auth.getUser(); if (!user) return { error: 'The reset link has expired. Request a new one.' }
+    const pw = String(fd.get('password') ?? ''), again = String(fd.get('confirm') ?? '')
+    const weak = passwordProblem(pw, user.email); if (weak) return { error: weak, fieldErrors: { password: weak } }
+    if (pw !== again) return { error: 'The two passwords do not match.', fieldErrors: { confirm: 'Does not match' } }
+    const { error } = await sb.auth.updateUser({ password: pw })
+    if (error) return { error: /same|different/i.test(error.message) ? 'Choose a password you have not used before.' : 'Could not change the password. Request a new reset link and try again.' }
+    const sid = sessionIdFromJwt((await sb.auth.getSession()).data.session?.access_token)
+    await sb.auth.signOut({ scope: 'others' }).catch(() => {})
+    await sb.rpc('revoke_other_sessions', { p_keep: sid, p_user: null }).then(() => {}, () => {})
+    await logLogin('password_changed', { userId: user.id, email: user.email, sessionId: sid })
+    redirect('/?m=password-changed')
+  })
 }

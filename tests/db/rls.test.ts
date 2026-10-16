@@ -897,3 +897,75 @@ describe('Project payments / advances (0021)', () => {
     await fails(as(U.accA, `update invoices set advance_applied=-1 where id=$1`, [inv2]), /check/)
   })
 })
+
+describe('security hardening (0023)', () => {
+  /** like `as`, but with an explicit authenticator assurance level in the JWT (aal1 = password only, aal2 = two-step done) */
+  async function asAal(uid: string, aal: 'aal1' | 'aal2', sql: string, params: unknown[] = []) {
+    const c = await pool.connect()
+    try {
+      await c.query('begin'); await c.query('set local role authenticated')
+      await c.query(`select set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.aal', $2, true)`, [uid, aal])
+      const r = await c.query(sql, params); await c.query('commit'); return r
+    } catch (e) { await c.query('rollback'); throw e } finally { c.release() }
+  }
+
+  it('signed-out callers (anon) cannot execute any database function', async () => {
+    await fails(as(null, `select has_permission('finance.view')`, [], 'anon'), /permission denied/)
+    await fails(as(null, `select approval_setting($1, 'sales.terms')`, [B], 'anon'), /permission denied/)
+    await fails(as(null, `select share_link_perm_ok('quote')`, [], 'anon'), /permission denied/)
+    const exposed = (await sup(`select count(*) n from pg_proc p where p.pronamespace = 'public'::regnamespace and has_function_privilege('anon', p.oid, 'execute')`)).rows[0].n
+    expect(Number(exposed)).toBe(0)
+  })
+
+  it('cross-company helpers are not callable by users', async () => {
+    await sup(`insert into app_settings(company_id, key, value) values ($1, 'sales.terms', '"Rival terms"') on conflict do nothing`, [B])
+    await fails(as(U.ownerA, `select approval_setting($1, 'sales.terms')`, [B]), /permission denied/)
+    await fails(as(U.ownerA, `select invoice_credits($1)`, [uuid()]), /permission denied/)
+    await fails(as(U.ownerA, `select audit_row()`), /permission denied/)
+    // the RLS helpers users rely on still work
+    expect((await as(U.ownerA, `select current_company_id() c, has_permission('finance.view') f`)).rows[0]).toMatchObject({ c: A, f: true })
+  })
+
+  it('two-step verification is enforced by the database', async () => {
+    const f = (await sup(`insert into auth.mfa_factors(user_id, status) values ($1, 'verified') returning id`, [U.viewerA])).rows[0].id
+    try {
+      expect((await asAal(U.viewerA, 'aal1', `select current_company_id() c`)).rows[0].c).toBeNull()
+      expect(Number((await asAal(U.viewerA, 'aal1', `select count(*) n from documents`)).rows[0].n)).toBe(0)
+      expect(Number((await asAal(U.viewerA, 'aal1', `select count(*) n from profiles`)).rows[0].n)).toBe(0)
+      expect((await asAal(U.viewerA, 'aal2', `select current_company_id() c`)).rows[0].c).toBe(A)
+      expect(Number((await asAal(U.viewerA, 'aal2', `select count(*) n from documents`)).rows[0].n)).toBeGreaterThan(0)
+      // users without a verified authenticator are unaffected at aal1
+      expect((await asAal(U.ownerA, 'aal1', `select current_company_id() c`)).rows[0].c).toBe(A)
+    } finally { await sup(`delete from auth.mfa_factors where id = $1`, [f]) }
+    expect((await asAal(U.viewerA, 'aal1', `select current_company_id() c`)).rows[0].c).toBe(A)
+  })
+
+  it('shared rate limits: server only, fixed window', async () => {
+    await fails(as(U.ownerA, `select rate_limit_hit('x', 1, 60)`), /permission denied/)
+    const key = `test:${uuid()}`, hit = async () => (await as(null, `select rate_limit_hit($1, 2, 60) ok`, [key], 'service_role')).rows[0].ok
+    expect([await hit(), await hit(), await hit()]).toEqual([true, true, false])
+    await sup(`update rate_limits set window_start = now() - interval '2 minutes' where key = $1`, [key])
+    expect(await hit()).toBe(true)                                                          // a new window starts
+    await fails(as(U.ownerA, `select * from rate_limits`), /permission denied/)
+  })
+
+  it('idle or old sessions are ended by touch_session', async () => {
+    const idle = uuid(), old = uuid(), fresh = uuid()
+    await sup(`insert into user_sessions(id, user_id, company_id, last_seen_at) values ($1, $4, $5, now() - interval '25 hours'),
+      ($2, $4, $5, now()), ($3, $4, $5, now())`, [idle, old, fresh, U.accA, A])
+    await sup(`update user_sessions set created_at = now() - interval '31 days' where id = $1`, [old])
+    expect((await as(U.accA, `select touch_session($1, null, null) r`, [idle])).rows[0].r).toBe(true)
+    expect((await as(U.accA, `select touch_session($1, null, null) r`, [old])).rows[0].r).toBe(true)
+    expect((await as(U.accA, `select touch_session($1, null, null) r`, [fresh])).rows[0].r).toBe(false)
+    expect((await sup(`select count(*) n from user_sessions where id = any($1) and revoked_at is not null`, [[idle, old]])).rows[0].n).toBe('2')
+    expect(Number((await sup(`select count(*) n from login_events where event = 'session_expired' and user_id = $1`, [U.accA])).rows[0].n)).toBe(2)
+  })
+
+  it('security events are visible only to the company admins', async () => {
+    await sup(`insert into security_events(company_id, user_id, kind, detail) values ($1, $3, 'permission_denied', 'A'), ($2, null, 'sign_in_locked', 'B')`, [A, B, U.viewerA])
+    const own = (await as(U.ownerA, `select kind, detail from security_events`)).rows
+    expect(own.some(r => r.detail === 'A')).toBe(true); expect(own.some(r => r.detail === 'B')).toBe(false)
+    expect((await as(U.viewerA, `select * from security_events`)).rows).toHaveLength(0)
+    await fails(as(U.ownerA, `insert into security_events(company_id, kind) values ($1, 'x')`, [A]), /row-level security|permission denied/)
+  })
+})

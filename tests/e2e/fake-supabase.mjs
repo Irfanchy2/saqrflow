@@ -56,6 +56,7 @@ http.createServer(async (req, res) => {
       return json(res, 200, user({ id: c.sub, email: c.email }))
     }
     if (path === '/auth/v1/logout') { res.writeHead(204); return res.end() }
+    if (path === '/auth/v1/recover' && req.method === 'POST') { await body(req); return json(res, 200, {}) }   // GoTrue answers the same for any email
 
     if (path === '/mock/fixtures' && req.method === 'POST') {
       const b = JSON.parse((await body(req)).toString())

@@ -3,6 +3,16 @@ import { ZodError } from 'zod'
 import { ForbiddenError } from './permissions'
 import type { ActionState } from './utils'
 import { scheduleEventWork } from './event-kick'
+import { after } from 'next/server'
+
+/** Logs a refused action for monitoring once the response is sent (never delays or breaks the answer to the user). */
+async function denied(detail: string) {
+  try {
+    const [{ getCtx }, { recordDenied }] = await Promise.all([import('./auth'), import('./security')])
+    const c = await getCtx()
+    try { after(() => recordDenied(c, detail)) } catch { await recordDenied(c, detail) }
+  } catch { /* not signed in, or outside a request */ }
+}
 
 /** Wraps a server action body: converts validation / permission / DB errors into friendly messages. */
 export async function safe(fn: () => Promise<ActionState | void>): Promise<ActionState> {
@@ -14,9 +24,9 @@ export async function safe(fn: () => Promise<ActionState | void>): Promise<Actio
     if (digest.startsWith('NEXT_REDIRECT') && digest.includes(';/login;')) return { error: 'Your session has expired. Sign in again in a new tab, then retry. Your changes are still on this screen.', data: { auth: true } }
     if (digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_NOT_FOUND')) throw e
     if (e instanceof ZodError) return { error: e.issues.map(i => `${i.path.join('.') || 'Form'}: ${i.message}`).join(' · ') }
-    if (e instanceof ForbiddenError) return { error: e.message }
+    if (e instanceof ForbiddenError) { await denied(e.message); return { error: e.message } }
     const m = (e as { message?: string; code?: string }) ?? {}
-    if (m.code === '42501' || /row-level security|insufficient privilege/i.test(m.message ?? '')) return { error: 'You are not allowed to do that.' }
+    if (m.code === '42501' || /row-level security|insufficient privilege/i.test(m.message ?? '')) { await denied(`database refused: ${m.message?.slice(0, 160)}`); return { error: 'You are not allowed to do that.' } }
     if (m.code === '23505') return { error: 'A record with the same unique value already exists.' }
     if (m.code === '23514') return { error: 'One of the values is not allowed (check dates, amounts and statuses).' }
     if (m.code === '23503') return { error: 'This record is still referenced by other data.' }

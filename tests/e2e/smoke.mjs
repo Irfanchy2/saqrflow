@@ -33,12 +33,37 @@ try {
   await shot(p, '01-login')
   await p.goto(`${BASE}/login`); await p.getByLabel('Email').fill('nobody@x.ae'); await p.getByLabel('Password').fill('wrongpassword1'); await p.getByRole('button', { name: 'Sign in' }).click(); await settle(p)
   ok((await bodyText(p)).includes('Incorrect email or password'), 'wrong credentials show a friendly error')
+  // security headers: per-request nonce CSP, and the inline theme script carries that nonce
+  {
+    const r = await p.context().request.get(`${BASE}/login`), csp = r.headers()['content-security-policy'] ?? '', nonce = csp.match(/'nonce-([^']+)'/)?.[1]
+    ok(nonce && csp.includes("'strict-dynamic'") && csp.includes("object-src 'none'") && csp.includes("frame-ancestors 'self'") && !/script-src[^;]*'unsafe-inline'/.test(csp), 'pages send a nonce Content-Security-Policy without inline-script allowance')
+    ok(nonce && (await r.text()).includes(`nonce="${nonce}"`), 'inline scripts carry the request nonce')
+    const r2 = await p.context().request.get(`${BASE}/login`)
+    ok((r2.headers()['content-security-policy'] ?? '').match(/'nonce-([^']+)'/)?.[1] !== nonce, 'the nonce changes on every request')
+  }
+  // brute force: 5 failures for one email lock it for 15 minutes (the 6th attempt is refused before the password is checked)
+  for (let i = 0; i < 5; i++) { await p.getByLabel('Email').fill('locked@x.ae'); await p.getByLabel('Password').fill(`wrong-${i}-password`); await p.getByRole('button', { name: 'Sign in' }).click(); await settle(p, 300) }
+  await p.getByLabel('Email').fill('locked@x.ae'); await p.getByLabel('Password').fill('another-try-1'); await p.getByRole('button', { name: 'Sign in' }).click(); await settle(p)
+  ok((await bodyText(p)).includes('locked for 15 minutes'), 'repeated failed sign-ins lock the account for 15 minutes')
+  ok((await db.query("select count(*)::int n from login_events where email = 'locked@x.ae' and event = 'sign_in_locked'")).rows[0].n >= 1, 'the lockout is recorded in sign-in history')
+  // password recovery never reveals whether an email is registered
+  await p.goto(`${BASE}/login`); await p.getByRole('link', { name: 'Forgot password?' }).click(); await p.waitForURL('**/login/forgot')
+  await p.getByLabel('Email').fill('nobody@x.ae'); await p.getByRole('button', { name: 'Send reset link' }).click(); await settle(p)
+  ok((await bodyText(p)).includes('If an account uses this email'), 'password reset answers the same for any email')
+  await p.goto(`${BASE}/login/reset`); ok((await bodyText(p)).includes('expired'), 'the reset page without a valid link asks for a new one')
   await signup(p, 'owner@alsaqr.test', 'Al Saqr Steels', 'Faisal Al Saqr')
   ok((await bodyText(p)).includes('Dashboard') && (await bodyText(p)).includes('Al Saqr Steels') && p.url() === `${BASE}/`, 'owner lands on the dashboard after onboarding')
   ok((await bodyText(p)).includes('Set up Averiqo'), 'empty dashboard shows the setup guide (no fake data)')
   await shot(p, '02-dashboard-empty')
   // a Suspense boundary in the app shell streams part of it in a second chunk, which races hydration (React #418)
   ok(!/<template id="B:\d+"/.test(await (await p.context().request.get(`${BASE}/`)).text()), 'app shell arrives in one HTML chunk (no streamed Suspense boundary)')
+  // CSRF: a cookie-authenticated API write from another site is refused; the same request from the app's origin is not
+  {
+    const evil = await p.context().request.post(`${BASE}/api/customers/search`, { headers: { origin: 'https://evil.example' }, data: {} })
+    ok(evil.status() === 403, 'cross-site API write is refused (403)')
+    const own = await p.context().request.post(`${BASE}/api/customers/search`, { headers: { origin: BASE }, data: {} })
+    ok(own.status() !== 403, 'same-origin API request is not refused by the origin check')
+  }
   for (const l of ['Dashboard', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Quotations', 'Invoices', 'Payments', 'Projects', 'Customers', 'Vehicles & Assets', 'Reminders', 'Calendar', 'Reports & Analytics', 'Averiqo AI', 'User Management', 'Settings'])
     ok(await p.getByRole('link', { name: l }).first().isVisible(), `sidebar has “${l}”`)
   ok(!(await p.locator('aside').first().innerText()).match(/\b(Soon|Beta|Coming soon|Planned)\b/i), 'every module is live: no Soon / Beta / Planned labels in navigation')

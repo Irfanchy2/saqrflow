@@ -8,6 +8,9 @@ import type { Ctx } from '@/lib/auth'
 export const LOGIN_EVENT: Record<string, { label: string; tone: 'green' | 'red' | 'neutral' | 'amber' | 'blue' }> = {
   sign_in: { label: 'Signed in', tone: 'green' }, sign_in_failed: { label: 'Wrong password', tone: 'red' }, mfa_verified: { label: 'Two-step code accepted', tone: 'green' },
   mfa_failed: { label: 'Wrong two-step code', tone: 'red' }, sign_out: { label: 'Signed out', tone: 'neutral' }, session_revoked: { label: 'Device signed out', tone: 'amber' }, sessions_revoked: { label: 'Other devices signed out', tone: 'amber' },
+  session_expired: { label: 'Session expired', tone: 'neutral' }, sign_in_locked: { label: 'Locked (too many attempts)', tone: 'red' },
+  password_reset_requested: { label: 'Password reset requested', tone: 'amber' }, password_changed: { label: 'Password changed', tone: 'blue' },
+  new_device: { label: 'New device', tone: 'amber' },
 }
 export const ACTIVE_DAYS = 30
 export const fmtWhen = (d: string, tz: string) => new Date(d).toLocaleString('en-GB', { timeZone: tz, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })

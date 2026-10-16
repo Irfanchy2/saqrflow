@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { mergeStatus, optIntent, parseWebhook, verifySignature } from '@/lib/whatsapp/webhook'
+import { securityEvent } from '@/lib/security'
 import { safeEqual } from '@/lib/crypto'
 import { supabaseStore } from '@/lib/reminders/engine'
 import type { LogRow, RecipientInfo } from '@/lib/reminders/dispatch'
@@ -19,7 +20,10 @@ export async function POST(req: NextRequest) {
   const secret = process.env.META_APP_SECRET || process.env.WHATSAPP_APP_SECRET
   if (!secret) return new NextResponse('Webhook not configured', { status: 503 })
   const raw = await req.text()
-  if (!verifySignature(secret, raw, req.headers.get('x-hub-signature-256'))) return new NextResponse('Invalid signature', { status: 401 })
+  if (!verifySignature(secret, raw, req.headers.get('x-hub-signature-256'))) {
+    await securityEvent('webhook_signature_rejected', { detail: `WhatsApp webhook with ${req.headers.get('x-hub-signature-256') ? 'a wrong' : 'no'} signature (${raw.length} bytes)` })
+    return new NextResponse('Invalid signature', { status: 401 })
+  }
   let body: unknown; try { body = JSON.parse(raw) } catch { return new NextResponse('Bad request', { status: 400 }) }
   const { statuses, messages, inbound } = parseWebhook(body)
   const admin = createAdminClient(), store = supabaseStore(admin)

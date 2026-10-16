@@ -1,6 +1,7 @@
 import 'server-only'
 import type { Ctx } from '../auth'
-import { safeFileName, sha256Hex, validateUpload } from '../files'
+import { safeFileName, scanUpload, sha256Hex, validateUpload } from '../files'
+import { securityEvent } from '../security'
 
 export const MAX_INBOX_FILES = 20
 /** Step 1 of the pipeline: validate and store the original privately (status "uploaded"). Nothing is read yet. */
@@ -8,6 +9,8 @@ export async function storeInboxUpload(c: Ctx, f: File, source: 'upload' | 'mobi
   const buf = new Uint8Array(await f.arrayBuffer())
   const chk = validateUpload({ name: f.name, size: f.size, type: f.type }, buf.slice(0, 16))
   if (!chk.ok) return { error: `${f.name}: ${chk.error}` }
+  const bad = scanUpload(buf, chk.mime)
+  if (bad) { await securityEvent('upload_rejected', { companyId: c.company.id, userId: c.userId, detail: `${f.name}: ${bad}` }); return { error: `${f.name}: ${bad}` } }
   const id = crypto.randomUUID(), sha = sha256Hex(buf)
   const path = `${c.company.id}/inbox/${id}/${safeFileName(f.name)}`                     // company-id/…/uuid: never a person's name as the key
   const up = await c.supabase.storage.from('vault').upload(path, buf, { contentType: chk.mime, upsert: false })

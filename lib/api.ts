@@ -2,6 +2,7 @@ import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from './supabase/admin'
+import { alertAdmins, rateLimit, securityEvent } from './security'
 
 // Read-only REST API (docs/API.md). Keys are shown once; only their SHA-256 is stored. Every query filters by the key's
 // company explicitly (the service role bypasses RLS) and returns a fixed list of non-sensitive fields.
@@ -31,11 +32,19 @@ const err = (status: number, code: string, message: string) => NextResponse.json
 
 /** Resolves the Bearer key → company + scopes, or an error response. Records last use. */
 export async function authenticate(req: NextRequest): Promise<{ companyId: string; scopes: string[] } | NextResponse> {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  // shared limits (every server instance counts together): per network before the key is even looked at, then per key
+  if (!(await rateLimit(`api:ip:${ip}`, 600, 60))) return err(429, 'rate_limited', 'Too many requests. Slow down to at most 600 per minute.')
   const m = /^Bearer\s+(\S+)$/i.exec(req.headers.get('authorization') ?? '')
   if (!m || !KEY_RE.test(m[1])) return err(401, 'unauthorized', 'Send your API key as: Authorization: Bearer avq_…')
   const admin = createAdminClient()
   const { data: k } = await admin.from('api_keys').select('id,company_id,scopes,expires_at,revoked_at,use_count').eq('key_hash', hashApiKey(m[1])).maybeSingle()
-  if (!k || k.revoked_at || (k.expires_at && new Date(k.expires_at) < new Date())) return err(401, 'unauthorized', 'This API key is not valid (unknown, revoked or expired).')
+  if (!k || k.revoked_at || (k.expires_at && new Date(k.expires_at) < new Date())) {
+    await securityEvent('api_key_rejected', { companyId: k?.company_id ?? null, detail: `${!k ? 'unknown' : k.revoked_at ? 'revoked' : 'expired'} key from ${ip} on ${req.nextUrl.pathname}` })
+    if (k?.company_id) await alertAdmins(k.company_id, { title: 'A revoked or expired API key is still in use', body: `Requests from ${ip} were refused. Update or remove the integration that uses it.`, throttleKey: `apikey:${k.id}` })
+    return err(401, 'unauthorized', 'This API key is not valid (unknown, revoked or expired).')
+  }
+  if (!(await rateLimit(`api:key:${k.id}`, 300, 60))) return err(429, 'rate_limited', 'This key made too many requests. Slow down to at most 300 per minute.')
   await admin.from('api_keys').update({ last_used_at: new Date().toISOString(), use_count: Number(k.use_count ?? 0) + 1 }).eq('id', k.id)
   return { companyId: k.company_id, scopes: k.scopes }
 }
