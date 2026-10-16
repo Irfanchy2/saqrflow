@@ -10,11 +10,25 @@ export function CustomerPicker({ customers, value, onPick, disabled }: { custome
   const [open, setOpen] = useState(false), [q, setQ] = useState(''), [hi, setHi] = useState(0)
   const box = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null), listId = useId()
   const current = customers.find(c => c.id === value)
+  // the server searches all customers (debounced 200 ms, the previous request is cancelled); until it answers, the
+  // customers already known to the page are filtered locally so typing always shows something at once
+  const [remote, setRemote] = useState<{ q: string; rows: CustomerOpt[] } | null>(null), [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const t = q.trim(), ctl = new AbortController()
+    const timer = setTimeout(() => {
+      setBusy(true)
+      fetch(`/api/customers/search?q=${encodeURIComponent(t)}`, { signal: ctl.signal }).then(r => r.ok ? r.json() : { customers: [] })
+        .then(d => setRemote({ q: t, rows: d.customers ?? [] })).catch(() => {}).finally(() => { if (!ctl.signal.aborted) setBusy(false) })
+    }, t ? 200 : 0)
+    return () => { clearTimeout(timer); ctl.abort() }
+  }, [q, open])
   const list = useMemo(() => {
     const t = q.trim().toLowerCase()
-    const rows = !t ? customers : customers.filter(c => [c.name, c.trn, c.phone, c.contact_person, c.email].some(v => v?.toLowerCase().includes(t)))
-    return rows.slice(0, 50)
-  }, [customers, q])
+    const local = !t ? customers : customers.filter(c => [c.name, c.trn, c.phone, c.contact_person, c.email].some(v => v?.toLowerCase().includes(t)))
+    const fromServer = remote && remote.q.toLowerCase() === t ? remote.rows : []
+    return [...new Map([...local, ...fromServer].map(c => [c.id, c])).values()].slice(0, 50)
+  }, [customers, q, remote])
   useEffect(() => {
     if (!open) return
     const off = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
@@ -45,7 +59,7 @@ export function CustomerPicker({ customers, value, onPick, disabled }: { custome
           <Check size={14} className={cn('mt-0.5 shrink-0', c.id === value ? 'text-primary' : 'invisible')} aria-hidden />
           <span className="min-w-0"><span className="block truncate font-medium">{c.name}</span>
             <span className="block truncate text-xs text-muted">{[c.contact_person, c.phone, c.trn && `TRN ${c.trn}`].filter(Boolean).join(' · ') || '—'}</span></span></li>)}
-        {list.length === 0 && <li className="px-3 py-3 text-sm text-muted">No saved customer matches “{q}”.</li>}
+        {list.length === 0 && <li className="px-3 py-3 text-sm text-muted">{busy ? 'Searching…' : <>No saved customer matches “{q}”.</>}</li>}
         <li id={`${listId}-${list.length}`} role="option" aria-selected={false} onMouseMove={() => setHi(list.length)} onClick={() => choose(null)}
           className={cn('mt-1 flex cursor-pointer items-center gap-2 rounded-md border-t border-border px-2.5 py-2 text-sm text-primary', hi === list.length && 'bg-primary-soft')}>
           <UserPlus size={14} aria-hidden />One-off / new customer (type the details below)</li>

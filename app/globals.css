@@ -111,11 +111,17 @@ kbd { font-family: var(--font-geist-sans), ui-sans-serif, system-ui; }
 [data-row-link] { cursor: pointer; }
 
 /* scrollable tab rows (components/ui/tab-strip): no scrollbar; the edges fade while more tabs are hidden that way */
-.tabstrip { --fs: 0px; --fe: 0px; scrollbar-width: none; }
-.tabstrip[data-fade-start], .tabstrip[data-fade-end] { mask-image: linear-gradient(to right, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
-[dir=rtl] .tabstrip[data-fade-start], [dir=rtl] .tabstrip[data-fade-end] { mask-image: linear-gradient(to left, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
+/* The fades are pure CSS (a scroll-driven animation of the mask stops), so no script ever changes server-rendered HTML.
+   A row that does not scroll has no active timeline, so it gets no mask. Browsers without scroll timelines show no fade. */
+.tabstrip { scrollbar-width: none; }
 .tabstrip::-webkit-scrollbar { display: none; }
-.tabstrip[data-fade-start=true] { --fs: 36px; } .tabstrip[data-fade-end=true] { --fe: 36px; }
+@property --fs { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --fe { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@keyframes strip-fade { 0% { --fs: 0px; --fe: 36px; } 6% { --fs: 36px; } 94% { --fe: 36px; } 100% { --fs: 36px; --fe: 0px; } }
+@supports (animation-timeline: scroll()) {
+  .tabstrip { mask-image: linear-gradient(to right, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); animation: strip-fade linear both; animation-timeline: scroll(self inline); }
+  [dir=rtl] .tabstrip { mask-image: linear-gradient(to left, transparent, #000 var(--fs), #000 calc(100% - var(--fe)), transparent); }
+}
 /* tab labels stay on one line (the row scrolls instead of squeezing them) */
 .tabstrip:not(.metrics) > :where(a, button, li, span) { flex-shrink: 0; white-space: nowrap; }
 

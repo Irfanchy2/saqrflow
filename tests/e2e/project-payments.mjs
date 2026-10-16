@@ -32,7 +32,7 @@ try {
   ok(true, 'customer and project (contract AED 50,000) seeded')
 
   console.log('\n[1] Record a project advance')
-  await p.goto(`${BASE}/projects/${pr}`); await settle()
+  await p.goto(`${BASE}/projects/${pr}?tab=finance`); await settle()
   const card = p.locator('[data-project-payments]')
   ok(await card.isVisible() && (await card.innerText()).includes('No payments recorded'), 'project shows a Project payments section')
   await card.getByRole('button', { name: 'Record payment' }).click()
@@ -119,7 +119,7 @@ try {
   ok(/Paid Amount\s+15,000\.00/.test(it) && /incl\. advance 15,000\.00/.test(it) && /Total Balance\s+6,000\.00/.test(it), 'invoice PDF: paid 15,000 incl. advance, balance 6,000')
 
   console.log('\n[5] Project after invoicing; second advance applied from the invoice, moved back')
-  await p.goto(`${BASE}/projects/${pr}`); await settle()
+  await p.goto(`${BASE}/projects/${pr}?tab=finance`); await settle()
   ok((await card.locator('[data-pp-received]').innerText()) === '15,000.00' && (await card.locator('[data-pp-unapplied]').innerText()) === '0.00', 'received stays 15,000 (not counted twice); nothing left to apply')
   const hist = await card.locator('[data-pp-history]').innerText().catch(() => '(no history)')
   ok(/Advance applied to /.test(hist), `history: advance applied to the invoice (${JSON.stringify(hist.slice(0, 160))})`)
@@ -140,15 +140,15 @@ try {
   console.log('\n[6b] Whole-row click')
   await p.goto(`${BASE}/invoices`); await settle()
   const row = p.locator('.rtable tbody tr').first(); const num = await row.locator('a').first().innerText()
-  await row.locator('td').nth(1).click(); await p.waitForURL(/\/invoices\/[0-9a-f-]{36}/, { timeout: 8000 }).catch(() => {})
+  await row.locator('td').nth(1).click(); await p.waitForURL(/\/invoices\/[0-9a-f-]{36}/, { timeout: 8000 }).catch(() => {}); await settle()
   ok(/\/invoices\/[0-9a-f-]{36}/.test(p.url()) && (await body()).includes(num), `clicking a row's empty space opens the record (${num})`)
-  await p.goto(`${BASE}/projects/${pr}`); await settle()
+  await p.goto(`${BASE}/projects/${pr}?tab=finance`); await settle()
   const before = p.url(); await p.locator('[data-project-payments]').getByRole('button', { name: 'Record payment' }).click(); await p.waitForTimeout(300)
   ok(p.url() === before && await dlg().isVisible(), 'buttons keep their own action (no accidental navigation)'); await p.keyboard.press('Escape')
 
   console.log('\n[7] Phone 360 px')
   const m = await browser.newContext({ viewport: { width: 360, height: 780 }, storageState: await ctx.storageState() }); const mp = await m.newPage()
-  for (const u of [`/projects/${pr}`, `/invoices/${qid}`]) {
+  for (const u of [`/projects/${pr}`, `/projects/${pr}?tab=finance`, `/invoices/${qid}`]) {
     await mp.goto(BASE + u); await mp.waitForLoadState('networkidle').catch(() => {})
     const ov = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     ok(ov <= 1, `${u.split('/')[1]}: fits a 360 px phone (overflow ${ov}px)`)

@@ -44,15 +44,9 @@ export default async function Dashboard() {
     c.can('crm.view') ? c.supabase.from('leads').select('id', head1).lte('next_followup', c.today).not('stage', 'in', '(won,lost,on_hold)') : Promise.resolve({ count: undefined }),
     c.can('documents.view') ? c.supabase.from('site_visits').select('id', head1).in('status', ['scheduled', 'rescheduled']).eq('scheduled_date', c.today) : Promise.resolve({ count: undefined }),
   ])
-  // per-user layout + the two optional widgets (only queried when shown)
-  const prefs = await c.supabase.from('user_preferences').select('value').eq('user_id', c.userId).eq('key', 'dashboard.layout').maybeSingle()
-  const layout = normalizeLayout(prefs.data?.value)
-  const on = (k: WidgetKey) => layout.items.some(i => i.key === k && !i.hidden)
-  const extras = Promise.all([
-    on('mytasks') ? c.supabase.from('tasks').select('id,title,due_date,project:projects(name)').eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).is('deleted_at', null).order('due_date', { nullsFirst: false }).limit(8) : null,
-    on('approvals') ? c.supabase.from('approval_requests').select('id,title,amount,entity_type').eq('status', 'pending').order('requested_at').limit(20) : null,
-  ])
-  const [sources, cheques, activity, salesData, monthInv, monthExp, dueSoon, followDue, activeProjects, activeCount, exp30, expired, visas, vehicles, emp, docsAny, people] = await Promise.all([
+  const prefsP = Promise.resolve(c.supabase.from('user_preferences').select('value').eq('user_id', c.userId).eq('key', 'dashboard.layout').maybeSingle())   // query builders are lazy: Promise.resolve starts it now
+  const since8 = (() => { const d = new Date(`${c.today.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() - 7); return d.toISOString().slice(0, 10) })()
+  const mainP = Promise.all([
     sb.from('reminder_sources').select('source_type,source_id,title,subject,owner_type,due_date,amount,direction,link').lte('due_date', in30).order('due_date').limit(60),
     canFin ? sb.from('cheques').select('direction,status,amount,cheque_date').in('status', ['received', 'issued', 'scheduled', 'deposited', 'presented']).limit(5000) : null,
     c.can('audit.view') ? sb.from('audit_logs').select('id,action,table_name,created_at,user_id,record_id').in('table_name', ['invoices', 'payments', 'customers', 'projects', 'cheques', 'documents', 'employees', 'assets', 'project_expenses']).order('created_at', { ascending: false }).limit(8) : null,
@@ -71,19 +65,29 @@ export default async function Dashboard() {
     canDocs ? sb.from('documents').select('id', head).is('deleted_at', null).limit(1) : null,
     c.can('audit.view') ? sb.from('profiles').select('id,full_name') : null,
   ])
-  const [myTasksRes, apprRes] = await extras
-  const since8 = (() => { const d = new Date(`${c.today.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() - 7); return d.toISOString().slice(0, 10) })()
-  const [projMonths, quoteMonths, recentE] = await Promise.all([
+  // chart history does not depend on the dashboard layout either: it starts now, alongside the main counts
+  const histP = Promise.all([
     c.can('documents.view') ? sb.from('projects').select('created_at').gte('created_at', since8).limit(5000) : null,
     canFin ? sb.from('invoices').select('issue_date').eq('doc_type', 'quotation').is('deleted_at', null).gte('issue_date', since8).limit(5000) : null,
-    canFin && on('recent') ? sb.from('project_expenses').select('id,spent_on,amount,description,category,project:projects(id,name)').order('spent_on', { ascending: false }).order('created_at', { ascending: false }).limit(6) : null,
+    canFin ? sb.from('payments').select('paid_on,amount').gte('paid_on', yearStart).lte('paid_on', c.today).limit(20000) : null,
   ])
-  const [payYear, recentQ, recentI, recentP] = canFin ? await Promise.all([
-    sb.from('payments').select('paid_on,amount').gte('paid_on', yearStart).lte('paid_on', c.today).limit(20000),
-    on('recent') ? sb.from('invoices').select('id,number,customer_name,subject,site,issue_date,valid_until,total,status,doc_type,project:projects(name)').eq('doc_type', 'quotation').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
-    on('recent') ? sb.from('invoices').select('id,number,customer_name,subject,site,issue_date,due_date,total,status,doc_type,project:projects(name)').eq('doc_type', 'invoice').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
-    on('recent') ? sb.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name),customer:customers(id,name)').order('paid_on', { ascending: false }).order('created_at', { ascending: false }).limit(6) : null,
-  ]) : [null, null, null, null]
+  const prefs = await prefsP
+  // per-user layout + the optional widgets (only queried when shown)
+  const layout = normalizeLayout(prefs.data?.value)
+  const on = (k: WidgetKey) => layout.items.some(i => i.key === k && !i.hidden)
+  const extras = Promise.all([
+    on('mytasks') ? c.supabase.from('tasks').select('id,title,due_date,project:projects(name)').eq('owner_id', c.userId).in('status', ['todo', 'in_progress', 'waiting']).is('deleted_at', null).order('due_date', { nullsFirst: false }).limit(8) : null,
+    on('approvals') ? c.supabase.from('approval_requests').select('id,title,amount,entity_type').eq('status', 'pending').order('requested_at').limit(20) : null,
+  ])
+  const recentGroup = Promise.all([
+    canFin && on('recent') ? sb.from('project_expenses').select('id,spent_on,amount,description,category,project:projects(id,name)').order('spent_on', { ascending: false }).order('created_at', { ascending: false }).limit(6) : null,
+    canFin && on('recent') ? sb.from('invoices').select('id,number,customer_name,subject,site,issue_date,valid_until,total,status,doc_type,project:projects(name)').eq('doc_type', 'quotation').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
+    canFin && on('recent') ? sb.from('invoices').select('id,number,customer_name,subject,site,issue_date,due_date,total,status,doc_type,project:projects(name)').eq('doc_type', 'invoice').is('deleted_at', null).order('created_at', { ascending: false }).limit(6) : null,
+    canFin && on('recent') ? sb.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name),customer:customers(id,name)').order('paid_on', { ascending: false }).order('created_at', { ascending: false }).limit(6) : null,
+  ])
+  const [sources, cheques, activity, salesData, monthInv, monthExp, dueSoon, followDue, activeProjects, activeCount, exp30, expired, visas, vehicles, emp, docsAny, people] = await mainP
+  const [myTasksRes, apprRes] = await extras
+  const [[projMonths, quoteMonths, payYear], [recentE, recentQ, recentI, recentP]] = await Promise.all([histP, recentGroup])
   const trend = canFin ? buildTrend(c.today, (monthInv?.data ?? []) as any, (payYear?.data ?? []) as any, (monthExp?.data ?? []) as any) : null
   const myTasks = myTasksRes ? myTasksRes.data ?? [] : null
   const pendingApprovals = apprRes ? (apprRes.data ?? []).filter(a => canDecide(a.entity_type, c.can)).slice(0, 8) : null
@@ -219,27 +223,32 @@ export default async function Dashboard() {
   const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className={cn('min-w-0', k === 'left' && cn('col-span-12', SPAN[i.key] ?? 'lg:col-span-12'), PHONE_HIDDEN.has(i.key) && 'max-sm:hidden')}>{W[i.key]}</div>)
 
   const dateShort = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: tz }).format(new Date())
+  // phones: one composed summary instead of six separate boxes. A navy money card (sales this month, trend, receivables,
+  // pending quotes) and one strip of counts with hairline dividers; every figure still opens the list behind it.
   const mobile = <section aria-label="Today" className="mb-5 sm:hidden">
-    <h1 className="text-[26px] font-bold leading-[1.15] tracking-[-0.025em]">{greeting(tz)}{firstName && <><br />{c.profile.full_name}</>}</h1>
-    <p className="mt-1.5 text-sm text-muted">{dateShort}</p>
-    {sk && trend && <div className="mt-5 grid gap-3">
-      <Link href="/reports?period=month" className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-card">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-500 text-white" aria-hidden><Receipt size={22} /></span>
-        <span className="min-w-0 flex-1"><span className="block text-[13px] text-muted">Sales this month</span><span className="block text-[22px] font-bold tabular-nums tracking-[-0.02em]">{formatAed(salesNet)}</span>
-          {trend.change.sales !== null && <span className={cn('text-[13px] font-semibold tabular-nums', trend.change.sales >= 0 ? 'text-success' : 'text-danger')}>{trend.change.sales >= 0 ? '↑' : '↓'} {Math.abs(trend.change.sales)}% <span className="font-normal text-muted">vs last month</span></span>}</span>
-        <MiniBars values={months8.map(m => m.sales)} className="bg-blue-500" /></Link>
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/invoices?tab=receivables" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 shadow-card"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300" aria-hidden><Wallet size={18} /></span>
-          <span className="min-w-0"><span className="block text-xs text-muted">Receivables</span><span className="block truncate text-[15px] font-bold tabular-nums">{formatAed(sk.outstanding)}</span></span></Link>
-        <Link href="/invoices?tab=quotation" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 shadow-card"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300" aria-hidden><FileText size={18} /></span>
-          <span className="min-w-0"><span className="block text-xs text-muted">Pending quotes</span><span className="block truncate text-[15px] font-bold tabular-nums">{formatAed(sk.pipeline)}</span></span></Link>
+    <p className="text-[13.5px] font-medium text-muted">{greeting(tz)}{firstName ? ',' : ''}</p>
+    <h1 className="mt-0.5 text-[24px] font-bold leading-tight tracking-[-0.025em]">{c.profile.full_name || greeting(tz)}</h1>
+    <p className="mt-1 text-[13px] text-muted">{dateShort}</p>
+    {sk && trend && <div className="mt-4 space-y-3">
+      <div className="relative overflow-hidden rounded-2xl bg-[linear-gradient(140deg,hsl(var(--sb))_0%,hsl(223_55%_19%)_60%,hsl(217_65%_30%)_100%)] text-white shadow-[0_14px_30px_-16px_hsl(var(--sb)/.9)]">
+        <span aria-hidden className="pointer-events-none absolute -end-10 -top-12 h-40 w-40 rounded-full bg-[radial-gradient(closest-side,hsl(var(--sb-accent)/.35),transparent)]" />
+        <Link href="/reports?period=month" className="relative flex items-end justify-between gap-3 px-4 pb-3.5 pt-4 active:opacity-90">
+          <span className="min-w-0"><span className="block text-[12.5px] font-medium text-white/70">Sales this month</span>
+            <span className="mt-0.5 block text-[26px] font-semibold tabular-nums leading-tight tracking-[-0.03em]">{formatAed(salesNet)}</span>
+            {trend.change.sales !== null && <span className={cn('mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums', trend.change.sales >= 0 ? 'bg-emerald-400/15 text-emerald-300' : 'bg-rose-400/15 text-rose-300')}>{trend.change.sales >= 0 ? '↑' : '↓'} {Math.abs(trend.change.sales)}%<span className="font-normal text-white/60">vs last month</span></span>}</span>
+          <MiniBars values={months8.map(m => m.sales)} className="bg-white" /></Link>
+        <div className="relative grid grid-cols-2 border-t border-white/10">
+          <Link href="/invoices?tab=receivables" className="min-w-0 px-4 py-3 active:bg-white/5"><span className="flex items-center gap-1.5 text-[12px] text-white/65"><Wallet size={13} aria-hidden />Receivables</span><span className="mt-0.5 block truncate text-[16px] font-semibold tabular-nums">{formatAed(sk.outstanding)}</span></Link>
+          <Link href="/invoices?tab=quotation" className="min-w-0 border-s border-white/10 px-4 py-3 active:bg-white/5"><span className="flex items-center gap-1.5 text-[12px] text-white/65"><FileText size={13} aria-hidden />Pending quotes</span><span className="mt-0.5 block truncate text-[16px] font-semibold tabular-nums">{formatAed(sk.pipeline)}</span></Link>
+        </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">{[
-        ['Quotations', sk.pipelineCount, '/invoices?tab=quotation', ScrollText, 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300'],
-        ['Unpaid invoices', sk.openCount, '/invoices?tab=invoice', Receipt, 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'],
-        ['Projects', activeCount?.count ?? 0, '/projects', HardHat, 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'],
-      ].map(([l, v, h, I, t]: any) => <Link key={l} href={h} className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface px-2 py-3.5 text-center shadow-card">
-        <span className={cn('grid h-11 w-11 place-items-center rounded-xl', t)} aria-hidden><I size={20} /></span><span className="text-xs leading-tight text-muted">{l}</span><span className="text-[17px] font-bold tabular-nums leading-none">{v}</span></Link>)}</div>
+      <div className="grid grid-cols-3 divide-x divide-border/80 overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-card rtl:divide-x-reverse">{[
+        ['Quotations', sk.pipelineCount, '/invoices?tab=quotation', ScrollText, 'text-emerald-600 dark:text-emerald-300'],
+        ['Unpaid invoices', sk.openCount, '/invoices?tab=invoice', Receipt, 'text-blue-600 dark:text-blue-300'],
+        ['Projects', activeCount?.count ?? 0, '/projects', HardHat, 'text-orange-600 dark:text-orange-300'],
+      ].map(([l, v, h, I, t]: any) => <Link key={l} href={h} className="flex min-w-0 flex-col gap-1 px-3 py-3 active:bg-surface-2/70">
+        <span className={cn('flex items-center gap-1.5 truncate text-[11.5px] font-medium text-muted')}><I size={14} className={t} aria-hidden /><span className="truncate">{l}</span></span>
+        <span className="text-[20px] font-semibold tabular-nums leading-none tracking-[-0.02em]">{v}</span></Link>)}</div>
     </div>}
   </section>
 

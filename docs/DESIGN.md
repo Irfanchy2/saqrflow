@@ -50,7 +50,7 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
     - On phones and tablets it becomes a drawer.
   - **Top bar:** search (Ctrl K), company location, notifications, settings, theme, and the user menu (account, settings, sign out).
 - **Page:** `PageHeader` (optional breadcrumb `crumbs`, title, one line of context, actions on the right).
-- **Metrics:** `Metrics` + `StatCard` give a row of KPI cards. Each card has an icon tile, a label, the value, an optional change (`change`, %), a hint and optional mini bars (`bars`). Every card that counts something links to the list behind it.
+- **Metrics:** `Metrics` + `StatCard` give a row of KPI cards. Each card has an icon tile, a label, the value, an optional change (`change`, %), a hint and optional mini bars (`bars`). Every card that counts something links to the list behind it. Phones show the cards as one swipeable strip. Tablets use three columns only when the cards fill the rows, so 4 or 8 cards sit 2-up with none left alone.
 - **Dashboard** (`app/(app)/page.tsx`):
   - **Main column:** greeting with a date card and **Create new**; a banner with today's workload; KPI cards; the 12-month sales overview (area chart) beside Quick actions; recent documents in tabs; recent activity; projects in progress.
   - **Right column** (≥1536 px): my tasks (tick to complete), needs attention, the month calendar and operations.
@@ -74,7 +74,10 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
 
 - **Bars:** top bar (menu, logo, search, alerts, account) and the bottom tab bar (Home, Sales, Projects, Tasks, More). Any other module you open takes the second slot under a short name; every tab has the same width.
 - **Header actions** wrap onto a second line instead of scrolling, so the main action is never off-screen.
-- **Scrolling rows** (tabs, filters, KPI strips) carry the `tabstrip` class. `components/layout/strip-edges.tsx` fades the side that has more and scrolls the current tab into view.
+- **Scrolling rows** (tabs, filters, KPI strips) carry the `tabstrip` class.
+  - The side that has more fades out through a CSS scroll-driven animation; no script edits the HTML.
+  - `components/layout/strip-edges.tsx` scrolls the current tab into view.
+- **Record pages with many sections use tabs** (the project page: Overview, Finance, Work, Files & photos, Activity). Each tab loads on its own. See `docs/PERFORMANCE.md`.
 - **Sales** sections are pills on phones, so they read differently from the status tabs under them; from 640 px they are underline tabs.
 - **Settings** sections are a sticky row of chips under the top bar; Users, Audit log and Trash sit at its end.
 - **Floating "+" and action bars:** `main` adds bottom room when the page has a `.fab` (floating +) or a `.dock` (the document editor's WhatsApp/PDF bar), so nothing ends up under them.

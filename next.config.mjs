@@ -13,9 +13,10 @@ export default {
   poweredByHeader: false,
   // local OCR runs in a worker thread and loads its language data from disk — keep it unbundled and ship the data files
   serverExternalPackages: ['tesseract.js', 'tesseract.js-core'],
-  outputFileTracingIncludes: {
-    '/**': ['./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**', './node_modules/tesseract.js-core/*-lstm.wasm'],
-  },
+  // Only the routes that can run OCR (Smart Inbox, its processing API, receipt scan, the AI settings test and the assistant)
+  // ship the ~11 MB of language data and wasm. Every other page's server function stays small, so it starts faster.
+  outputFileTracingIncludes: Object.fromEntries(['/inbox', '/inbox/[id]', '/settings', '/assistant', '/api/inbox/[id]/process', '/api/expenses/scan']
+    .map(r => [r, ['./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**', './node_modules/tesseract.js-core/*-lstm.wasm']])),
   experimental: { serverActions: { bodySizeLimit: '16mb' } },
   async headers() {
     const common = [

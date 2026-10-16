@@ -41,7 +41,7 @@ const field = 'w-full rounded-lg border border-border bg-surface px-3 text-sm te
 const TEXTUAL = new Set([undefined, 'text', 'search', 'email', 'tel', 'url', 'password'])
 export const Input = ({ className, dir, type, ...p }: InputHTMLAttributes<HTMLInputElement>) =>
   <input type={type} dir={dir ?? (TEXTUAL.has(type) ? 'auto' : undefined)} className={cn(field, 'h-11 text-start sm:h-10', className)} {...p} />
-export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cn(field, 'field-select h-11 cursor-pointer pe-9 sm:h-10', className)} {...p} />
+export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement> & { ref?: Ref<HTMLSelectElement> }) => <select className={cn(field, 'field-select h-11 cursor-pointer pe-9 sm:h-10', className)} {...p} />
 export const Textarea = ({ className, dir, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) =>
   <textarea dir={dir ?? 'auto'} className={cn(field, 'min-h-[84px] resize-y px-3 py-2 text-start leading-[1.55] [overflow-wrap:anywhere] [unicode-bidi:plaintext] whitespace-pre-wrap', className)} {...p} />
 
@@ -126,9 +126,11 @@ export function Metrics({ children, className, cols }: { children: ReactNode; cl
   const kids = Children.toArray(children).filter(Boolean)
   const n = cols ?? (Math.min(6, Math.max(2, kids.length)) as 2 | 3 | 4 | 5 | 6)
   const lg = { 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-3 xl:grid-cols-5', 6: 'lg:grid-cols-3 2xl:grid-cols-6' }[n]
+  // tablets: three columns only when the cards fill the rows (3, 6, 9…) or leave a pair (5); 4 or 8 cards read better 2-up
+  const md3 = n >= 3 && (kids.length % 3 === 0 || kids.length === 5)
   let i = 0
   // phones: one swipeable strip of compact cards, so the list below starts near the top of the screen
-  return <div className={cn('metrics tabstrip -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:w-[46%] [&>*]:min-w-[158px] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto sm:[&>*]:min-w-0', n >= 3 && 'md:grid-cols-3', lg, className)}>
+  return <div className={cn('metrics tabstrip -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:w-[46%] [&>*]:min-w-[158px] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto sm:[&>*]:min-w-0', md3 && 'md:grid-cols-3', lg, className)}>
     {kids.map(k => isValidElement(k) && k.type === StatCard ? cloneElement(k as React.ReactElement<{ index?: number }>, { index: (k.props as { index?: number }).index ?? i++ }) : k)}</div>
 }
 

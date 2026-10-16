@@ -12,7 +12,9 @@ export function NavProgress() {
   useEffect(() => setOn(false), [path, sp])
   useEffect(() => {
     const click = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      // Next's <Link> always calls preventDefault (it navigates itself), so that flag cannot tell us anything; a handler that
+      // really cancels a navigation (the builder's unsaved-changes prompt) stops propagation, so this listener never runs.
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
       const a = (e.target as HTMLElement).closest('a'); if (!a || a.target || a.hasAttribute('download')) return
       const u = new URL(a.href, location.href)
       if (u.origin !== location.origin || u.pathname.startsWith('/api/') || (u.pathname === location.pathname && u.search === location.search)) return

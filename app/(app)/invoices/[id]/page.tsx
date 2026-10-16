@@ -30,8 +30,9 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const t = d.doc.doc_type as SalesType, isInv = t === 'invoice', isQtn = t === 'quotation'
   const [branding, settings, { data: customers }, { data: projects }, { data: catalog }, { data: templates }, { data: people }, { data: deliv }, { data: revisions }, { data: events }, { data: followups }, { data: cheques }] = await Promise.all([
     brandingFor(c), salesSettings(c),
-    c.supabase.from('customers').select('id,name,address,trn,phone,contact_person,email').order('name').limit(2000),
-    c.supabase.from('projects').select('id,name,code,customer_id,location').not('status', 'in', '(completed,cancelled)').order('name').limit(500),
+    // only the document's own customer: the picker searches the rest on demand (/api/customers/search) instead of shipping every customer
+    d.doc.customer_id ? c.supabase.from('customers').select('id,name,address,trn,phone,contact_person,email').eq('id', d.doc.customer_id) : Promise.resolve({ data: [] as any[] }),
+    c.supabase.from('projects').select('id,name,code,customer_id,location,customer:customers(id,name,address,trn,phone,contact_person,email)').not('status', 'in', '(completed,cancelled)').order('name').limit(500),
     c.supabase.from('catalog_items').select('id,name,description,unit,rate,vat_category,category').eq('active', true).order('name').limit(1000),
     c.supabase.from('terms_templates').select('id,name,kind,lines,is_default').order('name'),
     c.supabase.from('profiles').select('id,full_name').eq('is_active', true).order('full_name'),
@@ -67,7 +68,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const { data: fmt } = edit && d.doc.status === 'draft' && !(d.doc as any).sent_at && !d.doc.revision ? await c.supabase.from('document_number_formats').select(NUMBER_FORMAT_COLS).eq('doc_type', d.doc.doc_type).maybeSingle() : { data: null }
   const canRenumber = !!fmt && !matchesFormat(d.doc.number, fmt)
   return <>
-    <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} customers={(customers ?? []) as any} projects={(projects ?? []) as any}
+    <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} customers={[...new Map([...(customers ?? []), ...(projects ?? []).map((x: any) => x.customer).filter(Boolean)].map((x: any) => [x.id, x])).values()] as any} projects={(projects ?? []).map(({ customer: _c, ...x }: any) => x) as any}
       catalog={(catalog ?? []).map((x: any) => ({ ...x, rate: Number(x.rate) }))} templates={(templates ?? []) as any} salespeople={people ?? []} delivery={delivery}
       editable={edit && !locked} lockedReason={!edit ? 'You can view this document but not change it.' : locked} requireApproval={settings.requireApproval}
       canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber} />
