@@ -11,6 +11,9 @@ pages fast.
 - **Pages arrive complete, not streamed.** There is no route-level `loading.tsx` and no Suspense streaming inside app pages.
   - With streaming, a later chunk could arrive after the user had already tapped elsewhere. That breaks React's streaming insert (seen in tests as `Cannot read properties of null (reading 'parentNode')` and React error 419).
   - Server actions also misbehave with route loading states (see `nav-progress.tsx`).
+  - **The app layout has no `<Suspense>` either.** A boundary around the sidebar made it stream in a second HTML chunk on every load. When that chunk arrived while React was hydrating, React threw error #418 (about once per full test run, on any page).
+    - The layout is `force-dynamic`, so `useSearchParams` needs no boundary there.
+    - To check: no `<template id="B:` in a page's HTML.
   - Speed comes from doing less per page instead: the rules below.
 
 ## Load the main content first

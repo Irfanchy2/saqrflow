@@ -37,6 +37,8 @@ try {
   ok((await bodyText(p)).includes('Dashboard') && (await bodyText(p)).includes('Al Saqr Steels') && p.url() === `${BASE}/`, 'owner lands on the dashboard after onboarding')
   ok((await bodyText(p)).includes('Set up Averiqo'), 'empty dashboard shows the setup guide (no fake data)')
   await shot(p, '02-dashboard-empty')
+  // a Suspense boundary in the app shell streams part of it in a second chunk, which races hydration (React #418)
+  ok(!/<template id="B:\d+"/.test(await (await p.context().request.get(`${BASE}/`)).text()), 'app shell arrives in one HTML chunk (no streamed Suspense boundary)')
   for (const l of ['Dashboard', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Quotations', 'Invoices', 'Payments', 'Projects', 'Customers', 'Vehicles & Assets', 'Reminders', 'Calendar', 'Reports & Analytics', 'Averiqo AI', 'User Management', 'Settings'])
     ok(await p.getByRole('link', { name: l }).first().isVisible(), `sidebar has “${l}”`)
   ok(!(await p.locator('aside').first().innerText()).match(/\b(Soon|Beta|Coming soon|Planned)\b/i), 'every module is live: no Soon / Beta / Planned labels in navigation')
