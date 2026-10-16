@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/primitives'
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => { console.error(error) }, [error])
   const offline = typeof navigator !== 'undefined' && !navigator.onLine
-  return <div className="mx-auto mt-16 max-w-md rounded-lg border border-border bg-surface p-6 text-center shadow-card" role="alert">
+  return <div className="mx-auto mt-16 max-w-md rounded-xl border border-border/80 bg-surface p-6 text-center shadow-card" role="alert">
     <AlertTriangle className="mx-auto mb-3 text-warning" size={28} aria-hidden />
     <h1 className="text-lg font-semibold">{offline ? 'You are offline' : 'This page could not be loaded'}</h1>
     <p className="mt-2 text-sm text-muted">{offline ? 'Check your internet connection, then try again.' : 'A temporary problem stopped this page from loading. Try again. If it keeps happening, tell your administrator'}{error.digest && !offline ? ` (reference ${error.digest}).` : '.'}</p>

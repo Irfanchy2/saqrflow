@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, ScrollText, Target, Truck, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
-import { Badge, Card, EmptyState, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, EmptyState, PageHeader, Pagination, Metrics, Money, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { NewDocFab, NewSalesButtons } from '@/components/sales/new-buttons'
 import { FilterBar, FilterTabs, MList, MRow, Tile, TINTS } from '@/components/ui/mobile'
 import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
@@ -101,15 +101,15 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
       : <><MList>{data.map((r: any) => { const bal = Number(r.total) - (paidOf.get(r.id) ?? 0), tone = STATUS_TONE[r.status] ?? 'neutral'
           return <MRow key={r.id} href={`/invoices/${r.id}`} lead={<Tile icon={t === 'quotation' ? ScrollText : t === 'invoice' ? Receipt : t === 'credit_note' ? FileMinus : Truck} tint={TINTS[TONE_TINT[tone]]} />}
             title={r.number} sub={r.customer_name ?? r.subject ?? '—'}
-            line={meta.priced ? <span className="font-bold tabular-nums">AED {fmtMoney(r.total)}{isInv && bal > 0.005 && !['draft', 'cancelled', 'paid'].includes(r.status) && <span className="ms-2 text-xs font-medium text-muted">{fmtMoney(bal)} due</span>}</span> : undefined}
+            line={meta.priced ? <><Money value={r.total} className="text-[15px] font-semibold tracking-[-0.01em]" />{isInv && bal > 0.005 && !['draft', 'cancelled', 'paid'].includes(r.status) && <span className="whitespace-nowrap text-[12.5px] font-medium tabular-nums text-warning">{fmtMoney(bal)} due</span>}</> : undefined}
             right={<Badge tone={tone}>{statusLabel(t, r.status)}</Badge>} rightSub={formatShortDate(r.issue_date)} /> })}</MList>
         <div className="hidden sm:block"><TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Customer</Th><Th>Subject / project</Th><Th>Date</Th>{t !== 'delivery_note' && <Th>{isInv ? 'Due' : 'Valid until'}</Th>}{meta.priced && <Th className="text-right">Total (AED)</Th>}{isInv && <Th className="text-right">Balance</Th>}<Th>Status</Th></tr></thead>
         <tbody className="divide-y divide-border">{data.map((r: any) => {
           const bal = Number(r.total) - (paidOf.get(r.id) ?? 0)
           return <tr key={r.id} className="hover:bg-surface-2/50">
             <Td><Link href={`/invoices/${r.id}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{r.number}</Link></Td>
-            <Td className="max-w-[220px] truncate">{r.customer_name ?? <span className="text-muted">—</span>}</Td>
-            <Td className="max-w-[260px] truncate text-muted">{r.subject ?? r.project?.name ?? r.site ?? '—'}</Td>
+            <Td className="max-w-[220px] truncate" title={r.customer_name ?? undefined}>{r.customer_name ?? <span className="text-muted">—</span>}</Td>
+            <Td className="max-w-[260px] truncate text-muted" title={r.subject ?? r.project?.name ?? r.site ?? undefined}>{r.subject ?? r.project?.name ?? r.site ?? '—'}</Td>
             <Td className="whitespace-nowrap tabular-nums">{r.issue_date}</Td>
             {t !== 'delivery_note' && <Td className={cn('whitespace-nowrap tabular-nums', isInv && r.status === 'overdue' && 'font-medium text-danger')}>{(isInv ? r.due_date : r.valid_until) ?? '—'}</Td>}
             {meta.priced && <Td className="text-right tabular-nums">{fmtMoney(r.total)}</Td>}

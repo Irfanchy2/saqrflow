@@ -471,7 +471,7 @@ function DeliveryDialog({ items, delivery, onClose, onCreate, busy }: { items: I
 }
 
 function Section({ icon: Icon, title, sub, children, collapsed }: { icon: typeof FileText; title: string; sub?: string; children: ReactNode; collapsed?: boolean }) {
-  return <details open={!collapsed} className="group rounded-lg border border-border bg-surface shadow-card">
+  return <details open={!collapsed} className="group rounded-xl border border-border/80 bg-surface shadow-card">
     <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg px-4 py-3 hover:bg-surface-2/50 [&::-webkit-details-marker]:hidden">
       <span className="rounded-md bg-primary-soft p-1.5 text-primary"><Icon size={15} aria-hidden /></span>
       <span className="flex-1"><span className="block text-sm font-semibold">{title}</span>{sub && <span className="block text-xs text-muted">{sub}</span>}</span>

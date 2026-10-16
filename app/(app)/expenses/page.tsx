@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { Download, Fuel, HardHat, Home, Package, Paperclip, Pencil, Plus, Trash2, Truck, Users, Utensils, Wallet, Wrench } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
-import { Badge, Card, EmptyState, LinkButton, PageHeader, Pagination, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, EmptyState, LinkButton, PageHeader, Pagination, Metrics, Money, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { ExpenseFields } from '@/components/expenses/expense-fields'
@@ -62,7 +62,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         : <><MList>{data.map((e: any) => { const [I, t] = CAT_ICON[e.category] ?? CAT_ICON.other
           return <MRow key={e.id} lead={<Tile icon={I} tint={TINTS[t]} />} title={e.description} sub={[e.supplier_name, e.project?.name ?? 'General'].filter(Boolean).join(' · ')}
             line={edit ? <DialogButton wide size="sm" variant="ghost" label={<><Pencil size={13} />Edit</>} title="Edit expense"><ActionForm action={saveExpense.bind(null, e.id, null)} resetOnSuccess={false}><ExpenseFields e={e} today={c.today} projects={projs} assets={assetOpts} employees={emps} suppliers={sups} /></ActionForm></DialogButton> : undefined}
-            right={<span className="text-[15px] font-bold tabular-nums">AED {fmtMoney(e.amount)}</span>} rightSub={formatShortDate(e.spent_on)} /> })}</MList>
+            right={<Money value={e.amount} className="text-[15px] font-semibold tracking-[-0.01em]" />} rightSub={formatShortDate(e.spent_on)} /> })}</MList>
         <div className="hidden sm:block"><TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Description</Th><Th>Category</Th><Th>Project</Th><Th>Payment</Th><Th className="text-right">Amount</Th><Th className="text-right">VAT</Th>{edit && <Th />}</tr></thead>
           <tbody className="divide-y divide-border">{data.map((e: any) => <tr key={e.id} className="hover:bg-surface-2/50">
             <Td className="whitespace-nowrap tabular-nums">{e.spent_on}</Td>

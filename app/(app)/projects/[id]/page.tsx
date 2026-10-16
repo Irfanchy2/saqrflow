@@ -52,7 +52,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         {/* its Client dropdown loads the customer list only when the dialog opens */}
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit project" icon={<Pencil size={14} />}><EditProjectForm p={p} /></DialogButton>}
         {edit && fin && <NewSalesButtons projectId={id} customerId={p.customer_id ?? undefined} />}
-        {del && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'project', id)} confirm={`Move project “${p.name}” to the trash? Its documents, invoices and costs are kept and it can be restored.`}><Trash2 size={14} />Delete</ActionButton>}
+        {del && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'project', id)} confirm={`Move project “${p.name}” to the trash? Its documents, invoices and costs are kept and it can be restored.`}><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div>
     </div>
 

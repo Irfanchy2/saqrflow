@@ -69,7 +69,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         {edit && !['on_hold', 'completed', 'cancelled'].includes(w.status) && <ActionButton size="md" action={setWorkOrderStatus.bind(null, id, 'on_hold')}>Put on hold</ActionButton>}
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit work order" icon={<Pencil size={14} />}><ActionForm action={updateWorkOrder.bind(null, id)} resetOnSuccess={false}>
           <WorkOrderFields w={w} projects={o(projects, (x: any) => x.name)} users={userOpts} /></ActionForm></DialogButton>}
-        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'work_order', id)} confirm="Move this work order to the trash? Its tasks stay with it and it can be restored."><Trash2 size={14} />Delete</ActionButton>}
+        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'work_order', id)} confirm="Move this work order to the trash? Its tasks stay with it and it can be restored."><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div>
     </div>
 

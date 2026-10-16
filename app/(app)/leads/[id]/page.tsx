@@ -74,7 +74,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit lead" icon={<Pencil size={14} />}><ActionForm action={updateLead.bind(null, id)} resetOnSuccess={false}><LeadFields l={l} users={userOpts} /></ActionForm></DialogButton>}
         {edit && !l.customer_id && <ActionButton size="md" action={convertLeadToCustomer.bind(null, id)}><UserCheck size={14} />Convert to customer</ActionButton>}
         {edit && fin && <NewSalesButtons leadId={id} only={['quotation']} variant="primary" />}
-        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'lead', id)} confirm={`Move lead “${l.company_name}” to the trash? It can be restored.`}><Trash2 size={14} />Delete</ActionButton>}
+        {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'lead', id)} confirm={`Move lead “${l.company_name}” to the trash? It can be restored.`}><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div>
     </div>
 

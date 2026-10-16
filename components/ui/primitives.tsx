@@ -2,6 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import Link from 'next/link'
 import { Children, cloneElement, isValidElement, type Ref } from 'react'
 import { cn } from '@/lib/utils'
+import { formatAed } from '@/lib/time'
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { LucideIcon } from '@/components/icons'
 import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, CalendarClock, Users, FileText, Truck, Landmark, TrendingUp, BarChart3, Receipt, Clock, CheckCircle2, ShieldCheck, Package, Wrench, MapPinned, ArrowUp, ArrowDown } from '@/components/icons'
@@ -22,7 +23,8 @@ const button = cva('relative inline-flex cursor-pointer items-center justify-cen
       ghost: 'text-muted hover:bg-fg/[.05] hover:text-fg active:bg-fg/[.08]',
       danger: 'bg-danger bg-[linear-gradient(180deg,hsl(0_0%_100%/.1),hsl(0_0%_100%/0))] text-white shadow-solid [--b:var(--danger)] hover:bg-danger/[.93] hover:shadow-solid-hover',
     },
-    size: { sm: 'h-10 gap-1.5 px-3 text-[13px] sm:h-8 sm:px-2.5', md: 'h-11 px-4 sm:h-10 sm:px-4', icon: 'h-11 w-11 sm:h-10 sm:w-10' },
+    // one icon size per button size, whatever size the caller passed (14 px small, 16 px regular, 18 px icon-only)
+    size: { sm: 'h-10 gap-1.5 px-3 text-[13px] sm:h-8 sm:px-2.5 [&>svg]:h-3.5 [&>svg]:w-3.5', md: 'h-11 px-4 sm:h-10 sm:px-4 [&>svg]:h-4 [&>svg]:w-4', icon: 'h-11 w-11 sm:h-10 sm:w-10 [&>svg]:h-[18px] [&>svg]:w-[18px]' },
   },
   defaultVariants: { variant: 'primary', size: 'md' },
 })
@@ -96,6 +98,22 @@ const ICON_RULES: [RegExp, LucideIcon][] = [[/overdue|late|expired|risk|blocked/
   [/cheque|bank/i, Landmark], [/rate|%|margin|growth|conversion|win/i, TrendingUp], [/hour|time|day|week/i, Clock], [/done|complete|closed|approved|resolved|won/i, CheckCircle2],
   [/compliance|permit|licen|warranty/i, ShieldCheck], [/item|catalog|stock|product/i, Package], [/ticket|service|repair|maint/i, Wrench], [/visit|site|location/i, MapPinned]]
 const iconFor = (label: string) => ICON_RULES.find(([r]) => r.test(label))?.[1] ?? BarChart3
+// semantic tile colours: the same kind of figure always gets the same colour (index into TILES / BARS); anything else rotates
+const TONE_RULES: [RegExp, number][] = [[/collect|received|paid|payment|profit|margin|won|done|complete/i, 2], [/receivable|outstanding|balance|owed|due|pending/i, 5],
+  [/cost|spend|expense|labour|material|fuel|transport/i, 1], [/quot|pipeline|lead|opportunit|approval/i, 3], [/sales|invoice|revenue|billed|contract|value/i, 0]]
+const toneIndex = (label: string, i: number) => TONE_RULES.find(([r]) => r.test(label))?.[1] ?? i
+/** "AED 1,284,567.50" with a small, quiet currency so the figure itself carries the weight; never wraps. */
+export function Money({ value, className, currency = true }: { value: number | string; className?: string; currency?: boolean }) {
+  const s = formatAed(value), neg = s.startsWith('-'), num = s.replace(/^-?AED /, '')
+  // plain inline text (not flex), so the copied / read text stays "AED 1,250.00"
+  return <span className={cn('whitespace-nowrap tabular-nums', className)}>{currency && <><span className="text-[0.72em] font-medium tracking-normal opacity-60">AED</span>{' '}</>}{neg ? '-' : ''}{num}</span>
+}
+/** A KPI value: "AED …" strings get the quiet currency; the length drives the fluid size (globals.css .kpi-value). */
+function kpiValue(v: ReactNode) {
+  if (typeof v !== 'string') return v
+  const m = /^(-?)AED (.+)$/.exec(v)
+  return m ? <><span className="kpi-cur">AED</span>{' '}{m[1]}{m[2]}</> : v
+}
 
 /** Small bar series for a KPI card (e.g. last 8 months). Server-rendered, decorative: the card's text carries the numbers. */
 export function MiniBars({ values, className }: { values: number[]; className?: string }) {
@@ -106,18 +124,19 @@ export function MiniBars({ values, className }: { values: number[]; className?: 
 
 const valueTone: Partial<Record<Tone, string>> = { red: 'text-danger' }
 export function StatCard({ label, value, hint, href, tone: t = 'neutral', icon, change, bars, index = 0 }: { label: string; value: ReactNode; hint?: ReactNode; icon?: LucideIcon; href?: string; tone?: Tone; change?: number | null; bars?: number[]; index?: number }) {
-  const Icon = icon ?? iconFor(label), tile = t === 'red' ? RED_TILE : TILES[index % TILES.length]
+  const Icon = icon ?? iconFor(label), ti = toneIndex(label, index), tile = t === 'red' ? RED_TILE : TILES[ti % TILES.length]
+  const len = typeof value === 'string' ? value.replace(/^-?AED /, '').length + (value.includes('AED') ? 2.4 : 0) : 0
   const showChange = change !== undefined && change !== null
   // layout is CSS (globals.css .kpi): stacked on narrow cards, icon tile on the left with bars bottom-right once the card is wide enough
   // resting: hairline + soft shadow; a card that links somewhere lifts 1 px with a deeper shadow on hover
   const inner = <div className={cn('stat kpi-in h-full min-w-0 rounded-xl border border-border/80 bg-surface p-3.5 shadow-card sm:p-[18px]', href && 'transition-[border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px hover:border-border-strong/80 hover:shadow-lift')}>
     <span className={cn('kpi-tile grid h-9 w-9 shrink-0 place-items-center rounded-lg shadow-[inset_0_0_0_1px_hsl(var(--fg)/.04)] sm:h-11 sm:w-11 sm:rounded-xl', tile)} aria-hidden><Icon size={19} strokeWidth={1.9} /></span>
     <span className="kpi-label min-w-0 text-[12.5px] font-medium leading-snug text-muted sm:text-[13px]">{label}</span>
-    <div className={cn('kpi-value text-[19px] font-semibold leading-tight tabular-nums tracking-[-0.03em] [overflow-wrap:anywhere] sm:text-[23px]', valueTone[t])}>{value}</div>
+    <div className={cn('kpi-value font-semibold leading-tight tabular-nums tracking-[-0.03em]', len ? 'kpi-fit' : 'text-[19px] [overflow-wrap:anywhere] sm:text-[23px]', valueTone[t])} style={len ? { '--len': len } as React.CSSProperties : undefined} title={typeof value === 'string' ? value : undefined}>{kpiValue(value)}</div>
     {(showChange || hint) && <div className="kpi-hint flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted">
       {showChange && <span className={cn('inline-flex shrink-0 items-center gap-0.5 font-semibold tabular-nums', change >= 0 ? 'text-success' : 'text-danger')}>{change >= 0 ? <ArrowUp size={12} strokeWidth={2.5} aria-hidden /> : <ArrowDown size={12} strokeWidth={2.5} aria-hidden />}{Math.abs(change)}%</span>}
       {hint && <span className="min-w-0">{hint}</span>}</div>}
-    {bars && <span className="kpi-bars"><MiniBars values={bars} className={t === 'red' ? 'bg-rose-500' : BARS[index % BARS.length]} /></span>}
+    {bars && <span className="kpi-bars"><MiniBars values={bars} className={t === 'red' ? 'bg-rose-500' : BARS[ti % BARS.length]} /></span>}
   </div>
   return href ? <Link href={href} className="kpi block h-full rounded-xl focus-visible:ring-offset-0">{inner}</Link> : <div className="kpi h-full">{inner}</div>
 }
@@ -135,10 +154,11 @@ export function Metrics({ children, className, cols }: { children: ReactNode; cl
 }
 
 /** Nothing here yet: the icon sits in a raised tile inside two fading rings, then a title, one line of help and the next step. */
-export function EmptyState({ title, body, action, icon: Icon = Inbox }: { title: string; body?: string; action?: ReactNode; icon?: LucideIcon }) {
-  return <div className="flex flex-col items-center justify-center px-6 py-12 text-center sm:py-14">
-    <span className="empty-rings relative mb-5 mt-2 grid h-12 w-12 place-items-center rounded-xl border border-border/80 bg-surface text-primary shadow-lift" aria-hidden><Icon size={21} strokeWidth={1.75} /></span>
-    <p className="text-[15px] font-semibold tracking-[-0.012em]">{title}</p>{body && <p className="mt-1.5 max-w-sm text-[13.5px] leading-relaxed text-muted">{body}</p>}{action && <div className="mt-5">{action}</div>}
+/** `compact`: inside a dashboard widget or a short panel (smaller tile, tighter spacing, no rings). */
+export function EmptyState({ title, body, action, icon: Icon = Inbox, compact }: { title: string; body?: string; action?: ReactNode; icon?: LucideIcon; compact?: boolean }) {
+  return <div className={cn('empty-in flex flex-col items-center justify-center text-center', compact ? 'px-5 py-7' : 'px-6 py-10 sm:py-14')}>
+    <span className={cn('relative grid place-items-center border border-border/80 bg-surface text-primary shadow-lift', compact ? 'mb-3 h-10 w-10 rounded-[11px]' : 'empty-rings mb-5 mt-2 h-12 w-12 rounded-xl')} aria-hidden><Icon size={compact ? 18 : 21} strokeWidth={1.75} /></span>
+    <p className={cn('font-semibold tracking-[-0.012em]', compact ? 'text-[14px]' : 'text-[15px]')}>{title}</p>{body && <p className={cn('mt-1.5 max-w-sm leading-relaxed text-muted', compact ? 'text-[13px]' : 'text-[13.5px]')}>{body}</p>}{action && <div className={compact ? 'mt-4' : 'mt-5'}>{action}</div>}
   </div>
 }
 /** Page title row: optional breadcrumb trail, 24 px title, one line of context, actions on the right. */

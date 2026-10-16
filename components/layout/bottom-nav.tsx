@@ -18,15 +18,15 @@ export function BottomNav({ items }: { items: NavItem[] }) {
   const here = items.find(i => !i.tab && i.key !== 'overview' && on(i.href))
   const list = here && !base.some(b => on(b.href)) ? [base[0], here, ...base.slice(1)].slice(0, 4) : base.slice(0, 4)
   const short: Record<string, string> = { leads: 'CRM', parties: 'Customers', site_visits: 'Visits', work_orders: 'Orders', site_reports: 'Reports', documents: 'Documents', employees: 'People', assets: 'Assets', expenses: 'Expenses', cheques: 'Cheques', reports: 'Reports', overview: 'Home', catalog: 'Catalog', users: 'Users', vault: 'Vault', inbox: 'Inbox', brief: 'Brief', calendar: 'Calendar', approvals: 'Approvals', reminders: 'Reminders', settings: 'Settings', tickets: 'Service', kb: 'Guides', audit: 'Audit', trash: 'Trash', payments: 'Payments', assistant: 'Assistant' }
-  const cell = 'group/tab flex min-h-[60px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1 text-[11px] font-medium tracking-[-0.005em] transition-colors duration-150'
-  // the active pill is one element that glides to the tab you open (layoutId), the icon fills, the label turns blue
-  return <nav aria-label="Quick navigation" className="no-print fixed inset-x-0 bottom-0 z-nav flex border-t border-border/70 bg-surface/90 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_hsl(var(--shadow)/.25)] backdrop-blur-md backdrop-saturate-150 lg:hidden">
+  const cell = 'group/tab relative flex min-h-[58px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-[3px] text-[11px] font-medium tracking-[-0.005em] transition-colors duration-150'
+  // the active pill is one soft-tinted element that glides to the tab you open (layoutId); the icon fills and the label turns blue
+  return <nav aria-label="Quick navigation" className="no-print fixed inset-x-0 bottom-0 z-nav flex border-t border-border/60 bg-surface/[.92] px-1.5 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_28px_-18px_hsl(var(--shadow)/.3)] backdrop-blur-xl backdrop-saturate-150 lg:hidden">
     {list.map(i => { const I = ICONS[i.key], a = on(i.href)
       return <Link key={i.key} href={i.href} aria-current={a ? 'page' : undefined} className={cn(cell, a ? 'text-primary' : 'text-muted active:text-fg')}>
-        <span className="relative grid h-7 w-11 place-items-center transition-transform duration-150 ease-out group-active/tab:scale-90">
-          {a && <m.span layoutId="tab-on" transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }} aria-hidden className="absolute inset-0 rounded-full bg-primary shadow-[0_4px_10px_-4px_hsl(var(--primary)/.7)]" />}
-          <I size={19} weight={a ? 'fill' : 'regular'} aria-hidden className={cn('relative', a && 'text-primary-fg')} /></span>
+        <span className="relative grid h-7 w-12 place-items-center transition-transform duration-150 ease-out group-active/tab:scale-90">
+          {a && <m.span layoutId="tab-on" transition={{ type: 'spring', stiffness: 560, damping: 40, mass: 0.7 }} aria-hidden className="absolute inset-0 rounded-full bg-primary/[.12] ring-1 ring-inset ring-primary/15 dark:bg-primary/20" />}
+          <I size={20} weight={a ? 'fill' : 'regular'} aria-hidden className="relative" /></span>
         <span className={cn('max-w-full truncate px-1', a && 'font-semibold')}>{short[i.key] ?? i.label}</span></Link> })}
-    <button type="button" onClick={() => dispatchEvent(new Event('averiqo:menu'))} className={cn(cell, 'cursor-pointer text-muted active:text-fg')}><span className="grid h-7 w-11 place-items-center transition-transform duration-150 ease-out group-active/tab:scale-90"><ListIcon size={19} aria-hidden /></span><span>More</span></button>
+    <button type="button" onClick={() => dispatchEvent(new Event('averiqo:menu'))} className={cn(cell, 'cursor-pointer text-muted active:text-fg')}><span className="grid h-7 w-12 place-items-center transition-transform duration-150 ease-out group-active/tab:scale-90"><ListIcon size={20} aria-hidden /></span><span>More</span></button>
   </nav>
 }

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Banknote, CalendarDays, CheckCircle2, FileText, HardHat, Landmark, Receipt, ScrollText, ShieldCheck, Truck, Flag, Users, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
-import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, MiniBars, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, MiniBars, Money, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { buildAlerts } from '@/lib/dashboard'
 import { summarizeCheques } from '@/lib/cheques'
 import { addDays, formatAed, formatShortDate } from '@/lib/time'
@@ -163,26 +163,26 @@ export default async function Dashboard() {
     recent: canFin && recentQ ? <Card><CardTabs id="recent" action={<CardLink href="/invoices">All documents</CardLink>} tabs={[
       { key: 'q', label: 'Recent quotations', panel: <DocTable rows={recentQ.data ?? []} dateCol="Valid until" date={(r: any) => r.valid_until} empty="No quotations yet" /> },
       { key: 'i', label: 'Recent invoices', panel: <DocTable rows={recentI?.data ?? []} dateCol="Due" date={(r: any) => r.due_date} empty="No invoices yet" /> },
-      { key: 'p', label: 'Recent payments', panel: !(recentP?.data ?? []).length ? <EmptyState title="No payments yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Received from</Th><Th>Against</Th><Th>Method</Th><Th className="text-right">Amount</Th></tr></thead>
+      { key: 'p', label: 'Recent payments', panel: !(recentP?.data ?? []).length ? <EmptyState compact title="No payments yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Received from</Th><Th>Against</Th><Th>Method</Th><Th className="text-right">Amount</Th></tr></thead>
         <tbody className="divide-y divide-border">{(recentP!.data ?? []).map((x: any) => <tr key={x.id}><Td className="whitespace-nowrap tabular-nums">{formatShortDate(x.paid_on)}</Td>
           <Td className="max-w-[240px] truncate font-medium">{x.invoice?.customer_name ?? x.customer?.name ?? '—'}</Td>
           <Td>{x.invoice ? <Link href={`/invoices/${x.invoice.id}`} className="font-medium text-primary hover:underline">{x.invoice.number}</Link> : x.customer ? <Link href={`/parties/${x.customer.id}`} className="text-muted hover:text-fg">On account</Link> : <span className="text-muted">On account</span>}</Td>
           <Td className="capitalize text-muted">{String(x.method ?? '—').replace(/_/g, ' ')}</Td>
           <Td className="text-right font-semibold tabular-nums text-success">{fmtMoney(x.amount)}</Td></tr>)}</tbody></TableWrap> },
-      ...(activeProjects ? [{ key: 'pr', label: 'Ongoing projects', panel: !(activeProjects.data ?? []).length ? <EmptyState title="No open projects" /> : <TableWrap><thead><tr><Th>Project</Th><Th>Customer</Th><Th>Fabrication</Th><Th>Site</Th><Th>Status</Th></tr></thead>
+      ...(activeProjects ? [{ key: 'pr', label: 'Ongoing projects', panel: !(activeProjects.data ?? []).length ? <EmptyState compact title="No open projects" /> : <TableWrap><thead><tr><Th>Project</Th><Th>Customer</Th><Th>Fabrication</Th><Th>Site</Th><Th>Status</Th></tr></thead>
         <tbody className="divide-y divide-border">{(activeProjects.data ?? []).map((p: any) => <tr key={p.id}><Td className="max-w-[260px] truncate font-medium"><Link href={`/projects/${p.id}`} className="hover:text-primary">{p.name}</Link></Td>
           <Td className="max-w-[200px] truncate text-muted">{p.customer?.name ?? '—'}</Td><Td className="tabular-nums">{p.fabrication_progress ?? 0}%</Td><Td className="tabular-nums">{p.site_progress ?? 0}%</Td>
           <Td badge><Badge tone={tone(p.status)}>{PROJECT_STATUS[p.status]?.label ?? p.status}</Badge></Td></tr>)}</tbody></TableWrap> }] : []),
-      ...(recentE ? [{ key: 'e', label: 'Recent expenses', panel: !(recentE.data ?? []).length ? <EmptyState title="No expenses yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Description</Th><Th>Project</Th><Th>Category</Th><Th className="text-right">Amount</Th></tr></thead>
+      ...(recentE ? [{ key: 'e', label: 'Recent expenses', panel: !(recentE.data ?? []).length ? <EmptyState compact title="No expenses yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Description</Th><Th>Project</Th><Th>Category</Th><Th className="text-right">Amount</Th></tr></thead>
         <tbody className="divide-y divide-border">{(recentE.data ?? []).map((x: any) => <tr key={x.id}><Td className="whitespace-nowrap tabular-nums">{formatShortDate(x.spent_on)}</Td>
           <Td className="max-w-[260px] truncate font-medium">{x.description}</Td><Td className="max-w-[200px] truncate">{x.project ? <Link href={`/projects/${x.project.id}`} className="text-muted hover:text-fg">{x.project.name}</Link> : '—'}</Td>
           <Td className="capitalize text-muted">{x.category}</Td><Td className="text-right tabular-nums">{fmtMoney(x.amount)}</Td></tr>)}</tbody></TableWrap> }] : []),
     ]} /></Card> : null,
     attention: <Card><CardHeader title="Needs attention" sub="Overdue or due within 30 days" action={c.can('reminders.create') ? <CardLink href="/reminders" /> : undefined} />
-        {!alerts.length ? <EmptyState icon={CheckCircle2} title="Nothing is due" body="No documents, cheques, invoices or renewals fall due in the next 30 days." /> :
+        {!alerts.length ? <EmptyState compact icon={CheckCircle2} title="Nothing is due" body="No documents, cheques, invoices or renewals fall due in the next 30 days." /> :
           <ul className="max-h-[440px] overflow-y-auto overscroll-contain px-2 pb-2">{alerts.slice(0, 20).map(a => { const [I, tint] = alertIcon(a.key); return <li key={a.key}><Link href={a.href} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-surface-2/70">
             <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-lg', tint)} aria-hidden><I size={16} /></span>
-            <span className="min-w-0 flex-1"><span className="block truncate font-medium" title={a.text}>{a.text}</span><span className="block truncate text-xs text-muted">{a.sub}</span></span>
+            <span className="min-w-0 flex-1"><span className="line-clamp-2 font-medium leading-snug [overflow-wrap:anywhere]" title={a.text}>{a.text}</span><span className="block truncate text-xs text-muted">{a.sub}</span></span>
             <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums', a.severity === 'critical' ? 'bg-danger/10 text-danger' : a.severity === 'warning' ? 'bg-warning/10 text-warning' : 'bg-surface-2 text-muted')}>{a.days < 0 ? `${-a.days}d late` : a.days === 0 ? 'Today' : `${a.days} days`}</span></Link></li> })}</ul>}</Card>,
     calendar: <Card className="hidden md:block"><MiniCalendar today={c.today} due={dueMap} /></Card>,
     operations: ops.length > 0 && <Card><CardHeader title="Operations" sub={opsNow.length ? 'Counts that need someone today' : undefined} />
@@ -192,25 +192,25 @@ export default async function Dashboard() {
             <span className={cn('min-w-7 rounded-md px-1.5 text-center text-xs font-semibold leading-6 tabular-nums', o.bad ? 'bg-danger/10 text-danger' : o.warn ? 'bg-warning/10 text-warning' : 'bg-surface-2 text-fg')}>{o.v}</span></Link></li>)}</ul>}</Card> || null,
     inbox: (c.can('documents.upload') || c.can('employees.view_sensitive')) ? <SmartInboxPanel c={c} /> : null,
     projects: activeProjects && <Card className="h-full"><CardHeader title="Projects in progress" sub={`${activeCount?.count ?? 0} active`} action={<CardLink href="/projects" />} />
-        {!(activeProjects.data ?? []).length ? <EmptyState icon={HardHat} title="No open projects" body="Create a project to follow fabrication and site progress, costs and billing." /> :
+        {!(activeProjects.data ?? []).length ? <EmptyState compact icon={HardHat} title="No open projects" body="Create a project to follow fabrication and site progress, costs and billing." /> :
           <ul className="px-2 pb-2">{(activeProjects.data ?? []).map((p: any) => { const pct = Math.round(((p.fabrication_progress ?? 0) + (p.site_progress ?? 0)) / 2); return <li key={p.id}><Link href={`/projects/${p.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-lg px-3 py-2.5 hover:bg-surface-2/70 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]">
             <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}</span><span className="block truncate text-xs text-muted">{p.customer?.name ?? 'No customer'}</span></span>
             <span className="col-span-2 flex items-center gap-2.5 sm:col-span-1" title={`Fabrication ${p.fabrication_progress ?? 0}% · Site ${p.site_progress ?? 0}%`}><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><span className={cn('block h-full rounded-full', pct >= 75 ? 'bg-success' : pct >= 40 ? 'bg-primary' : 'bg-warning')} style={{ width: `${pct}%` }} /></span><span className="w-9 text-end text-xs font-medium tabular-nums">{pct}%</span></span>
             <span className="row-start-1 col-start-2 sm:col-start-3"><Badge tone={tone(p.status)}>{PROJECT_STATUS[p.status]?.label ?? p.status}</Badge></span></Link></li> })}</ul>}</Card> || null,
     activity: <Card className="h-full"><CardHeader title="Recent activity" action={c.can('audit.view') ? <CardLink href="/audit">Audit log</CardLink> : undefined} />
-        {activity ? ((activity.data?.length ?? 0) === 0 ? <EmptyState title="No activity yet" /> :
+        {activity ? ((activity.data?.length ?? 0) === 0 ? <EmptyState compact title="No activity yet" /> :
           <ul className="px-2 pb-2 text-sm">{activity.data!.map(a => { const [I, tint] = ACT[a.table_name] ?? [FileText, 'bg-surface-2 text-muted']; return <li key={a.id} className="flex items-center gap-3 rounded-lg px-3 py-2">
             <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg', tint)} aria-hidden><I size={15} /></span>
             <span className="min-w-0 flex-1 truncate"><span className="font-medium">{TABLE_LABEL[a.table_name] ?? a.table_name.replace(/_/g, ' ')}</span> <span className="text-muted">{(ACTION_LABEL[a.action] ?? a.action).toLowerCase()} by {a.user_id ? who.get(a.user_id) ?? 'a former user' : 'the system'}</span></span>
             <time dateTime={a.created_at} title={new Date(a.created_at).toLocaleString('en-GB', { timeZone: c.company.timezone })} className="shrink-0 text-xs tabular-nums text-muted">{ago(a.created_at)}</time></li> })}</ul>)
-          : <EmptyState title="Activity is visible to owners" body="Ask an owner for access to the audit trail." />}</Card>,
+          : <EmptyState compact title="Activity is visible to owners" body="Ask an owner for access to the audit trail." />}</Card>,
     mytasks: myTasks ? <Card><CardHeader title="My tasks" sub="Open, by due date" action={<CardLink href="/tasks?view=mine" />} />
-      {!myTasks.length ? <EmptyState icon={CheckCircle2} title="No open tasks" /> : <ul className="px-2 pb-2 text-sm">{myTasks.map((t: any) => <li key={t.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">
+      {!myTasks.length ? <EmptyState compact icon={CheckCircle2} title="No open tasks" /> : <ul className="px-2 pb-2 text-sm">{myTasks.map((t: any) => <li key={t.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">
         <TaskCheck id={t.id} title={t.title} />
         <Link href={`/tasks?view=mine&open=${t.id}`} className="min-w-0 flex-1"><span className="block truncate font-medium">{t.title}</span>{t.project?.name && <span className="block truncate text-xs text-muted">{t.project.name}</span>}</Link>
         {t.due_date && <span className={cn('shrink-0 text-xs tabular-nums', t.due_date < c.today ? 'font-semibold text-danger' : t.due_date === c.today ? 'font-semibold text-warning' : 'text-muted')}>{t.due_date === c.today ? 'Today' : formatShortDate(t.due_date)}</span>}</li>)}</ul>}</Card> : null,
     approvals: pendingApprovals ? <Card><CardHeader title="Waiting for approval" action={<CardLink href="/approvals" />} />
-      {!pendingApprovals.length ? <EmptyState icon={CheckCircle2} title="Nothing to approve" /> : <ul className="px-2 pb-2 text-sm">{pendingApprovals.map((a: any) => <li key={a.id}><Link href={`/approvals?open=${a.id}`} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">
+      {!pendingApprovals.length ? <EmptyState compact icon={CheckCircle2} title="Nothing to approve" /> : <ul className="px-2 pb-2 text-sm">{pendingApprovals.map((a: any) => <li key={a.id}><Link href={`/approvals?open=${a.id}`} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">
         <span className="min-w-0 flex-1 truncate">{a.title}</span>{a.amount !== null && <span className="shrink-0 text-xs tabular-nums text-muted">{formatAed(a.amount)}</span>}</Link></li>)}</ul>}</Card> : null,
   }
   const visible = layout.items.filter(i => !i.hidden && W[i.key])
@@ -234,12 +234,12 @@ export default async function Dashboard() {
         <span aria-hidden className="pointer-events-none absolute -end-10 -top-12 h-40 w-40 rounded-full bg-[radial-gradient(closest-side,hsl(var(--sb-accent)/.35),transparent)]" />
         <Link href="/reports?period=month" className="relative flex items-end justify-between gap-3 px-4 pb-3.5 pt-4 active:opacity-90">
           <span className="min-w-0"><span className="block text-[12.5px] font-medium text-white/70">Sales this month</span>
-            <span className="mt-0.5 block text-[26px] font-semibold tabular-nums leading-tight tracking-[-0.03em]">{formatAed(salesNet)}</span>
+            <Money value={salesNet} className="mt-0.5 block text-[clamp(21px,6.6vw,26px)] font-semibold leading-tight tracking-[-0.03em]" />
             {trend.change.sales !== null && <span className={cn('mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums', trend.change.sales >= 0 ? 'bg-emerald-400/15 text-emerald-300' : 'bg-rose-400/15 text-rose-300')}>{trend.change.sales >= 0 ? '↑' : '↓'} {Math.abs(trend.change.sales)}%<span className="font-normal text-white/60">vs last month</span></span>}</span>
           <MiniBars values={months8.map(m => m.sales)} className="bg-white" /></Link>
         <div className="relative grid grid-cols-2 border-t border-white/10">
-          <Link href="/invoices?tab=receivables" className="min-w-0 px-4 py-3 active:bg-white/5"><span className="flex items-center gap-1.5 text-[12px] text-white/65"><Wallet size={13} aria-hidden />Receivables</span><span className="mt-0.5 block truncate text-[16px] font-semibold tabular-nums">{formatAed(sk.outstanding)}</span></Link>
-          <Link href="/invoices?tab=quotation" className="min-w-0 border-s border-white/10 px-4 py-3 active:bg-white/5"><span className="flex items-center gap-1.5 text-[12px] text-white/65"><FileText size={13} aria-hidden />Pending quotes</span><span className="mt-0.5 block truncate text-[16px] font-semibold tabular-nums">{formatAed(sk.pipeline)}</span></Link>
+          <Link href="/invoices?tab=receivables" className="min-w-0 px-4 py-3 active:bg-white/5"><span className="flex items-center gap-1.5 text-[12px] text-white/65"><Wallet size={13} aria-hidden />Receivables</span><Money value={sk.outstanding} className="mt-0.5 block text-[clamp(13px,4.1vw,16px)] font-semibold tracking-[-0.01em]" /></Link>
+          <Link href="/invoices?tab=quotation" className="min-w-0 border-s border-white/10 px-4 py-3 active:bg-white/5"><span className="flex items-center gap-1.5 text-[12px] text-white/65"><FileText size={13} aria-hidden />Pending quotes</span><Money value={sk.pipeline} className="mt-0.5 block text-[clamp(13px,4.1vw,16px)] font-semibold tracking-[-0.01em]" /></Link>
         </div>
       </div>
       <div className="grid grid-cols-3 divide-x divide-border/80 overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-card rtl:divide-x-reverse">{[
@@ -247,7 +247,7 @@ export default async function Dashboard() {
         ['Unpaid invoices', sk.openCount, '/invoices?tab=invoice', Receipt, 'text-blue-600 dark:text-blue-300'],
         ['Projects', activeCount?.count ?? 0, '/projects', HardHat, 'text-orange-600 dark:text-orange-300'],
       ].map(([l, v, h, I, t]: any) => <Link key={l} href={h} className="flex min-w-0 flex-col gap-1 px-3 py-3 active:bg-surface-2/70">
-        <span className={cn('flex items-center gap-1.5 truncate text-[11.5px] font-medium text-muted')}><I size={14} className={t} aria-hidden /><span className="truncate">{l}</span></span>
+        <span className="flex items-start gap-1.5 text-[11.5px] font-medium leading-tight text-muted"><I size={14} className={cn('shrink-0', t)} aria-hidden /><span className="line-clamp-2">{l}</span></span>
         <span className="text-[20px] font-semibold tabular-nums leading-none tracking-[-0.02em]">{v}</span></Link>)}</div>
     </div>}
   </section>
@@ -270,7 +270,8 @@ export default async function Dashboard() {
         <li key={h}><Link href={h} className="flex h-full gap-3 rounded-xl border border-border p-3.5 transition-colors hover:border-border-strong hover:bg-surface-2/50"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">{i + 1}</span><span><span className="block font-medium">{t}</span><span className="mt-0.5 block text-xs text-muted">{s}</span></span></Link></li>)}</ol></Card>}
 
     <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-rows-[auto_1fr]">
-      <div className="min-w-0 2xl:col-start-1 2xl:row-start-1">{col('top')}</div>
+      {/* the top zone (banner, KPI cards) is replaced by the summary on phones: drop its empty grid row there too */}
+      <div className={cn('flex min-w-0 flex-col gap-5 2xl:col-start-1 2xl:row-start-1 [&>*>section]:mb-0', visible.every(i => i.col !== 'top' || PHONE_HIDDEN.has(i.key)) && 'max-sm:hidden')}>{col('top')}</div>
       <div className="grid min-w-0 grid-cols-1 content-start items-start gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:col-start-2 2xl:row-span-2 2xl:row-start-1 2xl:grid-cols-1">{col('right')}</div>
       <div className="grid min-w-0 grid-cols-12 content-start items-stretch gap-5 self-start 2xl:col-start-1 2xl:row-start-2">{col('left')}</div>
     </div>
@@ -279,7 +280,7 @@ export default async function Dashboard() {
 
 /** Latest sales documents: number (with issue date), customer, project or subject, the relevant date, amount, status. */
 function DocTable({ rows, dateCol, date, empty }: { rows: any[]; dateCol: string; date: (r: any) => string | null; empty: string }) {
-  if (!rows.length) return <EmptyState title={empty} />
+  if (!rows.length) return <EmptyState compact title={empty} />
   return <TableWrap><thead><tr><Th>No.</Th><Th>Customer</Th><Th>Project / subject</Th><Th>Date</Th><Th>{dateCol}</Th><Th className="text-right">Amount (AED)</Th><Th>Status</Th></tr></thead>
     <tbody className="divide-y divide-border">{rows.map(r => <tr key={r.id}>
       <Td className="whitespace-nowrap"><Link href={`/invoices/${r.id}`} className="font-medium text-primary hover:underline">{r.number}</Link></Td>

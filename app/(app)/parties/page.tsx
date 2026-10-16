@@ -93,7 +93,7 @@ export default async function Parties({ searchParams }: { searchParams: Promise<
         {!data?.length ? <EmptyState icon={Handshake} title={q ? 'No matches' : `No ${isC ? 'clients' : 'suppliers'} yet`} body="Add the companies you trade with so cheques, invoices and projects can be linked to them." /> :
           <><MList>{data.map(p => { const e = per.get(p.id); return <MRow key={p.id} href={isC ? `/parties/${p.id}` : undefined}
             lead={<span className={cn('grid h-11 w-11 place-items-center rounded-xl text-[13px] font-bold', tint(p.name))} aria-hidden>{initials(p.name)}</span>}
-            title={<span className="text-primary">{p.name}</span>} sub={[p.contact_person, p.phone].filter(Boolean).join(' · ') || p.email || '—'}
+            title={p.name} sub={[p.contact_person, p.phone].filter(Boolean).join(' · ') || p.email || '—'}
             right={isC && fin ? (e?.overdue ? <Badge tone="red">Overdue</Badge> : e?.owed ? <Badge tone="amber">Balance due</Badge> : e ? <Badge tone="green">Active</Badge> : <Badge tone="blue">Prospect</Badge>) : undefined}
             rightSub={isC && fin && e ? `AED ${fmtMoney(e.sales)}` : undefined} /> })}</MList>
           <div className="hidden sm:block"><TableWrap><thead><tr><Th>Company</Th><Th>Contact person</Th><Th>Phone</Th><Th>Email</Th>{isC && fin ? <><Th className="text-right">Total sales (AED)</Th><Th>Status</Th></> : <Th>TRN</Th>}{isC && <Th><span className="sr-only">Preview</span></Th>}</tr></thead><tbody className="divide-y divide-border">
