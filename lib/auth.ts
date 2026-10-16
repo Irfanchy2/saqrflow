@@ -40,7 +40,14 @@ export const getCtx = cache(async (): Promise<Ctx> => {
     sid ? supabase.rpc('touch_session', { p_sid: sid, p_ip: ip, p_ua: ua }) : Promise.resolve({ data: false }),
   ])
   if (touch.data === true) redirect('/auth/signout?reason=revoked')   // this device was signed out from another device / by an admin
-  if (!row) redirect('/onboarding')
+  if (!row) {
+    // The database hides company data from a session that has not finished two-step verification (an authenticator was
+    // enrolled on another device after this session began, so the middleware could not tell yet): ask for the code.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    const { data: f } = aal?.currentLevel === 'aal2' ? { data: null } : await supabase.auth.mfa.listFactors()
+    if (f?.totp?.some(x => x.status === 'verified')) redirect('/login/mfa')
+    redirect('/onboarding')
+  }
   const company = (Array.isArray(row.company) ? row.company[0] : row.company) as Ctx['company'] | null
   if (!company) redirect('/onboarding')
   const role = row.role as Role

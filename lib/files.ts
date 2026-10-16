@@ -36,6 +36,22 @@ export function validateUpload(file: { name: string; size: number; type: string 
   return { ok: true, mime, ext }
 }
 export const sha256Hex = (buf: Uint8Array) => createHash('sha256').update(buf).digest('hex')
+
+/**
+ * Content screening for the file types most used to carry malware (there is no antivirus engine here, so this blocks the
+ * active content instead): Word/Excel files with macros (also .docx/.xlsx renamed from a macro-enabled file) and PDFs that
+ * launch programs. Returns a message for the user, or null when the file is acceptable. Best effort: content inside
+ * compressed PDF object streams is not inspected.
+ */
+export function scanUpload(buf: Uint8Array, mime: string): string | null {
+  const b = Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength)
+  const has = (s: string, enc: BufferEncoding = 'latin1') => b.indexOf(Buffer.from(s, enc)) !== -1
+  if (mime.includes('openxmlformats') && (has('vbaProject.bin') || has('vbaData.xml'))) return 'Files with macros are not accepted. Save it as a normal .docx / .xlsx without macros.'
+  if ((mime === 'application/msword' || mime === 'application/vnd.ms-excel') && (has('_VBA_PROJECT', 'utf16le') || has('Macros', 'utf16le') || has('_VBA_PROJECT')))
+    return 'Files with macros are not accepted. Save it as .docx / .xlsx (or PDF) without macros.'
+  if (mime === 'application/pdf' && /\/Launch\b|\/S\s*\/Launch/.test(b.toString('latin1'))) return 'This PDF tries to start a program when opened, so it was not accepted.'
+  return null
+}
 export function safeFileName(name: string): string {
   return name.normalize('NFKD').replace(/[^\w.\- ]+/g, '_').replace(/\.{2,}/g, '.').replace(/^\.+/, '').slice(-120) || 'file'
 }

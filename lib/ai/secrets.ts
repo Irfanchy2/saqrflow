@@ -1,4 +1,5 @@
 import 'server-only'
+import { auditAction } from '../security'
 import { createAdminClient } from '../supabase/admin'
 import { adminConfigured } from '../env'
 import { decryptSecret, encryptSecret } from '../crypto'
@@ -25,12 +26,13 @@ export async function getSecret(companyId: string | null, name: SecretName): Pro
   cache.set(k, { v, at: Date.now() })
   return v
 }
-export async function saveSecret(companyId: string, name: SecretName, value: string | null) {
+export async function saveSecret(companyId: string, name: SecretName, value: string | null, userId: string | null = null) {
   const admin = createAdminClient()
   cache.delete(`${companyId}:${name}`)
-  if (!value) { await admin.from('integration_secrets').delete().eq('company_id', companyId).eq('name', name); return }
+  if (!value) { await admin.from('integration_secrets').delete().eq('company_id', companyId).eq('name', name); await auditAction(companyId, userId, 'SECRET_REMOVED', 'integration_secrets', { name }); return }
   const { error } = await admin.from('integration_secrets').upsert({ company_id: companyId, name, ciphertext: encryptSecret(value), updated_at: new Date().toISOString() })
   if (error) throw error
+  await auditAction(companyId, userId, 'SECRET_SET', 'integration_secrets', { name, hint: `…${value.slice(-4)}` })
 }
 /** "••••••••xyz7" — never more than the last 4 characters. */
 export function mask(v: string | null | undefined): string | null {

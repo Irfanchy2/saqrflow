@@ -1,6 +1,7 @@
 import 'server-only'
 import type { Ctx } from './auth'
-import { sha256Hex, storagePath, validateUpload } from './files'
+import { scanUpload, sha256Hex, storagePath, validateUpload } from './files'
+import { securityEvent } from './security'
 
 export interface SavedVersion { versionId: string; versionNo: number; duplicateOf: string[] }
 
@@ -9,6 +10,8 @@ export async function saveVersion(c: Ctx, docId: string, file: File, note?: stri
   const buf = new Uint8Array(await file.arrayBuffer())
   const check = validateUpload({ name: file.name, size: file.size, type: file.type }, buf.slice(0, 16))
   if (!check.ok) throw new Error(check.error)
+  const bad = scanUpload(buf, check.mime)
+  if (bad) { await securityEvent('upload_rejected', { companyId: c.company.id, userId: c.userId, detail: `${file.name}: ${bad}` }); throw new Error(bad) }
   const sha = sha256Hex(buf)
 
   // Duplicate detection (same bytes already stored in this company) – warn, don't block.

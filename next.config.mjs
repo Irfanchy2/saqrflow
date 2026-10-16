@@ -1,12 +1,4 @@
-const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-const csp = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'" + (process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''),
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:" + (supabase ? ` ${supabase}` : ''),
-  `connect-src 'self' ${supabase} ${supabase.replace('https://', 'wss://')}`.trim(),
-  "frame-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'self'",
-].join('; ')
+// Content-Security-Policy is set per request in middleware.ts (it carries a fresh script nonce).
 
 /** @type {import('next').NextConfig} */
 export default {
@@ -25,14 +17,16 @@ export default {
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
       { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
       { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+      { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },   // other sites cannot script a window they open of this app
+      { key: 'X-DNS-Prefetch-Control', value: 'off' },
     ]
     return [
       // The file route sets its own (stricter) CSP; a global object-src 'none' would stop the browser PDF viewer.
       { source: '/api/documents/:path*', headers: common },
       { source: '/api/inbox/:path*', headers: common },
       // public enquiry forms (/f/<slug>) may be embedded in the company's own website; everything else stays same-origin only
-      { source: '/f/:path*', headers: [{ key: 'Content-Security-Policy', value: csp.replace("frame-ancestors 'self'", 'frame-ancestors *') }, ...common.filter(h => h.key !== 'X-Frame-Options')] },
-      { source: '/((?!api/documents|api/inbox|f/).*)', headers: [{ key: 'Content-Security-Policy', value: csp }, ...common] },
+      { source: '/f/:path*', headers: common.filter(h => h.key !== 'X-Frame-Options') },
+      { source: '/((?!api/documents|api/inbox|f/).*)', headers: common },
     ]
   },
 }

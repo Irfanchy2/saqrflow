@@ -20,15 +20,19 @@ export default async function SignInActivity({ searchParams }: { searchParams: P
   if (user) ev = ev.eq('user_id', user); if (event) ev = ev.eq('event', event)
   let ss = c.supabase.from('user_sessions').select('id,user_id,ip,user_agent,created_at,last_seen_at').eq('company_id', c.company.id).is('revoked_at', null).gte('last_seen_at', since).order('last_seen_at', { ascending: false }).limit(200)
   if (user) ss = ss.eq('user_id', user)
-  const [{ data: events }, { data: sessions }, { data: people }, failed] = await Promise.all([ev, ss, c.supabase.from('profiles').select('id,full_name').order('full_name'),
-    c.supabase.from('login_events').select('id', { count: 'exact', head: true }).eq('company_id', c.company.id).in('event', ['sign_in_failed', 'mfa_failed']).gte('created_at', week)])
+  const [{ data: events }, { data: sessions }, { data: people }, failed, { data: sec }, alerts] = await Promise.all([ev, ss, c.supabase.from('profiles').select('id,full_name').order('full_name'),
+    c.supabase.from('login_events').select('id', { count: 'exact', head: true }).eq('company_id', c.company.id).in('event', ['sign_in_failed', 'mfa_failed']).gte('created_at', week),
+    // security events (RLS: this company, admins only): locked sign-ins, refused actions, rejected keys and uploads, new devices
+    c.supabase.from('security_events').select('id,user_id,kind,detail,ip,created_at').order('created_at', { ascending: false }).limit(100),
+    c.supabase.from('security_events').select('id', { count: 'exact', head: true }).neq('kind', 'new_device').gte('created_at', week)])
   const who = new Map((people ?? []).map(p => [p.id, p.full_name as string]))
   const byUser = new Map<string, number>(); for (const s of sessions ?? []) byUser.set(s.user_id, (byUser.get(s.user_id) ?? 0) + 1)
   return <>
     <Link href="/users" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} className="rtl:rotate-180" />User management</Link>
     <PageHeader title="Sign-in activity" sub={`Signed-in devices (active in the last ${ACTIVE_DAYS} days) and the sign-in history of everyone in ${c.company.name}.`} />
-    <Metrics cols={3} className="mb-5"><StatCard label="Signed-in devices" value={(sessions ?? []).length} /><StatCard label="People signed in" value={byUser.size} />
-      <StatCard label="Failed attempts (7 days)" value={failed.count ?? 0} tone={(failed.count ?? 0) > 0 ? 'red' : 'neutral'} href="/users/activity?event=sign_in_failed" /></Metrics>
+    <Metrics cols={4} className="mb-5"><StatCard label="Signed-in devices" value={(sessions ?? []).length} /><StatCard label="People signed in" value={byUser.size} />
+      <StatCard label="Failed attempts (7 days)" value={failed.count ?? 0} tone={(failed.count ?? 0) > 0 ? 'red' : 'neutral'} href="/users/activity?event=sign_in_failed" />
+      <StatCard label="Security events (7 days)" value={alerts.count ?? 0} tone={(alerts.count ?? 0) > 0 ? 'red' : 'neutral'} href="#security-events" hint="Locks, refused actions, rejected keys" /></Metrics>
     <form className="mb-4 flex flex-wrap items-end gap-2" method="get">
       <label className="text-sm"><span className="mb-1 block text-xs text-muted">Person</span><Select name="user" defaultValue={user ?? ''} className="w-56"><option value="">Everyone</option>{(people ?? []).map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}</Select></label>
       <label className="text-sm"><span className="mb-1 block text-xs text-muted">Event</span><Select name="event" defaultValue={event ?? ''} className="w-56"><option value="">All events</option>{Object.entries(LOGIN_EVENT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select></label>
@@ -48,5 +52,18 @@ export default async function SignInActivity({ searchParams }: { searchParams: P
             <Td><Badge tone={LOGIN_EVENT[e.event]?.tone}>{LOGIN_EVENT[e.event]?.label ?? e.event}</Badge>{e.detail && <span className="ms-2 text-xs text-muted">{e.detail}</span>}</Td>
             <Td className="text-xs">{e.user_agent ? deviceLabel(e.user_agent) : '—'}</Td><Td className="font-mono text-xs">{e.ip ?? '—'}</Td></tr>)}
             {!(events ?? []).length && <tr><Td colSpan={5} className="text-muted">Nothing recorded yet.</Td></tr>}</tbody></table></div></Card>
-    </div></>
+    </div>
+    <Card className="mt-5" id="security-events"><CardHeader title="Security events" sub="Latest 100: locked sign-ins, refused actions, rejected API keys, webhook signatures and uploads, new devices. Admins are alerted when something repeats." />
+      <div className="overflow-x-auto"><table className="w-full min-w-[640px]"><thead><tr><Th>When</Th><Th>What</Th><Th>Who</Th><Th>Details</Th><Th>IP</Th></tr></thead>
+        <tbody>{(sec ?? []).map(e => <tr key={e.id}><Td className="whitespace-nowrap text-xs tabular-nums text-muted">{fmtWhen(e.created_at, c.company.timezone)}</Td>
+          <Td><Badge tone={SECURITY_KIND[e.kind]?.tone ?? 'neutral'}>{SECURITY_KIND[e.kind]?.label ?? e.kind}</Badge></Td>
+          <Td>{e.user_id ? who.get(e.user_id) ?? 'Former user' : <span className="text-muted">—</span>}</Td>
+          <Td className="max-w-[420px] text-xs text-muted [overflow-wrap:anywhere]">{e.detail ?? '—'}</Td><Td className="font-mono text-xs">{e.ip ?? '—'}</Td></tr>)}
+          {!(sec ?? []).length && <tr><Td colSpan={5} className="text-muted">No security events recorded.</Td></tr>}</tbody></table></div></Card></>
+}
+
+const SECURITY_KIND: Record<string, { label: string; tone: 'red' | 'amber' | 'neutral' | 'blue' }> = {
+  sign_in_locked: { label: 'Sign-in locked', tone: 'red' }, permission_denied: { label: 'Action refused', tone: 'amber' }, api_key_rejected: { label: 'API key rejected', tone: 'red' },
+  webhook_signature_rejected: { label: 'Bad webhook signature', tone: 'red' }, upload_rejected: { label: 'Upload blocked', tone: 'amber' }, rate_limited: { label: 'Rate limited', tone: 'amber' },
+  new_device: { label: 'New device', tone: 'blue' }, mfa_failed: { label: 'Wrong two-step code', tone: 'amber' }, sign_in_failed: { label: 'Failed sign-in', tone: 'amber' },
 }

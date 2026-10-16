@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { getCtx, need } from '@/lib/auth'
 import { safe, str } from '@/lib/action'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { auditAction } from '@/lib/security'
 import { encryptSecret } from '@/lib/crypto'
 import { parseOffsets } from '@/lib/reminders/schedule'
 import { ROLES, type Role } from '@/lib/permissions'
@@ -49,12 +50,13 @@ export async function saveWhatsApp(_: ActionState, fd: FormData): Promise<Action
     if (token) {
       if (!process.env.SETTINGS_ENCRYPTION_KEY) return { error: 'Cannot store the token: SETTINGS_ENCRYPTION_KEY is not set on the server. Set it, or provide WHATSAPP_ACCESS_TOKEN as an environment variable instead.' }
       const { error } = await createAdminClient().from('integration_secrets').upsert({ company_id: c.company.id, name: 'whatsapp_token', ciphertext: encryptSecret(token), updated_at: new Date().toISOString() }); if (error) throw error
+      await auditAction(c.company.id, c.userId, 'SECRET_SET', 'integration_secrets', { name: 'whatsapp_token', hint: `…${token.slice(-4)}` })
     }
     revalidatePath('/settings'); revalidatePath('/reminders'); return { ok: true, message: token ? 'Saved. The token is encrypted and can never be displayed again.' : 'Saved.' }
   })
 }
 export async function clearWhatsAppToken(): Promise<ActionState> {
-  return safe(async () => { const c = await getCtx(); need(c, 'settings.manage'); await createAdminClient().from('integration_secrets').delete().eq('company_id', c.company.id).eq('name', 'whatsapp_token'); revalidatePath('/settings'); return { ok: true, message: 'Stored token removed.' } })
+  return safe(async () => { const c = await getCtx(); need(c, 'settings.manage'); await createAdminClient().from('integration_secrets').delete().eq('company_id', c.company.id).eq('name', 'whatsapp_token'); await auditAction(c.company.id, c.userId, 'SECRET_REMOVED', 'integration_secrets', { name: 'whatsapp_token' }); revalidatePath('/settings'); return { ok: true, message: 'Stored token removed.' } })
 }
 export async function setLocale(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {

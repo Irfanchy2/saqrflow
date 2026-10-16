@@ -4,7 +4,8 @@ import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Ctx } from '@/lib/auth'
 import { localDate } from '@/lib/time'
-import { safeFileName, sha256Hex, validateUpload } from '@/lib/files'
+import { safeFileName, scanUpload, sha256Hex, validateUpload } from '@/lib/files'
+import { securityEvent } from '@/lib/security'
 import { UNKNOWN_TYPE } from '@/lib/inbox/catalog'
 
 /**
@@ -104,6 +105,8 @@ export async function storeLinkUpload(r: ResolvedLink, f: File, note: string, ow
   const buf = new Uint8Array(await f.arrayBuffer())
   const chk = validateUpload({ name: f.name, size: f.size, type: f.type }, buf.slice(0, 16))
   if (!chk.ok) return { error: `${f.name}: ${chk.error}` }
+  const bad = scanUpload(buf, chk.mime)
+  if (bad) { await securityEvent('upload_rejected', { companyId: r.company.id, detail: `${f.name} (via secure link): ${bad}` }); return { error: `${f.name}: ${bad}` } }
   const id = crypto.randomUUID(), sha = sha256Hex(buf)
   const path = `${r.company.id}/inbox/${id}/${safeFileName(f.name)}`
   const up = await r.admin.storage.from('vault').upload(path, buf, { contentType: chk.mime, upsert: false })
