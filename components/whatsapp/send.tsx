@@ -32,7 +32,7 @@ export function WhatsAppSend({ kind, recordId, label = 'WhatsApp', variant = 'se
   const blocked = !prep || prep.optedOut || (!custom && !prep.templateReady)
   return <>
     {trigger ? trigger(open) : <Button type="button" variant={variant} size={size} onClick={open} aria-label={ariaLabel ?? (size === 'icon' ? `Send ${label} via WhatsApp` : undefined)}><MessageCircle size={14} />{size !== 'icon' && label}</Button>}
-    <dialog ref={ref} onClick={e => { if (e.target === ref.current) ref.current?.close() }} data-wa-dialog
+    <dialog ref={ref} onClick={e => { if (e.target === ref.current) ref.current?.close() }} data-wa-dialog data-row-stop
       className="mx-0 mb-0 mt-auto max-h-[92dvh] w-full max-w-none flex-col rounded-t-2xl border border-border bg-surface p-0 text-fg shadow-pop open:flex sm:m-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-2xl">
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5 sm:px-5 sm:py-3">
         <h2 className="text-[15px] font-semibold">Send via WhatsApp{prep ? `: ${prep.label}` : ''}</h2>

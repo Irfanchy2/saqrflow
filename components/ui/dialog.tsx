@@ -1,5 +1,6 @@
 'use client'
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from '@/components/icons'
 import { Button } from './primitives'
 import type { VariantProps } from 'class-variance-authority'
@@ -34,9 +35,9 @@ export function DialogButton({ label, title, children, icon, variant = 'primary'
   }, [openParam])
   return <>
     <Button variant={variant} size={size} onClick={() => ref.current?.showModal()}>{icon}{label}</Button>
-    <dialog ref={ref} onClick={e => { if (e.target === ref.current) ref.current?.close() }}
+    <dialog ref={ref} onClick={e => { if (e.target === ref.current) ref.current?.close() }} data-row-stop
       data-drawer={wide ? '' : undefined}
-      className={`mx-0 mb-0 mt-auto max-h-[92dvh] w-full max-w-none flex-col rounded-t-2xl text-start border border-border/80 bg-surface p-0 text-fg shadow-pop open:flex sm:m-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:rounded-2xl ${wide ? 'sm:max-w-2xl lg:my-0 lg:me-0 lg:ms-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[min(680px,100vw)] lg:max-w-[680px] lg:rounded-none lg:border-y-0 lg:border-e-0' : 'sm:max-w-lg'}`}>
+      className={dialogCls(wide)}>
       {/* phones: a grab handle says "this is a sheet" */}
       <span aria-hidden className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-border-strong/80 sm:hidden" />
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 pb-3 pt-2 sm:px-6 sm:py-4">
@@ -46,4 +47,26 @@ export function DialogButton({ label, title, children, icon, variant = 'primary'
       <Ctx.Provider value={{ close: () => ref.current?.close() }}><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">{children}</div></Ctx.Provider>
     </dialog>
   </>
+}
+
+const dialogCls = (wide?: boolean) => `mx-0 mb-0 mt-auto max-h-[92dvh] w-full max-w-none flex-col rounded-t-2xl text-start border border-border/80 bg-surface p-0 text-fg shadow-pop open:flex sm:m-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:rounded-2xl ${wide ? 'sm:max-w-2xl lg:my-0 lg:me-0 lg:ms-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[min(680px,100vw)] lg:max-w-[680px] lg:rounded-none lg:border-y-0 lg:border-e-0' : 'sm:max-w-lg'}`
+
+/**
+ * The same sheet / dialog as DialogButton, opened from anywhere (a menu item, a row action): render it while `open`.
+ * Rendered into <body>, so clicks inside never reach a clickable table row behind it.
+ */
+export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  useEffect(() => { if (mounted && !ref.current?.open) ref.current?.showModal() }, [mounted])
+  if (!mounted) return null
+  return createPortal(<dialog ref={ref} data-row-stop onClose={onClose} onClick={e => { if (e.target === ref.current) ref.current?.close() }} className={dialogCls(wide)}>
+    <span aria-hidden className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-border-strong/80 sm:hidden" />
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 pb-3 pt-2 sm:px-6 sm:py-4">
+      <h2 className="min-w-0 text-[16px] font-semibold tracking-[-0.018em]">{title}</h2>
+      <button type="button" aria-label="Close" className="-me-1.5 grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-fg/[.05] hover:text-fg active:scale-95 sm:h-8 sm:w-8" onClick={() => ref.current?.close()}><X size={18} /></button>
+    </div>
+    <Ctx.Provider value={{ close: () => ref.current?.close() }}><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">{children}</div></Ctx.Provider>
+  </dialog>, document.body)
 }

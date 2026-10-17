@@ -37,6 +37,9 @@ export async function POST(req: NextRequest) {
     if (s.status === 'delivered' || s.status === 'read') patch.delivered_at = new Date(Number(s.timestamp ?? Date.now() / 1000) * 1000).toISOString()
     if (next === 'failed') patch.last_error = s.error ?? 'Delivery failed (reported by WhatsApp)'
     await admin.from('notification_logs').update(patch).eq('id', log.id)
+    // a tax invoice read on WhatsApp counts as viewed by the customer (document status "Viewed")
+    if (s.status === 'read' && log.record_type === 'invoice' && log.record_id)
+      await admin.from('invoices').update({ viewed_at: patch.delivered_at as string }).eq('id', log.record_id).eq('company_id', log.company_id).eq('doc_type', 'invoice').is('viewed_at', null)
     if (next === 'failed' && !log.fallback_of && log.recipient_id) {      // accepted by Meta but not deliverable → email fallback
       const { data: st } = await admin.from('app_settings').select('value').eq('company_id', log.company_id).eq('key', 'reminders.email_fallback').maybeSingle()
       const r = await store.recipient(log.recipient_id)

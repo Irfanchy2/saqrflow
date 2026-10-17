@@ -11,7 +11,7 @@ import { projectFinancials, projectPaymentSummary } from './projects'
 /** Sales documents, payments against them, advances on account and costs: everything the money figures are made of. */
 export const projectMoney = cache(async (c: Ctx, id: string, contract: number | string | null) => {
   const [{ data: sales }, { data: invPays }, { data: adv }, { data: exps }] = await Promise.all([
-    c.supabase.from('invoices').select('id,doc_type,number,status,total,vat_amount,issue_date,created_at').eq('project_id', id).order('issue_date', { ascending: false }),
+    c.supabase.from('invoice_list').select('id,doc_type,number,status,total,vat_amount,issue_date,due_date,created_at,doc_status,payment_status').eq('project_id', id).order('issue_date', { ascending: false }),
     // payments against this project's invoices (same sum as invoice_balances.paid, without scanning every payment)
     c.supabase.from('payments').select('id,amount,paid_on,method,reference,notes,created_at,invoice_id,invoice:invoices!inner(id,number,project_id)').eq('invoice.project_id', id).order('paid_on', { ascending: false }).limit(300),
     c.supabase.from('payments').select('id,amount,paid_on,method,reference,notes,created_at,invoice_id,invoice:invoices(id,number)').eq('project_id', id).order('paid_on', { ascending: false }).limit(300),

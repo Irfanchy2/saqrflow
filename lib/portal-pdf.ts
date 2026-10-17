@@ -18,6 +18,8 @@ export async function linkPdf(r: ResolvedLink, id: string) {
   if (!built) return NF()
   await logLinkEvent(r, 'downloaded', d.number)
   await r.admin.from('sales_doc_events').insert({ company_id: r.company.id, invoice_id: id, event: 'downloaded', detail: 'through a secure link', user_id: null })
+  // the customer has the invoice: document status "Viewed" (first time only)
+  if (d.doc_type === 'invoice') await r.admin.from('invoices').update({ viewed_at: new Date().toISOString() }).eq('id', id).is('viewed_at', null)
   return new NextResponse(built.bytes as BodyInit, { headers: {
     'Content-Type': 'application/pdf', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'X-Robots-Tag': 'noindex',
     'Content-Disposition': `inline; filename="${built.name.replace(/[^\w .()-]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(built.name)}`,

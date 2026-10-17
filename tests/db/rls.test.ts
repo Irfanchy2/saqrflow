@@ -969,3 +969,58 @@ describe('security hardening (0023)', () => {
     await fails(as(U.ownerA, `insert into security_events(company_id, kind) values ($1, 'x')`, [A]), /row-level security|permission denied/)
   })
 })
+
+describe('invoice document status and payment status (0024)', () => {
+  const row = async (uid: string, id: string) => (await as(uid, `select doc_status, payment_status, paid::float, credited::float, balance::float from invoice_list where id = $1`, [id])).rows[0]
+  let inv: string, cust: string
+  beforeAll(async () => {
+    cust = (await as(U.accA, `insert into customers(company_id,name) values ($1,'Status Test LLC') returning id`, [A])).rows[0].id
+    inv = (await as(U.accA, `insert into invoices(company_id,doc_type,number,total,status,due_date,customer_id) values ($1,'invoice','INV-ST-1',1000,'draft','2099-01-01',$2) returning id`, [A, cust])).rows[0].id
+  })
+
+  it('the SQL rules match the app (never paid without a payment)', async () => {
+    const st = async (...a: unknown[]) => (await sup(`select invoice_payment_status($1,$2,$3,$4,$5,$6) s`, a)).rows[0].s
+    expect(await st('draft', 100, 0, 0, null, '2026-10-16')).toBeNull()
+    expect(await st('cancelled', 100, 0, 0, null, '2026-10-16')).toBeNull()
+    expect(await st('sent', 100, 0, 0, '2026-10-16', '2026-10-16')).toBe('unpaid')
+    expect(await st('sent', 100, 0, 0, '2026-10-15', '2026-10-16')).toBe('overdue')
+    expect(await st('sent', 100, 40, 0, null, '2026-10-16')).toBe('partially_paid')
+    expect(await st('partially_paid', 100, 40, 0, '2026-10-01', '2026-10-16')).toBe('overdue')
+    expect(await st('sent', 100, 100, 0, '2026-01-01', '2026-10-16')).toBe('paid')
+    expect(await st('paid', 100, 0, 0, null, '2026-10-16')).toBe('unpaid')          // a stored "paid" without money is not paid
+    expect(await st('paid', 100, 0, 100, null, '2026-10-16')).toBe('credited')      // settled by credit notes only
+    expect(await st('paid', 100, 70, 30, null, '2026-10-16')).toBe('paid')
+  })
+
+  it('draft → sent → partly paid → paid → payments detached (kept on account) → unpaid', async () => {
+    expect(await row(U.accA, inv)).toMatchObject({ doc_status: 'draft', payment_status: null, balance: 1000 })
+    await as(U.accA, `update invoices set status = 'sent' where id = $1`, [inv])
+    expect(await row(U.accA, inv)).toMatchObject({ doc_status: 'sent', payment_status: 'unpaid' })
+    const p1 = (await as(U.accA, `insert into payments(company_id,invoice_id,amount,method) values ($1,$2,400,'cash') returning id`, [A, inv])).rows[0].id
+    expect(await row(U.accA, inv)).toMatchObject({ payment_status: 'partially_paid', paid: 400, balance: 600 })
+    await as(U.accA, `insert into payments(company_id,invoice_id,amount,method) values ($1,$2,600,'bank_transfer')`, [A, inv])
+    expect(await row(U.accA, inv)).toMatchObject({ payment_status: 'paid', balance: 0 })
+    expect((await sup(`select status from invoices where id = $1`, [inv])).rows[0].status).toBe('paid')
+    // "Mark as unpaid" (keep as credit): the payments stay recorded for the customer, the invoice is unpaid again
+    await as(U.accA, `update payments set invoice_id = null where invoice_id = $1`, [inv])
+    expect(await row(U.accA, inv)).toMatchObject({ payment_status: 'unpaid', paid: 0, balance: 1000 })
+    const kept = (await sup(`select count(*)::int n, sum(amount)::float s from payments where customer_id = $1 and invoice_id is null`, [cust])).rows[0]
+    expect(kept).toEqual({ n: 2, s: 1000 })
+    expect((await sup(`select status from invoices where id = $1`, [inv])).rows[0].status).toBe('sent')
+    await as(U.accA, `update payments set invoice_id = $2 where id = $1`, [p1, inv])   // re-applied later
+    expect(await row(U.accA, inv)).toMatchObject({ payment_status: 'partially_paid', paid: 400 })
+  })
+
+  it('viewed and overdue are derived, not stored statuses', async () => {
+    await as(U.accA, `update invoices set viewed_at = now(), due_date = '2020-01-01' where id = $1`, [inv])
+    expect(await row(U.accA, inv)).toMatchObject({ doc_status: 'viewed', payment_status: 'overdue' })
+    expect((await sup(`select status from invoices where id = $1`, [inv])).rows[0].status).toBe('partially_paid')
+  })
+
+  it('the list view is tenant-isolated and permission-checked', async () => {
+    expect((await as(U.ownerB, `select * from invoice_list where id = $1`, [inv])).rows).toHaveLength(0)
+    expect((await as(U.empA, `select * from invoice_list where id = $1`, [inv])).rows).toHaveLength(0)   // no finance access
+    await fails(as(null, `select * from invoice_list`, [], 'anon'), /permission denied/)
+    expect((await as(U.ownerA, `select company_today() d`)).rows[0].d).toBeInstanceOf(Date)
+  })
+})

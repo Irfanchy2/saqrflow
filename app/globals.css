@@ -63,6 +63,9 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 @keyframes shimmer { 100% { transform: translateX(100%); } }
 .skeleton { @apply relative overflow-hidden rounded-md bg-surface-2; }
 .skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .055) 50%, transparent); animation: shimmer 1.6s cubic-bezier(.4,0,.2,1) infinite; }
+/* Overdue payment badge: a soft ring that pulses a few times when it appears, then stays still (never blinks). */
+@keyframes due-pulse { 0% { box-shadow: 0 0 0 0 hsl(var(--danger) / .4); } 70%, 100% { box-shadow: 0 0 0 5px hsl(var(--danger) / 0); } }
+.due-pulse { animation: due-pulse 2.2s ease-out 3; }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
 /* KPI card (StatCard): stacked when narrow; from 250 px wide the icon tile sits on the left and the bars bottom-right */
 .kpi { container-type: inline-size; }
