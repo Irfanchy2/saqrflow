@@ -5,21 +5,24 @@ import { clearDraft, draftAge, readDraft, writeDraft } from '@/lib/drafts'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle,
+  ArrowDown, ArrowLeft, ArrowUp, Banknote, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle,
   MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, HardHat, Wallet,
 } from '@/components/icons'
 import { SalesPaper, docDiscount, vatOn, type Branding, type PaperItem } from './paper'
 import { FitPaper } from './preview'
 import { RichTextField } from './rich-field'
+import { UnitPicker } from './unit-picker'
+import { InvoiceStatus } from './status-badges'
+import type { DocState, PayState } from '@/lib/sales/status'
 import { CustomerPicker, type CustomerOpt } from './customer-picker'
 import { CatalogPicker, type CatalogOpt } from './catalog-picker'
 import { Badge, Button, Input, SEG, Select, Textarea, segItem } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { APPROVAL_LABEL, APPROVAL_TONE, CONVERSIONS, DOC_META, STATUS_TONE, UNITS, isTaxDoc, manualStatuses, statusLabel, type SalesType } from '@/lib/sales/docs'
+import { APPROVAL_LABEL, APPROVAL_TONE, CONVERSIONS, DOC_META, STATUS_TONE, isTaxDoc, manualStatuses, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { VAT_CATEGORIES, amountInWords, computeTotals, fmtMoney, lineAmount } from '@/lib/sales/money'
 import {
-  archivePdfToVault, convertSalesDoc, createDeliveryNote, deleteSalesDraft, duplicateSalesDoc, logSalesEvent, projectAdvanceInfo, renumberDraft, requestApproval, saveSalesDoc, setSalesStatus, type SalesDocInput,
+  archivePdfToVault, convertSalesDoc, createDeliveryNote, deleteSalesDraft, duplicateSalesDoc, logSalesEvent, markInvoiceViewed, projectAdvanceInfo, renumberDraft, requestApproval, saveSalesDoc, setSalesStatus, type SalesDocInput,
 } from '@/app/actions/sales'
 import type { ActionState } from '@/lib/utils'
 import { createProjectFromQuotation, createWorkOrderFromQuotation } from '@/app/actions/operations'
@@ -45,10 +48,12 @@ function ago(ts: number | null, now: number) {
   return s < 10 ? 'Saved just now' : s < 60 ? `Saved ${Math.floor(s / 5) * 5} seconds ago` : s < 3600 ? `Saved ${Math.floor(s / 60)} min ago` : 'Saved'
 }
 
-export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false }: {
+export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false, statusView }: {
   doc: Record<string, any>; items: (PaperItem & { id?: string })[]; branding: Branding; paid: number; customers: CustomerOpt[]; projects: ProjectOpt[]
   catalog: CatalogOpt[]; templates: TemplateOpt[]; salespeople: { id: string; full_name: string }[]; delivery: Record<string, { ordered: number; delivered: number }>
   editable: boolean; lockedReason?: string | null; canStatus: boolean; canDelete: boolean; canVault: boolean; requireApproval: boolean; canRenumber?: boolean
+  /** invoices: document status and payment status, shown side by side ("Sent | Unpaid") instead of one combined status */
+  statusView?: { doc: DocState; pay: PayState | null; daysLate: number }
 }) {
   const t = doc.doc_type as SalesType, meta = DOC_META[t], isTax = isTaxDoc(t), isInv = t === 'invoice', isQtn = t === 'quotation', isDn = t === 'delivery_note', isCn = t === 'credit_note'
   const draft = doc.status === 'draft'
@@ -241,12 +246,14 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   ] : []
 
   const waMain = waKinds[0]
+  const payJump = !!statusView && !['draft', 'cancelled'].includes(doc.status)
   return <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
     {/* phones: the two things people do with a finished document, always within thumb reach */}
     <div className="dock no-print fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-nav flex gap-2 border-t border-border bg-surface/95 p-3 backdrop-blur-md lg:hidden">
       {waMain && <WhatsAppSend kind={waMain[0]} recordId={doc.id} label={waMain[1]}
-        trigger={open => <button type="button" aria-label={`Send ${waMain[1] === 'WhatsApp' ? meta.label.toLowerCase() : waMain[1].toLowerCase()} via WhatsApp`} onClick={() => (dirty ? save(open) : open())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#16a34a] text-[15px] font-semibold text-white active:scale-[.99]"><MessageCircle size={18} aria-hidden /><span className="whitespace-nowrap"><span className="max-[379px]:hidden">Send via </span>WhatsApp</span></button>} />}
-      <button type="button" onClick={() => (dirty ? save(download) : download())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-[1.5px] border-primary text-[15px] font-semibold text-primary active:scale-[.99]"><Download size={18} aria-hidden /><span className="whitespace-nowrap">Download PDF</span></button>
+        trigger={open => <button type="button" aria-label={`Send ${waMain[1] === 'WhatsApp' ? meta.label.toLowerCase() : waMain[1].toLowerCase()} via WhatsApp`} onClick={() => (dirty ? save(open) : open())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#16a34a] text-[15px] font-semibold text-white active:scale-[.99]"><MessageCircle size={18} aria-hidden /><span className="whitespace-nowrap"><span className={payJump ? 'hidden' : 'max-[379px]:hidden'}>Send via </span>WhatsApp</span></button>} />}
+      <button type="button" onClick={() => (dirty ? save(download) : download())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-[1.5px] border-primary text-[15px] font-semibold text-primary active:scale-[.99]"><Download size={18} aria-hidden /><span className="whitespace-nowrap">{payJump ? 'PDF' : 'Download PDF'}</span></button>
+      {payJump && <a href="#payment" className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-primary text-[15px] font-semibold text-primary-fg active:scale-[.99]" data-pay-jump><Banknote size={18} aria-hidden /><span className="whitespace-nowrap">Payment</span></a>}
     </div>
     {/* toolbar */}
     <div className="no-print sticky top-16 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-surface/90 px-4 py-2.5 backdrop-blur sm:px-6">
@@ -255,7 +262,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
       {/* phones: back · title on the first row, the view switch and tools on a full second row */}
       <div className="min-w-0 flex-1 leading-tight lg:flex-none">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><h1 className="min-w-0 truncate text-[15px] font-semibold sm:text-sm">{meta.label} {doc.number}{doc.revision ? <span className="ms-1 text-muted">Rev.{doc.revision}</span> : null}</h1>
-          <Badge tone={STATUS_TONE[doc.status]}>{statusLabel(t, doc.status)}</Badge>{approval && <Badge tone={APPROVAL_TONE[approval]}>{APPROVAL_LABEL[approval]}</Badge>}</div>
+          {statusView ? <InvoiceStatus doc={statusView.doc} pay={statusView.pay} daysLate={statusView.daysLate} /> : <Badge tone={STATUS_TONE[doc.status]}>{statusLabel(t, doc.status)}</Badge>}{approval && <Badge tone={APPROVAL_TONE[approval]}>{APPROVAL_LABEL[approval]}</Badge>}</div>
         <div className={cn('text-[11px]', errors && editable ? 'text-danger' : 'text-muted')} aria-live="polite" data-testid="save-status">{errors && editable && !saving ? 'Not saved. See the message below' : status}</div>
       </div>
       <div className="ms-auto flex items-center gap-1.5 max-lg:w-full">
@@ -263,6 +270,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
           {(['edit', 'preview'] as const).map(v => <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn(segItem(view === v), 'min-h-9 cursor-pointer capitalize')}>{v === 'edit' ? <PenLine size={13} /> : <Eye size={13} />}{v}</button>)}
         </div>
         {editable && <Button size="sm" onClick={() => save()} disabled={saving || !dirty}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}Save</Button>}
+        {payJump && <a href="#payment" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[13px] font-medium hover:bg-surface-2 max-lg:hidden"><Banknote size={14} />Payment</a>}
         <Button size="sm" variant="secondary" onClick={() => (dirty ? save(openPrint) : openPrint())}><Printer size={14} /><span className="hidden sm:inline">Print</span></Button>
         <Button size="sm" variant="secondary" className="max-lg:hidden" onClick={() => (dirty ? save(download) : download())}><Download size={14} /><span className="hidden sm:inline">PDF</span></Button>
         {waKinds.map(([k, l], n) => <WhatsAppSend key={k} kind={k} recordId={doc.id} label={l}
@@ -279,6 +287,8 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
             <MenuItem icon={ClipboardList} onClick={() => run(() => createWorkOrderFromQuotation(doc.id, tok('work-order')), { saveFirst: true })}>Create work order (and project)</MenuItem>
             {!doc.project_id && <MenuItem icon={HardHat} onClick={() => run(() => createProjectFromQuotation(doc.id), { saveFirst: true })}>Create project</MenuItem>}</>}
           {canStatus && !isCn && <MenuItem icon={Copy} onClick={() => run(() => duplicateSalesDoc(doc.id, tok('duplicate')), { saveFirst: true })}>Duplicate</MenuItem>}
+          {payJump && <MenuItem icon={Banknote} href="#payment">Payments: record, mark paid / unpaid…</MenuItem>}
+          {payJump && canStatus && !doc.viewed_at && <MenuItem icon={Eye} onClick={() => run(() => markInvoiceViewed(doc.id))}>Mark as viewed (customer confirmed)</MenuItem>}
           {statuses.length > 0 && <div className="my-1 border-t border-border" role="separator" />}
           {statuses.map(s => <MenuItem key={s} icon={s === 'cancelled' ? X : CheckCircle2} danger={s === 'cancelled'}
             onClick={() => run(() => setSalesStatus(doc.id, s), { saveFirst: true, confirm: s === 'cancelled' ? `Cancel ${doc.number}? It stays on record but can no longer be edited.` : isCn && s === 'sent' ? `Issue credit note ${doc.number}? It reduces the invoice balance and can no longer be edited.` : undefined })}>
@@ -368,7 +378,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
                 {isQtn && <div className="mt-2"><RichTextField label={`Line ${i + 1} materials`} value={it.materials} onChange={v => setItem(i, { materials: v })} placeholder="Materials to be used (optional)" /></div>}
                 <div className={cn('mt-2 grid gap-2', meta.priced ? 'grid-cols-[1fr_1fr_1.3fr]' : 'grid-cols-2')}>
                   <F label="Qty" small error={err(`items.${i}.quantity`)}><Input type="number" min={0} step="any" inputMode="decimal" value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} /></F>
-                  <F label="Unit" small><Select value={it.unit} onChange={e => setItem(i, { unit: e.target.value })}>{[...new Set([...UNITS, it.unit])].map(u => <option key={u}>{u}</option>)}</Select></F>
+                  <F label="Unit" small><UnitPicker value={it.unit} onChange={u => setItem(i, { unit: u })} ariaLabel={`Line ${i + 1} unit`} /></F>
                   {meta.priced && <F label="Rate (AED)" small error={err(`items.${i}.unit_price`)}><Input type="number" min={0} step="0.01" inputMode="decimal" value={it.unit_price} onChange={e => setItem(i, { unit_price: e.target.value })} /></F>}
                 </div>
                 {meta.priced && <div className="mt-2 grid grid-cols-[1fr_1.3fr] gap-2">

@@ -15,6 +15,7 @@ import { formatAed, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
 import { TabStrip } from '@/components/ui/tab-strip'
+import { InvoicesTab } from './invoices-tab'
 
 export const metadata = { title: 'Sales & Invoices' }
 const TABS = [
@@ -47,7 +48,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
 
     <Metrics className="mb-5" cols={4}>
       <StatCard label="Outstanding receivables" value={formatAed(k.outstanding)} hint={`${k.openCount} open invoice${k.openCount === 1 ? '' : 's'}`} icon={Wallet} tone="blue" href={tabHref('receivables')} />
-      <StatCard label="Overdue" value={formatAed(k.overdue)} hint={k.overdueCount ? `${k.overdueCount} invoice${k.overdueCount === 1 ? '' : 's'} past due` : 'Nothing overdue'} icon={AlertTriangle} tone={k.overdueCount ? 'red' : 'neutral'} href={`${base}?tab=invoice&status=overdue`} />
+      <StatCard label="Overdue" value={formatAed(k.overdue)} hint={k.overdueCount ? `${k.overdueCount} invoice${k.overdueCount === 1 ? '' : 's'} past due` : 'Nothing overdue'} icon={AlertTriangle} tone={k.overdueCount ? 'red' : 'neutral'} href={`${base}?tab=invoice&view=overdue`} />
       <StatCard label="Collected this month" value={formatAed(k.collectedThisMonth)} hint={`Invoiced ${formatAed(k.invoicedThisMonth)}`} icon={Banknote} tone="green" href={tabHref('payments')} />
       <StatCard label="Open quotations" value={formatAed(k.pipeline)} hint={`${k.pipelineCount} open${k.winRate !== null ? ` · ${k.winRate}% win rate` : ''}`} icon={Target} tone="amber" href={`${base}?tab=quotation&status=sent`} />
     </Metrics>
@@ -61,7 +62,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <t.icon size={15} aria-hidden />{t.label}{t.k in counts && <span className={cn('rounded-full px-1.5 text-[11px] tabular-nums sm:rounded-sm sm:bg-surface-2 sm:text-muted', a ? 'bg-white/20' : 'bg-surface-2 text-muted')}>{counts[t.k]}</span>}</Link> })}
     </TabStrip>
 
-    {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'followups' ? <FollowupsTab /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} /> : <DocsTab t={tab as SalesType} sp={sp} edit={edit} />}
+    {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'followups' ? <FollowupsTab /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} /> : tab === 'invoice' ? <InvoicesTab sp={sp} edit={edit} /> : <DocsTab t={tab as SalesType} sp={sp} edit={edit} />}
   </>
 }
 
@@ -136,13 +137,14 @@ async function FollowupsTab() {
 async function PaymentsTab({ sp }: { sp: Record<string, string | undefined> }) {
   const c = await getCtx()
   const page = pageOf(sp.page), edit = c.can('records.edit')
-  const { data, count } = await c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name)', { count: 'exact' }).order('paid_on', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+  const { data, count } = await c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name),customer:customers(id,name),project:projects(id,name)', { count: 'exact' }).order('paid_on', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
   return <Card>{!data?.length ? <EmptyState icon={Banknote} title="No payments yet" body="Open an issued tax invoice and use “Record payment”. Partial payments update the balance and status automatically." />
     : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Invoice</Th><Th>Customer</Th><Th>Method</Th><Th>Reference</Th><Th className="text-right">Amount (AED)</Th>{edit && <Th><span className="sr-only">Send receipt</span></Th>}</tr></thead>
       <tbody className="divide-y divide-border">{data.map((p: any) => <tr key={p.id} className="hover:bg-surface-2/50">
         <Td className="tabular-nums">{p.paid_on}</Td>
-        <Td>{p.invoice ? <Link href={`/invoices/${p.invoice.id}`} className="font-mono text-[13px] text-primary hover:underline">{p.invoice.number}</Link> : '—'}</Td>
-        <Td className="max-w-[220px] truncate">{p.invoice?.customer_name ?? '—'}</Td><Td>{METHOD[p.method] ?? p.method ?? '—'}</Td><Td className="text-muted">{p.reference ?? '—'}</Td>
+        <Td>{p.invoice ? <Link href={`/invoices/${p.invoice.id}`} className="font-mono text-[13px] text-primary hover:underline">{p.invoice.number}</Link>
+          : <span className="text-xs text-muted">{p.project ? <>Project advance · <Link href={`/projects/${p.project.id}?tab=finance`} className="text-primary hover:underline">{p.project.name}</Link></> : 'On account (not applied)'}</span>}</Td>
+        <Td className="max-w-[220px] truncate">{p.invoice?.customer_name ?? (p.customer ? <Link href={`/parties/${p.customer.id}`} className="hover:text-primary hover:underline">{p.customer.name}</Link> : '—')}</Td><Td>{METHOD[p.method] ?? p.method ?? '—'}</Td><Td className="text-muted">{p.reference ?? '—'}</Td>
         <Td className="text-right font-medium tabular-nums text-success">{fmtMoney(p.amount)}</Td>
         {edit && <Td className="text-right"><WhatsAppSend kind="receipt" recordId={p.id} label="Receipt" ariaLabel="Send payment receipt via WhatsApp" variant="ghost" /></Td>}</tr>)}</tbody></TableWrap>}
     <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/invoices" /></Card>

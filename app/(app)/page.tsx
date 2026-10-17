@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { SalesDocBadge } from '@/components/sales/status-badges'
 import { Banknote, CalendarDays, CheckCircle2, FileText, HardHat, Landmark, Receipt, ScrollText, ShieldCheck, Truck, Flag, Users, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, MiniBars, Money, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
@@ -88,6 +89,11 @@ export default async function Dashboard() {
   const [sources, cheques, activity, salesData, monthInv, monthExp, dueSoon, followDue, activeProjects, activeCount, exp30, expired, visas, vehicles, emp, docsAny, people] = await mainP
   const [myTasksRes, apprRes] = await extras
   const [[projMonths, quoteMonths, payYear], [recentE, recentQ, recentI, recentP]] = await Promise.all([histP, recentGroup])
+  // recent invoices show document status and payment status separately ("Sent | Unpaid")
+  const invIds = (recentI?.data ?? []).map((r: any) => r.id)
+  const { data: invSt } = invIds.length ? await sb.from('invoice_list').select('id,doc_status,payment_status').in('id', invIds) : { data: [] as any[] }
+  const stOf = new Map((invSt ?? []).map((x: any) => [x.id, x]))
+  const recentInv = (recentI?.data ?? []).map((r: any) => ({ ...r, ...stOf.get(r.id) }))
   const trend = canFin ? buildTrend(c.today, (monthInv?.data ?? []) as any, (payYear?.data ?? []) as any, (monthExp?.data ?? []) as any) : null
   const myTasks = myTasksRes ? myTasksRes.data ?? [] : null
   const pendingApprovals = apprRes ? (apprRes.data ?? []).filter(a => canDecide(a.entity_type, c.can)).slice(0, 8) : null
@@ -162,7 +168,7 @@ export default async function Dashboard() {
     quick: <Card className="h-full"><CardHeader title="Quick actions" /><QuickGrid can={{ sales: can.sales, crm: c.can('crm.view') && c.can('records.edit'), docs: can.docs, people: can.people, projects: c.can('documents.view') && c.can('records.edit') }} /></Card>,
     recent: canFin && recentQ ? <Card><CardTabs id="recent" action={<CardLink href="/invoices">All documents</CardLink>} tabs={[
       { key: 'q', label: 'Recent quotations', panel: <DocTable rows={recentQ.data ?? []} dateCol="Valid until" date={(r: any) => r.valid_until} empty="No quotations yet" /> },
-      { key: 'i', label: 'Recent invoices', panel: <DocTable rows={recentI?.data ?? []} dateCol="Due" date={(r: any) => r.due_date} empty="No invoices yet" /> },
+      { key: 'i', label: 'Recent invoices', panel: <DocTable rows={recentInv} dateCol="Due" date={(r: any) => r.due_date} empty="No invoices yet" /> },
       { key: 'p', label: 'Recent payments', panel: !(recentP?.data ?? []).length ? <EmptyState compact title="No payments yet" /> : <TableWrap><thead><tr><Th>Date</Th><Th>Received from</Th><Th>Against</Th><Th>Method</Th><Th className="text-right">Amount</Th></tr></thead>
         <tbody className="divide-y divide-border">{(recentP!.data ?? []).map((x: any) => <tr key={x.id}><Td className="whitespace-nowrap tabular-nums">{formatShortDate(x.paid_on)}</Td>
           <Td className="max-w-[240px] truncate font-medium">{x.invoice?.customer_name ?? x.customer?.name ?? '—'}</Td>
@@ -289,5 +295,5 @@ function DocTable({ rows, dateCol, date, empty }: { rows: any[]; dateCol: string
       <Td className="whitespace-nowrap tabular-nums text-muted">{formatShortDate(r.issue_date)}</Td>
       <Td className="whitespace-nowrap tabular-nums text-muted">{date(r) ? formatShortDate(date(r)!) : '—'}</Td>
       <Td className="text-right font-medium tabular-nums">{fmtMoney(r.total)}</Td>
-      <Td badge><Badge tone={STATUS_TONE[r.status]}>{statusLabel(r.doc_type, r.status)}</Badge></Td></tr>)}</tbody></TableWrap>
+      <Td badge><SalesDocBadge r={r} /></Td></tr>)}</tbody></TableWrap>
 }

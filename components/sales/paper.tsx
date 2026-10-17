@@ -3,7 +3,7 @@
 // Layout is in millimetres on a fixed 210 mm canvas; print rules live in app/globals.css (".sales-paper").
 import { memo } from 'react'
 import { amountInWords, computeTotals, fmtMoney, lineAmount, lineVat, VAT_CATEGORIES, type VatCategory } from '@/lib/sales/money'
-import { DOC_META, isTaxDoc, type SalesType } from '@/lib/sales/docs'
+import { DOC_META, fmtQty, isTaxDoc, type SalesType } from '@/lib/sales/docs'
 import { resolveTemplate, templateKind, type TemplateKind } from '@/lib/sales/template'
 import { RichBlocks } from './rich-text'
 
@@ -125,7 +125,7 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
                   {!isDn && (Number(it.discount_pct) > 0 || (it.vat_category && it.vat_category !== 'standard')) && <div className="mt-[0.5mm] text-[11px] italic">
                     {Number(it.discount_pct) > 0 && <>Less {Number(it.discount_pct)}% discount{it.vat_category && it.vat_category !== 'standard' ? ' · ' : ''}</>}
                     {it.vat_category && it.vat_category !== 'standard' && VAT_CATEGORIES[it.vat_category as VatCategory]}</div>}</td>
-                <td className="text-center">{Number(it.quantity || 0)}{it.unit && it.unit !== 'Nos' ? <span className="block text-[11px]">{it.unit}</span> : null}</td>
+                <td className="text-center" data-qty><span className="whitespace-nowrap">{fmtQty(it.quantity)}</span>{it.unit ? <> <span className="whitespace-nowrap" data-unit>{it.unit}</span></> : null}</td>
                 {isDn ? <><td className="paper-hatch" /><td className="paper-hatch" /></>
                   : isInv ? <><td className="text-right">{Number(it.unit_price) ? fmtMoney(it.unit_price) : '—'}</td><td className="text-right">{fmtMoney(amt)}</td><td className="text-right">{fmtMoney(vat)}</td><td className="text-right font-bold">{fmtMoney(amt + vat)}</td></>
                   : <><td className="text-center">{Number(it.unit_price) ? fmtMoney(it.unit_price) : '—'}</td><td className="text-center">{fmtMoney(amt)}</td></>}

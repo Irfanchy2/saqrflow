@@ -114,7 +114,7 @@ try {
   const after = await one(`select i.status, (select count(*)::int from payments where invoice_id=i.id and project_id is not null) linked, (select coalesce(sum(amount),0)::text from payments where invoice_id=i.id) paid from invoices i where i.id=$1`, [iid])
   ok(after.status === 'partially_paid' && after.linked === 1 && after.paid === '15000.00', `issuing links the advance as a payment (status ${after.status}, paid ${after.paid})`)
   await p.reload(); await settle()
-  ok((await body()).includes('Balance AED 6,000.00') && (await body()).includes('Project advance'), 'invoice Payments: balance 6,000 and the row is marked Project advance')
+  ok(/Remaining balance\s*AED\s*6,000\.00/.test(await p.locator('[data-payment-figures]').innerText()) && (await body()).includes('Project advance'), 'invoice Payments: balance 6,000 and the row is marked Project advance')
   const it = await pdfText(`${BASE}/api/sales/${iid}/pdf`)
   ok(/Paid Amount\s+15,000\.00/.test(it) && /incl\. advance 15,000\.00/.test(it) && /Total Balance\s+6,000\.00/.test(it), 'invoice PDF: paid 15,000 incl. advance, balance 6,000')
 
@@ -128,7 +128,7 @@ try {
   await p.getByRole('button', { name: 'Apply project advance' }).click()
   ok(await dlg().getByLabel('Amount to apply (AED) *').inputValue() === '5000.00', 'apply dialog offers the 5,000 available')
   await dlg().getByRole('button', { name: 'Apply advance' }).click(); await settle(1200)
-  ok((await one(`select status from invoices where id=$1`, [iid])).status === 'partially_paid' && (await body()).includes('Balance AED 1,000.00'), 'second advance applied: balance 1,000')
+  ok((await one(`select status from invoices where id=$1`, [iid])).status === 'partially_paid' && /Remaining balance\s*AED\s*1,000\.00/.test(await p.locator('[data-payment-figures]').innerText()), 'second advance applied: balance 1,000')
   await p.getByRole('button', { name: 'Move back' }).first().click(); await settle(1200)
   const mb = await one(`select (select coalesce(sum(amount),0)::text from payments where project_id=$1 and invoice_id is null) un, (select coalesce(sum(amount),0)::text from payments where project_id=$1) total`, [pr])
   ok(Number(mb.un) > 0 && mb.total === '20000.00', `Move back returns an advance to the project; nothing is lost (unapplied ${mb.un}, total ${mb.total})`)

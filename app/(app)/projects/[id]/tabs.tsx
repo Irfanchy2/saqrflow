@@ -1,3 +1,4 @@
+import { SalesDocBadge } from '@/components/sales/status-badges'
 import Link from 'next/link'
 import { AlertTriangle, Camera, CheckCircle2, Circle, ClipboardCheck, ClipboardList, Clock, FileText, ListTodo, Paperclip, Plus, Receipt, Trash2, Upload, UserPlus, Users, Wallet } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
@@ -125,7 +126,7 @@ export async function FinanceTab({ c, p }: { c: Ctx; p: any }) {
             <tbody className="divide-y divide-border">{(sales ?? []).map((s: any) => <tr key={s.id} className="hover:bg-surface-2/50">
               <Td><Link href={`/invoices/${s.id}`} className="font-mono text-[13px] text-primary hover:underline">{s.number}</Link></Td><Td>{DOC_META[s.doc_type as SalesType]?.label}</Td><Td className="tabular-nums">{s.issue_date}</Td>
               <Td className="text-right tabular-nums">{DOC_META[s.doc_type as SalesType]?.priced ? fmtMoney(s.total) : '—'}</Td><Td className="text-right tabular-nums">{s.doc_type === 'invoice' ? fmtMoney(paid.get(s.id) ?? 0) : '—'}</Td>
-              <Td><Badge tone={STATUS_TONE[s.status]}>{statusLabel(s.doc_type, s.status)}</Badge></Td></tr>)}</tbody></TableWrap>}
+              <Td badge><SalesDocBadge r={s} /></Td></tr>)}</tbody></TableWrap>}
       </Card>}
 
       {fin && <Card data-project-payments><CardHeader title="Project payments" sub="Advances and payments from the customer. Recording one creates no invoice and no VAT"

@@ -1,6 +1,8 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
 import { WhatsAppHistory } from '@/components/whatsapp/history'
 import Link from 'next/link'
+import { SalesDocBadge } from '@/components/sales/status-badges'
+import { cn } from '@/lib/utils'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, BookOpen, Clock, FileText, HardHat, Landmark, Mail, MapPin, MessageCircle, Pencil, Phone, Receipt, Target, Trash2, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
@@ -33,7 +35,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   if (!cu) notFound()
   const fin = c.can('finance.view'), edit = c.can('records.edit')
   const [{ data: sales }, { data: projects }, { data: rel }, { data: cheques }, { data: pays }, ledger] = await Promise.all([
-    fin ? c.supabase.from('invoices').select('id,doc_type,number,status,total,issue_date,due_date,created_at').eq('customer_id', id).order('issue_date', { ascending: false }).limit(300) : Promise.resolve({ data: [] as any[] }),
+    fin ? c.supabase.from('invoice_list').select('id,doc_type,number,status,total,issue_date,due_date,created_at,balance,doc_status,payment_status').eq('customer_id', id).order('issue_date', { ascending: false }).limit(300) : Promise.resolve({ data: [] as any[] }),
     c.supabase.from('projects').select('id,name,code,status,contract_value,created_at').eq('customer_id', id).order('created_at', { ascending: false }),
     c.supabase.from('document_relationships').select('role,created_at,document:documents(id,name,created_at,deleted_at)').eq('related_type', 'customer').eq('related_id', id).limit(200),
     fin ? c.supabase.from('cheques').select('id,cheque_no,amount,cheque_date,status,created_at').eq('customer_id', id).order('cheque_date', { ascending: false }).limit(50) : Promise.resolve({ data: [] as any[] }),
@@ -97,8 +99,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               return <tr key={s.id} className="hover:bg-surface-2/50">
                 <Td><Link href={`/invoices/${s.id}`} className="font-mono text-[13px] text-primary hover:underline">{s.number}</Link></Td><Td>{DOC_META[s.doc_type as SalesType]?.label}</Td><Td className="tabular-nums">{s.issue_date}</Td>
                 <Td className="text-right tabular-nums">{DOC_META[s.doc_type as SalesType]?.priced ? fmtMoney(s.total) : '—'}</Td>
-                <Td className="text-right tabular-nums">{b ? fmtMoney(b.balance) : '—'}</Td>
-                <Td><Badge tone={STATUS_TONE[s.status]}>{statusLabel(s.doc_type, s.status)}</Badge></Td></tr> })}</tbody></TableWrap>}
+                <Td className={cn('text-right tabular-nums', s.payment_status === 'overdue' && 'font-medium text-danger')}>{s.doc_type === 'invoice' && s.payment_status ? fmtMoney(s.balance) : b ? fmtMoney(b.balance) : '—'}</Td>
+                <Td badge><SalesDocBadge r={s} /></Td></tr> })}</tbody></TableWrap>}
       </Card>}
       <Card><CardHeader title="Timeline" action={<Clock size={15} className="text-muted" aria-hidden />} />
         {!ev.length ? <p className="px-4 py-5 text-sm text-muted">Nothing yet.</p> : <ol className="max-h-[520px] divide-y divide-border overflow-y-auto text-sm">{ev.map((e, i) => <li key={i}>

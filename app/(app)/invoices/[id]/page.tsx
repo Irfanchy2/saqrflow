@@ -7,11 +7,14 @@ import { APPROVAL_LABEL, DOC_META, STATUS_TONE, statusLabel, type SalesType } fr
 import { fmtMoney } from '@/lib/sales/money'
 import { SalesEditor } from '@/components/sales/editor'
 import { matchesFormat, NUMBER_FORMAT_COLS } from '@/lib/numbering'
-import { Badge, Card, CardHeader, Field, Input, Select, Td, Th, TableWrap, Textarea } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, Field, Input, Money, Select, Td, Th, TableWrap, Textarea } from '@/components/ui/primitives'
+import { InvoiceStatus, PayStatusBadge } from '@/components/sales/status-badges'
+import { InvoicePaymentActions } from '@/components/sales/invoice-actions'
+import { balanceOf, daysOverdue, docState, payState } from '@/lib/sales/status'
+import { cn } from '@/lib/utils'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
-import { addFollowup, applyProjectAdvance, completeFollowup, decideApproval, deletePayment, recordPayment, unapplyProjectAdvance } from '@/app/actions/sales'
-import { ACCEPT_ATTR } from '@/lib/files'
+import { addFollowup, applyProjectAdvance, completeFollowup, decideApproval, deletePayment, unapplyProjectAdvance } from '@/app/actions/sales'
 import { formatLongDate } from '@/lib/time'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
@@ -51,7 +54,9 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
     : t === 'credit_note' && d.doc.status !== 'draft' ? 'This credit note is issued and can no longer be edited.'
     : pendingApproval && !c.can('sales.approve') ? 'Waiting for manager approval. Editing is locked until a decision is made.' : null
   const credited = (d as any).credited as number
-  const balance = Number(d.doc.total) - d.paid - credited
+  const balance = balanceOf({ total: d.doc.total, paid: d.paid, credited })
+  const docSt = docState(d.doc.status, (d.doc as any).viewed_at), pay = isInv ? payState({ status: d.doc.status, total: d.doc.total, paid: d.paid, credited, due_date: d.doc.due_date }, c.today) : null
+  const late = pay === 'overdue' ? daysOverdue(d.doc.due_date, c.today) : 0
   const usedCheques = new Set(d.payments.map((p: any) => p.cheque_id).filter(Boolean))
   const applicable = (cheques ?? []).filter((q: any) => !usedCheques.has(q.id) && (q.invoice_id === id || !q.invoice_id) && (!q.customer_id || !d.doc.customer_id || q.customer_id === d.doc.customer_id))
   const chequeOf = new Map((cheques ?? []).map((q: any) => [q.id, q]))
@@ -71,7 +76,8 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
     <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} customers={[...new Map([...(customers ?? []), ...(projects ?? []).map((x: any) => x.customer).filter(Boolean)].map((x: any) => [x.id, x])).values()] as any} projects={(projects ?? []).map(({ customer: _c, ...x }: any) => x) as any}
       catalog={(catalog ?? []).map((x: any) => ({ ...x, rate: Number(x.rate) }))} templates={(templates ?? []) as any} salespeople={people ?? []} delivery={delivery}
       editable={edit && !locked} lockedReason={!edit ? 'You can view this document but not change it.' : locked} requireApproval={settings.requireApproval}
-      canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber} />
+      canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber}
+      statusView={isInv ? { doc: docSt, pay, daysLate: late } : undefined} />
 
     <div className="no-print mt-2 grid gap-5 px-0 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
       {isQtn && pendingApproval && c.can('sales.approve') && <Card className="border-warning/40"><CardHeader title="Approval requested" sub="Review the quotation, then decide" action={<ShieldCheck size={16} className="text-warning" aria-hidden />} />
@@ -79,40 +85,40 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
           <Field label="Decision *"><Select name="decision" defaultValue="approved"><option value="approved">Approve. It can be sent</option><option value="changes_requested">Request changes</option><option value="rejected">Reject</option></Select></Field>
           <Field label="Note" hint="Required when requesting changes or rejecting"><Textarea name="note" maxLength={500} /></Field></ActionForm></div></Card>}
 
-      {isInv && <Card className="lg:col-span-2 2xl:col-span-2">
-        <CardHeader title="Payments" sub={`Invoice AED ${fmtMoney(d.doc.total)} · Paid AED ${fmtMoney(d.paid)}${credited ? ` · Credited AED ${fmtMoney(credited)}` : ''} · Balance AED ${fmtMoney(balance)}${d.doc.due_date && balance > 0 && d.doc.due_date < c.today ? ` · ${Math.round((Date.parse(c.today) - Date.parse(d.doc.due_date)) / 864e5)} days overdue` : ''}`}
-          action={edit && !['draft', 'cancelled', 'paid'].includes(d.doc.status) ? <div className="flex flex-wrap justify-end gap-2">
-            {unapplied > 0 && balance > 0 && <DialogButton size="sm" variant="secondary" label="Apply project advance" title={`Apply project advance: ${d.doc.number}`} icon={<Wallet size={14} />}>
-              <ActionForm action={applyProjectAdvance.bind(null, id)} submit="Apply advance">
-                <p className="text-sm">This project has <b>AED {fmtMoney(unapplied)}</b> of advances not yet applied. Applying links them to this invoice as payments (oldest first). No VAT is added.</p>
-                <Field label="Amount to apply (AED) *"><Input name="amount" type="number" step="0.01" min="0.01" max={Math.min(unapplied, balance).toFixed(2)} defaultValue={Math.min(unapplied, balance).toFixed(2)} required inputMode="decimal" /></Field>
-              </ActionForm></DialogButton>}
-            <DialogButton size="sm" label="Record payment" title={`Record payment: ${d.doc.number}`} icon={<Plus size={14} />} wide>
-            <ActionForm action={recordPayment.bind(null, id)} submit="Save payment" idempotent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Amount (AED) *" hint={`Outstanding: AED ${fmtMoney(balance)}`}><Input name="amount" type="number" step="0.01" min="0.01" max={balance.toFixed(2)} defaultValue={balance.toFixed(2)} required inputMode="decimal" /></Field>
-                <Field label="Date received *"><Input name="paid_on" type="date" defaultValue={c.today} max={c.today} required /></Field>
-                <Field label="Method *"><Select name="method" defaultValue="bank_transfer">{Object.entries(METHOD).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
-                <Field label="Reference" hint="Transfer ref., receipt no."><Input name="reference" maxLength={120} /></Field>
-                <Field label="Bank"><Input name="bank_name" maxLength={120} placeholder="e.g. Emirates NBD" /></Field>
-                <Field label="Cleared cheque" hint={applicable.length ? 'Only cheques you confirmed as Cleared appear here' : 'No cleared cheques to apply. Mark the cheque Cleared under Cheques first.'}>
-                  <Select name="cheque_id" defaultValue="" disabled={!applicable.length}><option value="">— None —</option>{applicable.map((q: any) => <option key={q.id} value={q.id}>#{q.cheque_no} · {q.party_name} · AED {fmtMoney(q.amount)} · {q.cheque_date}</option>)}</Select></Field>
-                {c.can('documents.upload') && <Field label="Receipt / proof (optional)" className="sm:col-span-2"><input type="file" name="file" accept={ACCEPT_ATTR} className="text-sm" /></Field>}
-                <Field label="Notes" className="sm:col-span-2"><Input name="notes" maxLength={1000} /></Field>
-              </div>
-            </ActionForm></DialogButton></div> : null} />
-        {d.doc.status === 'draft' ? <p className="px-4 py-6 text-sm text-muted">Issue the invoice (⋯ → Issue tax invoice) before recording payments.</p>
-          : d.payments.length === 0 ? <p className="px-4 py-6 text-sm text-muted">No payments recorded yet.</p>
-          : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Method</Th><Th>Reference</Th><Th>Cheque / bank</Th><Th>By</Th><Th className="text-right">Amount</Th><Th /></tr></thead><tbody className="divide-y divide-border">
+      {isInv && <Card id="payment" className="scroll-mt-32 lg:col-span-2 2xl:col-span-2" data-payment-panel>
+        <CardHeader title="Payment" sub={d.doc.status === 'draft' ? 'Issue the invoice to record payments' : pay === 'paid' ? 'Paid in full' : pay === 'overdue' ? `${late} day${late === 1 ? '' : 's'} past the due date` : 'Recorded payments and what is still owed'}
+          action={<InvoiceStatus doc={docSt} pay={pay} daysLate={late} />} />
+        <dl className="grid grid-cols-2 gap-px border-b border-border bg-border sm:grid-cols-5" data-payment-figures>
+          <Figure k="Invoice total" v={<Money value={d.doc.total} />} />
+          <Figure k="Paid amount" v={<Money value={d.paid} className={d.paid > 0 ? 'text-success' : undefined} />} sub={credited ? `+ AED ${fmtMoney(credited)} credited` : undefined} />
+          <Figure k="Remaining balance" v={<Money value={balance} className={balance > 0.005 && d.doc.status !== 'draft' ? (pay === 'overdue' ? 'text-danger' : 'text-warning') : undefined} />} />
+          <Figure k="Due date" v={d.doc.due_date ? formatLongDate(d.doc.due_date) : '—'} sub={pay === 'overdue' ? `${late} day${late === 1 ? '' : 's'} overdue` : undefined} danger={pay === 'overdue'} />
+          <Figure k="Payment status" v={pay ? <PayStatusBadge state={pay} daysLate={late} /> : <span className="text-muted">Not issued</span>} className="col-span-2 sm:col-span-1" />
+        </dl>
+        <div className="h-1.5 overflow-hidden bg-surface-2" aria-hidden><div className={cn('h-full transition-all', pay === 'overdue' ? 'bg-danger' : 'bg-success')} style={{ width: `${Math.min(100, Number(d.doc.total) ? ((d.paid + credited) / Number(d.doc.total)) * 100 : 0)}%` }} /></div>
+        {edit && !['draft', 'cancelled'].includes(d.doc.status) && <div className="flex flex-col gap-2 border-b border-border p-3 sm:flex-row sm:items-center sm:justify-end">
+          {unapplied > 0 && balance > 0 && <DialogButton size="sm" variant="secondary" label="Apply project advance" title={`Apply project advance: ${d.doc.number}`} icon={<Wallet size={14} />}>
+            <ActionForm action={applyProjectAdvance.bind(null, id)} submit="Apply advance">
+              <p className="text-sm">This project has <b>AED {fmtMoney(unapplied)}</b> of advances not yet applied. Applying links them to this invoice as payments (oldest first). No VAT is added.</p>
+              <Field label="Amount to apply (AED) *"><Input name="amount" type="number" step="0.01" min="0.01" max={Math.min(unapplied, balance).toFixed(2)} defaultValue={Math.min(unapplied, balance).toFixed(2)} required inputMode="decimal" /></Field>
+            </ActionForm></DialogButton>}
+          <InvoicePaymentActions inv={{ id, number: d.doc.number, status: d.doc.status, total: Number(d.doc.total), paid: d.paid, credited, due_date: d.doc.due_date ?? null, viewed: !!(d.doc as any).viewed_at }} today={c.today}
+            cheques={applicable.map((q: any) => ({ id: q.id, label: `#${q.cheque_no} · ${q.party_name} · AED ${fmtMoney(q.amount)} · ${q.cheque_date}` }))} canEdit={edit} canDelete={c.can('records.delete')} canUpload={c.can('documents.upload')} />
+        </div>}
+        {d.doc.status === 'cancelled' && <p className="border-b border-border px-4 py-3 text-sm text-muted">This invoice is cancelled. It keeps its number and stays on record.</p>}
+        <h3 className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted">Payment history</h3>
+        {d.doc.status === 'draft' ? <p className="px-4 pb-5 pt-1 text-sm text-muted">Issue the invoice (⋯ → Issue tax invoice) before recording payments.</p>
+          : d.payments.length === 0 ? <p className="px-4 pb-5 pt-1 text-sm text-muted">No payments recorded yet.</p>
+          : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Payment date</Th><Th className="text-right">Amount</Th><Th>Method</Th><Th>Reference</Th><Th>Cheque / bank</Th><Th>Recorded by</Th><Th><span className="sr-only">Actions</span></Th></tr></thead><tbody className="divide-y divide-border" data-payment-history>
             {d.payments.map((p: any) => { const q = p.cheque_id ? chequeOf.get(p.cheque_id) : null
-              return <tr key={p.id}><Td className="whitespace-nowrap tabular-nums">{p.paid_on}</Td><Td>{METHOD[p.method] ?? p.method ?? '—'}{p.project_id && <div className="text-xs text-muted">Project advance</div>}</Td>
+              return <tr key={p.id}><Td className="whitespace-nowrap tabular-nums">{p.paid_on}</Td>
+                <Td className="text-right font-medium tabular-nums text-success">{fmtMoney(p.amount)}</Td>
+                <Td>{METHOD[p.method] ?? p.method ?? '—'}{p.project_id && <div className="text-xs text-muted">Project advance</div>}</Td>
                 <Td className="text-muted">{p.reference ?? '—'}{p.notes && <div className="text-xs">{p.notes}</div>}{p.document_id && <Link href={`/documents/${p.document_id}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"><Paperclip size={11} />{docName.get(p.document_id) ?? 'Attachment'}</Link>}</Td>
                 <Td className="text-muted">{q ? <Link href={`/cheques?open=${q.id}`} className="text-primary hover:underline">#{q.cheque_no}</Link> : null}{q ? ` · ${q.bank_name}` : p.bank_name ?? '—'}</Td>
                 <Td className="text-muted">{names.get(p.created_by) ?? '—'}</Td>
-                <Td className="text-right font-medium tabular-nums">{fmtMoney(p.amount)}</Td>
-                <Td className="text-right">{edit && p.project_id && <ActionButton variant="ghost" action={unapplyProjectAdvance.bind(null, p.id)} confirm="Move this advance back to the project? The invoice balance goes up; the money stays recorded on the project.">Move back</ActionButton>}{c.can('records.delete') && !p.project_id && <ActionButton variant="ghost" action={deletePayment.bind(null, p.id)} confirm="Delete this payment? The invoice balance will be recalculated."><Trash2 size={14} /><span className="sr-only">Delete payment</span></ActionButton>}</Td></tr> })}
+                <Td className="text-right">{edit && p.project_id && <ActionButton variant="ghost" action={unapplyProjectAdvance.bind(null, p.id)} confirm="Move this advance back to the project? The invoice balance goes up; the money stays recorded on the project.">Move back</ActionButton>}{c.can('records.delete') && !p.project_id && <ActionButton variant="ghost" action={deletePayment.bind(null, p.id)} confirm="Delete this payment? The invoice balance will be recalculated. (To keep the money as customer credit instead, use “Mark as unpaid”.)"><Trash2 size={14} /><span className="sr-only">Delete payment</span></ActionButton>}</Td></tr> })}
           </tbody></TableWrap>}
-        <div className="h-2 overflow-hidden rounded-b-lg bg-surface-2" aria-hidden><div className="h-full bg-success transition-all" style={{ width: `${Math.min(100, Number(d.doc.total) ? ((d.paid + credited) / Number(d.doc.total)) * 100 : 0)}%` }} /></div>
       </Card>}
 
       {isInv && creditNotes.length > 0 && <Card><CardHeader title="Credit notes" action={<FileMinus size={15} className="text-muted" aria-hidden />} />
@@ -171,4 +177,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
 }
 function Linked({ icon: Icon, href, label, value }: { icon: typeof Link2; href: string; label: string; value: React.ReactNode }) {
   return <li><Link href={href} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/60"><Icon size={15} className="text-muted" aria-hidden /><span className="w-28 shrink-0 text-xs text-muted">{label}</span><span className="min-w-0 truncate font-medium">{value}</span></Link></li>
+}
+function Figure({ k, v, sub, danger, className }: { k: string; v: React.ReactNode; sub?: string; danger?: boolean; className?: string }) {
+  return <div className={cn('bg-surface px-4 py-3', className)}><dt className="text-xs text-muted">{k}</dt><dd className={cn('mt-1 text-[15px] font-semibold tabular-nums', danger && 'text-danger')}>{v}</dd>{sub && <div className={cn('mt-0.5 text-xs', danger ? 'text-danger' : 'text-muted')}>{sub}</div>}</div>
 }

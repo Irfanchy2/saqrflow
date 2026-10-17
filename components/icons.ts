@@ -15,6 +15,8 @@ export {
   ArrowUpRightIcon as ArrowUpRight,
   SealCheckIcon as BadgeCheck,
   MoneyIcon as Banknote,
+  ProhibitIcon as Ban,
+  CurrencyCircleDollarIcon as CircleDollarSign,
   ChartBarIcon as BarChart3,
   BellIcon as Bell,
   BellRingingIcon as BellPlus,

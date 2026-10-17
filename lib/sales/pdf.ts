@@ -1,7 +1,7 @@
 import 'server-only'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
 import { amountInWords, computeTotals, fmtMoney, lineAmount, lineVat, VAT_CATEGORIES, type VatCategory } from './money'
-import { DOC_META, isTaxDoc } from './docs'
+import { DOC_META, fmtQty, isTaxDoc } from './docs'
 import { docDiscount, vatOn, type PaperDoc, type PaperItem } from '@/components/sales/paper'
 import type { BrandKind } from './data'
 import { resolveTemplate, templateKind, type TemplateKind } from './template'
@@ -181,7 +181,7 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
     const full = Math.max(22, cell.reduce((a, l) => a + l.h, 0) + 10), pageBody = H - M - bottom - 26 - 12
     if (y - full < bottom + 40 && full <= pageBody) { newPage(); tableHeader() }
     const amt = lineAmount(it), vat = lineVat(it, doc.vat_rate)
-    const qty = `${Number(it.quantity || 0)}${it.unit && it.unit !== 'Nos' ? ' ' + it.unit : ''}`
+    const qty = `${fmtQty(it.quantity)}${it.unit ? ' ' + it.unit : ''}`
     const vals = isInv ? [String(idx + 1).padStart(2, '0'), '', qty, Number(it.unit_price) ? fmtMoney(it.unit_price) : '-', fmtMoney(amt), fmtMoney(vat), fmtMoney(amt + vat)]
       : [String(idx + 1).padStart(2, '0'), '', qty, isDn ? '' : Number(it.unit_price) ? fmtMoney(it.unit_price) : '-', isDn ? '' : fmtMoney(amt)]
     if (full > pageBody && y - bottom < 120) { newPage(); tableHeader() }   // a long row starts with real room, not one line at the foot of a page
@@ -196,8 +196,9 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
         rect(x, y - rh, c.w, rh, isDn && ci >= 3 ? hatch : undefined)
         if (ci === 1) { let yy = y - 13; for (const l of part) { l.draw(x + 4, yy); yy -= l.h } }
         else if (!first) { /* values only on the row's first page */ }
-        else if (ci === 2 && it.unit && it.unit !== 'Nos' && font.widthOfTextAtSize(safe(font, qty), 9) > c.w - 4) {
-          center(String(Number(it.quantity || 0)), x + c.w / 2, y - Math.min(rh, 40) / 2 + 2, 9); center(it.unit, x + c.w / 2, y - Math.min(rh, 40) / 2 - 8, 7)
+        else if (ci === 2 && it.unit && font.widthOfTextAtSize(safe(font, qty), 9) > c.w - 4) {   // too wide for one line: quantity over unit, same readable size
+          const us = font.widthOfTextAtSize(safe(font, it.unit), 9) > c.w - 4 ? 7.5 : 9
+          center(fmtQty(it.quantity), x + c.w / 2, y - Math.min(rh, 40) / 2 + 2, 9); center(it.unit, x + c.w / 2, y - Math.min(rh, 40) / 2 - 8.5, us)
         }
         else if (vals[ci]) { const yy = y - Math.min(rh, full) / 2 - 3; c.a === 'c' ? center(vals[ci], x + c.w / 2, yy, 9, ci === 0 || ci === 6 ? bold : font) : right(vals[ci], x + c.w - 4, yy, 9, ci === 6 ? bold : font) }
         x += c.w

@@ -250,7 +250,7 @@ export async function setSalesStatus(id: string, status: string): Promise<Action
     }
     if (t === 'invoice' && status === 'cancelled') {
       const { count } = await c.supabase.from('payments').select('id', { count: 'exact', head: true }).eq('invoice_id', id)
-      if (count) return { error: 'This invoice has payments. Delete the payments first (or issue a credit note).' }
+      if (count) return { error: 'This invoice has payments. Use “Mark as unpaid” first (the money can stay as customer credit), or issue a credit note.' }
     }
     const { error } = await c.supabase.from('invoices').update({ status, sent_at: status === 'sent' && !cur.sent_at ? new Date().toISOString() : undefined, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) { if (/exceeds the invoice balance|not issued|advance exceeds|not linked to a project/.test(error.message)) return { error: error.message.charAt(0).toUpperCase() + error.message.slice(1) + '.' }; throw error }
@@ -503,6 +503,17 @@ export async function recordPayment(invoiceId: string, _: ActionState, fd: FormD
     if (!parsed.success) return { error: parsed.error.issues[0].message, fieldErrors: Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.'), i.message])) }
     const v = parsed.data
     if (v.paid_on > c.today) return { error: 'Payment date cannot be in the future. Track post-dated cheques under Cheques.', fieldErrors: { paid_on: 'Cannot be in the future' } }
+    // "Mark as paid" records one payment for the whole balance (worked out here, never trusted from the form);
+    // "Mark as partially paid" must leave something owed. Either way a real payment is recorded: nothing is ever just labelled paid.
+    const mode = str(fd, 'mode')
+    if (mode === 'full' || mode === 'partial') {
+      const { data: b } = await c.supabase.from('invoice_balances').select('balance').eq('id', invoiceId).maybeSingle()
+      const bal = Math.round(Number(b?.balance ?? 0) * 100) / 100
+      if (!b) return { error: 'Invoice not found.' }
+      if (bal <= 0) return { error: 'Nothing is left to pay on this invoice.' }
+      if (mode === 'full') v.amount = bal
+      else if (v.amount >= bal - 0.005) return { error: `AED ${fmtMoney(bal)} is the whole balance. Use “Mark as paid” for a full payment.`, fieldErrors: { amount: 'Less than the balance' } }
+    }
     if (v.idempotency_key) {
       const { data: dup } = await c.supabase.from('payments').select('id').eq('idempotency_key', v.idempotency_key).maybeSingle()
       if (dup) return { ok: true, message: 'Payment already recorded.' }
@@ -529,9 +540,9 @@ export async function recordPayment(invoiceId: string, _: ActionState, fd: FormD
       throw error
     }
     if (documentId) await c.supabase.from('document_relationships').insert({ company_id: c.company.id, document_id: documentId, related_type: 'invoice', related_id: invoiceId, role: 'payment_receipt', created_by: c.userId })
-    await logEvent(c, invoiceId, 'payment', `AED ${v.amount.toFixed(2)} · ${v.method}${v.reference ? ' · ' + v.reference : ''}`)
+    await logEvent(c, invoiceId, 'payment', `${mode === 'full' ? 'Marked as paid · ' : mode === 'partial' ? 'Part payment · ' : ''}AED ${v.amount.toFixed(2)} · ${v.method}${v.reference ? ' · ' + v.reference : ''}`)
     done(invoiceId); revalidatePath('/cheques')
-    return { ok: true, message: 'Payment recorded.' }
+    return { ok: true, message: mode === 'full' ? `Paid in full: AED ${fmtMoney(v.amount)} recorded.` : 'Payment recorded.' }
   })
 }
 
@@ -544,6 +555,48 @@ export async function deletePayment(paymentId: string): Promise<ActionState> {
     if (data[0].invoice_id) await logEvent(c, data[0].invoice_id, 'payment', `Payment of AED ${Number(data[0].amount).toFixed(2)} removed`)
     done(data[0].invoice_id ?? undefined)
     return { ok: true, message: 'Payment removed.' }
+  })
+}
+
+/**
+ * "Mark as unpaid": takes every payment off the invoice. Nothing is lost by default: payments stay recorded as money
+ * received on account from the customer (customer ledger, statement), and project advances go back to their project.
+ * Deleting the payment records instead (entered by mistake) needs delete permission. A reason is always required and logged.
+ */
+export async function markInvoiceUnpaid(invoiceId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'records.edit')
+    const how = str(fd, 'how') === 'delete' ? 'delete' : 'credit', reason = (str(fd, 'reason') ?? '').trim().slice(0, 300)
+    if (reason.length < 3) return { error: 'Say why the payments are being taken off (at least 3 characters).', fieldErrors: { reason: 'Required' } }
+    if (how === 'delete') need(c, 'records.delete')
+    const { data: inv } = await c.supabase.from('invoices').select('id,number,doc_type,customer_id').eq('id', invoiceId).maybeSingle()
+    if (!inv || inv.doc_type !== 'invoice') return { error: 'Invoice not found.' }
+    const { data: pays, error: pe } = await c.supabase.from('payments').select('id,amount,project_id,customer_id,notes').eq('invoice_id', invoiceId)
+    if (pe) throw pe
+    if (!pays?.length) return { error: 'This invoice has no recorded payments.' }
+    const own = pays.filter(p => !p.project_id), adv = pays.filter(p => p.project_id)
+    if (how === 'credit' && own.some(p => !p.customer_id) && !inv.customer_id) return { error: 'This invoice has no saved customer, so the money cannot be kept as customer credit. Link the customer, or delete the payments instead.' }
+    const note = (p: { notes: string | null }) => `${p.notes ? p.notes + '\n' : ''}Taken off ${inv.number} on ${c.today}: ${reason}`.slice(0, 1000)
+    for (const p of adv) { const { error } = await c.supabase.from('payments').update({ invoice_id: null, notes: note(p) }).eq('id', p.id); if (error) throw error }
+    if (how === 'delete' && own.length) { const { error } = await c.supabase.from('payments').delete().in('id', own.map(p => p.id)); if (error) throw error }
+    else for (const p of own) { const { error } = await c.supabase.from('payments').update({ invoice_id: null, customer_id: p.customer_id ?? inv.customer_id, notes: note(p) }).eq('id', p.id); if (error) throw error }
+    const sum = pays.reduce((s, p) => s + Number(p.amount), 0)
+    await logEvent(c, invoiceId, 'payment', `Marked as unpaid: ${pays.length} payment${pays.length === 1 ? '' : 's'} (AED ${sum.toFixed(2)}) ${how === 'delete' ? 'deleted' : 'kept as customer credit'}${adv.length ? `, ${adv.length} advance${adv.length === 1 ? '' : 's'} back to the project` : ''} · ${reason}`)
+    done(invoiceId); revalidatePath('/cheques'); if (inv.customer_id) revalidatePath(`/parties/${inv.customer_id}`)
+    return { ok: true, message: how === 'delete' ? 'Marked as unpaid. The payments were deleted.' : 'Marked as unpaid. The money stays recorded as customer credit (on account).' }
+  })
+}
+
+/** The customer confirmed they have the invoice (phone, email …): document status "Viewed". Opening it through a secure link or reading it on WhatsApp sets this automatically. */
+export async function markInvoiceViewed(id: string): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'records.edit')
+    const { data, error } = await c.supabase.from('invoices').update({ viewed_at: new Date().toISOString() }).eq('id', id).eq('doc_type', 'invoice').is('viewed_at', null).not('status', 'in', '(draft,cancelled)').select('id')
+    if (error) throw error
+    if (!data?.length) return { error: 'Only an issued invoice that is not yet marked as viewed can be marked as viewed.' }
+    await logEvent(c, id, 'status', 'Marked as viewed (customer confirmed)')
+    done(id)
+    return { ok: true, message: 'Marked as viewed.' }
   })
 }
 

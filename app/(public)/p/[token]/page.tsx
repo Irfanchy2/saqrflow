@@ -1,3 +1,5 @@
+import { PayStatusBadge } from '@/components/sales/status-badges'
+import { payState } from '@/lib/sales/status'
 import { FileText } from '@/components/icons'
 import { Badge, Card, CardHeader, Field, Input, Metrics, Select, StatCard, Textarea } from '@/components/ui/primitives'
 import { LinkGone, PublicShell } from '@/components/public/shell'
@@ -30,6 +32,11 @@ export default async function CustomerPortal({ params }: { params: Promise<{ tok
   const pids = (projects ?? []).map(p => p.id)
   const { data: miles } = pids.length ? await r.admin.from('project_milestones').select('project_id,title,due_date,done').eq('company_id', cid).in('project_id', pids).order('due_date') : { data: [] as any[] }
   const bal = new Map(ledger.invoices.map((i: any) => [i.id, i]))
+  // what the customer still owes per invoice: payment status from the recorded payments (the company's own "today")
+  const invIds = (docs ?? []).filter(d => d.doc_type === 'invoice').map(d => d.id)
+  const { data: money } = invIds.length ? await r.admin.from('invoice_list').select('id,paid,credited').eq('company_id', cid).in('id', invIds) : { data: [] as any[] }
+  const moneyOf = new Map((money ?? []).map((m: any) => [m.id, m]))
+  const payOf = (i: any) => payState({ status: i.status, total: i.total, paid: moneyOf.get(i.id)?.paid ?? 0, credited: moneyOf.get(i.id)?.credited ?? 0, due_date: i.due_date }, r.ctx.today)
   const quotes = (docs ?? []).filter(d => d.doc_type === 'quotation'), invoices = (docs ?? []).filter(d => d.doc_type === 'invoice'), others = (docs ?? []).filter(d => d.doc_type === 'credit_note' || d.doc_type === 'delivery_note')
   const openQ = (q: any) => ['sent', 'viewed', 'follow_up'].includes(q.status) && !(q.valid_until && q.valid_until < r.ctx.today)
   const Pdf = ({ id }: { id: string }) => <a href={`/p/${token}/doc/${id}`} target="_blank" rel="noopener" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"><FileText size={13} />PDF</a>
@@ -62,7 +69,7 @@ export default async function CustomerPortal({ params }: { params: Promise<{ tok
         return <li key={i.id} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm"><span className="min-w-0 flex-1"><span className="block font-medium">{i.number}{i.subject ? ` · ${i.subject}` : ''}</span>
           <span className={b?.daysOverdue > 0 ? 'block text-xs text-danger' : 'block text-xs text-muted'}>{i.issue_date}{i.due_date ? ` · due ${i.due_date}` : ''}{b?.daysOverdue > 0 ? ` · ${b.daysOverdue} days overdue` : ''}</span></span>
           <span className="text-end tabular-nums"><span className="block">{fmtMoney(i.total)}</span>{b && b.balance > 0.004 && <span className="block text-xs text-muted">balance {fmtMoney(b.balance)}</span>}</span>
-          <Badge tone={STATUS_TONE[i.status]}>{statusLabel('invoice' as SalesType, i.status)}</Badge><Pdf id={i.id} /></li> })}</ul>}</Card>
+          {payOf(i) ? <PayStatusBadge state={payOf(i)!} daysLate={b?.daysOverdue} /> : null}<Pdf id={i.id} /></li> })}</ul>}</Card>
 
     {others.length > 0 && <Card><CardHeader title="Delivery notes & credit notes" />
       <ul className="divide-y divide-border">{others.map((o: any) => <li key={o.id} className="flex items-center gap-2 px-4 py-3 text-sm"><span className="min-w-0 flex-1 font-medium">{DOC_META[o.doc_type as SalesType].label} {o.number}</span><span className="text-xs text-muted">{o.issue_date}</span><Pdf id={o.id} /></li>)}</ul></Card>}

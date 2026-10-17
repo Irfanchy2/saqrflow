@@ -15,8 +15,8 @@ export const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', sent: 'Sent', viewed: 'Viewed', follow_up: 'Follow-up required', accepted: 'Accepted', rejected: 'Rejected', expired: 'Expired',
   converted: 'Converted', partially_paid: 'Partially paid', paid: 'Paid', overdue: 'Overdue', cancelled: 'Cancelled', delivered: 'Delivered',
 }
-/** the same stored status reads differently per document type ("sent" invoice = issued) */
-export const statusLabel = (t: SalesType, s: string) => (s === 'sent' && (t === 'invoice' || t === 'credit_note') ? 'Issued' : STATUS_LABEL[s] ?? s)
+/** the same stored status reads differently per document type ("sent" credit note = issued) */
+export const statusLabel = (t: SalesType, s: string) => (s === 'sent' && t === 'credit_note' ? 'Issued' : STATUS_LABEL[s] ?? s)
 export const STATUS_TONE: Record<string, 'neutral' | 'blue' | 'green' | 'amber' | 'red'> = {
   draft: 'neutral', sent: 'blue', viewed: 'blue', follow_up: 'amber', accepted: 'green', rejected: 'red', expired: 'neutral', converted: 'green',
   partially_paid: 'amber', paid: 'green', overdue: 'red', cancelled: 'neutral', delivered: 'green',
@@ -36,7 +36,24 @@ export const CONVERSIONS: Partial<Record<SalesType, SalesType[]>> = { quotation:
 /** documents that carry VAT columns on paper (tax invoice, tax credit note) */
 export const isTaxDoc = (t: SalesType) => t === 'invoice' || t === 'credit_note'
 
-export const UNITS = ['Nos', 'Sq.Mtr', 'Mtr', 'Rmt', 'Kg', 'Ton', 'Set', 'Pcs', 'Lot', 'L.S', 'Job', 'Hrs', 'Days'] as const
+/**
+ * Units offered in the line editor and the catalog. The code is stored and printed exactly as shown ("L.S", "SQM" …).
+ * Older lines keep whatever unit they were saved with (e.g. "Sq.Mtr", "Rmt", "Kg"): the pickers always include the
+ * current value, and anything else can be typed through "Other…".
+ */
+export const UNIT_OPTIONS: { code: string; label: string }[] = [
+  { code: 'Nos', label: 'Numbers' }, { code: 'PCS', label: 'Pieces' }, { code: 'L.S', label: 'Lump sum' }, { code: 'LM', label: 'Linear metre' },
+  { code: 'RMT', label: 'Running metre' }, { code: 'MTR', label: 'Metre' }, { code: 'SQM', label: 'Square metre' }, { code: 'CUM', label: 'Cubic metre' },
+  { code: 'KG', label: 'Kilogram' }, { code: 'TON', label: 'Tonne' }, { code: 'SET', label: 'Set' }, { code: 'LOT', label: 'Lot' },
+  { code: 'PAIR', label: 'Pair' }, { code: 'BOX', label: 'Box' }, { code: 'ROLL', label: 'Roll' }, { code: 'LTR', label: 'Litre' },
+  { code: 'JOB', label: 'Job' }, { code: 'HRS', label: 'Hours' }, { code: 'DAYS', label: 'Days' }, { code: 'MONTH', label: 'Month' },
+]
+export const UNITS = UNIT_OPTIONS.map(u => u.code)
+export const UNIT_MAX = 20
+/** The picker list for a line: the standard units, plus the line's own unit when it is not one of them. */
+export const unitChoices = (current?: string | null) => (current && !UNITS.includes(current) ? [current, ...UNITS] : UNITS)
+/** "12.5 SQM" — the quantity and its unit as printed (every unit, "Nos" included). */
+export const fmtQty = (q: number | string | null | undefined) => { const n = Number(q || 0); return Number.isInteger(n) ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { maximumFractionDigits: 3 }) }
 
 export const DEFAULTS = {
   intro: 'Dear Sir/Mam,\nThank You so much for kind enquiry, please see our best offer for the requested work',
