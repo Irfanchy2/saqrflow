@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getCtx, need, type Ctx } from '@/lib/auth'
+import { demoGuard } from '@/lib/demo'
 import { safe, str } from '@/lib/action'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isEvent } from '@/lib/events'
@@ -62,7 +63,7 @@ export async function deleteRule(id: string): Promise<ActionState> {
 // ───────────── webhooks ─────────────
 export async function saveWebhook(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'webhooks'); need(c, 'settings.manage')
     const url = (str(fd, 'url') ?? '').trim(), bad = urlProblem(url)
     if (bad) return { error: bad, fieldErrors: { url: bad } }
     const events = [...new Set(all(fd, 'events'))].filter(e => e === '*' || isEvent(e))
@@ -80,7 +81,7 @@ export async function saveWebhook(_: ActionState, fd: FormData): Promise<ActionS
 }
 export async function rotateWebhookSecret(id: string): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage'); if (!UUID.test(id)) return { error: 'Unknown webhook.' }
+    const c = await getCtx(); demoGuard(c, 'webhooks'); need(c, 'settings.manage'); if (!UUID.test(id)) return { error: 'Unknown webhook.' }
     const { data: ep } = await c.supabase.from('webhook_endpoints').select('id').eq('id', id).maybeSingle(); if (!ep) return { error: 'Unknown webhook.' }
     const secret = newWebhookSecret()
     const { error } = await createAdminClient().from('webhook_secrets').upsert({ endpoint_id: id, company_id: c.company.id, secret, rotated_at: new Date().toISOString() }); if (error) throw error
@@ -105,7 +106,7 @@ export async function deleteWebhook(id: string): Promise<ActionState> {
 /** Sends a signed `ping` right away and reports what the endpoint answered. */
 export async function sendTestWebhook(id: string): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage'); if (!UUID.test(id)) return { error: 'Unknown webhook.' }
+    const c = await getCtx(); demoGuard(c, 'webhooks'); need(c, 'settings.manage'); if (!UUID.test(id)) return { error: 'Unknown webhook.' }
     const { data: ep } = await c.supabase.from('webhook_endpoints').select('id,enabled').eq('id', id).maybeSingle()
     if (!ep) return { error: 'Unknown webhook.' }
     if (!ep.enabled) return { error: 'Switch the webhook on first.' }
@@ -123,7 +124,7 @@ export async function sendTestWebhook(id: string): Promise<ActionState> {
 // ───────────── API keys ─────────────
 export async function createApiKey(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'API keys'); need(c, 'settings.manage')
     const scopes = [...new Set(all(fd, 'scopes'))].filter(s => s in SCOPES)
     if (!scopes.length) return { error: 'Choose what the key may read.' }
     const days = Number(str(fd, 'days') ?? '365')
@@ -194,7 +195,7 @@ async function currentSid(c: Ctx) { return sessionIdFromJwt((await c.supabase.au
 
 export async function revokeSession(sid: string): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); if (!UUID.test(sid)) return { error: 'Unknown session.' }
+    const c = await getCtx(); demoGuard(c, 'signing out devices'); if (!UUID.test(sid)) return { error: 'Unknown session.' }
     if (sid === await currentSid(c)) return { error: 'This is the device you are using. Use Sign out instead.' }
     const { data, error } = await c.supabase.rpc('revoke_session', { p_sid: sid }); if (error) throw error
     revalidatePath('/settings'); revalidatePath('/users/activity')
@@ -203,7 +204,7 @@ export async function revokeSession(sid: string): Promise<ActionState> {
 }
 export async function revokeOtherSessions(userId?: string): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx()
+    const c = await getCtx(); demoGuard(c, 'signing out devices')
     const target = userId && UUID.test(userId) ? userId : c.userId
     if (target !== c.userId) need(c, 'users.manage')
     const keep = target === c.userId ? await currentSid(c) : null

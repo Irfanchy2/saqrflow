@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { formatAed } from '@/lib/time'
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { LucideIcon } from '@/components/icons'
+import { EmptyArt } from './empty-art'
 import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, CalendarClock, Users, FileText, Truck, Landmark, TrendingUp, BarChart3, Receipt, Clock, CheckCircle2, ShieldCheck, Package, Wrench, MapPinned, ArrowUp, ArrowDown } from '@/components/icons'
 
 /*
@@ -119,7 +120,7 @@ function kpiValue(v: ReactNode) {
 export function MiniBars({ values, className }: { values: number[]; className?: string }) {
   const max = Math.max(...values, 0)
   if (!values.length || max <= 0) return null
-  return <span aria-hidden className="flex h-8 shrink-0 items-end gap-[3px]">{values.map((v, i) => <span key={i} className={cn('w-[5px] rounded-sm', className, i === values.length - 1 ? 'opacity-100' : 'opacity-35')} style={{ height: `${Math.max(10, (v / max) * 100)}%` }} />)}</span>
+  return <span aria-hidden className="flex h-8 shrink-0 items-end gap-[3px]">{values.map((v, i) => <span key={i} className={cn('w-[5px] rounded-sm', className, i === values.length - 1 ? 'opacity-100' : 'opacity-35')} style={{ height: `${Math.max(10, (v / max) * 100)}%`, '--b': i } as React.CSSProperties} />)}</span>
 }
 
 const valueTone: Partial<Record<Tone, string>> = { red: 'text-danger' }
@@ -153,11 +154,12 @@ export function Metrics({ children, className, cols }: { children: ReactNode; cl
     {kids.map(k => isValidElement(k) && k.type === StatCard ? cloneElement(k as React.ReactElement<{ index?: number }>, { index: (k.props as { index?: number }).index ?? i++ }) : k)}</div>
 }
 
-/** Nothing here yet: the icon sits in a raised tile inside two fading rings, then a title, one line of help and the next step. */
+/** Nothing here yet: a small illustration for the kind of data (the icon on a floating card), then a title, one line of help and the next step. */
 /** `compact`: inside a dashboard widget or a short panel (smaller tile, tighter spacing, no rings). */
 export function EmptyState({ title, body, action, icon: Icon = Inbox, compact }: { title: string; body?: string; action?: ReactNode; icon?: LucideIcon; compact?: boolean }) {
   return <div className={cn('empty-in flex flex-col items-center justify-center text-center', compact ? 'px-5 py-7' : 'px-6 py-10 sm:py-14')}>
-    <span className={cn('relative grid place-items-center border border-border/80 bg-surface text-primary shadow-lift', compact ? 'mb-3 h-10 w-10 rounded-[11px]' : 'empty-rings mb-5 mt-2 h-12 w-12 rounded-xl')} aria-hidden><Icon size={compact ? 18 : 21} strokeWidth={1.75} /></span>
+    {compact ? <span className="relative mb-3 grid h-10 w-10 place-items-center rounded-[11px] border border-border/80 bg-surface text-primary shadow-lift" aria-hidden><Icon size={18} strokeWidth={1.75} /></span>
+      : <EmptyArt icon={Icon} className="mb-4" />}
     <p className={cn('font-semibold tracking-[-0.012em]', compact ? 'text-[14px]' : 'text-[15px]')}>{title}</p>{body && <p className={cn('mt-1.5 max-w-sm leading-relaxed text-muted', compact ? 'text-[13px]' : 'text-[13.5px]')}>{body}</p>}{action && <div className={compact ? 'mt-4' : 'mt-5'}>{action}</div>}
   </div>
 }

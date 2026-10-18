@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getCtx, need } from '@/lib/auth'
+import { demoGuard } from '@/lib/demo'
 import { safe, str } from '@/lib/action'
 import { saveSecret, SECRETS, type SecretName } from '@/lib/ai/secrets'
 import { isOcrMode, ocrProviders } from '@/lib/ai/ocr'
@@ -20,7 +21,7 @@ const setting = (companyId: string, key: string, value: unknown) => ({ company_i
 /** Settings → AI & Automation. API keys are write-only: encrypted at rest, never shown again (only ••••1234). */
 export async function saveAiSettings(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'changing AI keys and settings'); need(c, 'settings.manage')
     const ocr = str(fd, 'ocr_provider'), ai = str(fd, 'ai_provider')
     if (!isOcrMode(ocr) || !isAiMode(ai)) return { error: 'Choose an OCR and an AI provider.' }
     const { error } = await c.supabase.from('app_settings').upsert([
@@ -45,7 +46,7 @@ export async function saveAiSettings(_: ActionState, fd: FormData): Promise<Acti
 
 export async function clearAiSecret(name: string): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'changing AI keys and settings'); need(c, 'settings.manage')
     const n = z.enum(Object.keys(SECRETS) as [SecretName, ...SecretName[]]).parse(name)
     await saveSecret(c.company.id, n, null, c.userId)
     revalidatePath('/settings'); return { ok: true, message: `${SECRETS[n].label} removed.` }
@@ -55,7 +56,7 @@ export async function clearAiSecret(name: string): Promise<ActionState> {
 /** Real round-trip to the provider with a built-in test image (no customer data). */
 export async function testOcrProvider(provider: string): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'testing AI providers'); need(c, 'settings.manage')
     const id = z.enum(['google_vision', 'ocrspace', 'tesseract']).parse(provider)
     const p = (await ocrProviders(c.company.id))[id]
     if (!p.configured()) return { error: `${p.label} is not configured.` }
@@ -68,7 +69,7 @@ export async function testOcrProvider(provider: string): Promise<ActionState> {
 
 export async function testAiProvider(provider: string): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'testing AI providers'); need(c, 'settings.manage')
     const id = z.enum(['gemini', 'claude']).parse(provider)
     const p = (await aiProviders(c.company.id))[id]
     if (!p.configured()) return { error: `${p.label} is not configured.` }

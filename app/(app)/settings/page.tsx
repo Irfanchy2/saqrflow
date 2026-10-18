@@ -101,7 +101,7 @@ export default async function Settings() {
       <Card id="account"><CardHeader title="Your account & security" sub="Language, two-step verification, signed-in devices and sign-in history. Light / dark theme is in the toolbar." /><div className="space-y-5 p-4 text-sm">
         <div><div className="text-xs text-muted">Signed in as</div><div>{c.email} · <span className="capitalize">{c.profile.role.replace('_', ' ')}</span></div></div>
         <ActionForm action={setLocale} submit="Save language" resetOnSuccess={false}><Field label="Interface language" hint="Arabic (right-to-left) and Bengali currently translate navigation and chrome only; page content is English."><Select name="locale" defaultValue={c.profile.locale}>{LOCALES.map(l => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}</Select></Field></ActionForm>
-        <div><h3 className="mb-2 font-medium">Two-step verification</h3><MfaSetup /></div>
+        <div><h3 className="mb-2 font-medium">Two-step verification</h3>{c.company.is_demo ? <p className="text-muted">Not available in the shared demo (it would lock other visitors out).</p> : <MfaSetup />}</div>
         <MySessions c={c} /></div></Card>
 
       <DataBackup c={c} />

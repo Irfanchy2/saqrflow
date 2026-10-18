@@ -1,6 +1,7 @@
 'use server'
 import { revalidatePath } from 'next/cache'
 import { getCtx, need } from '@/lib/auth'
+import { demoGuard } from '@/lib/demo'
 import { safe, str } from '@/lib/action'
 import { KINDS, bodyProblems, maskPhone, toMetaBody } from '@/lib/whatsapp/messages'
 import { SendError, companyWhatsApp, loadTemplates, prepare, queueAndSend } from '@/lib/whatsapp/outbox'
@@ -35,7 +36,7 @@ export async function sendViaWhatsApp(kind: string, recordId: string, _: ActionS
 // ───────────── Settings → WhatsApp ─────────────
 export async function testWhatsAppConnection(): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'the WhatsApp connection'); need(c, 'settings.manage')
     const { cfg } = await companyWhatsApp(c.company.id)
     const r = await phoneInfo(cfg)
     return 'error' in r ? { error: r.error } : { ok: true, message: `Connected: ${r.name} · ${r.number}${r.quality ? ` · quality ${r.quality.toLowerCase()}` : ''}` }
@@ -60,7 +61,7 @@ export async function saveWaTemplate(kind: string, _: ActionState, fd: FormData)
 /** Creates / edits averiqo_<kind> in the WhatsApp Business Account for Meta's review. */
 export async function submitWaTemplate(kind: string): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'submitting WhatsApp templates'); need(c, 'settings.manage')
     if (!KINDS[kind]) return { error: 'Unknown message type.' }
     const wa = await companyWhatsApp(c.company.id)
     if (!wa.live) return { error: 'Connect WhatsApp first (phone number ID, access token, sandbox off).' }
@@ -79,7 +80,7 @@ export async function submitWaTemplate(kind: string): Promise<ActionState> {
 
 export async function refreshWaTemplates(): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'the WhatsApp connection'); need(c, 'settings.manage')
     const wa = await companyWhatsApp(c.company.id)
     if (!wa.live || !wa.wabaId) return { error: 'Connect WhatsApp and add the Business Account ID first.' }
     const list = await listTemplates(wa.cfg, wa.wabaId); if ('error' in list) return { error: list.error }

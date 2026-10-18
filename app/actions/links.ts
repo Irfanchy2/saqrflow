@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getCtx, need } from '@/lib/auth'
+import { demoGuard } from '@/lib/demo'
 import { safe, str } from '@/lib/action'
 import { LINK_KINDS, LINK_PATH, baseUrl, hashToken, newToken, type LinkKind } from '@/lib/portal'
 import type { ActionState } from '@/lib/utils'
@@ -15,7 +16,7 @@ type Target = 'customer' | 'supplier' | 'employee' | 'invoice'
  */
 export async function createShareLink(kind: string, target: Target, targetId: string, _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'records.edit')
+    const c = await getCtx(); demoGuard(c, 'public share links'); need(c, 'records.edit')
     if (!(kind in LINK_KINDS) || !UUID.test(targetId)) return { error: 'Unknown record.' }
     const k = kind as LinkKind
     if (k !== 'document_request') need(c, 'finance.view')

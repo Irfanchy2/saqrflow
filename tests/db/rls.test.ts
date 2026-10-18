@@ -1024,3 +1024,64 @@ describe('invoice document status and payment status (0024)', () => {
     expect((await as(U.ownerA, `select company_today() d`)).rows[0].d).toBeInstanceOf(Date)
   })
 })
+
+describe('shared demo company (0026)', () => {
+  const demoUser = uuid()
+  let D: string
+  const counts = async (cid: string) => {
+    const { rows } = await sup(`select (select count(*) from invoices where company_id = $1)::int inv, (select count(*) from customers where company_id = $1)::int cust,
+      (select count(*) from payments where company_id = $1)::int pay, (select count(*) from employees where company_id = $1)::int emp,
+      (select count(*) from documents where company_id = $1)::int docs, (select count(*) from audit_logs where company_id = $1)::int audits`, [cid])
+    return rows[0]
+  }
+  beforeAll(async () => {
+    await sup('insert into auth.users(id,email) values ($1,$2)', [demoUser, 'demo@test.local'])
+    D = (await sup(`select demo_provision($1) id`, [demoUser])).rows[0].id
+  })
+
+  it('provisions an isolated company flagged is_demo, owned by the demo user, with sample data', async () => {
+    expect((await sup(`select is_demo from companies where id = $1`, [D])).rows[0].is_demo).toBe(true)
+    expect((await sup(`select count(*)::int n from companies where is_demo and id <> $1`, [D])).rows[0].n).toBe(0)   // real companies stay real
+    expect((await sup(`select role, company_id from profiles where id = $1`, [demoUser])).rows[0]).toEqual({ role: 'company_owner', company_id: D })
+    const c = await counts(D)
+    expect(c).toMatchObject({ cust: 6, pay: 2, emp: 6, docs: 7 })
+    const st = (await as(demoUser, `select number, payment_status from invoice_list where doc_type = 'invoice' order by number`)).rows
+    expect(st.map(r => r.payment_status)).toEqual(['paid', 'partially_paid', 'overdue', 'unpaid', null])
+    expect((await as(demoUser, `select count(*)::int n from customers`)).rows[0].n).toBe(6)                      // sees only its own company
+    expect((await as(U.ownerA, `select count(*)::int n from customers where company_id = $1`, [D])).rows[0].n).toBe(0)
+  })
+
+  it('the daily reset restores the sample data and numbering, and leaves every other company alone', async () => {
+    const before = await counts(A), beforeB = await counts(B)
+    await as(demoUser, `update customers set name = 'Defaced' where id = (select id from customers where company_id = $1 limit 1)`, [D])
+    await as(demoUser, `insert into customers(company_id, name) values ($1, 'Visitor added')`, [D])
+    expect((await sup(`select demo_reset() n`)).rows[0].n).toBe(1)
+    expect((await sup(`select count(*)::int n from customers where company_id = $1 and name in ('Defaced','Visitor added')`, [D])).rows[0].n).toBe(0)
+    expect((await counts(D))).toMatchObject({ cust: 6, pay: 2, emp: 6, docs: 7 })
+    expect((await sup(`select min(number) n from invoices where company_id = $1 and doc_type = 'invoice'`, [D])).rows[0].n).toBe('INV-610')
+    expect((await sup(`select id from profiles where company_id = $1`, [D])).rows.map(r => r.id)).toEqual([demoUser])   // the sign-in survives
+    expect(await counts(A)).toEqual(before); expect(await counts(B)).toEqual(beforeB)
+  })
+
+  it('repairs the shared sign-in (password, email, two-step) without touching anyone else', async () => {
+    await sup(`update auth.users set email = 'vandal@x.test', encrypted_password = 'x', email_change = 'other@x.test' where id = $1`, [demoUser])
+    await sup(`insert into auth.mfa_factors(user_id) values ($1), ($2)`, [demoUser, U.viewerA])
+    expect((await sup(`select demo_repair_auth('Demo@Test.local', 'admin123') id`)).rows[0].id).toBe(demoUser)
+    const u = (await sup(`select email, email_change, encrypted_password = crypt('admin123', encrypted_password) ok from auth.users where id = $1`, [demoUser])).rows[0]
+    expect(u).toEqual({ email: 'demo@test.local', email_change: '', ok: true })
+    expect((await sup(`select count(*)::int n from auth.mfa_factors where user_id = $1`, [demoUser])).rows[0].n).toBe(0)
+    expect((await sup(`select count(*)::int n from auth.mfa_factors where user_id = $1`, [U.viewerA])).rows[0].n).toBe(1)   // a real user's factor stays
+    await sup(`delete from auth.mfa_factors where user_id = $1`, [U.viewerA])
+    await fails(sup(`select demo_repair_auth('ownerA@test.local', 'x')`), /another account/)   // cannot take over a real address
+  })
+
+  it('refuses real companies and real users, and is server-only', async () => {
+    await fails(sup(`select demo_wipe($1)`, [A]), /not a demo company/)
+    await fails(sup(`select demo_seed($1)`, [A]), /not a demo company/)
+    await fails(sup(`select demo_provision($1)`, [U.ownerA]), /already belongs/)
+    for (const fn of ['demo_reset()', `demo_wipe('${D}')`, `demo_provision('${uuid()}')`, `demo_repair_auth('a@b.c', 'x')`]) {
+      await fails(as(demoUser, `select ${fn}`), /permission denied/)
+      await fails(as(null, `select ${fn}`, [], 'anon'), /permission denied/)
+    }
+  })
+})
