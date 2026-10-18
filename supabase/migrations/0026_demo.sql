@@ -292,7 +292,6 @@ declare cid uuid;
 begin
   if exists (select 1 from profiles where id = p_user) then raise exception 'user already belongs to a company'; end if;
   insert into companies(name, timezone, currency, is_demo) values (p_company_name, 'Asia/Dubai', 'AED', true) returning id into cid;
-  delete from document_number_formats where company_id = cid;   -- the seed sets them up again
   insert into profiles(id, company_id, full_name, role) values (p_user, cid, 'Demo Admin', 'company_owner');
   perform demo_seed(cid);
   return cid;
