@@ -1,5 +1,6 @@
 'use client'
 import { useRef, useState, useTransition } from 'react'
+import { flushSync } from 'react-dom'
 import { ArrowDown, ArrowUp, LayoutGrid, Loader2 } from '@/components/icons'
 import { Button } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
@@ -9,6 +10,7 @@ import { WIDGETS, type DashboardLayout, type WidgetCol } from '@/lib/dashboard-w
 /** "Customize" dialog: show / hide each dashboard widget, choose its column and its order. Saved per user. */
 export function DashboardCustomize({ layout, available }: { layout: DashboardLayout; available: string[] }) {
   const dlg = useRef<HTMLDialogElement>(null), [items, setItems] = useState(layout.items), [pending, start] = useTransition()
+  const [ready, setReady] = useState(false)   // the widget list is built on first open, not into every dashboard load
   const shown = items.filter(i => available.includes(i.key))
   const move = (key: string, d: -1 | 1) => setItems(xs => {
     const i = xs.findIndex(x => x.key === key), same = xs.map((x, n) => [x, n] as const).filter(([x]) => x.col === xs[i].col && available.includes(x.key)).map(([, n]) => n)
@@ -19,10 +21,10 @@ export function DashboardCustomize({ layout, available }: { layout: DashboardLay
   const save = (l: DashboardLayout | null) => start(async () => { const r = await saveDashboardLayout(l); toast(r?.error ?? r?.message ?? 'Saved', r?.error ? 'error' : 'success'); if (!r?.error) dlg.current?.close() })
   const cols: [WidgetCol, string][] = [['top', 'Top'], ['left', 'Left column'], ['right', 'Right column']]
   return <>
-    <Button variant="secondary" onClick={() => { setItems(layout.items); dlg.current?.showModal() }}><LayoutGrid size={15} />Customize</Button>
+    <Button variant="secondary" onClick={() => { flushSync(() => { setItems(layout.items); setReady(true) }); dlg.current?.showModal() }}><LayoutGrid size={15} />Customize</Button>
     <dialog ref={dlg} onClick={e => { if (e.target === dlg.current) dlg.current?.close() }} className="mx-0 mb-0 mt-auto max-h-[92dvh] w-full max-w-none flex-col rounded-t-2xl border border-border bg-surface p-0 text-fg shadow-pop open:flex sm:m-auto sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-2xl">
       <div className="border-b border-border px-5 py-3"><h2 className="text-[15px] font-semibold">Customize dashboard</h2><p className="text-xs text-muted">Only you see this layout. Widgets you have no access to are not listed.</p></div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">{cols.map(([col, label]) => { const list = shown.filter(i => i.col === col); return list.length ? <div key={col} className="mb-4 last:mb-0">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">{ready && cols.map(([col, label]) => { const list = shown.filter(i => i.col === col); return list.length ? <div key={col} className="mb-4 last:mb-0">
         <h3 className="mb-1.5 text-xs font-medium text-muted">{label}</h3>
         <ul className="divide-y divide-border rounded-md border border-border">{list.map((it, n) => <li key={it.key} className="flex items-center gap-2 px-3 py-2 text-sm">
           <label className="flex min-w-0 flex-1 items-center gap-2"><input type="checkbox" checked={!it.hidden} onChange={e => set(it.key, { hidden: !e.target.checked })} /><span className="truncate">{WIDGETS[it.key].label}</span></label>

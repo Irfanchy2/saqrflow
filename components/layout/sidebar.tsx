@@ -45,6 +45,9 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false, user = 
   const path = usePathname(), params = useSearchParams()
   const [collapsed, setCollapsed] = useState(initialCollapsed)
   const [open, setOpen] = useState(false)
+  // the phone drawer's contents are built the first time it opens, not on every page (they doubled the HTML of each page)
+  const [drawerReady, setDrawerReady] = useState(false)
+  useEffect(() => { if (open) setDrawerReady(true) }, [open])
   const [folded, setFolded] = useState<string[]>([])
   const [tip, setTip] = useState<{ label: string; top: number } | null>(null)
   const tipTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -87,15 +90,14 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false, user = 
     return <Link key={i.key} href={i.href} aria-label={rail ? i.label : undefined} aria-current={on ? 'page' : undefined}
       onMouseEnter={e => { if (rail) showTip(i.label, e.currentTarget) }} onMouseLeave={hideTip}
       onFocus={e => { if (rail) showTip(i.label, e.currentTarget) }} onBlur={hideTip}
-      className={cn('nav-item group/l relative flex h-10 shrink-0 select-none items-center gap-3 rounded-[10px] ps-[10px] pe-2.5 text-[14px] outline-offset-0 transition-[color,transform] duration-150 active:scale-[.985] lg:h-[34px] lg:text-[13.5px]',
-        on ? 'font-medium text-white' : 'text-sb-muted hover:text-sb-fg')}>
+      className={cn('nav-item', on ? 'font-medium text-white' : 'text-sb-muted hover:text-sb-fg')}>
       {/* hover wash (static) and the active highlight (slides between items) */}
-      {!on && <span aria-hidden className="absolute inset-0 rounded-[inherit] bg-white/[.045] opacity-0 transition-opacity duration-150 group-hover/l:opacity-100" />}
+      {!on && <span aria-hidden className="nav-wash" />}
       {on && <m.span layoutId={`nav-on-${where}`} transition={{ duration: 0.26, ease: EASE }} aria-hidden
         className="absolute inset-0 rounded-[inherit] bg-[linear-gradient(90deg,hsl(var(--sb-accent)/.26),hsl(var(--sb-accent)/.10))] ring-1 ring-inset ring-sb-accent/25">
         <span className="absolute inset-y-2 start-0 w-[3px] rounded-e-full bg-sb-accent" /></m.span>}
       <I size={19} weight={on ? 'fill' : 'regular'} aria-hidden
-        className={cn('relative shrink-0 transition-[color,transform] duration-200 ease-out', on ? 'text-[hsl(var(--sb-accent-soft))]' : 'text-sb-muted group-hover/l:-translate-y-px group-hover/l:text-sb-fg')} />
+        className={cn('nav-ico', on && 'is-on')} />
       <m.span initial={false} animate={{ opacity: rail ? 0 : 1 }} transition={rail ? fade : { ...fade, delay: 0.06 }} className="relative min-w-0 flex-1 truncate">{i.label}</m.span>
     </Link>
   }
@@ -136,6 +138,7 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false, user = 
     <AnimatePresence>{open && <m.div key="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={T.fast} className="fixed inset-0 z-40 bg-[hsl(222_40%_4%/.5)] backdrop-blur-[2px] lg:hidden" onClick={() => setOpen(false)} aria-hidden />}</AnimatePresence>
     <m.aside aria-label="Navigation" aria-hidden={!open} inert={!open} initial={false} animate={{ x: open ? 0 : rtl ? '100%' : '-100%' }} transition={{ duration: 0.28, ease: EASE }} style={{ x: rtl ? '100%' : '-100%' }}
       className="sb fixed inset-y-0 start-0 z-drawer flex w-[300px] max-w-[86vw] flex-col bg-sb text-sb-fg shadow-pop lg:hidden">
+      {(open || drawerReady) && <>
       <div className="flex h-16 shrink-0 items-center gap-2 ps-[22px] pe-2"><div className="min-w-0 flex-1">{brand(false)}</div>
         <button aria-label="Close menu" className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-sb-muted transition-colors hover:bg-white/[.06] hover:text-sb-fg" onClick={() => setOpen(false)}><XIcon size={18} /></button></div>
       <Link href="/settings#account" className="mx-3 mb-3 flex items-center gap-3 rounded-xl bg-white/[.04] p-2.5 ring-1 ring-inset ring-white/[.06] transition-colors hover:bg-white/[.07]">
@@ -143,7 +146,7 @@ export function Sidebar({ items, company, rtl, initialCollapsed = false, user = 
         <span className="min-w-0 leading-tight"><span className="block truncate text-[13.5px] font-semibold text-white">{user}</span><span className="block truncate text-[11.5px] capitalize text-sb-muted">{role.replace(/_/g, ' ')} · {company}</span></span></Link>
       {search(false)}
       {nav(false, 'drawer')}
-      <div className="shrink-0 pb-[env(safe-area-inset-bottom)]" />
+      <div className="shrink-0 pb-[env(safe-area-inset-bottom)]" /></>}
     </m.aside>
 
     {/* desktop */}

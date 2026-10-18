@@ -88,6 +88,36 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 .art-twinkle { animation: art-twinkle 3.4s ease-in-out infinite; }
 .art-bars rect { transform-box: fill-box; transform-origin: bottom; animation: bar-grow .7s cubic-bezier(.2,.8,.2,1) both .15s; }
 @media print { *, ::before, ::after { animation: none !important; } }
+/* Sidebar link (components/layout/sidebar.tsx): one short class per part instead of the same long utility list on
+   every link, which made up a large share of each page's HTML. */
+.nav-item { position: relative; display: flex; height: 2.5rem; flex-shrink: 0; user-select: none; align-items: center; gap: .75rem; border-radius: 10px;
+  padding-inline: 10px .625rem; font-size: 14px; outline-offset: 0; transition: color .15s, transform .15s; }
+.nav-item:active { transform: scale(.985); }
+@media (min-width: 1024px) { .nav-item { height: 34px; font-size: 13.5px; } }
+.nav-wash { position: absolute; inset: 0; border-radius: inherit; background: rgb(255 255 255 / .045); opacity: 0; transition: opacity .15s; }
+.nav-item:hover .nav-wash { opacity: 1; }
+.nav-ico { position: relative; flex-shrink: 0; color: hsl(var(--sb-muted)); transition: color .2s ease-out, transform .2s ease-out; }
+.nav-item:hover .nav-ico:not(.is-on) { color: hsl(var(--sb-fg)); transform: translateY(-1px); }
+.nav-ico.is-on { color: hsl(var(--sb-accent-soft)); }
+/* Business art (components/brand/business-art.tsx): cards drift a few pixels, the trend line draws once, bars grow,
+   points pulse, windows light up, the glow breathes and the delivery van crosses. Transform/opacity only. */
+@keyframes ba-float { 50% { transform: translateY(-6px); } }
+@keyframes ba-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes ba-ping { 0% { opacity: .55; transform: scale(.4); } 80%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes ba-win { 0%, 100% { opacity: .2; } 45%, 70% { opacity: 1; } }
+@keyframes ba-aura { 50% { transform: translate(-18px, 10px) scale(1.06); } }
+@keyframes ba-flow { to { stroke-dashoffset: -32; } }
+@keyframes ba-van { from { translate: -80px 0; } to { translate: 1200px 0; } }
+.ba-card { transform-box: fill-box; }
+.ba-f1 { animation: ba-float 7s ease-in-out infinite; } .ba-f2 { animation: ba-float 8.5s ease-in-out -2s infinite; } .ba-f3 { animation: ba-float 6.5s ease-in-out -4s infinite; }
+.ba-draw { stroke-dasharray: 1; animation: ba-draw 1.8s cubic-bezier(.4,0,.2,1) .3s both; }
+.ba-ping { transform-box: fill-box; transform-origin: center; animation: ba-ping 2.8s ease-out infinite; }
+.ba-d1 { animation-delay: -.9s; } .ba-d2 { animation-delay: -1.8s; }
+.ba-bars rect { transform-box: fill-box; transform-origin: bottom; animation: bar-grow .9s cubic-bezier(.2,.8,.2,1) .4s both; }
+.ba-win { animation: ba-win 6s ease-in-out infinite; } .ba-w1 { animation-delay: -1.5s; } .ba-w2 { animation-delay: -3s; } .ba-w3 { animation-delay: -4.5s; }
+.ba-aura { transform-box: fill-box; transform-origin: center; animation: ba-aura 16s ease-in-out infinite; } .ba-aura2 { animation-duration: 21s; animation-direction: reverse; }
+.ba-flow { animation: ba-flow 2.4s linear infinite; }
+.ba-van { animation: ba-van 22s linear infinite; }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
 /* KPI card (StatCard): stacked when narrow; from 250 px wide the icon tile sits on the left and the bars bottom-right */
 .kpi { container-type: inline-size; }
@@ -299,3 +329,11 @@ main :where(p, dd, li, h1, h2, h3, label) { overflow-wrap: break-word; }
 }
 
 @keyframes navbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
+/* Table header and body cells (Th / Td in components/ui/primitives.tsx). A short class instead of the same utility list on
+   every cell of every table; in the components layer, so a cell's own utilities (text-right, px-5…) still win. */
+@layer components {
+  .th { @apply h-10 whitespace-nowrap border-b border-border bg-surface-2/50 px-3 text-start text-[12.5px] font-medium tracking-[0.005em] text-muted first:ps-5 last:pe-5; }
+  .td { @apply px-3 py-3 align-middle first:ps-5 last:pe-5; }
+  .cal-day { @apply relative mx-auto grid h-9 w-9 place-items-center rounded-lg tabular-nums transition-colors; }   /* mini calendar day */
+}

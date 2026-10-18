@@ -175,9 +175,9 @@ export const PageHeader = ({ title, sub, actions, crumbs }: { title: string; sub
 export const Alert = ({ tone: t = 'blue', children }: { tone?: Tone; children: ReactNode }) =>
   <div role={t === 'red' ? 'alert' : undefined} className={cn('rounded-md border px-3 py-2 text-sm', t === 'red' ? 'border-danger/25 bg-danger/5 text-danger' : t === 'amber' ? 'border-warning/25 bg-warning/5' : t === 'green' ? 'border-success/25 bg-success/5' : t === 'neutral' ? 'border-border bg-surface-2' : 'border-primary/20 bg-primary-soft')}>{children}</div>
 
-export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('h-10 whitespace-nowrap border-b border-border bg-surface-2/50 px-3 text-start text-[12.5px] font-medium tracking-[0.005em] text-muted first:ps-5 last:pe-5', className)}>{children}</th>
+export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => <th scope="col" className={cn('th', className)}>{children}</th>
 /** `badge`: on phone cards this cell (a status) sits at the top right, beside the record's title, instead of on its own line. */
-export const Td = ({ children, className, title, colSpan, badge }: { children?: ReactNode; className?: string; title?: string; colSpan?: number; badge?: boolean }) => <td title={title} colSpan={colSpan} data-card={badge ? 'badge' : undefined} className={cn('px-3 py-3 align-middle first:ps-5 last:pe-5', className)}>{children}</td>
+export const Td = ({ children, className, title, colSpan, badge }: { children?: ReactNode; className?: string; title?: string; colSpan?: number; badge?: boolean }) => <td title={title} colSpan={colSpan} data-card={badge ? 'badge' : undefined} className={cn('td', className)}>{children}</td>
 // relative: the scroll box is the containing block, so absolutely positioned children (sr-only labels) cannot widen the page
 export { TableWrap } from './table-wrap'
 

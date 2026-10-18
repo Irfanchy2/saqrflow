@@ -23,10 +23,11 @@ try {
   console.log('\n[S1] Login page & shell')
   await p.goto(`${BASE}/login`); await settle()
   ok((await body()).includes('Sales, people, documents and assets in one system.'), 'login: split layout with product hero')
-  await p.waitForSelector('section[aria-label="About Averiqo"] canvas', { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(1500)
-  ok(await p.locator('section[aria-label="About Averiqo"] canvas').count() === 1, 'login: 3D steel hero rendered (WebGL, lazy-loaded)'); await shot('29-login-3d')
+  await p.waitForTimeout(1500)
+  ok(await p.locator('section[aria-label="About Averiqo"] [data-business-art="hero"]').count() === 1 && await p.locator('section[aria-label="About Averiqo"] canvas').count() === 0,
+    'login: business scene hero (inline SVG, no WebGL download)'); await shot('29-login-hero')
   const m0 = await browser.newContext({ viewport: { width: 390, height: 844 } }); const mp0 = await m0.newPage(); await mp0.goto(`${BASE}/login`); await mp0.waitForTimeout(1500)
-  ok(await mp0.locator('canvas').count() === 0 && await mp0.getByRole('button', { name: 'Sign in' }).isVisible(), 'login on a phone: no 3D (battery), form first'); await m0.close()
+  ok(await mp0.locator('canvas').count() === 0 && await mp0.getByRole('button', { name: 'Sign in' }).isVisible(), 'login on a phone: no canvas, form first'); await m0.close()
   await p.goto(`${BASE}/signup`); await p.getByLabel('Work email').fill('sales-owner@alsaqr.test'); await p.getByLabel('Password').fill('correct-horse-battery'); await p.getByRole('button', { name: 'Create account' }).click()
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('Al Saqr Al Ahmar Welding'); await p.getByLabel('Your full name').fill('Sales Owner'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`)
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email='sales-owner@alsaqr.test'`)).company_id
