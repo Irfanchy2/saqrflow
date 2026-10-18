@@ -2,12 +2,13 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getCtx, need } from '@/lib/auth'
+import { demoGuard } from '@/lib/demo'
 import { safe, str } from '@/lib/action'
 import type { ActionState } from '@/lib/utils'
 
 export async function savePublicForm(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'public forms'); need(c, 'settings.manage')
     const v = z.object({
       slug: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{2,39}$/, 'Web address: 3–40 letters, digits or “-”'),
       title: z.string().trim().min(1, 'Title is required').max(120), intro: z.string().trim().max(1000).optional(),
@@ -23,7 +24,7 @@ export async function savePublicForm(_: ActionState, fd: FormData): Promise<Acti
 
 export async function setPublicFormEnabled(id: string, enabled: boolean): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'public forms'); need(c, 'settings.manage')
     if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: 'Unknown form.' }
     const { error } = await c.supabase.from('public_forms').update({ enabled }).eq('id', id)
     if (error) throw error

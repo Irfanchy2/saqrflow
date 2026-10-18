@@ -20,6 +20,7 @@ import { NavPending } from '@/components/layout/nav-pending'
 import { RowNavigator } from '@/components/layout/row-navigator'
 import { UserMenu, TopThemeToggle } from '@/components/layout/user-menu'
 import { AveriqoMark } from '@/components/brand/logo'
+import { signOut } from '@/app/actions/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +81,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         page threw React #418 (seen intermittently on any page) */}
     <Sidebar items={visible} company={c.company.name} user={c.profile.full_name} role={c.profile.role} rtl={isRtl(l)} initialCollapsed={collapsed} />
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
+      {c.company.is_demo && <div role="note" data-demo-banner className="no-print flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-primary/15 bg-primary-soft px-4 py-2 text-center text-[13px]">
+        <span><b className="font-semibold">Shared demo.</b> Sample data, reset every day. Messages are never really sent.</span>
+        <form action={signOut}><input type="hidden" name="next" value="signup" /><button className="cursor-pointer font-semibold text-primary underline-offset-2 hover:underline">Create your own account →</button></form></div>}
       <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border/70 bg-surface/85 px-2 backdrop-blur-md backdrop-saturate-150 sm:gap-3 sm:px-5 lg:px-8">
         <MenuButton />
         <Link href="/" className="flex h-11 min-w-0 flex-1 items-center gap-2 sm:hidden" aria-label={`Averiqo · ${c.company.name}`}><AveriqoMark size={28} /><span className="text-[18px] font-bold tracking-[-0.02em]">Averiqo</span></Link>

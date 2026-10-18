@@ -8,6 +8,7 @@ import { sendEmail, sendWhatsApp, type WhatsAppConfig } from '../whatsapp/client
 import { decryptSecret } from '../crypto'
 import { addDays, localHm, todayInTz } from '../time'
 import { advanceDue } from './schedule'
+import { isDemoCompany } from '../demo'
 
 type Admin = SupabaseClient
 
@@ -17,7 +18,7 @@ export async function loadWhatsAppConfig(admin: Admin, companyId: string, settin
   if (data?.ciphertext) { try { token = decryptSecret(data.ciphertext) } catch { /* bad key → fall back to env */ } }
   return {
     phoneNumberId: settings.phoneNumberId ?? process.env.WHATSAPP_PHONE_NUMBER_ID, accessToken: token,
-    apiVersion: process.env.WHATSAPP_API_VERSION ?? 'v21.0', forceSandbox: settings.whatsappMode === 'sandbox',
+    apiVersion: process.env.WHATSAPP_API_VERSION ?? 'v21.0', forceSandbox: settings.whatsappMode === 'sandbox' || await isDemoCompany(companyId),   // the shared demo never sends for real
   }
 }
 
@@ -29,7 +30,7 @@ export function makeSenders(admin: Admin): Senders {
   }
   return {
     whatsapp: async (to, t, p, companyId) => sendWhatsApp(await cfg(companyId), to, t, p),
-    email: async (to, subject, text) => sendEmail({ apiKey: process.env.RESEND_API_KEY, from: process.env.EMAIL_FROM }, to, subject, text),
+    email: async (to, subject, text, companyId) => (await isDemoCompany(companyId)) ? sendEmail({}, to, subject, text) : sendEmail({ apiKey: process.env.RESEND_API_KEY, from: process.env.EMAIL_FROM }, to, subject, text),
     party: async log => { const { deliverParty } = await import('../whatsapp/outbox'); return deliverParty(admin, log as any) },
   }
 }

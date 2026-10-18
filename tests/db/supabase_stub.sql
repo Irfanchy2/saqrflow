@@ -1,7 +1,8 @@
 -- Minimal stand-ins for Supabase-provided objects so migrations + RLS can be tested on vanilla Postgres.
 create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
 create schema auth;
-create table auth.users (id uuid primary key default gen_random_uuid(), email text);
+create table auth.users (id uuid primary key default gen_random_uuid(), email text, encrypted_password text, email_confirmed_at timestamptz,
+  email_change text default '', email_change_token_new text default '', email_change_token_current text default '', banned_until timestamptz);
 -- same resolution order as Supabase: per-claim GUC (used by our tests) or the JSON claims set by PostgREST
 create function auth.uid() returns uuid language sql stable as
   $$ select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),

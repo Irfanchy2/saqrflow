@@ -5,13 +5,15 @@ import { processEvents, deliverWebhooks } from '@/lib/event-worker'
 import { runDueSchedules } from '@/lib/scheduled-reports'
 import { recordRun } from '@/lib/system-runs'
 import { safeEqual } from '@/lib/crypto'
+import { resetDemo } from '@/lib/demo'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
 /**
  * Scheduler entry point (Vercel Cron calls it every morning with `Authorization: Bearer $CRON_SECRET`). Idempotent:
- * events → rule alerts / webhooks, due scheduled reports, then reminders (which also sends everything queued).
+ * events → rule alerts / webhooks, due scheduled reports, then reminders (which also sends everything queued), then the
+ * shared demo company is put back to its sample data.
  */
 async function handle(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -25,7 +27,8 @@ async function handle(req: NextRequest) {
       const reports = await runDueSchedules(admin)
       const reminders = await runReminderCycle(admin)
       const webhooks = await deliverWebhooks(admin, 100)
-      return { events, reports, webhooks, ...reminders }
+      const demo = await resetDemo(admin).catch(e => ({ demoError: (e as Error).message }))   // never blocks the real work above
+      return { events, reports, webhooks, ...reminders, ...demo }
     })
     return NextResponse.json({ ok: true, ms: Date.now() - started, ...r })
   } catch (e) { console.error('[cron/reminders]', e); return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 }) }

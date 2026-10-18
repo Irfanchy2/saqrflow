@@ -1,6 +1,7 @@
 import 'server-only'
 import { ZodError } from 'zod'
 import { ForbiddenError } from './permissions'
+import { DemoBlockedError } from './demo-account'
 import type { ActionState } from './utils'
 import { scheduleEventWork } from './event-kick'
 import { after } from 'next/server'
@@ -24,6 +25,7 @@ export async function safe(fn: () => Promise<ActionState | void>): Promise<Actio
     if (digest.startsWith('NEXT_REDIRECT') && digest.includes(';/login;')) return { error: 'Your session has expired. Sign in again in a new tab, then retry. Your changes are still on this screen.', data: { auth: true } }
     if (digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_NOT_FOUND')) throw e
     if (e instanceof ZodError) return { error: e.issues.map(i => `${i.path.join('.') || 'Form'}: ${i.message}`).join(' · ') }
+    if (e instanceof DemoBlockedError) return { error: e.message }
     if (e instanceof ForbiddenError) { await denied(e.message); return { error: e.message } }
     const m = (e as { message?: string; code?: string }) ?? {}
     if (m.code === '42501' || /row-level security|insufficient privilege/i.test(m.message ?? '')) { await denied(`database refused: ${m.message?.slice(0, 160)}`); return { error: 'You are not allowed to do that.' } }

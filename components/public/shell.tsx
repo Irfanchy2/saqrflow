@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ShieldCheck } from '@/components/icons'
+import { LinkBreak, ShieldCheck } from '@/components/icons'
+import { EmptyArt } from '@/components/ui/empty-art'
 
 /** Header + width for public pages. The company's own name is shown; Averiqo appears only as the small "secured by" line. */
 export function PublicShell({ company, title, sub, children, isPublic }: { company: string; title: string; sub?: string; children: ReactNode; isPublic?: boolean }) {
@@ -16,7 +17,7 @@ export function PublicShell({ company, title, sub, children, isPublic }: { compa
 
 export function LinkGone({ what = 'link' }: { what?: string }) {
   return <div className="mx-auto grid min-h-[70dvh] max-w-md place-items-center px-4 text-center">
-    <div><h1 className="text-xl font-semibold">This {what} is not available</h1>
+    <div className="empty-in"><EmptyArt icon={LinkBreak} size="lg" className="mb-5" /><h1 className="text-xl font-semibold">This {what} is not available</h1>
       <p className="mt-2 text-sm text-muted">It may have expired or been switched off by the sender. Please ask them for a new link.</p></div>
   </div>
 }

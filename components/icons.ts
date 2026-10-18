@@ -3,6 +3,7 @@
 // The SSR entry needs no React context, so these work in server and client components alike.
 export {
   WarningOctagonIcon as AlertOctagon,
+  LinkBreakIcon as LinkBreak,
   WarningIcon as AlertTriangle,
   ArchiveIcon as Archive,
   BoxArrowUpIcon as ArchiveRestore,

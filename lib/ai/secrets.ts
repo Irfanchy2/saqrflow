@@ -3,8 +3,9 @@ import { auditAction } from '../security'
 import { createAdminClient } from '../supabase/admin'
 import { adminConfigured } from '../env'
 import { decryptSecret, encryptSecret } from '../crypto'
+import { isDemoCompany } from '../demo'
 
-/** Integration credentials. An environment variable wins; otherwise a key saved (AES-GCM encrypted) from Settings is used. */
+/** Integration credentials. An environment variable wins; otherwise a key saved (AES-GCM encrypted) from Settings is used. The shared demo gets none. */
 export const SECRETS = {
   ocr_space_api_key: { env: 'OCR_SPACE_API_KEY', label: 'OCR.Space API key' },
   gemini_api_key: { env: 'GEMINI_API_KEY', label: 'Gemini API key' },
@@ -15,6 +16,7 @@ export type SecretName = keyof typeof SECRETS
 
 const cache = new Map<string, { v: string | null; at: number }>()
 export async function getSecret(companyId: string | null, name: SecretName): Promise<string | null> {
+  if (await isDemoCompany(companyId)) return null
   const env = process.env[SECRETS[name].env]
   if (env && env.trim()) return env.trim()
   if (!companyId || !adminConfigured() || !process.env.SETTINGS_ENCRYPTION_KEY) return null

@@ -12,7 +12,7 @@ export interface Ctx {
   supabase: Awaited<ReturnType<typeof createClient>>
   userId: string; email: string
   profile: { id: string; company_id: string; full_name: string; role: Role; locale: string }
-  company: { id: string; name: string; timezone: string; currency: string; locale: string }
+  company: { id: string; name: string; timezone: string; currency: string; locale: string; /** the shared demo (lib/demo.ts) */ is_demo?: boolean }
   today: string
   can: (p: Permission) => boolean
 }
@@ -36,7 +36,7 @@ export const getCtx = cache(async (): Promise<Ctx> => {
   const sid = sessionIdFromJwt((await supabase.auth.getSession()).data.session?.access_token)
   const ip = (h.get('x-forwarded-for')?.split(',')[0]?.trim() || '').slice(0, 64) || null, ua = (h.get('user-agent') ?? '').slice(0, 300) || null
   const [{ data: row }, touch] = await Promise.all([
-    supabase.from('profiles').select('id, company_id, full_name, role, locale, company:companies(id, name, timezone, currency, locale)').eq('id', userId).maybeSingle(),
+    supabase.from('profiles').select('id, company_id, full_name, role, locale, company:companies(id, name, timezone, currency, locale, is_demo)').eq('id', userId).maybeSingle(),
     sid ? supabase.rpc('touch_session', { p_sid: sid, p_ip: ip, p_ua: ua }) : Promise.resolve({ data: false }),
   ])
   if (touch.data === true) redirect('/auth/signout?reason=revoked')   // this device was signed out from another device / by an admin

@@ -6,7 +6,7 @@ export { Fab, FilterBar } from './mobile-client'
 
 /** Phone list (hidden from sm up, where the table shows instead). */
 export function MList({ children, className }: { children: ReactNode; className?: string }) {
-  return <ul className={cn('divide-y divide-border sm:hidden', className)}>{children}</ul>
+  return <ul className={cn('mlist divide-y divide-border sm:hidden', className)}>{children}</ul>
 }
 
 /**

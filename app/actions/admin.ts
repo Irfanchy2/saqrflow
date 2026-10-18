@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getCtx, need } from '@/lib/auth'
+import { demoGuard } from '@/lib/demo'
 import { safe, str } from '@/lib/action'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { auditAction } from '@/lib/security'
@@ -20,7 +21,7 @@ async function setting(c: Awaited<ReturnType<typeof getCtx>>, key: string, value
 
 export async function saveCompany(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'editing the company details'); need(c, 'settings.manage')
     const v = z.object({ name: z.string().min(2).max(200), trade_name: z.string().max(200).optional() }).parse({ name: str(fd, 'name'), trade_name: str(fd, 'trade_name') })
     const { error } = await c.supabase.from('companies').update(v).eq('id', c.company.id); if (error) throw error
     revalidatePath('/', 'layout'); return { ok: true, message: 'Saved.' }
@@ -40,7 +41,7 @@ export async function saveReminderSettings(_: ActionState, fd: FormData): Promis
 }
 export async function saveWhatsApp(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'the WhatsApp connection'); need(c, 'settings.manage')
     const pid = str(fd, 'phone_number_id'); if (pid && !/^\d{5,20}$/.test(pid)) return { error: 'Phone number ID should be digits only (from Meta → WhatsApp → API setup).' }
     const waba = str(fd, 'waba_id'); if (waba && !/^\d{5,20}$/.test(waba)) return { error: 'WhatsApp Business Account ID should be digits only.' }
     const appId = str(fd, 'app_id'); if (appId && !/^\d{5,20}$/.test(appId)) return { error: 'Meta App ID should be digits only (Meta for Developers → your app).' }
@@ -56,7 +57,7 @@ export async function saveWhatsApp(_: ActionState, fd: FormData): Promise<Action
   })
 }
 export async function clearWhatsAppToken(): Promise<ActionState> {
-  return safe(async () => { const c = await getCtx(); need(c, 'settings.manage'); await createAdminClient().from('integration_secrets').delete().eq('company_id', c.company.id).eq('name', 'whatsapp_token'); await auditAction(c.company.id, c.userId, 'SECRET_REMOVED', 'integration_secrets', { name: 'whatsapp_token' }); revalidatePath('/settings'); return { ok: true, message: 'Stored token removed.' } })
+  return safe(async () => { const c = await getCtx(); demoGuard(c, 'the WhatsApp connection'); need(c, 'settings.manage'); await createAdminClient().from('integration_secrets').delete().eq('company_id', c.company.id).eq('name', 'whatsapp_token'); await auditAction(c.company.id, c.userId, 'SECRET_REMOVED', 'integration_secrets', { name: 'whatsapp_token' }); revalidatePath('/settings'); return { ok: true, message: 'Stored token removed.' } })
 }
 export async function setLocale(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
@@ -74,7 +75,7 @@ async function ownersLeft(c: Awaited<ReturnType<typeof getCtx>>, exceptId: strin
 }
 export async function inviteUser(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'users.manage')
+    const c = await getCtx(); demoGuard(c, 'inviting users'); need(c, 'users.manage')
     const v = z.object({ email: z.string().email('Enter a valid email'), name: z.string().min(2, 'Enter a name').max(120), role: roleEnum }).parse({ email: str(fd, 'email'), name: str(fd, 'name'), role: str(fd, 'role') })
     if (v.role === 'super_admin' && c.profile.role !== 'super_admin') return { error: 'Only a Super Admin can create another Super Admin.' }
     const admin = createAdminClient()
@@ -86,7 +87,7 @@ export async function inviteUser(_: ActionState, fd: FormData): Promise<ActionSt
 }
 export async function changeRole(id: string, _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'users.manage'); const role = roleEnum.parse(str(fd, 'role')) as Role
+    const c = await getCtx(); demoGuard(c, 'changing user roles'); need(c, 'users.manage'); const role = roleEnum.parse(str(fd, 'role')) as Role
     if (!['company_owner', 'super_admin'].includes(role) && (await ownersLeft(c, id)) < 1) return { error: 'The company must keep at least one owner.' }
     const { data, error } = await c.supabase.from('profiles').update({ role }).eq('id', id).select('id'); if (error) throw error
     if (!data?.length) return { error: 'User not found.' }
@@ -95,7 +96,7 @@ export async function changeRole(id: string, _: ActionState, fd: FormData): Prom
 }
 export async function setUserActive(id: string, active: boolean): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'users.manage')
+    const c = await getCtx(); demoGuard(c, 'turning users on or off'); need(c, 'users.manage')
     if (!active && (id === c.userId || (await ownersLeft(c, id)) < 1)) return { error: id === c.userId ? 'You cannot deactivate your own account.' : 'The company must keep at least one active owner.' }
     const { error } = await c.supabase.from('profiles').update({ is_active: active }).eq('id', id); if (error) throw error
     revalidatePath('/users'); return { ok: true }

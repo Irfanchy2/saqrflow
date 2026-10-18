@@ -66,6 +66,28 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 /* Overdue payment badge: a soft ring that pulses a few times when it appears, then stays still (never blinks). */
 @keyframes due-pulse { 0% { box-shadow: 0 0 0 0 hsl(var(--danger) / .4); } 70%, 100% { box-shadow: 0 0 0 5px hsl(var(--danger) / 0); } }
 .due-pulse { animation: due-pulse 2.2s ease-out 3; }
+/* Entry motion: transform + opacity only (no layout work), short, played once. KPI cards rise one after another, their
+   mini bars grow from the baseline, and the first rows of a list cascade in; later rows come in together. */
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes row-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes bar-grow { from { transform: scaleY(0); } to { transform: none; } }
+.metrics > * { animation: rise .3s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 40ms); }
+.metrics > :nth-child(2) { --i: 1; } .metrics > :nth-child(3) { --i: 2; } .metrics > :nth-child(4) { --i: 3; } .metrics > :nth-child(5) { --i: 4; } .metrics > :nth-child(n+6) { --i: 5; }
+.kpi-bars span span { transform-origin: bottom; animation: bar-grow .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(120ms + var(--b, 0) * 30ms); }
+.rtable tbody tr, .mlist > li { animation: row-in .26s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--r, 10) * 18ms); }
+.rtable tbody tr:nth-child(1), .mlist > li:nth-child(1) { --r: 0; } .rtable tbody tr:nth-child(2), .mlist > li:nth-child(2) { --r: 1; }
+.rtable tbody tr:nth-child(3), .mlist > li:nth-child(3) { --r: 2; } .rtable tbody tr:nth-child(4), .mlist > li:nth-child(4) { --r: 3; }
+.rtable tbody tr:nth-child(5), .mlist > li:nth-child(5) { --r: 4; } .rtable tbody tr:nth-child(6), .mlist > li:nth-child(6) { --r: 5; }
+.rtable tbody tr:nth-child(7), .mlist > li:nth-child(7) { --r: 6; } .rtable tbody tr:nth-child(8), .mlist > li:nth-child(8) { --r: 7; }
+.rtable tbody tr:nth-child(9), .mlist > li:nth-child(9) { --r: 8; } .rtable tbody tr:nth-child(10), .mlist > li:nth-child(10) { --r: 9; }
+/* Empty-state art (components/ui/empty-art.tsx): the card floats a few pixels, the sparkles breathe. `translate` composes
+   with the centring transform. */
+@keyframes art-float { 50% { translate: 0 -4px; } }
+@keyframes art-twinkle { 50% { opacity: .45; } }
+.art-float { animation: art-float 5.5s ease-in-out infinite; box-shadow: 0 10px 24px -12px hsl(var(--primary) / .35), 0 1px 2px hsl(var(--fg) / .06); }
+.art-twinkle { animation: art-twinkle 3.4s ease-in-out infinite; }
+.art-bars rect { transform-box: fill-box; transform-origin: bottom; animation: bar-grow .7s cubic-bezier(.2,.8,.2,1) both .15s; }
+@media print { *, ::before, ::after { animation: none !important; } }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
 /* KPI card (StatCard): stacked when narrow; from 250 px wide the icon tile sits on the left and the bars bottom-right */
 .kpi { container-type: inline-size; }

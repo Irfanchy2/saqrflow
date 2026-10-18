@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { getCtx, need, type Ctx } from '@/lib/auth'
+import { demoGuard } from '@/lib/demo'
 import { safe, str } from '@/lib/action'
 import { saveVersion } from '@/lib/doc-upload'
 import { addDays } from '@/lib/time'
@@ -650,7 +651,7 @@ export async function archivePdfToVault(id: string): Promise<ActionState> {
 const IMG = /^image\/(png|jpeg)$/
 export async function uploadBranding(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); need(c, 'settings.manage')
+    const c = await getCtx(); demoGuard(c, 'uploading a logo, stamp or signature'); need(c, 'settings.manage')
     const kind = z.enum(BRAND_KINDS).parse(str(fd, 'kind'))
     const f = fd.get('file')
     if (!(f instanceof File) || !f.size) return { error: 'Choose an image (PNG or JPG).' }
