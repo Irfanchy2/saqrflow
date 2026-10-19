@@ -1,8 +1,7 @@
 import { supabaseConfigured } from '@/lib/env'
 import { SetupRequired } from '@/components/layout/setup-required'
-import { SteelHero } from '@/components/auth/steel-hero'
 import { AveriqoLogo, AveriqoMark } from '@/components/brand/logo'
-import { SteelFrameArt } from '@/components/dashboard/banner'
+import { BusinessArt } from '@/components/brand/business-art'
 
 const POINTS = [
   ['Quotations to payments', 'Your letterhead, stamp and terms. Convert, invoice, collect and follow ageing.'],
@@ -14,7 +13,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   if (!supabaseConfigured()) return <SetupRequired />
   return <main className="grid min-h-[100dvh] bg-bg lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
     <section aria-label="About Averiqo" className="relative hidden overflow-hidden bg-sb text-sb-fg lg:block">
-      <SteelHero />
+      <BusinessArt variant="hero" id="auth" className="opacity-90" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,hsl(var(--sb))_8%,hsl(var(--sb)/.55)_50%,hsl(var(--sb)/.1))]" />
       <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
         <div className="flex flex-col items-start gap-1.5"><AveriqoLogo height={40} tone="dark" />
@@ -29,7 +28,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="flex flex-col lg:grid lg:place-items-center lg:px-8 lg:py-10">
       {/* phones and tablets: a dark welcome panel above the form */}
       <section aria-label="Averiqo" className="relative overflow-hidden bg-[linear-gradient(160deg,hsl(var(--sb))_0%,hsl(223_55%_18%)_60%,hsl(217_70%_28%)_100%)] px-6 pb-16 pt-10 text-white lg:hidden">
-        <div className="absolute inset-0 opacity-40"><SteelFrameArt /></div>
+        <BusinessArt variant="hero" id="auth-m" className="opacity-35" />
         <div className="relative">
           <div className="flex items-center gap-3"><AveriqoMark size={44} /><span className="leading-tight"><span className="block text-[28px] font-bold tracking-[-0.02em]">Averiqo</span><span className="block text-xs text-white/70">Business Operating System</span></span></div>
           <h2 className="mt-14 text-[32px] font-bold leading-[1.12] tracking-[-0.025em]">Manage your business smarter</h2>

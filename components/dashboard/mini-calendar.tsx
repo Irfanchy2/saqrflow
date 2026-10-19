@@ -28,7 +28,7 @@ export function MiniCalendar({ today, due }: { today: string; due: Map<string, n
         if (c.out || !c.iso) return <div key={i} className="grid h-9 place-items-center text-muted/40 tabular-nums">{c.d}</div>
         const n = due.get(c.iso) ?? 0, isToday = c.iso === today
         return <Link key={i} href={`/calendar?m=${ym}`} aria-label={`${c.iso}${n ? `, ${n} due` : ''}`}
-          className={cn('relative mx-auto grid h-9 w-9 place-items-center rounded-lg tabular-nums transition-colors', isToday ? 'bg-primary font-semibold text-primary-fg' : 'hover:bg-surface-2', c.iso < today && !isToday && 'text-muted')}>
+          className={cn('cal-day', isToday ? 'bg-primary font-semibold text-primary-fg' : 'hover:bg-surface-2', c.iso < today && !isToday && 'text-muted')}>
           {c.d}{n > 0 && <span aria-hidden className={cn('absolute bottom-1 h-1 w-1 rounded-full', isToday ? 'bg-primary-fg' : c.iso < today ? 'bg-danger' : 'bg-warning')} />}</Link>
       })}
     </div>
