@@ -50,9 +50,9 @@ export function Dock({ can }: { can: Can }) {
   return <nav aria-label="Quick actions" className="app-dock no-print fixed start-5 top-1/2 z-nav hidden -translate-y-1/2 flex-col items-center gap-1 rounded-full bg-ink p-1.5 shadow-[0_18px_40px_-16px_hsl(var(--shadow)/.55)] lg:flex">
     <button type="button" className={btn} aria-label="Search (Ctrl K)" onClick={() => dispatchEvent(new Event('saqrflow:palette'))}><Search size={19} aria-hidden /><Tip>Search <kbd className="ms-1 rounded bg-ink-fg/15 px-1 text-[11px]">Ctrl K</kbd></Tip></button>
     <div ref={box} className="relative">
-      <button type="button" className={cn(btn, open && 'bg-ink-fg/10 text-ink-fg')} aria-label="Create new" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)} disabled={pending}>
+      <button type="button" className={cn(btn, open && 'bg-ink-fg/10 text-ink-fg')} aria-label="Quick create" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)} disabled={pending}>
         {pending ? <Loader2 size={19} className="animate-spin" aria-hidden /> : <Plus size={20} className={cn('transition-transform duration-200', open && 'rotate-45')} aria-hidden />}{!open && <Tip>Create <kbd className="ms-1 rounded bg-ink-fg/15 px-1 text-[11px]">C</kbd></Tip>}</button>
-      {open && <m.div role="menu" aria-label="Create new" initial={{ opacity: 0, x: -6, scale: 0.98 }} animate={{ opacity: 1, x: 0, scale: 1 }} transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
+      {open && <m.div role="menu" aria-label="Quick create" initial={{ opacity: 0, x: -6, scale: 0.98 }} animate={{ opacity: 1, x: 0, scale: 1 }} transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
         onKeyDown={e => { if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return; e.preventDefault(); const els = [...(box.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? [])], i = els.indexOf(document.activeElement as HTMLElement); els[(i + (e.key === 'ArrowDown' ? 1 : -1) + els.length) % els.length]?.focus() }}
         className="absolute start-[calc(100%+14px)] top-1/2 z-pop w-56 -translate-y-1/2 rounded-2xl border border-border/80 bg-surface/95 p-1.5 shadow-pop backdrop-blur-xl">
         <div className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Create</div>
