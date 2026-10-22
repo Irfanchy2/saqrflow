@@ -49,7 +49,7 @@ try {
   await tabs.getByRole('menu').getByRole('menuitem', { name: 'Work Orders' }).click(); await p.waitForURL('**/work-orders**'); await settle()
   ok(await tabs.locator('[data-top="ops"]').getAttribute('aria-current') === 'page', 'a page picked from the hover menu marks its tab current')
   await p.mouse.move(700, 700); await p.keyboard.press('c'); await p.waitForTimeout(300)
-  ok(await p.locator('nav[aria-label="Quick actions"]').getByRole('menu', { name: 'Create new' }).isVisible(), 'C opens the dock create menu')
+  ok(await p.locator('nav[aria-label="Quick actions"]').getByRole('menu', { name: 'Quick create' }).isVisible(), 'C opens the dock create menu')
   await p.keyboard.press('Escape'); await p.waitForTimeout(200)
   ok(!(await p.locator('nav[aria-label="Quick actions"]').getByRole('menu').count()), 'Escape closes it')
   await p.locator('nav[aria-label="Quick actions"]').getByRole('button', { name: 'Search (Ctrl K)' }).click(); await p.waitForTimeout(300)
