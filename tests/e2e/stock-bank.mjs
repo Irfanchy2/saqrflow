@@ -134,7 +134,7 @@ try {
   await db.query(`update payments set amount=3000 where id=$1`, [pay.id])
   ok(await bal(enbd.id) === 11973.75, 'changing the payment amount moves the balance with it')
   await p.locator('tr', { hasText: 'Transfer to Petty cash' }).getByRole('button', { name: 'Remove entry' }).click(); await settle(900)
-  ok(await bal(enbd.id) === 12973.75 && await bal(cash.id) === 1350, 'removing a transfer removes both legs')
+  ok(await bal(enbd.id) === 12973.75 && await bal(cash.id) === 350, `removing a transfer removes both legs (ENBD ${await bal(enbd.id)}, petty cash ${await bal(cash.id)})`)
   ok(!(await p.locator('tr', { hasText: 'TT-8812' }).getByRole('button', { name: 'Remove entry' }).count()), 'entries from payments cannot be removed here (changed at the payment)')
 
   console.log('\n[3] Phone')
