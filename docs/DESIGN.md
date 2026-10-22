@@ -4,18 +4,18 @@ Averiqo is the software brand. Company identity (letterhead, stamp, legal name) 
 
 ## Identity
 
-- **Navigation:** deep navy sidebar (`bg-sb`, tokens `--sb-*`) in both themes. The current page is a filled blue pill (`bg-sb-accent`). Sections have small uppercase labels.
-- **Content:** a light, blue-tinted page (`bg-bg`) with white cards (`bg-surface`, `rounded-xl`, hairline border, soft `shadow-card`).
+- **Navigation:** glass pill tabs across the top (one per group) with an ink pill on the current group, section pills under them, and a floating ink dock at the left edge. Phones and tablets keep the drawer and the bottom bar.
+- **Content:** a warm "paper" page (`bg-bg`) behind a slow, soft colour mesh (`.mesh`), with white cards (`bg-surface`, `rounded-xl` = 20 px, hairline border, soft `shadow-card`).
 - **Colour:**
   - Averiqo blue (`primary`) for links, tabs, the active nav item and charts.
   - Navy ink (`ink`) for the main action button on each page. In dark mode the ink becomes the primary blue.
   - Status colours (`success`, `warning`, `danger`) appear only as a tint with readable text.
   - KPI icon tiles rotate through soft tints (blue, orange, emerald, violet, sky, amber); a red tile means a problem.
-- **Type:** Geist with tabular figures. Size and weight by role:
+- **Type:** Urbanist for the interface (variable, self-hosted), Geist behind it and for documents, PDFs and print; tabular figures. Size and weight by role:
 
 | Role | Size and weight |
 |---|---|
-| Page title | 26 px semibold (24 px bold on phones) |
+| Page title | 34 px semibold, −0.035 em (26 px on phones) |
 | Card title | 15 px semibold |
 | KPI value | 23 px semibold |
 | Table header | 12.5 px medium |
@@ -49,11 +49,10 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
 ## Layout
 
 - **Shell:** `app/(app)/layout.tsx`
-  - **Sidebar:** `components/layout/sidebar.tsx`. Brand plus "Business Operating System"; Dashboard group, then Sales (CRM, Customers, Site visits, Quotations, Invoices, Delivery notes, Payments, Catalog), Operations, Finance, People & documents, Reports and System.
-    - It collapses from 256 px to a 68 px icon rail with tooltips; the choice is a cookie (Ctrl+\).
-    - Every section can fold: its arrow is always visible, and a folded section shows how many items it holds. The choice is remembered per browser, and the section holding the current page stays open.
-    - On phones and tablets it becomes a drawer.
-  - **Top bar:** search (Ctrl K), company location, notifications, settings, theme, and the user menu (account, settings, sign out).
+  - **Top tabs** (`components/layout/top-nav.tsx`, `TopTabs`): Dashboard, Sales, Operations, Finance, People, Reports. Each nav item carries its group (`top`). A tab opens the group's first page, shows a count of what needs attention (overdue invoices, late tasks, cheques due in 7 days, documents expiring in 30 days) and lists the group's pages on hover. System pages (users, audit log, trash, settings) are reached from Settings.
+  - **Section tabs** (`SubTabs`): the pages of the current group, under the header (hidden when the group has one page).
+  - **Dock** (`components/layout/dock.tsx`): search (Ctrl K), Create (C, a menu of new records), theme, help and settings, fixed at the left edge from 1024 px.
+  - **Header:** brand and company, the tabs, notifications and the user menu. Below 1024 px: menu button (drawer, `components/layout/sidebar.tsx`), brand, search, notifications, settings, theme.
 - **Page:** `PageHeader` (optional breadcrumb `crumbs`, title, one line of context, actions on the right).
 - **Metrics:** `Metrics` + `StatCard` give a row of KPI cards. Each card has an icon tile, a label, the value, an optional change (`change`, %), a hint and optional mini bars (`bars`). Every card that counts something links to the list behind it. Phones show the cards as one swipeable strip. Tablets use three columns only when the cards fill the rows, so 4 or 8 cards sit 2-up with none left alone.
 - **Dashboard** (`app/(app)/page.tsx`):
@@ -103,7 +102,7 @@ Tokens live in `app/globals.css` and the Tailwind scale in `tailwind.config.ts`.
 Framer Motion through `components/motion.tsx` (LazyMotion with layout animations, `reducedMotion="user"`, 140 / 200 / 280 ms, decelerating). CSS transitions use the same curve (`cubic-bezier(.2,.8,.2,1)`); nothing is linear or bouncy.
 
 Used for:
-- **Sidebar:** the current-page highlight slides between items; collapse animates the width while icons stay fixed and labels fade; sections fold with a height animation; rail tooltips appear after 90 ms.
+- **Navigation:** the ink pill slides between top tabs and the white pill between section tabs (spring, shared layout); tab menus and the dock's create menu fade and scale in; dock labels slide out on hover or focus.
 - **Interactions:** a hover wash plus a 1 px icon lift on hover, and a 1.5% press scale.
 - **Elsewhere:** the mobile drawer, menus, toasts, tabs and page enter.
 
