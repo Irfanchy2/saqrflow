@@ -36,7 +36,7 @@ try {
   const nav = await navText(p)
   for (const l of ['CRM & Leads', 'Site Visits', 'Work Orders', 'Daily Site Reports', 'Tasks']) ok(nav.includes(l), `sidebar: ${l}`)
   ok(/SALES/.test(nav) && /OPERATIONS/.test(nav), 'sidebar grouped: Sales, Operations')
-  ok(!/inventory|stock|warehouse/i.test(nav), 'no inventory / stock / warehouse module anywhere in navigation')
+  ok(/\nSTOCK\n/.test(nav), 'stock has its own tab (materials, not mixed into Operations)')
 
   console.log('\n[1a] Lead (double-click save → one lead, numbered)')
   await p.goto(`${BASE}/leads`); await settle()

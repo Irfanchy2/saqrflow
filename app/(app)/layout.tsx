@@ -49,6 +49,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { key: 'tasks', group: 'Operations', top: 'ops', href: '/tasks', show: true },
     { key: 'assets', group: 'Operations', top: 'ops', href: '/assets', show: c.can('documents.view') },
     { key: 'tickets', group: 'Operations', top: 'ops', href: '/tickets', show: true },
+    { key: 'stock', group: 'Stock', top: 'stock', href: '/stock', tab: 'items', fallback: true, show: c.can('documents.view') },
+    { key: 'stock_moves', group: 'Stock', top: 'stock', href: '/stock?tab=movements', tab: 'movements', show: c.can('documents.view') },
+    { key: 'bank_accounts', group: 'Finance', top: 'finance', href: '/banking', show: c.can('finance.view') },
     { key: 'expenses', group: 'Finance', top: 'finance', href: '/expenses', show: c.can('finance.view') },
     { key: 'cheques', group: 'Finance', top: 'finance', href: '/cheques', show: c.can('finance.view') },
     { key: 'employees', group: 'People & documents', top: 'people', href: '/employees', show: true },
@@ -75,8 +78,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     c.supabase.from('tasks').select('id', head).is('deleted_at', null).in('status', ['todo', 'in_progress', 'waiting']).lt('due_date', c.today),
     c.can('finance.view') ? c.supabase.from('cheques').select('id', head).in('status', ['received', 'issued', 'scheduled']).lte('cheque_date', addDays(c.today, 7)) : none,
     c.can('documents.view') ? c.supabase.from('documents').select('id', head).is('deleted_at', null).eq('status', 'active').lte('expiry_date', addDays(c.today, 30)) : none,
+    c.can('documents.view') ? c.supabase.from('stock_items').select('id', head).eq('is_low', true) : none,
   ])
-  const counts: Partial<Record<TopKey, number>> = { sales: tops[0].count ?? 0, ops: tops[1].count ?? 0, finance: tops[2].count ?? 0, people: tops[3].count ?? 0 }
+  const counts: Partial<Record<TopKey, number>> = { sales: tops[0].count ?? 0, ops: tops[1].count ?? 0, finance: tops[2].count ?? 0, people: tops[3].count ?? 0, stock: tops[4].count ?? 0 }
   const visible = items.filter(i => i.show)
   return <MotionRoot><div className="flex min-h-screen"><div className="mesh" aria-hidden><i className="mesh__a" /><i className="mesh__b" /><i className="mesh__c" /></div>
     <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
@@ -110,7 +114,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <UserMenu name={c.profile.full_name} role={c.profile.role} company={c.company.name} />
         </div></div></header>
       <main id="main" tabIndex={-1} className="relative mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 has-[.fab]:pb-[calc(10rem+env(safe-area-inset-bottom))] has-[.dock]:pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:!pb-12 lg:pe-10 lg:ps-[112px] lg:pt-1"><NavPending /><div className="mb-4 hidden lg:block"><SubTabs items={visible} /></div>{children}</main>
-    </div><BottomNav items={visible} /><Dock can={{ sales: c.can('records.edit') && c.can('finance.view'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') && c.can('documents.view'), projects: c.can('records.edit') && c.can('documents.view'), crm: c.can('crm.view') && c.can('records.edit') }} /><NavProgress /><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
+    </div><BottomNav items={visible} /><Dock can={{ sales: c.can('records.edit') && c.can('finance.view'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') && c.can('documents.view'), projects: c.can('records.edit') && c.can('documents.view'), crm: c.can('crm.view') && c.can('records.edit'), stock: c.can('records.edit') && c.can('documents.view') }} /><NavProgress /><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
       ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
       ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings#integrations', group: 'Settings' }] : []),

@@ -495,12 +495,12 @@ const paySchema = z.object({
   amount: z.coerce.number({ message: 'Enter the amount' }).positive('Amount must be greater than zero').max(1e10).transform(n => Math.round(n * 100) / 100),
   paid_on: date, method: z.enum(['cash', 'bank_transfer', 'cheque', 'pdc', 'card', 'other'], { message: 'Choose the payment method' }),
   reference: z.string().max(120).optional(), bank_name: z.string().max(120).optional(), notes: z.string().max(1000).optional(), cheque_id: z.string().uuid().optional(),
-  idempotency_key: z.string().uuid().optional(),
+  idempotency_key: z.string().uuid().optional(), deposit_bank_id: z.string().uuid().optional(),
 })
 export async function recordPayment(invoiceId: string, _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit')
-    const parsed = paySchema.safeParse({ amount: str(fd, 'amount'), paid_on: str(fd, 'paid_on') ?? c.today, method: str(fd, 'method'), reference: str(fd, 'reference'), bank_name: str(fd, 'bank_name'), notes: str(fd, 'notes'), cheque_id: str(fd, 'cheque_id'), idempotency_key: str(fd, 'idempotency_key') })
+    const parsed = paySchema.safeParse({ amount: str(fd, 'amount'), paid_on: str(fd, 'paid_on') ?? c.today, method: str(fd, 'method'), reference: str(fd, 'reference'), bank_name: str(fd, 'bank_name'), notes: str(fd, 'notes'), cheque_id: str(fd, 'cheque_id'), idempotency_key: str(fd, 'idempotency_key'), deposit_bank_id: str(fd, 'deposit_bank_id') })
     if (!parsed.success) return { error: parsed.error.issues[0].message, fieldErrors: Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.'), i.message])) }
     const v = parsed.data
     if (v.paid_on > c.today) return { error: 'Payment date cannot be in the future. Track post-dated cheques under Cheques.', fieldErrors: { paid_on: 'Cannot be in the future' } }
@@ -720,7 +720,7 @@ export async function saveSalesSettings(_: ActionState, fd: FormData): Promise<A
 export async function recordPaymentOnAccount(customerId: string, _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit')
-    const parsed = paySchema.safeParse({ amount: str(fd, 'amount'), paid_on: str(fd, 'paid_on') ?? c.today, method: str(fd, 'method'), reference: str(fd, 'reference'), bank_name: str(fd, 'bank_name'), notes: str(fd, 'notes'), idempotency_key: str(fd, 'idempotency_key') })
+    const parsed = paySchema.safeParse({ amount: str(fd, 'amount'), paid_on: str(fd, 'paid_on') ?? c.today, method: str(fd, 'method'), reference: str(fd, 'reference'), bank_name: str(fd, 'bank_name'), notes: str(fd, 'notes'), idempotency_key: str(fd, 'idempotency_key'), deposit_bank_id: str(fd, 'deposit_bank_id') })
     if (!parsed.success) return { error: parsed.error.issues[0].message, fieldErrors: Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.'), i.message])) }
     const v = parsed.data
     if (v.paid_on > c.today) return { error: 'Payment date cannot be in the future.', fieldErrors: { paid_on: 'Cannot be in the future' } }
@@ -736,7 +736,7 @@ export async function recordPaymentOnAccount(customerId: string, _: ActionState,
 export async function recordProjectPayment(projectId: string, _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit'); need(c, 'finance.view')
-    const parsed = paySchema.safeParse({ amount: str(fd, 'amount'), paid_on: str(fd, 'paid_on') ?? c.today, method: str(fd, 'method'), reference: str(fd, 'reference'), notes: str(fd, 'notes'), idempotency_key: str(fd, 'idempotency_key') })
+    const parsed = paySchema.safeParse({ amount: str(fd, 'amount'), paid_on: str(fd, 'paid_on') ?? c.today, method: str(fd, 'method'), reference: str(fd, 'reference'), notes: str(fd, 'notes'), idempotency_key: str(fd, 'idempotency_key'), deposit_bank_id: str(fd, 'deposit_bank_id') })
     if (!parsed.success) return { error: parsed.error.issues[0].message, fieldErrors: Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.'), i.message])) }
     const v = parsed.data
     if (v.paid_on > c.today) return { error: 'Payment date cannot be in the future. Track post-dated cheques under Cheques.', fieldErrors: { paid_on: 'Cannot be in the future' } }

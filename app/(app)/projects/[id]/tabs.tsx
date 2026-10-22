@@ -1,4 +1,5 @@
 import { SalesDocBadge } from '@/components/sales/status-badges'
+import { AccountSelect } from '@/components/banking/account-select'
 import Link from 'next/link'
 import { AlertTriangle, Camera, CheckCircle2, Circle, ClipboardCheck, ClipboardList, Clock, FileText, ListTodo, Paperclip, Plus, Receipt, Trash2, Upload, UserPlus, Users, Wallet } from '@/components/icons'
 import type { Ctx } from '@/lib/auth'
@@ -137,6 +138,7 @@ export async function FinanceTab({ c, p }: { c: Ctx; p: any }) {
             <Field label="Amount (AED) *"><Input type="number" name="amount" min="0.01" step="0.01" inputMode="decimal" required /></Field>
             <Field label="Payment method *"><Select name="method" defaultValue="bank_transfer" required>{Object.entries(PAY_METHODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
             <Field label="Reference"><Input name="reference" maxLength={120} placeholder="Transfer ref., cheque no., receipt no." /></Field>
+            <AccountSelect name="deposit_bank_id" label="Deposited to" />
           </div>
           <Field label="Notes"><Input name="notes" maxLength={1000} placeholder="e.g. 50% advance as per quotation" /></Field>
           <p className="text-xs text-muted">This is a payment record only. No tax invoice or VAT is created. Apply it later on the project’s quotation, invoice or delivery note.</p>

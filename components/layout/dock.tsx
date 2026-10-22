@@ -8,7 +8,7 @@ import { newSalesDoc } from '@/app/actions/sales'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
-type Can = { sales: boolean; docs: boolean; people: boolean; assets: boolean; projects: boolean; crm: boolean }
+type Can = { sales: boolean; docs: boolean; people: boolean; assets: boolean; projects: boolean; crm: boolean; stock: boolean }
 
 const btn = 'group/d relative grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-fg/75 transition-[background-color,color,transform] duration-150 hover:bg-ink-fg/10 hover:text-ink-fg active:scale-95'
 /** Label to the right of a dock button, shown on hover / keyboard focus. */
@@ -44,7 +44,7 @@ export function Dock({ can }: { can: Can }) {
     ['Lead', () => router.push('/leads?new=lead'), can.crm], ['Customer', () => router.push('/parties?new=customer'), can.people],
     ['Project', () => router.push('/projects?new=project'), can.projects], ['Task', () => router.push('/tasks?new=task'), true],
     ['Expense', () => router.push('/expenses?new=expense'), can.sales], ['Employee', () => router.push('/employees?new=employee'), can.people],
-    ['Vehicle or asset', () => router.push('/assets?tab=assets&new=asset'), can.assets], ['Upload document', () => router.push('/inbox'), can.docs],
+    ['Vehicle or asset', () => router.push('/assets?tab=assets&new=asset'), can.assets], ['Stock receipt', () => router.push('/stock?new=receive'), can.stock], ['Upload document', () => router.push('/inbox'), can.docs],
   ] as [string, () => void, boolean][]).filter(i => i[2])
   const theme = () => { const next = !dark; setDark(next); document.documentElement.classList.toggle('dark', next); try { localStorage.setItem('sf-theme', next ? 'dark' : 'light') } catch {} }
   return <nav aria-label="Quick actions" className="app-dock no-print fixed start-5 top-1/2 z-nav hidden -translate-y-1/2 flex-col items-center gap-1 rounded-full bg-ink p-1.5 shadow-[0_18px_40px_-16px_hsl(var(--shadow)/.55)] lg:flex">

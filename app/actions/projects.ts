@@ -65,9 +65,9 @@ const expenseSchema = z.object({
   vat_amount: z.coerce.number({ message: 'VAT must be a number' }).min(0, 'VAT cannot be negative').max(1e10).default(0).transform(n => Math.round(n * 100) / 100),
   reference: z.string().max(120).optional(), supplier_id: uuid.optional(), supplier_name: z.string().max(200).optional(),
   payment_method: z.enum(['cash', 'bank_transfer', 'cheque', 'card', 'credit', 'other']).optional(), employee_id: uuid.optional(), project_id: uuid.optional(), asset_id: uuid.optional(),
-  notes: z.string().max(2000).optional(), idempotency_key: uuid.optional(),
+  notes: z.string().max(2000).optional(), idempotency_key: uuid.optional(), paid_from_bank_id: uuid.optional(),
 }).refine(v => v.vat_amount <= v.amount, { message: 'VAT looks larger than the amount. Enter the amount before VAT', path: ['vat_amount'] })
-const EXP_KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_id', 'supplier_name', 'payment_method', 'employee_id', 'project_id', 'asset_id', 'notes', 'idempotency_key']
+const EXP_KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_id', 'supplier_name', 'payment_method', 'employee_id', 'project_id', 'asset_id', 'notes', 'idempotency_key', 'paid_from_bank_id']
 
 /** Expense with optional project and receipt file. Receipt OCR only pre-fills the form — this saves exactly what the user confirmed. */
 export async function saveExpense(id: string | null, fixedProject: string | null, _: ActionState, fd: FormData): Promise<ActionState> {
@@ -87,7 +87,7 @@ export async function saveExpense(id: string | null, fixedProject: string | null
       try { await saveVersion(c, d.id, f) } catch (e) { await c.supabase.from('documents').update({ deleted_at: new Date().toISOString() }).eq('id', d.id); return { error: `Expense not saved. The receipt was rejected: ${(e as Error).message}` } }
       receiptId = d.id
     }
-    const row = { ...v, project_id: projectId, supplier_name: v.supplier_name ?? null, reference: v.reference ?? null, notes: v.notes ?? null, payment_method: v.payment_method ?? null, employee_id: v.employee_id ?? null, asset_id: v.asset_id ?? null, ...(receiptId ? { receipt_document_id: receiptId } : {}) }
+    const row = { ...v, project_id: projectId, supplier_name: v.supplier_name ?? null, reference: v.reference ?? null, notes: v.notes ?? null, payment_method: v.payment_method ?? null, employee_id: v.employee_id ?? null, asset_id: v.asset_id ?? null, paid_from_bank_id: v.paid_from_bank_id ?? null, ...(receiptId ? { receipt_document_id: receiptId } : {}) }
     const { error } = id ? await c.supabase.from('project_expenses').update({ ...row, idempotency_key: undefined }).eq('id', id)
       : await c.supabase.from('project_expenses').insert({ ...row, company_id: c.company.id, created_by: c.userId })
     if (error) { if (error.code === '23505') return { ok: true, message: 'Expense already saved.' }; throw error }
