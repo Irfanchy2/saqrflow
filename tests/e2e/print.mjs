@@ -149,8 +149,9 @@ try {
   await p.goto(`${BASE}/invoices/${qid}`); await settle()
   const mainW = await p.locator('main').evaluate(el => el.getBoundingClientRect().width)
   ok(mainW >= 1440 - 112 - 40 - 2, `the editor gets the full width beside the dock (${Math.round(mainW)}px)`)
-  await p.locator('nav[aria-label="Quick actions"]').getByRole('link', { name: 'Settings' }).hover(); await p.waitForTimeout(250)
-  ok((await p.locator('nav[aria-label="Quick actions"]').getByRole('tooltip').filter({ visible: true }).innerText().catch(() => '')).includes('Settings'), 'dock tooltip shows the label on hover')
+  const gear = p.locator('nav[aria-label="Quick actions"]').getByRole('link', { name: 'Settings' }), tip = gear.locator('[role=tooltip]')
+  await gear.hover(); await p.waitForTimeout(300)
+  ok((await tip.innerText()).includes('Settings') && Number(await tip.evaluate(e => getComputedStyle(e).opacity)) > 0.9, 'dock tooltip shows the label on hover')
   const nav = await navText(p)
   ok(nav.includes('Vehicles & Assets') && !/Vehicles & Assets\s*SOON/i.test(nav), 'Vehicles & Assets is in the navigation, not marked “Soon”')
 
