@@ -87,7 +87,7 @@ export async function saveExpense(id: string | null, fixedProject: string | null
       try { await saveVersion(c, d.id, f) } catch (e) { await c.supabase.from('documents').update({ deleted_at: new Date().toISOString() }).eq('id', d.id); return { error: `Expense not saved. The receipt was rejected: ${(e as Error).message}` } }
       receiptId = d.id
     }
-    const row = { ...v, project_id: projectId, supplier_name: v.supplier_name ?? null, reference: v.reference ?? null, notes: v.notes ?? null, payment_method: v.payment_method ?? null, employee_id: v.employee_id ?? null, asset_id: v.asset_id ?? null, paid_from_bank_id: v.paid_from_bank_id ?? null, ...(receiptId ? { receipt_document_id: receiptId } : {}) }
+    const row = { ...v, project_id: projectId, supplier_name: v.supplier_name ?? null, reference: v.reference ?? null, notes: v.notes ?? null, payment_method: v.payment_method ?? null, employee_id: v.employee_id ?? null, asset_id: v.asset_id ?? null, ...(fd.has('paid_from_bank_id') ? { paid_from_bank_id: v.paid_from_bank_id ?? null } : {}), ...(receiptId ? { receipt_document_id: receiptId } : {}) }
     const { error } = id ? await c.supabase.from('project_expenses').update({ ...row, idempotency_key: undefined }).eq('id', id)
       : await c.supabase.from('project_expenses').insert({ ...row, company_id: c.company.id, created_by: c.userId })
     if (error) { if (error.code === '23505') return { ok: true, message: 'Expense already saved.' }; throw error }
