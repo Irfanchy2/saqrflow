@@ -3,6 +3,7 @@ import { chromium } from 'playwright-core'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText, sectionText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE, GW = process.env.E2E_GATEWAY
 const results = []
@@ -64,9 +65,14 @@ try {
     const own = await p.context().request.post(`${BASE}/api/customers/search`, { headers: { origin: BASE }, data: {} })
     ok(own.status() !== 403, 'same-origin API request is not refused by the origin check')
   }
-  for (const l of ['Dashboard', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Quotations', 'Invoices', 'Payments', 'Projects', 'Customers', 'Vehicles & Assets', 'Reminders', 'Calendar', 'Reports & Analytics', 'Averiqo AI', 'User Management', 'Settings'])
-    ok(await p.getByRole('link', { name: l }).first().isVisible(), `sidebar has “${l}”`)
-  ok(!(await p.locator('aside').first().innerText()).match(/\b(Soon|Beta|Coming soon|Planned)\b/i), 'every module is live: no Soon / Beta / Planned labels in navigation')
+  const nav = await navText(p)
+  for (const l of ['Dashboard', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Quotations', 'Invoices', 'Payments', 'Projects', 'Customers', 'Vehicles & Assets', 'Reminders', 'Calendar', 'Reports & Analytics', 'Averiqo AI'])
+    ok(nav.includes(l), `navigation has “${l}”`)
+  ok(!/\b(Soon|Beta|Coming soon|Planned)\b/i.test(nav), 'every module is live: no Soon / Beta / Planned labels in navigation')
+  ok(await p.locator('nav[aria-label="Quick actions"]').getByRole('link', { name: 'Settings' }).isVisible(), 'the dock links to Settings')
+  await p.goto(`${BASE}/settings`); await p.waitForLoadState('networkidle')
+  for (const l of ['User Management', 'Audit Log', 'Settings']) ok((await sectionText(p)).includes(l), `Settings section has “${l}”`)
+  await p.goto(`${BASE}/`); await p.waitForLoadState('networkidle')
 
   console.log('\n[2] Company documents, versions, secure access')
   await p.goto(`${BASE}/documents`); ok((await bodyText(p)).includes('No company documents yet'), 'documents empty state')

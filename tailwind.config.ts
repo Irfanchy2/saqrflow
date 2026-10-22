@@ -13,12 +13,12 @@ export default {
         sb: v('sb'), 'sb-2': v('sb-2'), 'sb-line': v('sb-line'), 'sb-fg': v('sb-fg'), 'sb-muted': v('sb-muted'), 'sb-accent': v('sb-accent'),
         success: v('success'), warning: v('warning'), danger: v('danger'),
       },
-      // radius: sm = badges/chips 6px · md = small controls 8px · lg = buttons, inputs, tiles 10px · xl = cards 14px · 2xl = sheets 18px
-      borderRadius: { sm: '0.375rem', md: '0.5rem', lg: '0.625rem', xl: '0.875rem', '2xl': '1.125rem' },
+      // radius: sm = badges/chips 6px · md = small controls 8px · lg = buttons, inputs, tiles 12px · xl = cards 20px · 2xl = sheets 24px
+      borderRadius: { sm: '0.375rem', md: '0.5rem', lg: '0.75rem', xl: '1.25rem', '2xl': '1.5rem' },
       // one light source from above: every layer is a hairline plus a short contact shadow and a long soft one, tinted navy.
       // card = resting surface · lift = hovered card · pop = menus, dialogs, toasts · key = secondary button · solid = filled button
       boxShadow: {
-        card: 'inset 0 1px 0 hsl(var(--hi)), 0 1px 1px hsl(var(--shadow) / .03), 0 2px 4px -1px hsl(var(--shadow) / .04), 0 8px 18px -10px hsl(var(--shadow) / .08)',
+        card: 'inset 0 1px 0 hsl(var(--hi)), 0 1px 1px hsl(var(--shadow) / .03), 0 2px 6px -2px hsl(var(--shadow) / .04), 0 14px 30px -18px hsl(var(--shadow) / .14)',
         lift: 'inset 0 1px 0 hsl(var(--hi)), 0 1px 2px hsl(var(--shadow) / .05), 0 6px 12px -4px hsl(var(--shadow) / .08), 0 18px 32px -16px hsl(var(--shadow) / .18)',
         pop: '0 0 0 1px hsl(var(--shadow) / .04), 0 4px 8px -2px hsl(var(--shadow) / .08), 0 18px 40px -12px hsl(var(--shadow) / .28)',
         sm: '0 1px 2px hsl(var(--shadow) / .06)', md: '0 4px 12px -4px hsl(var(--shadow) / .14)', lg: '0 12px 32px -8px hsl(var(--shadow) / .22)',
@@ -30,7 +30,7 @@ export default {
         btn: 'inset 0 1px 0 hsl(0 0% 100% / .14), 0 1px 2px hsl(var(--shadow) / .18)',
       },
       fontFamily: {
-        sans: ['var(--font-geist-sans)', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Noto Sans Arabic', 'Noto Sans Bengali', 'sans-serif'],
+        sans: ['var(--font-urbanist)', 'var(--font-geist-sans)', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Noto Sans Arabic', 'Noto Sans Bengali', 'sans-serif'],
         mono: ['var(--font-geist-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: { '2xs': ['11px', '16px'] },

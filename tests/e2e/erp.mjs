@@ -3,6 +3,7 @@ import { chromium } from 'playwright-core'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText, sectionText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE
 const OUT = 'tests/e2e/shots/erp'; fs.mkdirSync(OUT, { recursive: true })
@@ -24,14 +25,14 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 const docId = () => p.url().split('/').pop().split('?')[0]
 const yr = new Date().getFullYear()
 const EMAIL = `erp-owner-${Date.now()}@alsaqr.test`   // unique per run, so the suite can be re-run against a held stack
-const side = name => p.locator('aside').getByRole('link', { name, exact: true })
 
 try {
   console.log('\n[E0] Setup')
   await p.goto(`${BASE}/signup`); await p.getByLabel('Work email').fill(EMAIL); await p.getByLabel('Password').fill('correct-horse-battery'); await p.getByRole('button', { name: 'Create account' }).click()
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('Al Saqr ERP Test'); await p.getByLabel('Your full name').fill('Erp Owner'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`)
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email=$1`, [EMAIL])).company_id
-  ok(await side('Expenses').isVisible() && await side('Products & Services').isVisible() && await side('Audit Log').isVisible() && await side('Trash').isVisible(), 'sidebar: Expenses, Products & Services, Audit Log, Trash are live')
+  const nav = await navText(p); await p.goto(`${BASE}/settings`); await p.waitForLoadState('networkidle'); const sys = await sectionText(p)
+  ok(nav.includes('Expenses') && nav.includes('Products & Services') && sys.includes('Audit Log') && sys.includes('Trash'), 'navigation: Expenses, Products & Services (tabs), Audit Log, Trash (Settings section) are live')
 
   console.log('\n[A1] Customer with duplicate detection')
   await p.goto(`${BASE}/parties?new=customer`); await settle()

@@ -1,35 +1,46 @@
 @tailwind base; @tailwind components; @tailwind utilities;
 
-/* ═════════ Averiqo design tokens ("Ink") ═════════
-   Neutrals: one cool family (hue ~217), slightly blue-tinted so white surfaces read as paper on a calm desk.
-   One accent (Averiqo blue). Navigation lives on a deep navy surface (--sb-*) in both themes.
-   Status colours are tint + readable text only. Radius: chips 4 px · controls 6 px · containers 8 px.
-   Elevation: borders separate surfaces; shadows only for floating layers, plus a 1 px hairline lift on containers. */
+/* ═════════ Averiqo design tokens ("Paper") ═════════
+   Neutrals: one warm family (hue ~40) on a soft stone background with a slow colour mesh behind it; cards are white
+   glass with large radii. One accent (Averiqo blue); "ink" is the near-black of the active tab, the dock and primary
+   pills. The phone drawer and sign-in panel keep the deep navy surface (--sb-*). Status colours are tint + text only. */
 :root {
-  --bg: 220 33% 97.5%; --surface: 0 0% 100%; --surface-2: 220 33% 96.5%; --border: 220 22% 91%; --border-strong: 220 16% 82%;
-  --fg: 222 47% 11%; --muted: 220 11% 44%;
-  --primary: 217 85% 51%; --primary-fg: 0 0% 100%; --primary-soft: 217 100% 96.5%;
-  --ink: 223 55% 14%; --ink-fg: 0 0% 100%;
+  --bg: 60 5% 93%; --surface: 0 0% 100%; --surface-2: 50 8% 96%; --border: 40 9% 89%; --border-strong: 40 6% 80%;
+  --fg: 30 8% 10%; --muted: 30 4% 41%;
+  --primary: 214 78% 48%; --primary-fg: 0 0% 100%; --primary-soft: 214 90% 96%;
+  --ink: 30 8% 11%; --ink-fg: 45 30% 97%;
+  --mesh-1: 214 90% 84%; --mesh-2: 24 95% 86%; --mesh-3: 160 55% 85%;
   --success: 152 60% 32%; --warning: 28 90% 40%; --danger: 354 70% 48%;
   --nav: 220 33% 97.5%;
   --sb: 223 60% 12%; --sb-2: 223 45% 18%; --sb-line: 223 38% 19%; --sb-fg: 220 30% 95%; --sb-muted: 221 22% 70%; --sb-accent: 217 85% 56%; --sb-accent-soft: 214 100% 80%;
-  --shadow: 222 45% 25%; --hi: 0 0% 100% / 0;
+  --shadow: 30 20% 20%; --hi: 0 0% 100% / 0;
   /* chart series: validated categorical slots 1-3 (CVD ΔE ≥ 9 adjacent); dark mode uses its own steps */
   --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
 }
 .dark {
-  --bg: 223 30% 7%; --surface: 223 26% 10.5%; --surface-2: 223 22% 14%; --border: 223 18% 19%; --border-strong: 223 14% 29%;
-  --fg: 220 26% 94%; --muted: 220 12% 64%;
-  --primary: 215 90% 64%; --primary-fg: 223 40% 8%; --primary-soft: 218 45% 18%;
-  --ink: 215 90% 64%; --ink-fg: 223 40% 8%;
+  --bg: 30 6% 7%; --surface: 30 5% 10.5%; --surface-2: 30 5% 14%; --border: 30 5% 19%; --border-strong: 30 4% 28%;
+  --fg: 40 14% 93%; --muted: 40 5% 63%;
+  --primary: 213 88% 66%; --primary-fg: 220 40% 8%; --primary-soft: 214 40% 17%;
+  --ink: 45 25% 93%; --ink-fg: 30 8% 9%;
+  --mesh-1: 214 60% 22%; --mesh-2: 24 55% 18%; --mesh-3: 160 40% 16%;
   --success: 152 45% 55%; --warning: 36 85% 60%; --danger: 354 75% 68%;
   --nav: 223 30% 7%;
   --sb: 223 40% 6%; --sb-2: 223 32% 12%; --sb-line: 223 26% 15%; --sb-fg: 220 26% 93%; --sb-muted: 221 14% 62%; --sb-accent: 215 90% 62%; --sb-accent-soft: 214 100% 82%;
-  --shadow: 222 50% 2%; --hi: 220 40% 100% / .045;
+  --shadow: 30 30% 2%; --hi: 40 40% 100% / .045;
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
 }
 html { color-scheme: light; -webkit-text-size-adjust: 100%; } html.dark { color-scheme: dark; }
-body { @apply bg-bg text-fg antialiased; font-size: 14px; line-height: 1.5; font-feature-settings: 'cv11' 1, 'ss01' 0; letter-spacing: -0.003em; }
+body { @apply bg-bg text-fg antialiased; font-size: 14px; line-height: 1.5; font-feature-settings: 'tnum' 0; letter-spacing: 0; }
+/* Slow colour mesh behind the whole app (three soft gradient blobs drifting; compositor-only, off for reduced motion and print) */
+.mesh { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.mesh i { position: absolute; border-radius: 50%; opacity: .55; will-change: transform; }
+.mesh__a { width: 62vw; height: 62vw; left: -18vw; top: -26vw; background: radial-gradient(closest-side, hsl(var(--mesh-1)), transparent); animation: mesh-a 38s ease-in-out infinite alternate; }
+.mesh__b { width: 54vw; height: 54vw; right: -16vw; top: 10vh; background: radial-gradient(closest-side, hsl(var(--mesh-2)), transparent); animation: mesh-b 46s ease-in-out infinite alternate; }
+.mesh__c { width: 58vw; height: 58vw; left: 20vw; bottom: -34vw; background: radial-gradient(closest-side, hsl(var(--mesh-3)), transparent); animation: mesh-a 52s ease-in-out -12s infinite alternate-reverse; }
+@keyframes mesh-a { to { transform: translate(8vw, 6vh) scale(1.08); } }
+@keyframes mesh-b { to { transform: translate(-6vw, 10vh) scale(.94); } }
+/* Printed documents keep their own typeface, whatever the interface font is */
+.sales-paper, .paper-frame { font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; }
 * { @apply border-border; }
 :focus-visible { @apply outline-none ring-2 ring-primary/55 ring-offset-1 ring-offset-bg; }
 .sb :focus-visible { --tw-ring-offset-color: hsl(var(--sb)); }
@@ -87,7 +98,7 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 .art-float { animation: art-float 5.5s ease-in-out infinite; box-shadow: 0 10px 24px -12px hsl(var(--primary) / .35), 0 1px 2px hsl(var(--fg) / .06); }
 .art-twinkle { animation: art-twinkle 3.4s ease-in-out infinite; }
 .art-bars rect { transform-box: fill-box; transform-origin: bottom; animation: bar-grow .7s cubic-bezier(.2,.8,.2,1) both .15s; }
-@media print { *, ::before, ::after { animation: none !important; } }
+@media print { *, ::before, ::after { animation: none !important; } .mesh { display: none; } }
 /* Sidebar link (components/layout/sidebar.tsx): one short class per part instead of the same long utility list on
    every link, which made up a large share of each page's HTML. */
 .nav-item { position: relative; display: flex; height: 2.5rem; flex-shrink: 0; user-select: none; align-items: center; gap: .75rem; border-radius: 10px;

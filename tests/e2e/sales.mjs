@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText, sectionText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE
 const results = []
@@ -31,8 +32,9 @@ try {
   await p.goto(`${BASE}/signup`); await p.getByLabel('Work email').fill('sales-owner@alsaqr.test'); await p.getByLabel('Password').fill('correct-horse-battery'); await p.getByRole('button', { name: 'Create account' }).click()
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('Al Saqr Al Ahmar Welding'); await p.getByLabel('Your full name').fill('Sales Owner'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`)
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email='sales-owner@alsaqr.test'`)).company_id
-  ok(await p.locator('aside[data-collapsed]').getByRole('link', { name: 'Quotations' }).isVisible() && !(await p.locator('aside[data-collapsed]').getByRole('link', { name: /Projects/ }).first().innerText()).includes('Soon'), 'sidebar: Quotations and Projects are live (no “Soon”)')
-  ok(/SALES[\s\S]*OPERATIONS[\s\S]*FINANCE[\s\S]*PEOPLE & DOCUMENTS[\s\S]*REPORTS[\s\S]*SYSTEM/.test(await p.locator('aside[data-collapsed]').innerText()), 'sidebar is grouped into sections (Sales, Operations, Finance, People & documents, Reports, System)')
+  const nav = await navText(p)
+  ok(nav.includes('Quotations') && nav.includes('Projects') && !/\bSoon\b/.test(nav), 'navigation: Quotations and Projects are live (no “Soon”)')
+  ok(/DASHBOARD[\s\S]*SALES[\s\S]*OPERATIONS[\s\S]*FINANCE[\s\S]*PEOPLE[\s\S]*REPORTS/.test(nav), 'navigation is grouped into top tabs (Dashboard, Sales, Operations, Finance, People, Reports)')
   await p.keyboard.press('Control+k'); await p.waitForTimeout(300)
   ok(await p.getByRole('combobox', { name: 'Command' }).isVisible(), 'Ctrl+K opens the command palette')
   await p.keyboard.type('projects'); await p.keyboard.press('Enter'); await p.waitForURL('**/projects')

@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText, sectionText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE
 const OUT = 'tests/e2e/shots/service'; fs.mkdirSync(OUT, { recursive: true })
@@ -28,7 +29,7 @@ try {
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email=$1`, [EMAIL])).company_id
   const cust = (await one(`insert into customers(company_id,name,phone) values ($1,'Villa 9 Owner','+971 50 222 3344') returning id`, [co])).id
   const proj = (await one(`insert into projects(company_id,name,customer_id,status) values ($1,'Villa 9 sliding gate',$2,'completed') returning id`, [co, cust])).id
-  const nav = await p.locator('aside[data-collapsed]').innerText()
+  const nav = await navText(p)
   ok(nav.includes('Service & Warranty') && nav.includes('Knowledge Base'), 'sidebar: Service & Warranty, Knowledge Base')
 
   console.log('\n[1] Warranty → ticket')

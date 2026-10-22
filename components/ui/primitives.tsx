@@ -15,7 +15,8 @@ import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, Cale
  */
 // Buttons are tactile: filled ones carry a top highlight, a hairline in their own colour and a soft coloured shadow
 // that deepens on hover; outlined ones read as a key (hairline, faint bottom edge). Every button presses in by 2%.
-const button = cva('relative inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg text-[13.5px] font-medium tracking-[-0.006em] select-none transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-150 ease-out active:scale-[.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0', {
+// pill-shaped like the top tabs and the dock; icon-only buttons are circles
+const button = cva('relative inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full text-[13.5px] font-medium tracking-[-0.006em] select-none transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-150 ease-out active:scale-[.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0', {
   variants: {
     variant: {
       primary: 'bg-ink bg-[linear-gradient(180deg,hsl(0_0%_100%/.09),hsl(0_0%_100%/0))] text-ink-fg shadow-solid [--b:var(--ink)] hover:bg-ink/[.93] hover:shadow-solid-hover',
@@ -168,7 +169,7 @@ export const PageHeader = ({ title, sub, actions, crumbs }: { title: string; sub
   <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
     <div className="min-w-0">
       {crumbs && crumbs.length > 0 && <nav aria-label="Breadcrumb" className="mb-1.5 hidden flex-wrap sm:flex items-center gap-1.5 text-[13px] text-muted">{crumbs.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span aria-hidden className="text-muted/60">›</span>}{c.href ? <Link href={c.href} className="hover:text-fg">{c.label}</Link> : <span className="text-fg">{c.label}</span>}</span>)}</nav>}
-      <h1 className="text-[24px] font-bold leading-[1.15] tracking-[-0.028em] sm:text-[26px] sm:font-semibold sm:tracking-[-0.032em]">{title}</h1>{sub && <p className="mt-1.5 hidden max-w-[72ch] text-[13.5px] text-muted sm:block">{sub}</p>}</div>
+      <h1 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[34px] sm:tracking-[-0.035em]">{title}</h1>{sub && <p className="mt-1.5 hidden max-w-[72ch] text-[13.5px] text-muted sm:block">{sub}</p>}</div>
     {/* actions wrap onto a second line on phones rather than scrolling, so none is ever off-screen */}
     {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto [&>*]:shrink-0">{actions}</div>}</div>
 
