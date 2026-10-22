@@ -147,7 +147,7 @@ try {
   ok((await one(`select count(*)::int n from reminder_sources where company_id=$1 and source_type='milestone'`, [co])).n === 1, 'milestone feeds Smart Reminders')
   await shot('32-project')
   await p.goto(`${BASE}/`); await settle()
-  ok((await body()).includes('Outstanding receivables') && (await body()).includes('Villa 22 staircase'), 'dashboard: receivables + active projects')
+  ok((await body()).includes('Receivables') && (await body()).includes('Villa 22 staircase'), 'dashboard: receivables + active projects')
 
   console.log('\n[S7] Local OCR of a photographed Emirates ID (AI off)')
   const ayub = (await one(`insert into employees(company_id,employee_no,full_name) values ($1,'S-201','Mohammed Ayub') returning id`, [co])).id

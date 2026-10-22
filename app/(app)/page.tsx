@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { SalesDocBadge } from '@/components/sales/status-badges'
-import { Banknote, CalendarDays, CheckCircle2, FileText, HardHat, Landmark, Receipt, ScrollText, ShieldCheck, Truck, Flag, Users, Wallet } from '@/components/icons'
+import { Banknote, Briefcase, CalendarDays, CheckCircle2, Clock, FileText, HardHat, Landmark, Receipt, ScrollText, ShieldCheck, Truck, Flag, Users, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, MiniBars, Money, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { buildAlerts } from '@/lib/dashboard'
@@ -21,10 +21,12 @@ import { TrendChart } from '@/components/dashboard/trend-chart'
 import { CardTabs } from '@/components/dashboard/tabs'
 import { QuickGrid } from '@/components/dashboard/quick-grid'
 import { MiniCalendar } from '@/components/dashboard/mini-calendar'
-import { DashboardBanner } from '@/components/dashboard/banner'
 import { TaskCheck } from '@/components/dashboard/task-check'
 import { STATUS_TONE, statusLabel } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
+import { onTimeRate, orderBook, salesFunnel } from '@/lib/dashboard-ops'
+import { pctChange } from '@/lib/dashboard-trend'
+import { OnTheFloor, OnTheRoad, RunningLow, SalesFunnel, TeamToday, TodayHero, type DayEvent } from '@/components/dashboard/ops-panels'
 
 export const metadata = { title: 'Dashboard' }
 
@@ -35,7 +37,7 @@ export const metadata = { title: 'Dashboard' }
 export default async function Dashboard() {
   const c = await getCtx(); const sb = c.supabase; const head = { count: 'exact' as const, head: true }
   const canDocs = c.can('documents.view') || c.can('employees.view_sensitive'), canFin = c.can('finance.view')
-  const in30 = addDays(c.today, 30), week = addDays(c.today, 7)
+  const in30 = addDays(c.today, 30), week = addDays(c.today, 7), tz = c.company.timezone || 'Asia/Dubai'
   const yearStart = (() => { const d = new Date(`${c.today.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() - 11); return d.toISOString().slice(0, 10) })()
 
   // field operations: my open tasks due today / overdue, lead follow-ups due, visits today
@@ -71,6 +73,27 @@ export default async function Dashboard() {
     c.can('documents.view') ? sb.from('projects').select('created_at').gte('created_at', since8).limit(5000) : null,
     canFin ? sb.from('invoices').select('issue_date').eq('doc_type', 'quotation').is('deleted_at', null).gte('issue_date', since8).limit(5000) : null,
     canFin ? sb.from('payments').select('paid_on,amount').gte('paid_on', yearStart).lte('paid_on', c.today).limit(20000) : null,
+  ])
+  // the operations panels (work orders on the floor, funnel, stock, the road, the team, cash on hand, today's timeline)
+  const docsView = c.can('documents.view'), open3 = ['todo', 'in_progress', 'waiting']
+  const ts = (d: string) => `${d}T00:00:00Z`, d14 = addDays(c.today, -14), d28 = addDays(c.today, -28), d90 = addDays(c.today, -90)
+  const opsP = Promise.all([
+    docsView ? sb.from('work_orders').select('id,number,title,status,target_date,priority,customer:customers(name),project:projects(name)', { count: 'exact' }).is('deleted_at', null).not('status', 'in', '(completed,cancelled)').order('target_date', { ascending: true, nullsFirst: false }).limit(6) : null,
+    docsView ? sb.from('work_orders').select('target_date,completed_at').is('deleted_at', null).eq('status', 'completed').gte('completed_at', ts(d90)).limit(3000) : null,
+    docsView ? sb.from('work_orders').select('id', head).is('deleted_at', null).eq('status', 'completed').gte('completed_at', ts(d14)) : null,
+    docsView ? sb.from('work_orders').select('id', head).is('deleted_at', null).eq('status', 'completed').gte('completed_at', ts(d28)).lt('completed_at', ts(d14)) : null,
+    docsView ? sb.from('work_orders').select('id,title').is('deleted_at', null).not('status', 'in', '(completed,cancelled)').eq('target_date', c.today).limit(6) : null,
+    canFin && docsView ? sb.from('projects').select('id,contract_value').in('status', ['planning', 'active', 'on_hold']).not('contract_value', 'is', null).limit(3000) : null,
+    c.can('crm.view') ? sb.from('leads').select('stage,estimated_value').is('deleted_at', null).gte('created_at', ts(yearStart)).limit(5000) : null,
+    docsView ? sb.from('stock_items').select('id,name,unit,on_hand,reorder_level,reorder_qty', { count: 'exact' }).eq('is_low', true).order('on_hand').limit(5) : null,
+    docsView ? sb.from('stock_items').select('id', head).eq('active', true) : null,
+    docsView ? sb.from('site_visits').select('id,number,location,scheduled_time,employee_id,employee:employees(full_name),customer:customers(name)').in('status', ['scheduled', 'rescheduled']).eq('scheduled_date', c.today).order('scheduled_time', { nullsFirst: false }).limit(8) : null,
+    canFin ? sb.from('invoices').select('id,number,customer_name,site,issue_date').eq('doc_type', 'delivery_note').eq('status', 'sent').is('deleted_at', null).order('issue_date', { ascending: false }).limit(4) : null,
+    canFin ? sb.from('bank_balances').select('id,name,account_display_name,account_type,balance').eq('active', true).order('balance', { ascending: false }) : null,
+    c.can('employees.view_sensitive') ? sb.from('leave_records').select('employee_id').eq('status', 'approved').lte('start_date', c.today).gte('end_date', c.today).limit(500) : null,
+    docsView ? sb.from('work_order_members').select('employee_id,employee:employees(full_name),wo:work_orders!inner(title,status,deleted_at)').in('wo.status', ['scheduled', 'in_fabrication', 'ready_for_site', 'installation', 'inspection']).is('wo.deleted_at', null).limit(300) : null,
+    sb.from('tasks').select('id,title').eq('owner_id', c.userId).in('status', open3).is('deleted_at', null).eq('due_date', c.today).limit(5),
+    canFin ? sb.from('invoices').select('id,number,customer_name').eq('doc_type', 'invoice').in('status', ['sent', 'partially_paid', 'overdue']).is('deleted_at', null).eq('due_date', c.today).limit(5) : null,
   ])
   const prefs = await prefsP
   // per-user layout + the optional widgets (only queried when shown)
@@ -112,6 +135,25 @@ export default async function Dashboard() {
 
   // operations / compliance counts: one compact list, zero values stay quiet
   const [myDue, leadDue, visitsToday] = await opsCounts
+  const [woOpen, woDone90, wo14, woPrev14, woToday, openProjects, leadRows, lowRes, stockAny, visitRows, dnRows, accts, leaveRows, crew, tasksToday, invToday] = await opsP
+  const invoicedOnOpen = openProjects?.data?.length ? await sb.from('invoices').select('project_id,total,vat_amount').eq('doc_type', 'invoice').not('status', 'in', '(draft,cancelled)').is('deleted_at', null).in('project_id', openProjects.data.slice(0, 300).map(p => p.id)).limit(20000) : null
+  const book = openProjects ? orderBook((openProjects.data ?? []) as any, (invoicedOnOpen?.data ?? []) as any) : null
+  const onTime = woDone90 ? onTimeRate((woDone90.data ?? []) as any, tz) : null
+  const visits = (visitRows?.data ?? []) as any[]
+  const events: DayEvent[] = [
+    ...visits.map(v => ({ time: v.scheduled_time ? String(v.scheduled_time).slice(0, 5) : null, label: v.customer?.name ?? v.location ?? v.number, sub: v.employee?.full_name, href: `/site-visits?open=${v.id}`, kind: 'visit' as const })),
+    ...(woToday?.data ?? []).map((w: any) => ({ time: null, label: w.title, href: `/work-orders?open=${w.id}`, kind: 'order' as const })),
+    ...(tasksToday.data ?? []).map((t: any) => ({ time: null, label: t.title, href: `/tasks?view=mine&open=${t.id}`, kind: 'task' as const })),
+    ...((cheques?.data ?? []) as any[]).filter(q => q.cheque_date === c.today).slice(0, 4).map(q => ({ time: null, label: `Cheque ${q.direction === 'incoming' ? 'in' : 'out'} ${formatAed(q.amount)}`, href: '/cheques', kind: 'cheque' as const })),
+    ...(invToday?.data ?? []).map((i: any) => ({ time: null, label: `${i.number} due · ${i.customer_name ?? ''}`.trim(), href: `/invoices/${i.id}`, kind: 'invoice' as const })),
+  ]
+  const accounts = (accts?.data ?? []).map((a: any) => ({ id: a.id, label: [a.name, a.account_display_name].filter(Boolean).join(' · '), balance: Number(a.balance), type: a.account_type }))
+  const cash = !accts ? null : accounts.length ? { total: accounts.reduce((s, a) => s + a.balance, 0), accounts } : c.can('cheques.manage') ? 'none' as const : null
+  const leaveIds = new Set((leaveRows?.data ?? []).map((l: any) => l.employee_id)), crewRows = (crew?.data ?? []) as any[]
+  const crewPeople = new Map<string, { id: string; name: string; what: string }>()
+  for (const m of crewRows) if (m.employee?.full_name && !crewPeople.has(m.employee_id)) crewPeople.set(m.employee_id, { id: m.employee_id, name: m.employee.full_name, what: m.wo?.title ?? 'Work order' })
+  for (const v of visits) if (v.employee_id && v.employee?.full_name && !crewPeople.has(v.employee_id)) crewPeople.set(v.employee_id, { id: v.employee_id, name: v.employee.full_name, what: `Site visit${v.scheduled_time ? ' ' + String(v.scheduled_time).slice(0, 5) : ''}` })
+  const woTodayN = woToday?.data?.length ?? 0, visitN = visitsToday.count ?? 0
   const ops: { l: string; v: number | null | undefined; href: string; bad?: boolean; warn?: boolean }[] = [
     { l: 'My tasks due today or overdue', v: myDue.count, href: '/tasks?view=mine', warn: true },
     { l: 'Lead follow-ups due', v: leadDue.count, href: '/leads?view=list&due=1', warn: true },
@@ -133,7 +175,7 @@ export default async function Dashboard() {
   const quoteBars = months8.length ? bucket((quoteMonths?.data ?? []).map((r: any) => r.issue_date)) : []
   const dueMap = new Map<string, number>(); for (const s of sources.data ?? []) dueMap.set(s.due_date, (dueMap.get(s.due_date) ?? 0) + 1)
   const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: c.company.timezone || 'Asia/Dubai' }).format(new Date())
-  const tz = c.company.timezone || 'Asia/Dubai', place = tz === 'Asia/Dubai' ? 'Dubai, UAE' : tz.split('/').pop()!.replace(/_/g, ' ')
+  const place = tz === 'Asia/Dubai' ? 'Dubai, UAE' : tz.split('/').pop()!.replace(/_/g, ' ')
   const can = { sales: canFin && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }
   const ALERT_ICON: Record<string, [typeof FileText, string]> = { document: [FileText, 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300'], cheque: [Landmark, 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300'], followup: [CalendarDays, 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'], lead_followup: [CalendarDays, 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300'], task: [CheckCircle2, 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300'],
     invoice: [Receipt, 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'], milestone: [Flag, 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300'], asset: [Truck, 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'] }
@@ -145,26 +187,29 @@ export default async function Dashboard() {
   const tone = (st: string): 'green' | 'amber' | 'red' | 'blue' | 'neutral' => st === 'active' ? 'green' : st === 'on_hold' ? 'amber' : st === 'planning' ? 'blue' : 'neutral'
 
   const W: Partial<Record<WidgetKey, React.ReactNode>> = {
-    banner: <DashboardBanner company={c.company.name} stats={[
-      ...(activeCount ? [{ label: 'Active projects', value: activeCount.count ?? 0, href: '/projects' }] : []),
-      ...(visitsToday.count !== undefined && visitsToday.count !== null ? [{ label: 'Site visits today', value: visitsToday.count, href: '/site-visits' }] : []),
-      { label: 'My tasks due', value: myDue.count ?? 0, href: '/tasks?view=mine' },
-    ]} />,
     finance: (sk && ageing && cs && trend) ? <section aria-label="Key figures" className="mb-5">
       <Metrics cols={4}>
-        <StatCard label="Sales this month" value={formatAed(salesNet)} change={trend.change.sales} hint="vs same days last month" bars={months8.map(m => m.sales)} href="/reports?period=month" icon={Receipt} />
-        <StatCard label="Outstanding receivables" value={formatAed(sk.outstanding)} hint={sk.overdueCount > 0 ? <span className="font-medium text-danger">{formatAed(sk.overdue)} overdue</span> : `${sk.openCount} open invoice${sk.openCount === 1 ? '' : 's'}`} bars={ageing.grand > 0 ? ageing.totals : undefined} href="/invoices?tab=receivables" />
-        <StatCard label="Collected this month" value={formatAed(trend.mtd.collected)} change={trend.change.collected} hint="vs same days last month" bars={months8.map(m => m.collected)} href="/invoices?tab=payments" icon={Banknote} />
-        <StatCard label="Open quotations" value={formatAed(sk.pipeline)} hint={(followDue?.count ?? 0) > 0 ? <span className="font-medium text-warning">{followDue!.count} follow-up{followDue!.count === 1 ? '' : 's'} due</span> : `${sk.pipelineCount} open · no follow-ups due`} bars={quoteBars} href="/invoices?tab=quotation" />
+        <StatCard label="Revenue this month" value={formatAed(salesNet)} change={trend.change.sales} hint="Invoiced ex VAT, vs same days last month" bars={months8.map(m => m.sales)} href="/reports?period=month" icon={Receipt} index={0} />
+        {docsView && <StatCard label="Work orders completed" value={wo14?.count ?? 0} change={pctChange(wo14?.count ?? 0, woPrev14?.count ?? 0)} hint="Last 14 days, vs the 14 before" href="/work-orders?status=completed" icon={HardHat} index={1} />}
+        {book && <StatCard label="Open order book" value={formatAed(book.value)} hint={book.projects ? `Left to invoice on ${book.projects} project${book.projects === 1 ? '' : 's'}` : 'Contract values of open projects'} href="/projects" icon={Briefcase} index={2} />}
+        {onTime && <StatCard label="On-time completion" value={onTime.pct === null ? '—' : `${onTime.pct}%`} tone={onTime.pct !== null && onTime.pct < 70 ? 'amber' : 'neutral'} hint={onTime.total ? `${onTime.onTime} of ${onTime.total} work orders by target · 90 days` : 'No completed work orders with a target yet'} href="/work-orders?status=completed" icon={Clock} index={3} />}
       </Metrics>
-      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-xl border border-border bg-surface px-5 py-2.5 text-[13px] text-muted shadow-card">
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-2xl border border-white/70 bg-surface/75 px-5 py-2.5 text-[13px] text-muted shadow-card backdrop-blur-xl dark:border-white/[.06]">
+        <Link href="/invoices?tab=receivables" className="hover:text-fg">Receivables <span className="font-semibold tabular-nums text-fg">{formatAed(sk.outstanding)}</span>{sk.overdueCount > 0 && <span className="font-medium text-danger"> · {formatAed(sk.overdue)} overdue</span>}</Link>
+        <Link href="/invoices?tab=payments" className="hover:text-fg">Collected this month <span className="font-semibold tabular-nums text-fg">{formatAed(trend.mtd.collected)}</span></Link>
+        <Link href="/invoices?tab=quotation" className="hover:text-fg">Open quotations <span className="font-semibold tabular-nums text-fg">{formatAed(sk.pipeline)}</span>{(followDue?.count ?? 0) > 0 && <span className="font-medium text-warning"> · {followDue!.count} follow-up{followDue!.count === 1 ? '' : 's'} due</span>}</Link>
         <Link href="/cheques" className="hover:text-fg">Cheques this week <span className="font-semibold tabular-nums text-fg">In {formatAed(amt(weekIn))}</span> · <span className="font-semibold tabular-nums text-fg">Out {formatAed(amt(weekOut))}</span></Link>
         {expenses > 0 && <Link href="/expenses" className="hover:text-fg" title="Sales excluding VAT minus recorded expenses; labour and overheads count only if recorded">Recorded expenses this month <span className="font-semibold tabular-nums text-fg">{formatAed(expenses)}</span> · Estimated margin <span className="font-semibold tabular-nums text-fg">{formatAed(salesNet - expenses)}</span></Link>}
         {(dueSoon?.count ?? 0) > 0 && <Link href="/invoices?tab=invoice&status=sent" className="hover:text-fg"><span className="font-semibold tabular-nums text-fg">{dueSoon!.count}</span> invoice{dueSoon!.count === 1 ? '' : 's'} due in 7 days</Link>}
         {sk.winRate !== null && <span>Quotation win rate <span className="font-semibold tabular-nums text-fg">{sk.winRate}%</span></span>}
       </div>
     </section> : null,
-    trend: trend ? <Card><TrendChart months={trend.months} change={{ sales: trend.change.sales, collected: trend.change.collected }} action={<CardLink href="/reports">Reports</CardLink>} /></Card> : null,
+    trend: trend ? <Card className="h-full"><TrendChart title="Year at a glance" months={trend.months} change={{ sales: trend.change.sales, collected: trend.change.collected }} action={<CardLink href="/reports">Reports</CardLink>} /></Card> : null,
+    funnel: leadRows ? <SalesFunnel steps={salesFunnel((leadRows.data ?? []) as any)} /> : null,
+    floor: woOpen ? <OnTheFloor rows={(woOpen.data ?? []) as any} total={woOpen.count ?? 0} today={c.today} /> : null,
+    road: docsView ? <OnTheRoad visits={visits} deliveries={(dnRows?.data ?? []) as any} /> : null,
+    lowstock: lowRes ? <RunningLow rows={(lowRes.data ?? []) as any} total={lowRes.count ?? 0} tracked={(stockAny?.count ?? 0) > 0} /> : null,
+    team: emp ? <TeamToday active={emp.count ?? 0} onLeave={leaveIds.size} onSite={new Set(visits.map(v => v.employee_id).filter(Boolean)).size} onJobs={new Set(crewRows.map(m => m.employee_id)).size} people={[...crewPeople.values()]} /> : null,
     quick: <Card className="h-full"><CardHeader title="Quick actions" /><QuickGrid can={{ sales: can.sales, crm: c.can('crm.view') && c.can('records.edit'), docs: can.docs, people: can.people, projects: c.can('documents.view') && c.can('records.edit') }} /></Card>,
     recent: canFin && recentQ ? <Card><CardTabs id="recent" action={<CardLink href="/invoices">All documents</CardLink>} tabs={[
       { key: 'q', label: 'Recent quotations', panel: <DocTable rows={recentQ.data ?? []} dateCol="Valid until" date={(r: any) => r.valid_until} empty="No quotations yet" /> },
@@ -203,7 +248,7 @@ export default async function Dashboard() {
             <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}</span><span className="block truncate text-xs text-muted">{p.customer?.name ?? 'No customer'}</span></span>
             <span className="col-span-2 flex items-center gap-2.5 sm:col-span-1" title={`Fabrication ${p.fabrication_progress ?? 0}% · Site ${p.site_progress ?? 0}%`}><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><span className={cn('block h-full rounded-full', pct >= 75 ? 'bg-success' : pct >= 40 ? 'bg-primary' : 'bg-warning')} style={{ width: `${pct}%` }} /></span><span className="w-9 text-end text-xs font-medium tabular-nums">{pct}%</span></span>
             <span className="row-start-1 col-start-2 sm:col-start-3"><Badge tone={tone(p.status)}>{PROJECT_STATUS[p.status]?.label ?? p.status}</Badge></span></Link></li> })}</ul>}</Card> || null,
-    activity: <Card className="h-full"><CardHeader title="Recent activity" action={c.can('audit.view') ? <CardLink href="/audit">Audit log</CardLink> : undefined} />
+    activity: <Card className="h-full"><CardHeader title="Live activity" action={c.can('audit.view') ? <CardLink href="/audit">Audit log</CardLink> : undefined} />
         {activity ? ((activity.data?.length ?? 0) === 0 ? <EmptyState compact title="No activity yet" /> :
           <ul className="px-2 pb-2 text-sm">{activity.data!.map(a => { const [I, tint] = ACT[a.table_name] ?? [FileText, 'bg-surface-2 text-muted']; return <li key={a.id} className="flex items-center gap-3 rounded-lg px-3 py-2">
             <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg', tint)} aria-hidden><I size={15} /></span>
@@ -219,10 +264,16 @@ export default async function Dashboard() {
       {!pendingApprovals.length ? <EmptyState compact icon={CheckCircle2} title="Nothing to approve" /> : <ul className="px-2 pb-2 text-sm">{pendingApprovals.map((a: any) => <li key={a.id}><Link href={`/approvals?open=${a.id}`} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">
         <span className="min-w-0 flex-1 truncate">{a.title}</span>{a.amount !== null && <span className="shrink-0 text-xs tabular-nums text-muted">{formatAed(a.amount)}</span>}</Link></li>)}</ul>}</Card> : null,
   }
+  // the hero carries the page actions (Customize lists the widgets that have something to show, the hero included)
+  const headerActions = <><DashboardCustomize layout={layout} available={['banner', ...(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))]} />
+    <QuickActions label="Create new" can={can} /></>
+  W.banner = <TodayHero greet={`${greeting(tz)}${firstName ? `, ${firstName}` : ''}`} date={date} time={time} place={place} now={time} events={events} cash={cash}
+      chip={[...(docsView ? [`${visitN} site visit${visitN === 1 ? '' : 's'}`] : []), ...(woTodayN ? [`${woTodayN} work order${woTodayN === 1 ? '' : 's'} due`] : [])]} actions={headerActions} />
   const visible = layout.items.filter(i => !i.hidden && W[i.key])
   const shown = new Set(visible.map(i => i.key))
   const SPAN: Partial<Record<WidgetKey, string>> = {
-    trend: shown.has('quick') ? 'lg:col-span-8' : 'lg:col-span-12', quick: shown.has('trend') ? 'lg:col-span-4' : 'lg:col-span-12',
+    trend: shown.has('funnel') ? 'lg:col-span-8' : 'lg:col-span-12', funnel: shown.has('trend') ? 'lg:col-span-4' : 'lg:col-span-12',
+    floor: shown.has('road') ? 'lg:col-span-7' : 'lg:col-span-12', road: shown.has('floor') ? 'lg:col-span-5' : 'lg:col-span-12',
     activity: shown.has('projects') ? 'lg:col-span-6' : 'lg:col-span-12', projects: shown.has('activity') ? 'lg:col-span-6' : 'lg:col-span-12',
   }
   const PHONE_HIDDEN = new Set<WidgetKey>(['banner', 'finance', 'calendar', 'trend', 'inbox'])
@@ -260,16 +311,11 @@ export default async function Dashboard() {
 
   return <>
     {mobile}
-    <div className="mb-6 hidden flex-wrap items-center justify-between gap-x-4 gap-y-3 sm:flex">
-      <div className="min-w-0"><h1 className="text-[24px] font-bold leading-tight tracking-[-0.025em] sm:text-[26px]">{greeting(tz)}{firstName ? `, ${firstName}` : ''}</h1>
-        <p className="mt-1 text-sm text-muted"><span className="sr-only">Dashboard · {c.company.name} · </span>Here’s your business overview for today.</p></div>
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div className="hidden items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-2 shadow-card md:flex">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-soft text-primary" aria-hidden><CalendarDays size={17} /></span>
-          <span className="leading-tight"><span className="block text-[13.5px] font-semibold">{date}</span><span className="block text-xs text-muted">{time} · {place}</span></span></div>
-        <DashboardCustomize layout={layout} available={(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))} />
-        <QuickActions label="Create new" can={can} /></div>
-    </div>
+    {!shown.has('banner') && <div className="mb-6 hidden flex-wrap items-center justify-between gap-x-4 gap-y-3 sm:flex">
+      <div className="min-w-0"><h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em]">{greeting(tz)}{firstName ? `, ${firstName}` : ''}</h1>
+        <p className="mt-1 text-sm text-muted"><span className="sr-only">Dashboard · {c.company.name} · </span>{date}</p></div>
+      <div className="flex flex-wrap items-center gap-2.5">{headerActions}</div>
+    </div>}
 
     {isNew && <Card className="mb-5 p-5"><h2 className="text-[15px] font-semibold">Set up Averiqo</h2><p className="mt-0.5 text-sm text-muted">Four steps to a useful dashboard. Each one fills part of this page.</p>
       <ol className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">{[['Add company documents', '/documents', 'Trade licence, VAT certificate, tenancy'], ['Add employees', '/employees', 'Passports, visas, Emirates IDs'], ['Create a quotation', '/invoices', 'Your letterhead, stamp and terms'], ['Set up reminders', '/reminders', 'Recipients and WhatsApp opt-in']].map(([t, h, s], i) =>

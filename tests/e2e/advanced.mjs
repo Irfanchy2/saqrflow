@@ -138,14 +138,14 @@ try {
 
   console.log('\n[6] Dashboard customisation')
   await p.goto(`${BASE}/`); await settle()
-  ok((await main()).includes('Recent activity'), 'default dashboard unchanged (Recent activity shown)')
+  ok((await main()).includes('Live activity'), 'default dashboard unchanged (Recent activity shown)')
   await p.getByRole('button', { name: 'Customize' }).click()
-  await dlg().getByRole('checkbox', { name: 'Recent activity' }).uncheck(); await dlg().getByRole('checkbox', { name: 'My tasks' }).check(); await dlg().getByRole('button', { name: 'Save', exact: true }).click(); await settle(900)
+  await dlg().getByRole('checkbox', { name: 'Live activity' }).uncheck(); await dlg().getByRole('checkbox', { name: 'My tasks' }).check(); await dlg().getByRole('button', { name: 'Save', exact: true }).click(); await settle(900)
   await p.reload(); await settle()
   const dash = await main()
-  ok(!dash.includes('Recent activity') && dash.includes('My tasks') && dash.includes('Send drawings to client'), 'layout saved per user: activity hidden, My tasks shown')
+  ok(!dash.includes('Live activity') && dash.includes('My tasks') && dash.includes('Send drawings to client'), 'layout saved per user: activity hidden, My tasks shown')
   await p.getByRole('button', { name: 'Customize' }).click(); await dlg().getByRole('button', { name: 'Reset to default' }).click(); await settle(900); await p.reload(); await settle()
-  ok((await main()).includes('Recent activity'), 'reset restores the default dashboard')
+  ok((await main()).includes('Live activity'), 'reset restores the default dashboard')
 
   console.log('\n[7] Phone')
   const m = await browser.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, storageState: await ctx.storageState() }); const mp = await m.newPage()

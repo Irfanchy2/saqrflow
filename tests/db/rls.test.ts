@@ -1051,6 +1051,18 @@ describe('shared demo company (0026)', () => {
     expect((await as(U.ownerA, `select count(*)::int n from customers where company_id = $1`, [D])).rows[0].n).toBe(0)
   })
 
+  it('the demo has stock, bank accounts and work on the floor for the dashboard (0028)', async () => {
+    const q = async (sql: string) => (await as(demoUser, sql)).rows[0]
+    expect(await q(`select count(*)::int items, count(*) filter (where is_low)::int low from stock_items`)).toEqual({ items: 5, low: 2 })
+    const b = (await as(demoUser, `select name, balance::numeric from bank_balances order by name`)).rows
+    expect(b.map(r => r.name)).toEqual(['Emirates NBD', 'Mashreq', 'Petty cash'])
+    expect(Number(b.find(r => r.name === 'Petty cash')!.balance)).toBe(3270)   // 4,500 + 3,000 top-up − cash expenses
+    expect((await q(`select count(*)::int n from bank_transactions where source_type = 'payment'`)).n).toBe(2)
+    expect((await q(`select count(*)::int n from work_orders where status = 'completed' and completed_at is not null`)).n).toBe(5)
+    expect((await q(`select count(*)::int n from site_visits where scheduled_date = (now() at time zone 'Asia/Dubai')::date`)).n).toBe(2)
+    expect((await q(`select count(*)::int n from leads`)).n).toBe(11)
+  })
+
   it('the daily reset restores the sample data and numbering, and leaves every other company alone', async () => {
     const before = await counts(A), beforeB = await counts(B)
     await as(demoUser, `update customers set name = 'Defaced' where id = (select id from customers where company_id = $1 limit 1)`, [D])
