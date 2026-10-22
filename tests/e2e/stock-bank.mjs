@@ -53,7 +53,7 @@ try {
   await p.goto(`${BASE}/stock`); await settle()
   await p.getByRole('button', { name: 'Receive stock' }).click(); await settle(300)
   await dlg().getByLabel('Item *').selectOption(item.id); await dlg().getByLabel('Quantity *').fill('10'); await dlg().getByLabel('Cost per unit (AED)').fill('130')
-  await dlg().getByLabel('Supplier', { exact: true }).selectOption(sup); await dlg().getByLabel('Supplier invoice / DN / PO no.').fill('EST-5541')
+  await dlg().locator('select[name=supplier_id]').selectOption(sup); await dlg().getByLabel('Supplier invoice / DN / PO no.').fill('EST-5541')
   await save('Receive')
   let it = await one(`select on_hand, avg_cost from stock_items where id=$1`, [item.id])
   ok(Number(it.on_hand) === 30 && Number(it.avg_cost) === 110, `receipt: 30 on hand, weighted average cost AED 110 (${it.avg_cost})`)
