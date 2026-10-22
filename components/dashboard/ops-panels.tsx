@@ -40,20 +40,24 @@ export function TodayHero({ greet, date, time, place, now, chip, events, cash, a
       <div className="mt-5 rounded-2xl border border-white/70 bg-surface/75 p-4 shadow-card backdrop-blur-xl dark:border-white/[.06] sm:p-5">
         <div className="flex items-center justify-between gap-3"><h2 className="text-[14px] font-semibold">Today</h2>
           <span className="text-[12px] text-muted">{events.length ? `${events.length} thing${events.length === 1 ? '' : 's'} on` : 'A clear day'}</span></div>
-        <div className="relative mt-4 h-[74px] max-sm:hidden" role="list" aria-label="Today's timeline">
-          <div className="absolute inset-x-0 top-8 h-1 rounded-full bg-surface-2 shadow-[inset_0_0_0_1px_hsl(var(--border)/.6)]" />
-          {nowPct > 0 && nowPct < 100 && <div className="absolute top-8 h-1 rounded-full bg-ink/80" style={{ width: `${nowPct}%` }} aria-hidden />}
-          {hours.map(h => <span key={h} className="absolute top-12 -translate-x-1/2 text-[11px] tabular-nums text-muted rtl:translate-x-1/2" style={{ insetInlineStart: `${((h * 60 - start) / span) * 100}%` }}>{String(h).padStart(2, '0')}:00</span>)}
-          {nowPct > 0 && nowPct < 100 && <span aria-label={`Now, ${now}`} className="absolute top-[26px] h-4 w-4 -translate-x-1/2 rounded-full border-[3px] border-surface bg-ink shadow-card rtl:translate-x-1/2" style={{ insetInlineStart: `${nowPct}%` }} />}
-          {timed.map((e, i) => <Link role="listitem" key={i} href={e.href} title={`${e.time} · ${e.label}${e.sub ? ` · ${e.sub}` : ''}`} style={{ insetInlineStart: `${pos(e.time!)}%` }}
-            className={cn('group/ev absolute top-0 flex max-w-[180px] -translate-x-1/2 flex-col items-center rtl:translate-x-1/2', i % 2 && 'top-[46px]')}>
-            <span className={cn('truncate rounded-full bg-surface px-2 py-0.5 text-[11.5px] font-medium shadow-card ring-1 ring-border/70 transition-colors group-hover/ev:bg-surface-2', i % 2 && 'order-2 mt-1')}><span className="tabular-nums text-muted">{e.time}</span> {e.label}</span>
-            <span className={cn('mt-1 h-2.5 w-2.5 rounded-full ring-2 ring-surface', KIND_DOT[e.kind], i % 2 && 'order-1 -mt-[18px]')} aria-hidden /></Link>)}
+        <div className="relative mt-4 h-[92px] max-sm:hidden" role="list" aria-label="Today's timeline">
+          <div className="absolute inset-x-0 top-[38px] h-1 rounded-full bg-surface-2 shadow-[inset_0_0_0_1px_hsl(var(--border)/.6)]" />
+          {nowPct > 0 && nowPct < 100 && <div className="absolute top-[38px] h-1 rounded-full bg-ink/80 rtl:end-0" style={{ width: `${nowPct}%` }} aria-hidden />}
+          {hours.map(h => <span key={h} className="absolute top-[74px] -translate-x-1/2 text-[11px] tabular-nums text-muted rtl:translate-x-1/2" style={{ insetInlineStart: `${((h * 60 - start) / span) * 100}%` }}>{String(h).padStart(2, '0')}:00</span>)}
+          {timed.map((e, i) => { const up = i % 2 === 0
+            return <Link role="listitem" key={i} href={e.href} title={`${e.time} · ${e.label}${e.sub ? ` · ${e.sub}` : ''}`} style={{ insetInlineStart: `${Math.min(93, Math.max(7, pos(e.time!)))}%` }}
+              className={cn('group/ev absolute flex -translate-x-1/2 flex-col items-center rtl:translate-x-1/2', up ? 'top-0' : 'top-[35px]')}>
+              {!up && <span className={cn('h-2.5 w-2.5 rounded-full ring-2 ring-surface', KIND_DOT[e.kind])} aria-hidden />}
+              {!up && <span className="h-2 w-px bg-border-strong" aria-hidden />}
+              <span className="max-w-[170px] truncate rounded-full bg-surface px-2 py-0.5 text-[11.5px] font-medium shadow-card ring-1 ring-border/70 transition-colors group-hover/ev:bg-surface-2"><span className="tabular-nums text-muted">{e.time}</span> {e.label}</span>
+              {up && <span className="h-[14px] w-px bg-border-strong" aria-hidden />}
+              {up && <span className={cn('h-2.5 w-2.5 rounded-full ring-2 ring-surface', KIND_DOT[e.kind])} aria-hidden />}</Link> })}
+          {nowPct > 0 && nowPct < 100 && <span aria-label={`Now, ${now}`} className="absolute top-[32px] h-4 w-4 -translate-x-1/2 rounded-full border-[3px] border-surface bg-ink shadow-card rtl:translate-x-1/2" style={{ insetInlineStart: `${nowPct}%` }} />}
         </div>
         {(loose.length > 0 || timed.length > 0) && <ul className={cn('mt-3 flex flex-wrap gap-1.5', timed.length && 'sm:mt-1')}>{[...timed.map(e => ({ ...e, mobileOnly: true })), ...loose.map(e => ({ ...e, mobileOnly: false }))].map((e, i) =>
           <li key={i} className={cn(e.mobileOnly && 'sm:hidden')}><Link href={e.href} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-surface-2/80 px-2.5 py-1 text-[12.5px] transition-colors hover:bg-surface-2">
             <span className={cn('h-2 w-2 shrink-0 rounded-full', KIND_DOT[e.kind])} aria-hidden /><span className="sr-only">{KIND_LABEL[e.kind]}: </span>{e.time && <span className="tabular-nums text-muted">{e.time}</span>}<span className="truncate">{e.label}</span></Link></li>)}</ul>}
-        {!events.length && <p className="mt-1 flex items-center gap-2 text-sm text-muted sm:-mt-4"><CheckCircle2 size={15} className="text-success" aria-hidden />No site visits, due work orders, tasks, cheques or invoices today.</p>}
+        {!events.length && <p className="mt-1 flex items-center gap-2 text-sm text-muted sm:-mt-2"><CheckCircle2 size={15} className="text-success" aria-hidden />No site visits, due work orders, tasks, cheques or invoices today.</p>}
       </div>
     </div>
     {cash && <CashCard cash={cash} />}

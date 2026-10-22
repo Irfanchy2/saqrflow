@@ -49,6 +49,18 @@ try {
   ok(await p.locator('[data-demo-banner]').isVisible(), 'one click signs in; the app shows the shared-demo banner')
   ok((await text()).includes('Demo Steel Works LLC'), 'the demo company is shown')
   await p.screenshot({ path: `${OUT}/02-dashboard.png` })
+  {
+    const dash = await p.locator('main').innerText()
+    const panels = ['Cash on hand', 'Revenue this month', 'Work orders completed', 'Open order book', 'On-time completion', 'Year at a glance', 'Sales funnel', 'On the floor', 'Running low', 'On the road', 'Team today', 'Live activity']
+    ok(panels.every(s => dash.includes(s)), `dashboard shows every panel (missing: ${panels.filter(s => !dash.includes(s)).join(', ') || 'none'})`)
+    ok(dash.includes('MS plate 6 mm') && dash.includes('Welding rods E7018') && !dash.includes('Grinding discs'), 'running low lists only the items at or below their reorder level')
+    ok(dash.includes('Podium column base plates') && dash.includes('Canopy rafters'), 'on the floor lists the open work orders')
+    ok(/09:30/.test(dash) && /14:00/.test(dash) && dash.includes('DL-'), "today's timeline has both site visits; the delivery out is on the road")
+    ok(/80%/.test(dash), 'on-time completion: 4 of 5 work orders by their target (80%)')
+    const cash = await one(`select sum(balance)::numeric s from bank_balances where company_id = $1 and active`, [D])
+    ok(dash.replace(/,/g, '').includes(Number(cash.s).toFixed(2)), `cash on hand matches the accounts (AED ${Number(cash.s).toFixed(2)})`)
+    await p.screenshot({ path: `${OUT}/02b-dashboard-full.png`, fullPage: true })
+  }
 
   console.log('\n[2] Sample data, own company only')
   await p.goto(`${BASE}/invoices?tab=invoice`); await settle()
