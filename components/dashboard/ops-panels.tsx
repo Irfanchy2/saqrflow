@@ -57,7 +57,7 @@ export function TodayHero({ greet, date, time, place, now, chip, events, cash, a
         {(loose.length > 0 || timed.length > 0) && <ul className={cn('mt-3 flex flex-wrap gap-1.5', timed.length && 'sm:mt-1')}>{[...timed.map(e => ({ ...e, mobileOnly: true })), ...loose.map(e => ({ ...e, mobileOnly: false }))].map((e, i) =>
           <li key={i} className={cn(e.mobileOnly && 'sm:hidden')}><Link href={e.href} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-surface-2/80 px-2.5 py-1 text-[12.5px] transition-colors hover:bg-surface-2">
             <span className={cn('h-2 w-2 shrink-0 rounded-full', KIND_DOT[e.kind])} aria-hidden /><span className="sr-only">{KIND_LABEL[e.kind]}: </span>{e.time && <span className="tabular-nums text-muted">{e.time}</span>}<span className="truncate">{e.label}</span></Link></li>)}</ul>}
-        {!events.length && <p className="mt-1 flex items-center gap-2 text-sm text-muted sm:-mt-2"><CheckCircle2 size={15} className="text-success" aria-hidden />No site visits, due work orders, tasks, cheques or invoices today.</p>}
+        {!events.length && <p className="mt-3 flex items-center gap-2 text-sm text-muted"><CheckCircle2 size={15} className="text-success" aria-hidden />No site visits, due work orders, tasks, cheques or invoices today.</p>}
       </div>
     </div>
     {cash && <CashCard cash={cash} />}
