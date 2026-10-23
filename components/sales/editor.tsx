@@ -236,6 +236,12 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const download = () => { location.href = `/api/sales/${doc.id}/pdf` }
   const status = editable ? (saving ? 'Saving…' : dirty ? (draft ? 'Unsaved changes · autosaves in a moment' : 'Unsaved changes · Ctrl+S saves a new revision') : ago(savedAt, now) ?? 'All changes saved') : (lockedReason ?? 'Read only')
   const termsTpl = templates.filter(x => x.kind === 'terms'), payTpl = templates.filter(x => x.kind === 'payment')
+  const [payOn, setPayOn] = useState(() => !!head.paymentText.trim()), payStash = useRef('')
+  const togglePay = (on: boolean) => {
+    setPayOn(on)
+    if (!on) { payStash.current = head.paymentText; set('paymentText', '') }
+    else if (!head.paymentText.trim()) set('paymentText', payStash.current || payTpl[0]?.lines.join('\n') || '')
+  }
   const canDeliver = isQtn && canStatus && !['cancelled', 'rejected'].includes(doc.status) && Object.values(delivery).some(d => d.ordered - d.delivered > 0)
   const approval = doc.approval_status as string | null
   // Send via WhatsApp (Cloud API, PDF attached): the document itself, plus a follow-up / payment reminder once it has been sent
@@ -425,15 +431,17 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
             </div> : <p className="text-xs text-muted">This invoice is issued: apply advances from the invoice’s Payments tab.</p>}
           </Section>}
 
-          {(isQtn || isInv) && <Section icon={ScrollText} title={isQtn ? 'Letter & terms' : 'Terms'} sub="Pick a template (Settings → Document templates) and edit it for this document" collapsed={!isQtn}>
+          {(isQtn || isInv) && <Section icon={ScrollText} title={isQtn ? 'Letter & terms' : 'Terms'} sub={isQtn ? 'Pick a template (Settings → Document templates) and edit it for this document' : payOn ? 'Payment terms are shown on this invoice' : 'No payment terms on this invoice'} collapsed={!isQtn && !payOn}>
             {isQtn && <F label="Opening"><Textarea rows={3} className={GROW} value={head.intro ?? ''} onChange={e => set('intro', e.target.value)} /></F>}
             {isQtn && <F label="Closing note"><Textarea rows={3} className={GROW} value={head.closing ?? ''} onChange={e => set('closing', e.target.value)} /></F>}
             {isQtn && <F label="Terms and conditions" hint="One clause per line. They are numbered automatically">
               {termsTpl.length > 0 && <Select aria-label="Terms template" value="" onChange={e => applyTemplate('terms', e.target.value)}><option value="">Insert a terms template…</option>{termsTpl.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>}
               <Textarea rows={3} className={GROW} value={head.termsText} onChange={e => set('termsText', e.target.value)} /></F>}
-            <F label="Payment terms" hint="One per line">
+            {/* off = no payment terms on this document (saved as an empty list); the text is kept until you leave, so turning it back on restores it */}
+            <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={payOn} onChange={e => togglePay(e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" />Show payment terms on this {meta.label.toLowerCase()}</label>
+            {payOn && <F label="Payment terms" hint="One per line">
               {payTpl.length > 0 && <Select aria-label="Payment terms template" value="" onChange={e => applyTemplate('payment', e.target.value)}><option value="">Insert a payment-terms template…</option>{payTpl.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>}
-              <Textarea rows={3} className={GROW} value={head.paymentText} onChange={e => set('paymentText', e.target.value)} /></F>
+              <Textarea rows={3} className={GROW} value={head.paymentText} onChange={e => set('paymentText', e.target.value)} /></F>}
           </Section>}
 
           <Section icon={PenLine} title="Internal notes" sub="Never printed" collapsed={!head.notes}>

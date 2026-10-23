@@ -121,6 +121,8 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 .capsule-btn { display: grid; place-items: center; border-radius: 16px; color: hsl(220 10% 80%); transition: transform .15s ease-out, background-color .15s, color .15s; }
 .capsule-btn:active { transform: scale(.92); }
 .capsule-btn:focus-visible, .tab-cell:focus-visible { outline: 2px solid hsl(205 100% 72%); outline-offset: 2px; }
+/* expense form: "save anyway" appears when the server says the bill number is already saved for this supplier */
+.dup-wrap:has(input[name="reference"][aria-invalid="true"]) .dup-anyway { display: flex; }
 /* Business art (components/brand/business-art.tsx): cards drift a few pixels, the trend line draws once, bars grow,
    points pulse, windows light up, the glow breathes and the delivery van crosses. Transform/opacity only. */
 @keyframes ba-float { 50% { transform: translateY(-6px); } }
