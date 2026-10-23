@@ -18,6 +18,12 @@ export function NavPending() {
   const path = usePathname(), sp = useSearchParams()
   const [kind, setKind] = useState<Kind | null>(null)
   useEffect(() => setKind(null), [path, sp])
+  // entering the app from sign-in keeps the login page's scroll (a phone scrolls down to the form): start at the top,
+  // except on a reload or back/forward, where the browser's restored position is the right one
+  useEffect(() => {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+    if (nav?.type !== 'reload' && nav?.type !== 'back_forward' && !location.hash) scrollTo(0, 0)
+  }, [])
   useEffect(() => {
     const click = (e: MouseEvent) => {
       // Next's <Link> always calls preventDefault (it navigates itself), so that flag cannot tell us anything; a handler that

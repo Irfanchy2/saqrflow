@@ -95,7 +95,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* one header for every size: phones and tablets keep the compact bar (menu, search, bell, account); from lg the
           brand, the group tabs and the bell + account sit on the page background, aligned with the content */}
       <header className="no-print sticky top-0 z-20 bg-bg/75 backdrop-blur-xl backdrop-saturate-150 lg:relative lg:z-nav lg:bg-transparent lg:backdrop-blur-none">
-        <div className="mx-auto flex h-[68px] w-full max-w-[1680px] items-center gap-2.5 px-4 sm:gap-3 sm:px-5 lg:h-[84px] lg:gap-5 lg:pe-10 lg:ps-[112px]">
+        <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-2.5 px-4 sm:gap-3 sm:px-5 lg:h-[84px] lg:gap-5 lg:pe-10 lg:ps-[112px]">
         <MenuButton />
         <Link href="/" className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none lg:shrink-0 lg:gap-3" aria-label={`Averiqo · ${c.company.name}`}>
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-surface shadow-card ring-1 ring-white/70 dark:ring-white/[.06] lg:h-11 lg:w-11"><AveriqoMark size={24} /></span>
