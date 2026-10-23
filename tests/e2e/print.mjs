@@ -4,6 +4,7 @@ import { chromium } from 'playwright-core'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE
 const OUT = 'tests/e2e/shots/print'; fs.mkdirSync(OUT, { recursive: true })
@@ -144,20 +145,15 @@ try {
   ok(rows24 === 24, `no item row lost or split across pages (${rows24}/24 rows intact)`)
   await pr.close(); await p.emulateMedia({ media: 'screen' })
 
-  console.log('\n[P4] Sidebar')
+  console.log('\n[P4] Navigation')
   await p.goto(`${BASE}/invoices/${qid}`); await settle()
-  const mainW = async () => p.locator('main').evaluate(el => el.getBoundingClientRect().width)
-  const before = await mainW()
-  await p.getByRole('button', { name: 'Collapse sidebar' }).click(); await p.waitForTimeout(400)
-  const asideW = await p.locator('aside[data-collapsed]').evaluate(el => el.getBoundingClientRect().width)
-  ok(asideW <= 69, `collapsed sidebar is an icon rail (${asideW}px)`)
-  ok(await mainW() > before + 150, `workspace expands (${Math.round(before)} → ${Math.round(await mainW())} px)`)
-  await p.locator('aside[data-collapsed] a[href="/assets"]').hover(); await p.waitForTimeout(200)
-  ok((await p.getByRole('tooltip').innerText().catch(() => '')).includes('Vehicles & Assets'), 'tooltip shows the menu label on hover')
-  await p.reload(); await settle()
-  ok(await p.locator('aside[data-collapsed]').getAttribute('data-collapsed') === 'true', 'collapsed state persists after reload (no flash)')
-  await p.getByRole('button', { name: 'Expand sidebar' }).click(); await p.waitForTimeout(300)
-  ok(!(await p.locator('aside').first().innerText()).includes('SOON') || !(await p.locator('aside[data-collapsed]').innerText()).match(/Vehicles & Assets\s*SOON/i), 'Vehicles & Assets no longer marked “Soon”')
+  const mainW = await p.locator('main').evaluate(el => el.getBoundingClientRect().width)
+  ok(mainW >= 1440 - 112 - 40 - 2, `the editor gets the full width beside the dock (${Math.round(mainW)}px)`)
+  const gear = p.locator('nav[aria-label="Quick actions"]').getByRole('link', { name: 'Settings' }), tip = gear.locator('[role=tooltip]')
+  await gear.hover(); await p.waitForTimeout(300)
+  ok((await tip.innerText()).includes('Settings') && Number(await tip.evaluate(e => getComputedStyle(e).opacity)) > 0.9, 'dock tooltip shows the label on hover')
+  const nav = await navText(p)
+  ok(nav.includes('Vehicles & Assets') && !/Vehicles & Assets\s*SOON/i.test(nav), 'Vehicles & Assets is in the navigation, not marked “Soon”')
 
   console.log('\n[P5] Vehicles & Assets')
   const emp = (await one(`insert into employees(company_id,employee_no,full_name) values ($1,'EMP-010','Imran Driver') returning id`, [co])).id

@@ -4,6 +4,7 @@
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText, sectionText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE
 const OUT = 'tests/e2e/shots/operations'; fs.mkdirSync(OUT, { recursive: true })
@@ -32,7 +33,7 @@ try {
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email=$1`, [EMAIL])).company_id
   const welder = (await one(`insert into employees(company_id,employee_no,full_name,designation) values ($1,'E-101','Anil Thomas','Welder') returning id`, [co])).id
   const fitter = (await one(`insert into employees(company_id,employee_no,full_name,designation) values ($1,'E-102','Rashid Khan','Fitter') returning id`, [co])).id
-  const nav = await p.locator('aside[data-collapsed]').innerText()
+  const nav = await navText(p)
   for (const l of ['CRM & Leads', 'Site Visits', 'Work Orders', 'Daily Site Reports', 'Tasks']) ok(nav.includes(l), `sidebar: ${l}`)
   ok(/SALES/.test(nav) && /OPERATIONS/.test(nav), 'sidebar grouped: Sales, Operations')
   ok(!/inventory|stock|warehouse/i.test(nav), 'no inventory / stock / warehouse module anywhere in navigation')

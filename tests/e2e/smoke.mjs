@@ -3,6 +3,7 @@ import { chromium } from 'playwright-core'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText, sectionText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE, GW = process.env.E2E_GATEWAY
 const results = []
@@ -64,9 +65,14 @@ try {
     const own = await p.context().request.post(`${BASE}/api/customers/search`, { headers: { origin: BASE }, data: {} })
     ok(own.status() !== 403, 'same-origin API request is not refused by the origin check')
   }
-  for (const l of ['Dashboard', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Quotations', 'Invoices', 'Payments', 'Projects', 'Customers', 'Vehicles & Assets', 'Reminders', 'Calendar', 'Reports & Analytics', 'Averiqo AI', 'User Management', 'Settings'])
-    ok(await p.getByRole('link', { name: l }).first().isVisible(), `sidebar has “${l}”`)
-  ok(!(await p.locator('aside').first().innerText()).match(/\b(Soon|Beta|Coming soon|Planned)\b/i), 'every module is live: no Soon / Beta / Planned labels in navigation')
+  const nav = await navText(p)
+  for (const l of ['Dashboard', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Quotations', 'Invoices', 'Payments', 'Projects', 'Customers', 'Vehicles & Assets', 'Reminders', 'Calendar', 'Reports & Analytics', 'Averiqo AI'])
+    ok(nav.includes(l), `navigation has “${l}”`)
+  ok(!/\b(Soon|Beta|Coming soon|Planned)\b/i.test(nav), 'every module is live: no Soon / Beta / Planned labels in navigation')
+  ok(await p.locator('nav[aria-label="Quick actions"]').getByRole('link', { name: 'Settings' }).isVisible(), 'the dock links to Settings')
+  await p.goto(`${BASE}/settings`); await p.waitForLoadState('networkidle')
+  for (const l of ['User Management', 'Audit Log', 'Settings']) ok((await sectionText(p)).includes(l), `Settings section has “${l}”`)
+  await p.goto(`${BASE}/`); await p.waitForLoadState('networkidle')
 
   console.log('\n[2] Company documents, versions, secure access')
   await p.goto(`${BASE}/documents`); ok((await bodyText(p)).includes('No company documents yet'), 'documents empty state')
@@ -190,7 +196,7 @@ try {
   ok(dash.includes('Needs attention') && dash.includes('Emirates ID'), 'priority alerts include the expiring Emirates ID'); ok(dash.includes('Outgoing cheque of AED 3,200'), 'priority alerts include cheque payment')
   await p.getByRole('link', { name: /Emirates ID/ }).first().click(); await p.waitForURL(/\/employees\//); ok(true, 'alert click opens the employee record')
   await p.goto(`${BASE}/`); await shot(p, '07-dashboard'); await p.emulateMedia({ colorScheme: 'dark' }); await p.evaluate(() => document.documentElement.classList.add('dark')); await shot(p, '07b-dashboard-dark'); await p.evaluate(() => document.documentElement.classList.remove('dark'))
-  await p.goto(`${BASE}/calendar`); await settle(p); ok((await bodyText(p)).includes('Emirates ID') || (await bodyText(p)).includes('Trade License'), 'calendar shows due items'); await shot(p, '08-calendar')
+  await p.goto(`${BASE}/calendar?m=${plus(10).slice(0, 7)}`); await settle(p); ok((await bodyText(p)).includes('Emirates ID') || (await bodyText(p)).includes('Trade License'), 'calendar shows due items'); await shot(p, '08-calendar')
   await p.goto(`${BASE}/search?q=Mohammed`); ok((await bodyText(p)).includes('Mohammed Ali'), 'global search finds the employee')
   const csv = await p.context().request.get(`${BASE}/api/export/cheques`); ok(csv.ok() && (await csv.text()).includes('ABC Trading'), 'cheques CSV export works for owner')
   await p.goto(`${BASE}/reports?section=compliance`); ok((await bodyText(p)).includes('Employee compliance') && (await bodyText(p)).includes('Document expiry on'), 'reports page renders (documents & staff)'); await p.goto(`${BASE}/settings`); await settle(p); ok((await bodyText(p)).includes('saqrflow_document_reminder'), 'settings lists WhatsApp templates to approve'); await shot(p, '09-settings')

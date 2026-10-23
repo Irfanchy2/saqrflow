@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText, sectionText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE
 const OUT = 'tests/e2e/shots/advanced'; fs.mkdirSync(OUT, { recursive: true })
@@ -34,7 +35,7 @@ try {
   await one(`insert into cheques(company_id,cheque_no,direction,party_name,bank_name,amount,cheque_date,status) values ($1,'C-4401','incoming','ABC Contracting LLC','ADCB',4200,$2,'received') returning id`, [co, day(2)])
   await one(`insert into documents(company_id,name,expiry_date,status) values ($1,'Trade Licence',$2,'active') returning id`, [co, day(12)])
   await one(`insert into tasks(company_id,title,owner_id,due_date,status) values ($1,'Send drawings to client',$2,$3,'todo') returning id`, [co, owner, day(-1)])
-  const nav = await p.locator('aside[data-collapsed]').innerText()
+  const nav = await navText(p)
   ok(nav.includes('Approvals') && nav.includes('Daily Brief'), 'sidebar: Approvals and Daily Brief')
 
   console.log('\n[1] Approval Center')

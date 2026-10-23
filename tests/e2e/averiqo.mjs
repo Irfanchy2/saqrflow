@@ -4,6 +4,7 @@ import { chromium } from 'playwright-core'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import pg from 'pg'
+import { navText, sectionText } from './nav.mjs'
 
 const BASE = process.env.E2E_BASE
 const OUT = 'tests/e2e/shots/averiqo'; fs.mkdirSync(OUT, { recursive: true })
@@ -29,21 +30,32 @@ try {
   await p.goto(`${BASE}/signup`); await p.getByLabel('Work email').fill(EMAIL); await p.getByLabel('Password').fill('correct-horse-battery'); await p.getByRole('button', { name: 'Create account' }).click()
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('AL SAQR AL AHMAR WELDING AND BLACKSMITH'); await p.getByLabel('Your full name').fill('Faisal Rahman'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`); await settle()
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email=$1`, [EMAIL])).company_id
-  const aside = p.locator('aside[data-collapsed]')
-  ok((await aside.innerText()).includes('Averiqo') && (await aside.innerText()).includes('AL SAQR AL AHMAR'), 'sidebar: Averiqo software brand + the company using it')
-  ok(!/\b(Soon|Beta|BETA|Coming soon)\b/.test(await aside.innerText()), 'no Soon / Beta / Coming soon badges in navigation')
+  const brand = await p.locator('header a[aria-label^="Averiqo"]').filter({ visible: true }).innerText()
+  ok(brand.includes('Averiqo') && brand.includes('AL SAQR AL AHMAR'), 'header: Averiqo software brand + the company using it')
+  ok(!/\b(Soon|Beta|BETA|Coming soon)\b/.test(await navText(p)), 'no Soon / Beta / Coming soon badges in navigation')
   ok((await p.title()).includes('Averiqo'), `browser title carries the software brand (${await p.title()})`)
-  const fontOk = await p.evaluate(() => getComputedStyle(document.body).fontFamily.toLowerCase().includes('geist'))
-  ok(fontOk, 'Geist font is applied')
+  const font = await p.evaluate(() => getComputedStyle(document.body).fontFamily.toLowerCase())
+  ok(font.includes('urbanist') && font.includes('geist'), `Urbanist interface font with Geist behind it (${font.slice(0, 60)}…)`)
 
-  console.log('\n[6] Sidebar collapse persists across navigation and reload')
-  await aside.getByRole('button', { name: 'Collapse sidebar' }).click(); await p.waitForTimeout(300)
-  await p.goto(`${BASE}/assets`); await settle(); await p.reload(); await settle()
-  ok(await p.locator('aside[data-collapsed="true"]').count() === 1, 'collapsed after navigate + refresh (cookie)')
+  console.log('\n[6] Top tabs, section tabs and the dock')
+  const tabs = p.locator('nav[aria-label="Main"]')
+  await tabs.locator('[data-top="sales"]').click(); await p.waitForURL(u => u.pathname !== '/'); await settle(); await p.mouse.move(700, 700); await p.waitForTimeout(250)
+  ok(await tabs.locator('[data-top="sales"]').getAttribute('aria-current') === 'page', `Sales tab opens its first page and is marked current (${new URL(p.url()).pathname})`)
+  ok((await sectionText(p)).includes('Quotations') && (await sectionText(p)).includes('Payments'), 'section tabs list the Sales pages')
+  await p.locator('nav[aria-label="Section"]').getByRole('link', { name: 'Payments' }).click(); await p.waitForURL(/tab=payments/); await settle()
+  ok(await p.locator('nav[aria-label="Section"] a[aria-current="page"]').innerText() === 'Payments', 'the section tab you click becomes the current one')
+  await tabs.locator('[data-top="ops"]').hover(); await p.waitForTimeout(350)
+  ok((await tabs.getByRole('menu').innerText()).includes('Work Orders'), 'hovering a tab shows its pages')
+  await tabs.getByRole('menu').getByRole('menuitem', { name: 'Work Orders' }).click(); await p.waitForURL('**/work-orders**'); await settle()
+  ok(await tabs.locator('[data-top="ops"]').getAttribute('aria-current') === 'page', 'a page picked from the hover menu marks its tab current')
+  await p.mouse.move(700, 700); await p.keyboard.press('c'); await p.waitForTimeout(300)
+  ok(await p.locator('nav[aria-label="Quick actions"]').getByRole('menu', { name: 'Quick create' }).isVisible(), 'C opens the dock create menu')
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200)
+  ok(!(await p.locator('nav[aria-label="Quick actions"]').getByRole('menu').count()), 'Escape closes it')
+  await p.locator('nav[aria-label="Quick actions"]').getByRole('button', { name: 'Search (Ctrl K)' }).click(); await p.waitForTimeout(300)
+  ok(await p.getByRole('dialog', { name: 'Command palette' }).isVisible(), 'dock search opens the command palette'); await p.keyboard.press('Escape')
   const mainW = await p.locator('main').evaluate(e => e.getBoundingClientRect().width)
-  await p.locator('aside[data-collapsed="true"]').getByRole('button', { name: 'Expand sidebar' }).click(); await p.waitForTimeout(400)
-  const mainW2 = await p.locator('main').evaluate(e => e.getBoundingClientRect().width)
-  ok(mainW >= mainW2, `main content is wider with the sidebar collapsed (${Math.round(mainW)} vs ${Math.round(mainW2)}px)`)
+  ok(mainW >= 1440 - 112 - 40 - 2, `no sidebar: the workspace spans the page beside the dock (${Math.round(mainW)}px)`)
 
   console.log('\n[2] Vehicle → Mulkiya → expiry → reminder')
   const emp = (await one(`insert into employees(company_id,employee_no,full_name,designation) values ($1,'E-014','Mohammed Iqbal','Driver') returning id`, [co])).id
