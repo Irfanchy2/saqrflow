@@ -18,7 +18,7 @@ export function ClockChip({ tz, initial, chip, canEdit, demo }: { tz: string; in
   const [time, setTime] = useState(initial), [open, setOpen] = useState(false), [q, setQ] = useState(''), [busy, start] = useTransition()
   const box = useRef<HTMLDivElement>(null), panel = useRef<HTMLDivElement>(null), router = useRouter()
   useEffect(() => { setTime(fmt(tz)); const t = setInterval(() => setTime(fmt(tz)), 10_000); return () => clearInterval(t) }, [tz])
-  useLayoutEffect(() => { if (open) { popIn(panel.current, { items: '[data-zone]' }); panel.current?.querySelector('input')?.focus() } }, [open])
+  useLayoutEffect(() => { if (open) { popIn(panel.current, { items: '[data-zone]' }); panel.current?.querySelector('input')?.focus() } else setQ('') }, [open])
   useEffect(() => {
     if (!open) return
     const out = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
