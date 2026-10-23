@@ -137,6 +137,7 @@ try {
   const pp = (await db.query(`select d.owner_id, d.current_version_id, c.name from documents d join document_categories c on c.id = d.category_id where d.owner_id = $1 and c.name = 'Passport'`, [empId])).rows
   ok(pp.length === 1 && pp[0].current_version_id, 'the passport is saved on that employee, with the file')
   await p.goto(`${BASE}/employees?view=table`); await settle(p); ok((await bodyText(p)).includes('% complete'), 'the table layout is still one click away')
+  await p.goto(`${BASE}/employees/${empId}?tab=salary`); await settle(p)
   await p.getByRole('button', { name: 'Record payment' }).click(); await dlg(p).getByLabel('Month *').fill('2026-09'); await dlg(p).getByRole('button', { name: 'Save' }).click(); await settle(p, 1200); ok((await bodyText(p)).includes('2026-09'), 'salary payment recorded')
   await p.goto(`${BASE}/employees/${empId}?tab=leave`); await p.getByRole('button', { name: 'Add leave' }).click(); await dlg(p).getByLabel('From *').fill(plus(30)); await dlg(p).getByLabel('To *').fill(plus(34)); await dlg(p).getByRole('button', { name: 'Save' }).click(); await settle(p, 1200); ok((await bodyText(p)).includes('annual') || (await bodyText(p)).includes('Annual'), 'leave recorded (5 days)')
   await shot(p, '04-employee-profile')
