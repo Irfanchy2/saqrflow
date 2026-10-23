@@ -6,7 +6,8 @@ export async function navText(p) {
   for (let i = 0; i < await tabs.count(); i++) {
     const tab = tabs.nth(i); await tab.hover(); await p.waitForTimeout(260)
     const menu = main.locator('[role=menu]')
-    out.push(`${(await tab.innerText()).replace(/\d+\+?$/, '').trim().toUpperCase()}\n${await menu.count() ? await menu.innerText() : await tab.innerText()}`)
+    // textContent: the menu's items fade in one after another (GSAP), and innerText skips the ones not shown yet
+    out.push(`${(await tab.innerText()).replace(/\d+\+?$/, '').trim().toUpperCase()}\n${await menu.count() ? (await menu.locator('[role=menuitem]').allTextContents()).join('\n') : await tab.innerText()}`)
   }
   await p.mouse.move(2, 600); await p.waitForTimeout(200)
   return out.join('\n')
