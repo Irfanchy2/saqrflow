@@ -1,4 +1,5 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
+import { AccountSelect } from '@/components/banking/account-select'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, Download, Mail, Plus, Printer, Wallet } from '@/components/icons'
@@ -46,6 +47,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
             <Field label="Date received *"><Input name="paid_on" type="date" defaultValue={c.today} max={c.today} required /></Field>
             <Field label="Method *"><Select name="method" defaultValue="bank_transfer"><option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
             <Field label="Reference"><Input name="reference" maxLength={120} /></Field>
+            <AccountSelect name="deposit_bank_id" label="Deposited to" />
           </div></ActionForm></DialogButton>}
       </>} />
     <Metrics className="mb-5" cols={4}>

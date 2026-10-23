@@ -95,6 +95,8 @@ export {
   ChatCircleTextIcon as MessageCircle,
   MoonIcon as Moon,
   PackageIcon as Package,
+  CubeIcon as Boxes,
+  CardholderIcon as Cardholder,
   TruckTrailerIcon as PackageCheck,
   PackageIcon as PackagePlus,
   SidebarSimpleIcon as PanelLeftClose,

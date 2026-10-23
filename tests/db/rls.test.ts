@@ -1085,3 +1085,86 @@ describe('shared demo company (0026)', () => {
     }
   })
 })
+
+describe('stock and bank accounts (0027)', () => {
+  let item: string, itemB: string, proj: string, acct: string, cash: string, cust: string
+  beforeAll(async () => {
+    item = (await as(U.ownerA, `insert into stock_items(company_id,name,unit,reorder_level,on_hand,avg_cost) values ($1,'MS Plate 6mm','Sheet',5,999,999) returning id, on_hand, avg_cost`, [A])).rows[0].id
+    itemB = (await as(U.ownerB, `insert into stock_items(company_id,name) values ($1,'Rival rods') returning id`, [B])).rows[0].id
+    proj = (await as(U.ownerA, `insert into projects(company_id,name) values ($1,'Stock test job') returning id`, [A])).rows[0].id
+    cust = (await as(U.ownerA, `insert into customers(company_id,name) values ($1,'Stock test customer') returning id`, [A])).rows[0].id
+    acct = (await as(U.accA, `insert into banks(company_id,name,account_display_name,is_account,opening_balance,is_default) values ($1,'Emirates NBD','Current ••0001',true,10000,true) returning id`, [A])).rows[0].id
+    cash = (await as(U.accA, `insert into banks(company_id,name,account_display_name,is_account,account_type) values ($1,'Petty cash','Office',true,'cash') returning id`, [A])).rows[0].id
+  })
+  const onHand = async (id: string) => (await sup('select on_hand, avg_cost from stock_items where id=$1', [id])).rows[0]
+  const move = (uid: string, kind: string, qty: number, extra = '', vals: unknown[] = []) =>
+    as(uid, `insert into stock_movements(company_id,item_id,kind,qty,created_by${extra ? ',' + extra.split('=')[0] : ''}) values ($1,$2,$3,$4,$5${extra ? ',$6' : ''}) returning *`, [A, item, kind, qty, uid, ...vals])
+
+  it('a new item starts at zero whatever the insert says; on hand and cost cannot be edited directly', async () => {
+    expect(await onHand(item)).toMatchObject({ on_hand: '0.000', avg_cost: '0.0000' })
+    await as(U.ownerA, `update stock_items set on_hand=500, avg_cost=1, name='MS Plate 6mm' where id=$1`, [item])
+    expect(await onHand(item)).toMatchObject({ on_hand: '0.000', avg_cost: '0.0000' })
+  })
+  it('receipts raise on hand with a weighted average cost; issues use that cost and never go below zero', async () => {
+    await move(U.ownerA, 'receipt', 10, 'unit_cost=', [100])
+    await move(U.ownerA, 'receipt', 10, 'unit_cost=', [130])
+    expect(await onHand(item)).toMatchObject({ on_hand: '20.000', avg_cost: '115.0000' })
+    const iss = (await move(U.ownerA, 'issue', -6, 'project_id=', [proj])).rows[0]
+    expect(Number(iss.unit_cost)).toBe(115); expect(Number(iss.balance_after)).toBe(14)
+    await fails(move(U.ownerA, 'issue', -15), /not enough stock: 14 Sheet on hand/)
+    expect(await onHand(item)).toMatchObject({ on_hand: '14.000' })
+    expect((await sup('select is_low from stock_items where id=$1', [item])).rows[0].is_low).toBe(false)
+    await move(U.ownerA, 'adjustment', -9, 'notes=', ['Stock take'])
+    expect((await sup('select is_low from stock_items where id=$1', [item])).rows[0].is_low).toBe(true)   // 5 on hand, reorder level 5
+    await move(U.ownerA, 'adjustment', 9, 'notes=', ['Found on rack B'])
+    await fails(move(U.ownerA, 'receipt', -1), /stock_movements_sign/)
+    await fails(move(U.ownerA, 'issue', 2), /stock_movements_sign/)
+  })
+  it('the movement history is immutable and tenant-isolated', async () => {
+    const r = await as(U.ownerA, `update stock_movements set qty=999 where item_id=$1`, [item]); expect(r.rowCount).toBe(0)
+    const d = await as(U.ownerA, `delete from stock_movements where item_id=$1`, [item]); expect(d.rowCount).toBe(0)
+    expect((await as(U.ownerB, `select * from stock_movements where item_id=$1`, [item])).rowCount).toBe(0)
+    await fails(as(U.ownerB, `insert into stock_movements(company_id,item_id,kind,qty,created_by) values ($1,$2,'receipt',1,$3)`, [B, item, U.ownerB]), /another company/)
+    await fails(as(U.ownerA, `insert into stock_movements(company_id,item_id,kind,qty,created_by) values ($1,$2,'receipt',1,$3)`, [A, itemB, U.ownerA]))
+    await fails(as(U.viewerA, `insert into stock_movements(company_id,item_id,kind,qty,created_by) values ($1,$2,'receipt',1,$3)`, [A, item, U.viewerA]), /row-level security/)
+    await fails(as(U.pmA, `insert into stock_movements(company_id,item_id,kind,qty,created_by) values ($1,$2,'receipt',1,$3)`, [A, item, U.ownerA]), /row-level security/)   // created_by must be the caller
+  })
+  it('payments, expenses and cleared outgoing cheques post to the chosen account; balances follow edits and deletes', async () => {
+    const bal = async (id: string) => Number((await as(U.accA, `select balance from bank_balances where id=$1`, [id])).rows[0].balance)
+    expect(await bal(acct)).toBe(10000)
+    const pay = (await as(U.accA, `insert into payments(company_id,customer_id,amount,method,deposit_bank_id) values ($1,$2,2500,'bank_transfer',$3) returning id`, [A, cust, acct])).rows[0].id
+    expect(await bal(acct)).toBe(12500)
+    await as(U.accA, `update payments set amount=3000 where id=$1`, [pay]); expect(await bal(acct)).toBe(13000)
+    await as(U.accA, `update payments set deposit_bank_id=$2 where id=$1`, [pay, cash]); expect(await bal(acct)).toBe(10000); expect(await bal(cash)).toBe(3000)
+    const exp = (await as(U.accA, `insert into project_expenses(company_id,category,description,amount,paid_from_bank_id) values ($1,'fuel','Diesel',400,$2) returning id`, [A, cash])).rows[0].id
+    expect(await bal(cash)).toBe(2600)
+    await as(U.ownerA, `delete from project_expenses where id=$1`, [exp]); expect(await bal(cash)).toBe(3000)
+    const chq = (await as(U.accA, `insert into cheques(company_id,cheque_no,direction,party_name,bank_name,bank_id,amount,cheque_date,status) values ($1,'CQ-77','outgoing','Steel Supplier','Emirates NBD',$2,1200,'2026-10-01','issued') returning id`, [A, acct])).rows[0].id
+    expect(await bal(acct)).toBe(10000)
+    await sup(`update cheques set status='cleared' where id=$1`, [chq]); expect(await bal(acct)).toBe(8800)
+    await sup(`update cheques set purpose='Plates' where id=$1`, [chq]); expect(await bal(acct)).toBe(8800)   // one row per source, however often it changes
+    expect((await sup(`select count(*)::int n from bank_transactions where source_id=$1`, [chq])).rows[0].n).toBe(1)
+  })
+  it('a bank name taken from a customer cheque is not an account and never gets a balance', async () => {
+    const other = (await as(U.accA, `insert into banks(company_id,name) values ($1,'ADCB (customer)') returning id`, [A])).rows[0].id
+    await as(U.accA, `insert into payments(company_id,customer_id,amount,method,deposit_bank_id) values ($1,$2,50,'cash',$3)`, [A, cust, other])
+    expect((await sup(`select count(*)::int n from bank_transactions where bank_id=$1`, [other])).rows[0].n).toBe(0)
+    expect((await as(U.accA, `select * from bank_balances where id=$1`, [other])).rowCount).toBe(0)
+  })
+  it('manual entries: only by finance managers, never posing as a synced row; synced rows cannot be edited or deleted', async () => {
+    await as(U.accA, `insert into bank_transactions(company_id,bank_id,kind,amount,description,created_by) values ($1,$2,'fee',-25,'Monthly fee',$3)`, [A, acct, U.accA])
+    await fails(as(U.accA, `insert into bank_transactions(company_id,bank_id,kind,amount,created_by) values ($1,$2,'fee',25,$3)`, [A, acct, U.accA]), /bank_txn_sign/)
+    await fails(as(U.accA, `insert into bank_transactions(company_id,bank_id,kind,amount,source_type,source_id,created_by) values ($1,$2,'deposit',5,'payment',$3,$4)`, [A, acct, uuid(), U.accA]), /row-level security/)
+    await fails(as(U.pmA, `insert into bank_transactions(company_id,bank_id,kind,amount,created_by) values ($1,$2,'deposit',5,$3)`, [A, acct, U.pmA]), /row-level security/)
+    expect((await as(U.ownerA, `update bank_transactions set amount=1 where bank_id=$1`, [acct])).rowCount).toBe(0)
+    expect((await as(U.ownerA, `delete from bank_transactions where bank_id=$1 and source_type is not null`, [acct])).rowCount).toBe(0)
+    expect((await as(U.ownerB, `select * from bank_transactions where bank_id=$1`, [acct])).rowCount).toBe(0)
+    expect((await as(U.ownerB, `select * from bank_balances where id=$1`, [acct])).rowCount).toBe(0)
+    await fails(as(U.ownerA, `delete from banks where id=$1`, [acct]), /violates foreign key/)   // an account with history is kept
+  })
+  it('one default account per company; payments cannot post to another company\'s account', async () => {
+    await fails(as(U.accA, `insert into banks(company_id,name,account_display_name,is_account,is_default) values ($1,'Mashreq','Second',true,true)`, [A]), /banks_one_default_uidx/)
+    const bAcct = (await as(U.ownerB, `insert into banks(company_id,name,is_account) values ($1,'Rival bank',true) returning id`, [B])).rows[0].id
+    await fails(as(U.accA, `insert into payments(company_id,customer_id,amount,method,deposit_bank_id) values ($1,$2,10,'cash',$3)`, [A, cust, bAcct]), /another company/)
+  })
+})

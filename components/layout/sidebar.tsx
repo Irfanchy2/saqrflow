@@ -7,7 +7,7 @@ import {
   SquaresFourIcon, SunHorizonIcon, TrayIcon, CalendarDotsIcon, FunnelIcon, BuildingsIcon, MapPinAreaIcon, ScrollIcon, ReceiptIcon, TruckIcon,
   HandCoinsIcon, PackageIcon, HardHatIcon, ClipboardTextIcon, NotebookIcon, CheckSquareOffsetIcon, VanIcon, WrenchIcon, WalletIcon, BankIcon,
   IdentificationBadgeIcon, FilesIcon, VaultIcon, BellRingingIcon, BookOpenTextIcon, ChartLineUpIcon, SealCheckIcon, SparkleIcon, UserGearIcon,
-  ClockCounterClockwiseIcon, TrashIcon, GearSixIcon, MagnifyingGlassIcon, CaretDownIcon, XIcon,
+  ClockCounterClockwiseIcon, TrashIcon, GearSixIcon, CubeIcon, ArrowsLeftRightIcon, CardholderIcon, MagnifyingGlassIcon, CaretDownIcon, XIcon,
 } from '@phosphor-icons/react/dist/ssr'
 import type { Icon } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -20,7 +20,8 @@ export const ICONS: Record<string, Icon> = {
   leads: FunnelIcon, parties: BuildingsIcon, site_visits: MapPinAreaIcon, quotations: ScrollIcon, tax_invoices: ReceiptIcon, invoices: ReceiptIcon,
   delivery_notes: TruckIcon, payments: HandCoinsIcon, catalog: PackageIcon,
   projects: HardHatIcon, work_orders: ClipboardTextIcon, site_reports: NotebookIcon, tasks: CheckSquareOffsetIcon, assets: VanIcon, tickets: WrenchIcon,
-  expenses: WalletIcon, cheques: BankIcon,
+  stock: CubeIcon, stock_moves: ArrowsLeftRightIcon,
+  bank_accounts: CardholderIcon, expenses: WalletIcon, cheques: BankIcon,
   employees: IdentificationBadgeIcon, documents: FilesIcon, vault: VaultIcon, reminders: BellRingingIcon, kb: BookOpenTextIcon,
   reports: ChartLineUpIcon, approvals: SealCheckIcon, assistant: SparkleIcon,
   users: UserGearIcon, audit: ClockCounterClockwiseIcon, trash: TrashIcon, settings: GearSixIcon,

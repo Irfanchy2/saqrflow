@@ -1,5 +1,6 @@
 'use client'
 import { useRef, useState } from 'react'
+import { AccountSelect } from '@/components/banking/account-select'
 import { Loader2, ScanText } from '@/components/icons'
 import { Field, Input, Select, Textarea, Button } from '@/components/ui/primitives'
 import { EXPENSE_CATS, PAYMENT_METHODS } from '@/lib/projects'
@@ -44,6 +45,7 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
     <Field label="Amount excl. VAT (AED) *"><Input name="amount" type="number" step="0.01" min="0.01" required inputMode="decimal" defaultValue={e?.amount ?? ''} /></Field>
     <Field label="VAT (AED)" hint="Input VAT on the receipt (0 if none)"><Input name="vat_amount" type="number" step="0.01" min="0" inputMode="decimal" defaultValue={e?.vat_amount ?? 0} /></Field>
     <Field label="Payment method"><Select name="payment_method" defaultValue={e?.payment_method ?? 'cash'}>{Object.entries(PAYMENT_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
+    <AccountSelect name="paid_from_bank_id" label="Paid from" value={e ? e.paid_from_bank_id ?? null : undefined} />
     {!fixedProject && projects && <Field label="Project"><Select name="project_id" defaultValue={e?.project_id ?? ''}><option value="">— General / no project —</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}
     {assets && assets.length > 0 && <Field label="Vehicle / asset" hint="Fuel, Salik, parts or repairs for one item"><Select name="asset_id" defaultValue={e?.asset_id ?? ''}><option value="">None</option>{assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>}
     <Field label="Employee" hint="Who paid / used it"><Select name="employee_id" defaultValue={e?.employee_id ?? ''}><option value="">—</option>{employees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>

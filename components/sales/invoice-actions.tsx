@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
+import { AccountSelect } from '@/components/banking/account-select'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Ban, Banknote, CheckCircle2, CircleDollarSign, Download, Eye, FileText, Loader2, MessageCircle, MoreHorizontal, PenLine, Printer, RotateCcw } from '@/components/icons'
@@ -51,6 +52,7 @@ function PaymentForm({ inv, mode, bal, today, cheques, canUpload }: { inv: Invoi
       <Field label="Payment method *"><Select name="method" defaultValue="bank_transfer">{METHOD.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
       <Field label="Reference" hint="Transfer ref., receipt or cheque no."><Input name="reference" maxLength={120} /></Field>
       <Field label="Bank"><Input name="bank_name" maxLength={120} placeholder="e.g. Emirates NBD" /></Field>
+      <AccountSelect name="deposit_bank_id" label="Deposited to" />
       {cheques && <Field label="Cleared cheque" hint={cheques.length ? 'Only cheques confirmed as Cleared appear here' : 'No cleared cheques to apply. Mark the cheque Cleared under Cheques first.'}>
         <Select name="cheque_id" defaultValue="" disabled={!cheques.length}><option value="">— None —</option>{cheques.map(q => <option key={q.id} value={q.id}>{q.label}</option>)}</Select></Field>}
       {canUpload && <Field label="Receipt / proof (optional)" className="sm:col-span-2"><input type="file" name="file" accept={ACCEPT_ATTR} className="text-sm" /></Field>}
