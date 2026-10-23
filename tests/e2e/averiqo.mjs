@@ -54,7 +54,7 @@ try {
   ok(!(await p.locator('nav[aria-label="Quick actions"]').getByRole('menu').count()), 'Escape closes it')
   await p.locator('nav[aria-label="Quick actions"]').getByRole('button', { name: 'Search (Ctrl K)' }).click(); await p.waitForTimeout(300)
   ok(await p.getByRole('dialog', { name: 'Command palette' }).isVisible(), 'dock search opens the command palette'); await p.keyboard.press('Escape')
-  await p.getByRole('button', { name: /^Account:/ }).click(); const acct = p.getByRole('menu', { name: 'Account' })
+  await p.getByRole('button', { name: /^Account:/ }).click(); const acct = p.getByRole('menu', { name: 'Account' }); await p.waitForTimeout(450)   // let the GSAP entrance finish (items are hidden while they fade in)
   ok((await acct.innerText()).match(/My profile[\s\S]*Settings[\s\S]*Keyboard shortcuts[\s\S]*Light[\s\S]*Dark[\s\S]*Match system[\s\S]*Sign out/) && !(await acct.innerText()).includes('Reset demo data'), 'account menu: profile, settings, shortcuts, three themes, sign out (no demo reset in a real company)')
   await acct.getByRole('menuitemradio', { name: 'Dark' }).click(); await p.waitForTimeout(150)
   ok(await p.evaluate(() => document.documentElement.classList.contains('dark') && localStorage.getItem('sf-theme') === 'dark') && await acct.getByRole('menuitemradio', { name: 'Dark' }).getAttribute('aria-checked') === 'true', 'Dark is applied, remembered and ticked')
