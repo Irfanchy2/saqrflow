@@ -105,8 +105,6 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
       <StatCard label="Movements this month" value={monthMoves ?? 0} icon={ArrowDownLeft} href="/stock?tab=movements" index={3} />
     </Metrics>
 
-    <nav aria-label="Stock views" className="tabstrip mb-4 flex gap-1 overflow-x-auto border-b border-border lg:hidden">{([['items', 'Items'], ['movements', 'Movements']] as const).map(([k, l]) =>
-      <Link key={k} href={`/stock?tab=${k}`} aria-current={tab === k ? 'page' : undefined} className={cn('-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition-colors', tab === k ? 'border-primary font-medium text-fg' : 'border-transparent text-muted hover:text-fg')}>{l}</Link>)}</nav>
 
     {tab === 'items' ? <Card>
       <form className="flex flex-wrap gap-2 border-b border-border p-3">

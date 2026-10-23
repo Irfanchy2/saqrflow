@@ -7,7 +7,7 @@ import { Check } from '@/components/icons'
 export interface Notif { id: string; title: string; body: string | null; link: string | null; severity: string; read_at: string | null; created_at: string }
 export function NotificationBell({ items, unread }: { items: Notif[]; unread: number }) {
   return <details className="group relative">
-    <summary aria-label={`Notifications (${unread} unread)`} className="relative grid h-10 w-10 cursor-pointer list-none place-items-center rounded-lg text-muted lg:h-12 lg:w-12 lg:rounded-full lg:text-fg transition-colors hover:bg-fg/[.05] hover:text-fg group-open:bg-fg/[.06] group-open:text-fg [&::-webkit-details-marker]:hidden">
+    <summary aria-label={`Notifications (${unread} unread)`} className="relative grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full text-fg lg:h-12 lg:w-12 transition-colors hover:bg-fg/[.05] hover:text-fg group-open:bg-fg/[.06] group-open:text-fg [&::-webkit-details-marker]:hidden">
       <Bell size={19} />{unread > 0 && <span aria-hidden className="absolute end-[9px] top-[9px] h-2.5 w-2.5 rounded-full bg-[hsl(14_85%_52%)] ring-2 ring-surface" />}
     </summary>
     <div className="pop-in absolute end-0 z-40 mt-2 w-[22rem] max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border/80 bg-surface shadow-pop max-sm:fixed max-sm:inset-x-2 max-sm:top-[60px] max-sm:mt-0 max-sm:w-auto max-sm:max-w-none">

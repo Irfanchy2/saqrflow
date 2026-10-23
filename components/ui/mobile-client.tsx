@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils'
  * Floating "+" on phones and tablets (above the tab bar). `open` names a DialogButton's openParam on this page and opens
  * that form directly; `href` navigates instead.
  */
-/** The floating + : a solid blue disc with a top highlight, a coloured shadow and a firm press. Shared with the sales FAB. */
-export const FAB = 'fab no-print fixed bottom-[calc(76px+env(safe-area-inset-bottom))] end-4 z-nav grid h-14 w-14 cursor-pointer place-items-center rounded-full bg-primary bg-[linear-gradient(180deg,hsl(0_0%_100%/.16),hsl(0_0%_100%/0))] text-primary-fg shadow-[inset_0_1px_0_hsl(0_0%_100%/.25),0_0_0_1px_hsl(var(--primary)),0_12px_24px_-8px_hsl(var(--primary)/.65)] transition-transform duration-150 ease-out active:scale-90 disabled:opacity-70 lg:hidden'
+/** The floating + : an ink disc above the tab bar, with a ring of page colour and a firm press. Shared with the sales FAB. */
+export const FAB = 'fab no-print fixed bottom-[calc(84px+env(safe-area-inset-bottom))] end-4 z-nav grid h-14 w-14 cursor-pointer place-items-center rounded-full bg-ink text-ink-fg shadow-[0_14px_30px_-12px_hsl(var(--shadow)/.7)] ring-4 ring-bg transition-transform duration-150 ease-out active:scale-90 disabled:opacity-70 lg:hidden'
 export function Fab({ label, open, href }: { label: string; open?: string; href?: string }) {
   const cls = FAB
   if (href) return <Link href={href} aria-label={label} className={cls}><Plus size={24} strokeWidth={2.4} /></Link>

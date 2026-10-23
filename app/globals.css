@@ -101,15 +101,15 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 @media print { *, ::before, ::after { animation: none !important; } .mesh { display: none; } }
 /* Sidebar link (components/layout/sidebar.tsx): one short class per part instead of the same long utility list on
    every link, which made up a large share of each page's HTML. */
-.nav-item { position: relative; display: flex; height: 2.5rem; flex-shrink: 0; user-select: none; align-items: center; gap: .75rem; border-radius: 10px;
-  padding-inline: 10px .625rem; font-size: 14px; outline-offset: 0; transition: color .15s, transform .15s; }
+.nav-item { position: relative; display: flex; height: 2.75rem; flex-shrink: 0; user-select: none; align-items: center; gap: .75rem; border-radius: 9999px;
+  padding-inline: 14px .75rem; font-size: 14.5px; font-weight: 500; outline-offset: 0; transition: color .15s, transform .15s; }
 .nav-item:active { transform: scale(.985); }
 @media (min-width: 1024px) { .nav-item { height: 34px; font-size: 13.5px; } }
-.nav-wash { position: absolute; inset: 0; border-radius: inherit; background: rgb(255 255 255 / .045); opacity: 0; transition: opacity .15s; }
+.nav-wash { position: absolute; inset: 0; border-radius: inherit; background: hsl(var(--fg) / .05); opacity: 0; transition: opacity .15s; }
 .nav-item:hover .nav-wash { opacity: 1; }
-.nav-ico { position: relative; flex-shrink: 0; color: hsl(var(--sb-muted)); transition: color .2s ease-out, transform .2s ease-out; }
-.nav-item:hover .nav-ico:not(.is-on) { color: hsl(var(--sb-fg)); transform: translateY(-1px); }
-.nav-ico.is-on { color: hsl(var(--sb-accent-soft)); }
+.nav-ico { position: relative; flex-shrink: 0; color: hsl(var(--muted)); transition: color .2s ease-out, transform .2s ease-out; }
+.nav-item:hover .nav-ico:not(.is-on) { color: hsl(var(--fg)); transform: translateY(-1px); }
+.nav-ico.is-on { color: hsl(var(--ink-fg)); }
 /* Business art (components/brand/business-art.tsx): cards drift a few pixels, the trend line draws once, bars grow,
    points pulse, windows light up, the glow breathes and the delivery van crosses. Transform/opacity only. */
 @keyframes ba-float { 50% { transform: translateY(-6px); } }

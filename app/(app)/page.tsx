@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { SalesDocBadge } from '@/components/sales/status-badges'
-import { Banknote, Briefcase, CalendarDays, CheckCircle2, Clock, FileText, HardHat, Landmark, Receipt, ScrollText, ShieldCheck, Truck, Flag, Users, Wallet } from '@/components/icons'
+import { Banknote, Briefcase, CalendarDays, CheckCircle2, Clock, FileText, HardHat, Landmark, Receipt, ShieldCheck, Truck, Flag, Users, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
-import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, MiniBars, Money, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, CardHeader, CardLink, EmptyState, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { buildAlerts } from '@/lib/dashboard'
 import { summarizeCheques } from '@/lib/cheques'
 import { addDays, formatAed, formatShortDate } from '@/lib/time'
@@ -266,7 +266,7 @@ export default async function Dashboard() {
         <span className="min-w-0 flex-1 truncate">{a.title}</span>{a.amount !== null && <span className="shrink-0 text-xs tabular-nums text-muted">{formatAed(a.amount)}</span>}</Link></li>)}</ul>}</Card> : null,
   }
   // the hero carries the page actions (Customize lists the widgets that have something to show, the hero included)
-  const headerActions = <><DashboardCustomize layout={layout} available={['banner', ...(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))]} />
+  const headerActions = <><span className="contents max-sm:hidden"><DashboardCustomize layout={layout} available={['banner', ...(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))]} /></span>
     <QuickActions label="Create new" can={can} /></>
   W.banner = <TodayHero greet={`${greeting(tz)}${firstName ? `, ${firstName}` : ''}`} date={date} time={time} place={place} now={time} events={events} cash={cash}
       chip={[...(docsView ? [`${visitN} site visit${visitN === 1 ? '' : 's'}`] : []), ...(woTodayN ? [`${woTodayN} work order${woTodayN === 1 ? '' : 's'} due`] : [])]} actions={headerActions} />
@@ -277,41 +277,10 @@ export default async function Dashboard() {
     floor: shown.has('road') ? 'lg:col-span-7' : 'lg:col-span-12', road: shown.has('floor') ? 'lg:col-span-5' : 'lg:col-span-12',
     activity: shown.has('projects') ? 'lg:col-span-6' : 'lg:col-span-12', projects: shown.has('activity') ? 'lg:col-span-6' : 'lg:col-span-12',
   }
-  const PHONE_HIDDEN = new Set<WidgetKey>(['banner', 'finance', 'calendar', 'trend', 'inbox'])
+  const PHONE_HIDDEN = new Set<WidgetKey>(['calendar', 'inbox'])   // phones get the same dashboard; only the month grid and the inbox panel stay on bigger screens
   const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className={cn('min-w-0', k === 'left' && cn('col-span-12', SPAN[i.key] ?? 'lg:col-span-12'), PHONE_HIDDEN.has(i.key) && 'max-sm:hidden')}>{W[i.key]}</div>)
 
-  const dateShort = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: tz }).format(new Date())
-  // phones: one composed summary instead of six separate boxes. A navy money card (sales this month, trend, receivables,
-  // pending quotes) and one strip of counts with hairline dividers; every figure still opens the list behind it.
-  const mobile = <section aria-label="Today" className="mb-5 sm:hidden">
-    <p className="text-[13.5px] font-medium text-muted">{greeting(tz)}{firstName ? ',' : ''}</p>
-    <h1 className="mt-0.5 text-[24px] font-bold leading-tight tracking-[-0.025em]">{c.profile.full_name || greeting(tz)}</h1>
-    <p className="mt-1 text-[13px] text-muted">{dateShort}</p>
-    {sk && trend && <div className="mt-4 space-y-3">
-      <div className="relative overflow-hidden rounded-2xl bg-[linear-gradient(140deg,hsl(var(--sb))_0%,hsl(223_55%_19%)_60%,hsl(217_65%_30%)_100%)] text-white shadow-[0_14px_30px_-16px_hsl(var(--sb)/.9)]">
-        <span aria-hidden className="pointer-events-none absolute -end-10 -top-12 h-40 w-40 rounded-full bg-[radial-gradient(closest-side,hsl(var(--sb-accent)/.35),transparent)]" />
-        <Link href="/reports?period=month" className="relative flex items-end justify-between gap-3 px-4 pb-3.5 pt-4 active:opacity-90">
-          <span className="min-w-0"><span className="block text-[12.5px] font-medium text-white/70">Sales this month</span>
-            <Money value={salesNet} className="mt-0.5 block text-[clamp(21px,6.6vw,26px)] font-semibold leading-tight tracking-[-0.03em]" />
-            {trend.change.sales !== null && <span className={cn('mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums', trend.change.sales >= 0 ? 'bg-emerald-400/15 text-emerald-300' : 'bg-rose-400/15 text-rose-300')}>{trend.change.sales >= 0 ? '↑' : '↓'} {Math.abs(trend.change.sales)}%<span className="font-normal text-white/60">vs last month</span></span>}</span>
-          <MiniBars values={months8.map(m => m.sales)} className="bg-white" /></Link>
-        <div className="relative grid grid-cols-2 border-t border-white/10">
-          <Link href="/invoices?tab=receivables" className="min-w-0 px-4 py-3 active:bg-white/5"><span className="flex items-center gap-1.5 text-[12px] text-white/65"><Wallet size={13} aria-hidden />Receivables</span><Money value={sk.outstanding} className="mt-0.5 block text-[clamp(13px,4.1vw,16px)] font-semibold tracking-[-0.01em]" /></Link>
-          <Link href="/invoices?tab=quotation" className="min-w-0 border-s border-white/10 px-4 py-3 active:bg-white/5"><span className="flex items-center gap-1.5 text-[12px] text-white/65"><FileText size={13} aria-hidden />Pending quotes</span><Money value={sk.pipeline} className="mt-0.5 block text-[clamp(13px,4.1vw,16px)] font-semibold tracking-[-0.01em]" /></Link>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 divide-x divide-border/80 overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-card rtl:divide-x-reverse">{[
-        ['Quotations', sk.pipelineCount, '/invoices?tab=quotation', ScrollText, 'text-emerald-600 dark:text-emerald-300'],
-        ['Unpaid invoices', sk.openCount, '/invoices?tab=invoice', Receipt, 'text-blue-600 dark:text-blue-300'],
-        ['Projects', activeCount?.count ?? 0, '/projects', HardHat, 'text-orange-600 dark:text-orange-300'],
-      ].map(([l, v, h, I, t]: any) => <Link key={l} href={h} className="flex min-w-0 flex-col gap-1 px-3 py-3 active:bg-surface-2/70">
-        <span className="flex items-start gap-1.5 text-[11.5px] font-medium leading-tight text-muted"><I size={14} className={cn('shrink-0', t)} aria-hidden /><span className="line-clamp-2">{l}</span></span>
-        <span className="text-[20px] font-semibold tabular-nums leading-none tracking-[-0.02em]">{v}</span></Link>)}</div>
-    </div>}
-  </section>
-
   return <>
-    {mobile}
     {!shown.has('banner') && <div className="mb-6 hidden flex-wrap items-center justify-between gap-x-4 gap-y-3 sm:flex">
       <div className="min-w-0"><h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em]">{greeting(tz)}{firstName ? `, ${firstName}` : ''}</h1>
         <p className="mt-1 text-sm text-muted"><span className="sr-only">Dashboard · {c.company.name} · </span>{date}</p></div>

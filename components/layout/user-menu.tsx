@@ -6,19 +6,11 @@ import { Check, Command, Loader2, LogOut, Moon, RotateCw, Settings, Smartphone, 
 import { signOut } from '@/app/actions/auth'
 import { resetDemoData } from '@/app/actions/demo'
 import { toast } from '@/components/ui/toast'
-import { getThemePref, isDarkNow, setThemePref, toggleTheme, type ThemePref } from '@/lib/theme'
+import { getThemePref, setThemePref, type ThemePref } from '@/lib/theme'
 import { popIn, warmGsap } from '@/lib/gsap-pop'
 import { cn } from '@/lib/utils'
 
 const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || '·'
-
-/** One-tap light ↔ dark for the phone and tablet top bar (the account menu has the full choice). */
-export function TopThemeToggle() {
-  const [dark, setDark] = useState(false)
-  useEffect(() => { const sync = () => setDark(isDarkNow()); sync(); addEventListener('sf-theme', sync); return () => removeEventListener('sf-theme', sync) }, [])
-  return <button type="button" aria-label="Toggle dark mode" title={dark ? 'Light theme' : 'Dark theme'} onClick={toggleTheme}
-    className="hidden h-10 w-10 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg sm:grid">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
-}
 
 const THEMES: [ThemePref, string, typeof Sun][] = [['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'Match system', Smartphone]]
 

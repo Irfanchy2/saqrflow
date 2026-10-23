@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Search, Settings } from '@/components/icons'
 import { supabaseConfigured } from '@/lib/env'
 import { SetupRequired } from '@/components/layout/setup-required'
 import { getCtx } from '@/lib/auth'
@@ -9,15 +8,15 @@ import { ShortcutsDialog } from '@/components/layout/shortcuts'
 import { Pwa } from '@/components/pwa'
 import { t, isRtl } from '@/lib/i18n'
 import { Toaster } from '@/components/ui/toast'
-import { CommandPalette, PaletteHint } from '@/components/layout/command-palette'
+import { CommandPalette } from '@/components/layout/command-palette'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { NavProgress } from '@/components/layout/nav-progress'
 import { MotionRoot } from '@/components/motion'
-import { MenuButton } from '@/components/layout/menu-button'
+import { MenuButton, SearchButton } from '@/components/layout/menu-button'
 import { StripEdges } from '@/components/layout/strip-edges'
 import { NavPending } from '@/components/layout/nav-pending'
 import { RowNavigator } from '@/components/layout/row-navigator'
-import { UserMenu, TopThemeToggle } from '@/components/layout/user-menu'
+import { UserMenu } from '@/components/layout/user-menu'
 import { AveriqoMark } from '@/components/brand/logo'
 import { TopTabs, SubTabs, type TopItem, type TopKey } from '@/components/layout/top-nav'
 import { Dock } from '@/components/layout/dock'
@@ -95,26 +94,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <form action={signOut}><input type="hidden" name="next" value="signup" /><button className="cursor-pointer font-semibold text-primary underline-offset-2 hover:underline">Create your own account →</button></form></div>}
       {/* one header for every size: phones and tablets keep the compact bar (menu, search, bell, account); from lg the
           brand, the group tabs and the bell + account sit on the page background, aligned with the content */}
-      <header className="no-print sticky top-0 z-20 border-b border-border/70 bg-surface/85 backdrop-blur-md backdrop-saturate-150 lg:relative lg:z-nav lg:border-0 lg:bg-transparent lg:backdrop-blur-none">
-        <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-2 px-2 sm:gap-3 sm:px-5 lg:h-[84px] lg:gap-5 lg:pe-10 lg:ps-[112px]">
+      <header className="no-print sticky top-0 z-20 bg-bg/75 backdrop-blur-xl backdrop-saturate-150 lg:relative lg:z-nav lg:bg-transparent lg:backdrop-blur-none">
+        <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-2.5 px-4 sm:gap-3 sm:px-5 lg:h-[84px] lg:gap-5 lg:pe-10 lg:ps-[112px]">
         <MenuButton />
-        <Link href="/" className="flex h-11 min-w-0 flex-1 items-center gap-2 sm:hidden" aria-label={`Averiqo · ${c.company.name}`}><AveriqoMark size={28} /><span className="text-[18px] font-bold tracking-[-0.02em]">Averiqo</span></Link>
-        <Link href="/" className="hidden min-w-0 shrink-0 items-center gap-3 lg:flex" aria-label={`Averiqo · ${c.company.name}`}>
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-surface shadow-card ring-1 ring-white/70 dark:ring-white/[.06]"><AveriqoMark size={26} /></span>
-          <span className="min-w-0 leading-tight"><span className="block text-[18px] font-bold tracking-[-0.02em]">Averiqo</span><span className="block max-w-[150px] truncate text-[11.5px] text-muted" title={c.company.name}>{c.company.name}</span></span></Link>
-        <form action="/search" role="search" className="relative hidden max-w-[540px] flex-1 sm:block lg:hidden"><Search size={16} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
-          <input name="q" type="search" placeholder={t(l, 'search')} aria-label="Global search" className="h-10 w-full rounded-xl border border-transparent bg-surface-2/80 pe-[76px] ps-10 text-sm shadow-[inset_0_0_0_1px_hsl(var(--border)/.6)] transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-muted/80 hover:bg-surface-2 focus:border-primary/60 focus:bg-surface focus:shadow-focus focus-visible:ring-0 focus-visible:ring-offset-0" />
-          <PaletteHint /></form>
+        <Link href="/" className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none lg:shrink-0 lg:gap-3" aria-label={`Averiqo · ${c.company.name}`}>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-surface shadow-card ring-1 ring-white/70 dark:ring-white/[.06] lg:h-11 lg:w-11"><AveriqoMark size={24} /></span>
+          <span className="min-w-0 leading-tight"><span className="block text-[17px] font-bold tracking-[-0.02em] lg:text-[18px]">Averiqo</span><span className="block max-w-[150px] truncate text-[11.5px] text-muted" title={c.company.name}>{c.company.name}</span></span></Link>
         <div className="hidden min-w-0 flex-1 justify-center lg:flex"><TopTabs items={visible} counts={counts} /></div>
-        <div className="ms-auto flex items-center gap-0.5 sm:gap-1 lg:ms-0 lg:gap-2">
-          <a href="/search" aria-label="Search" className="grid h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-fg/[.05] active:bg-fg/[.08] sm:hidden"><Search size={19} /></a>
-          <span className="contents lg:grid lg:h-12 lg:w-12 lg:place-items-center lg:rounded-full lg:bg-surface/80 lg:shadow-card lg:ring-1 lg:ring-white/70 lg:backdrop-blur dark:lg:ring-white/[.06]"><NotificationBell items={notes ?? []} unread={unread ?? 0} /></span>
-          <Link href="/settings" aria-label="Settings" title="Settings" className="hidden h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-fg/[.05] hover:text-fg sm:grid lg:hidden"><Settings size={18} /></Link>
-          <span className="contents lg:hidden"><TopThemeToggle /></span>
-          <span className="mx-1.5 hidden h-7 w-px bg-border sm:block lg:hidden" aria-hidden />
+        <div className="ms-auto flex items-center gap-2 lg:ms-0">
+          <SearchButton />
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-surface/80 shadow-card ring-1 ring-white/70 backdrop-blur dark:ring-white/[.06] lg:h-12 lg:w-12"><NotificationBell items={notes ?? []} unread={unread ?? 0} /></span>
           <UserMenu name={c.profile.full_name} isDemo={!!c.company.is_demo} />
         </div></div></header>
-      <main id="main" tabIndex={-1} className="relative mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 has-[.fab]:pb-[calc(10rem+env(safe-area-inset-bottom))] has-[.dock]:pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:!pb-12 lg:pe-10 lg:ps-[112px] lg:pt-1"><NavPending /><div className="mb-4 hidden lg:block"><SubTabs items={visible} /></div>{children}</main>
+      <main id="main" tabIndex={-1} className="relative mx-auto w-full min-w-0 max-w-[1680px] flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 has-[.fab]:pb-[calc(10rem+env(safe-area-inset-bottom))] has-[.dock]:pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:!pb-12 lg:pe-10 lg:ps-[112px] lg:pt-1"><NavPending /><div className="mb-4 empty:hidden"><SubTabs items={visible} /></div>{children}</main>
     </div><BottomNav items={visible} /><ShortcutsDialog /><Dock can={{ sales: c.can('records.edit') && c.can('finance.view'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') && c.can('documents.view'), projects: c.can('records.edit') && c.can('documents.view'), crm: c.can('crm.view') && c.can('records.edit'), stock: c.can('records.edit') && c.can('documents.view') }} /><NavProgress /><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
       ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
