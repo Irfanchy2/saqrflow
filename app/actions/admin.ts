@@ -13,6 +13,7 @@ import { ROLES, type Role } from '@/lib/permissions'
 import { LOCALES } from '@/lib/i18n'
 import type { ActionState } from '@/lib/utils'
 import { findDuplicates, readParty } from '@/lib/parties'
+import { isZone, placeOf } from '@/lib/time-zones'
 
 async function setting(c: Awaited<ReturnType<typeof getCtx>>, key: string, value: unknown) {
   // app_settings.value is NOT NULL: "not set" is stored as false (readers check the type, so false reads as unset)
@@ -25,6 +26,16 @@ export async function saveCompany(_: ActionState, fd: FormData): Promise<ActionS
     const v = z.object({ name: z.string().min(2).max(200), trade_name: z.string().max(200).optional() }).parse({ name: str(fd, 'name'), trade_name: str(fd, 'trade_name') })
     const { error } = await c.supabase.from('companies').update(v).eq('id', c.company.id); if (error) throw error
     revalidatePath('/', 'layout'); return { ok: true, message: 'Saved.' }
+  })
+}
+/** The company's time zone, from the dashboard clock: "today", due dates and the clock all follow it. */
+export async function saveTimezone(tz: string): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'settings.manage')
+    if (c.company.is_demo) return { error: 'The shared demo stays on Dubai time. In your own account you can change it here.' }
+    const v = z.string().max(64).refine(isZone, 'Choose a time zone from the list.').parse(tz)
+    const { error } = await c.supabase.from('companies').update({ timezone: v }).eq('id', c.company.id); if (error) throw error
+    revalidatePath('/', 'layout'); return { ok: true, message: `Time zone set to ${placeOf(v)}.` }
   })
 }
 export async function saveReminderSettings(_: ActionState, fd: FormData): Promise<ActionState> {

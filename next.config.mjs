@@ -9,7 +9,9 @@ export default {
   // ship the ~11 MB of language data and wasm. Every other page's server function stays small, so it starts faster.
   outputFileTracingIncludes: Object.fromEntries(['/inbox', '/inbox/[id]', '/settings', '/assistant', '/api/inbox/[id]/process', '/api/expenses/scan']
     .map(r => [r, ['./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**', './node_modules/tesseract.js-core/*-lstm.wasm']])),
-  experimental: { serverActions: { bodySizeLimit: '16mb' } },
+  // Pages already opened stay in the browser for a few minutes, so going back to one is instant (no new server render).
+  // Saving anything (server actions call revalidatePath) clears this cache, so what you changed always shows.
+  experimental: { serverActions: { bodySizeLimit: '16mb' }, staleTimes: { dynamic: 180, static: 300 } },
   async headers() {
     const common = [
       { key: 'X-Frame-Options', value: 'SAMEORIGIN' },            // same-origin only: the document preview iframe is ours

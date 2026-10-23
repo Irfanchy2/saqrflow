@@ -31,6 +31,7 @@ export default {
       },
       fontFamily: {
         sans: ['var(--font-urbanist)', 'var(--font-geist-sans)', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Noto Sans Arabic', 'Noto Sans Bengali', 'sans-serif'],
+        tech: ['var(--font-tech)', 'var(--font-urbanist)', 'ui-sans-serif', 'sans-serif'],
         mono: ['var(--font-geist-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: { '2xs': ['11px', '16px'] },

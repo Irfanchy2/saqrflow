@@ -95,6 +95,7 @@ export {
   MapTrifoldIcon as MapPinned,
   ListIcon as Menu,
   ChatCircleTextIcon as MessageCircle,
+  WhatsappLogoIcon as WhatsApp,
   MoonIcon as Moon,
   PackageIcon as Package,
   CubeIcon as Boxes,
