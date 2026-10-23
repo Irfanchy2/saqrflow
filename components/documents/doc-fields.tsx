@@ -1,5 +1,5 @@
 import { Field, Input, Select, Textarea } from '@/components/ui/primitives'
-import { ACCEPT_ATTR } from '@/lib/files'
+import { ACCEPT_ATTR } from '@/lib/file-types'
 
 export interface Cat { id: string; name: string; scope: string }
 export interface Person { id: string; full_name: string }

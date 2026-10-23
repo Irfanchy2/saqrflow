@@ -120,6 +120,23 @@ try {
   const linked = (await db.query(`select owner_type, owner_id from documents where name like 'Emirates ID%'`)).rows; ok(linked.length === 1 && linked[0].owner_id === empId, 'document linked to employee (single record, no duplicate)')
   await p.goto(`${BASE}/vault?owner=employee`); ok((await bodyText(p)).includes('Emirates ID – Mohammed'), 'same document appears in the Vault')
   await p.goto(`${BASE}/employees/${empId}?tab=salary`); await settle(p); ok((await bodyText(p)).includes('AED 2,500'), 'salary visible to owner')
+  // employee cards: one card per person with their details and documents; drop a file on a card to add a document
+  await p.goto(`${BASE}/employees`); await settle(p)
+  const card = p.locator(`[data-drop-employee="${empId}"]`)
+  const ct = await card.innerText()
+  ok(ct.includes('Mohammed') && /AED 2,500\.00/.test(ct) && ct.includes('Emirates ID') && ct.includes('Passport') && /Documents/.test(ct), 'employee card: name, salary, documents with their state')
+  await card.evaluate((el, b64) => {
+    const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0)), dt = new DataTransfer()
+    dt.items.add(new File([bytes], 'passport-mohammed.pdf', { type: 'application/pdf' }))
+    for (const t of ['dragenter', 'dragover', 'drop']) el.dispatchEvent(new DragEvent(t, { bubbles: true, cancelable: true, dataTransfer: dt }))
+  }, files.eid.buffer.toString('base64'))
+  await p.waitForTimeout(500)
+  ok((await dlg(p).innerText()).includes('passport-mohammed.pdf') && (await dlg(p).innerText()).includes('looks like a Passport'), 'dropping a file on the card opens Add document with the file and a Passport guess')
+  ok(await dlg(p).locator('input[type=file][name=file]').evaluate(i => i.files.length === 1 && i.files[0].name === 'passport-mohammed.pdf'), 'the dropped file is attached to the form')
+  await dlg(p).getByRole('button', { name: 'Save document' }).click(); await settle(p, 1500)
+  const pp = (await db.query(`select d.owner_id, d.current_version_id, c.name from documents d join document_categories c on c.id = d.category_id where d.owner_id = $1 and c.name = 'Passport'`, [empId])).rows
+  ok(pp.length === 1 && pp[0].current_version_id, 'the passport is saved on that employee, with the file')
+  await p.goto(`${BASE}/employees?view=table`); await settle(p); ok((await bodyText(p)).includes('% complete'), 'the table layout is still one click away')
   await p.getByRole('button', { name: 'Record payment' }).click(); await dlg(p).getByLabel('Month *').fill('2026-09'); await dlg(p).getByRole('button', { name: 'Save' }).click(); await settle(p, 1200); ok((await bodyText(p)).includes('2026-09'), 'salary payment recorded')
   await p.goto(`${BASE}/employees/${empId}?tab=leave`); await p.getByRole('button', { name: 'Add leave' }).click(); await dlg(p).getByLabel('From *').fill(plus(30)); await dlg(p).getByLabel('To *').fill(plus(34)); await dlg(p).getByRole('button', { name: 'Save' }).click(); await settle(p, 1200); ok((await bodyText(p)).includes('annual') || (await bodyText(p)).includes('Annual'), 'leave recorded (5 days)')
   await shot(p, '04-employee-profile')

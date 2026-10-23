@@ -84,6 +84,8 @@ export default async function Dashboard() {
     docsView ? sb.from('work_orders').select('id', head).is('deleted_at', null).eq('status', 'completed').gte('completed_at', ts(d28)).lt('completed_at', ts(d14)) : null,
     docsView ? sb.from('work_orders').select('id,title').is('deleted_at', null).not('status', 'in', '(completed,cancelled)').eq('target_date', c.today).limit(6) : null,
     canFin && docsView ? sb.from('projects').select('id,contract_value').in('status', ['planning', 'active', 'on_hold']).not('contract_value', 'is', null).limit(3000) : null,
+    // invoiced so far on those open projects, in the same round (no second trip after the projects come back)
+    canFin && docsView ? sb.from('invoices').select('project_id,total,vat_amount,project:projects!inner(status)').eq('doc_type', 'invoice').not('status', 'in', '(draft,cancelled)').is('deleted_at', null).in('project.status', ['planning', 'active', 'on_hold']).limit(20000) : null,
     c.can('crm.view') ? sb.from('leads').select('stage,estimated_value').is('deleted_at', null).gte('created_at', ts(yearStart)).limit(5000) : null,
     docsView ? sb.from('stock_items').select('id,name,unit,on_hand,reorder_level,reorder_qty', { count: 'exact' }).eq('is_low', true).order('on_hand').limit(5) : null,
     docsView ? sb.from('stock_items').select('id', head).eq('active', true) : null,
@@ -135,8 +137,7 @@ export default async function Dashboard() {
 
   // operations / compliance counts: one compact list, zero values stay quiet
   const [myDue, leadDue, visitsToday] = await opsCounts
-  const [woOpen, woDone90, wo14, woPrev14, woToday, openProjects, leadRows, lowRes, stockAny, visitRows, dnRows, accts, leaveRows, crew, tasksToday, invToday] = await opsP
-  const invoicedOnOpen = openProjects?.data?.length ? await sb.from('invoices').select('project_id,total,vat_amount').eq('doc_type', 'invoice').not('status', 'in', '(draft,cancelled)').is('deleted_at', null).in('project_id', openProjects.data.slice(0, 300).map(p => p.id)).limit(20000) : null
+  const [woOpen, woDone90, wo14, woPrev14, woToday, openProjects, invoicedOnOpen, leadRows, lowRes, stockAny, visitRows, dnRows, accts, leaveRows, crew, tasksToday, invToday] = await opsP
   const book = openProjects ? orderBook((openProjects.data ?? []) as any, (invoicedOnOpen?.data ?? []) as any) : null
   const onTime = woDone90 ? onTimeRate((woDone90.data ?? []) as any, tz) : null
   const visits = (visitRows?.data ?? []) as any[]

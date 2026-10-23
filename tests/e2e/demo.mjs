@@ -100,6 +100,14 @@ try {
   ok((await one(`select count(*)::int n from customers where company_id = $1`, [D])).n === 6, 'the six sample customers are back')
   await p.goto(`${BASE}/parties`); await settle()
   ok((await text()).includes('Marina Crest Developments LLC') && await p.locator('[data-demo-banner]').isVisible(), 'a signed-in visitor keeps working after the reset')
+
+  console.log('\n[4b] "Reset demo data" in the account menu')
+  await db.query(`insert into customers(company_id, name) values ($1, 'Another visitor edit')`, [D])
+  await p.goto(`${BASE}/`); await settle()
+  await p.getByRole('button', { name: /^Account:/ }).click(); await p.getByRole('menuitem', { name: 'Reset demo data' }).click()
+  await p.waitForFunction(() => document.body.innerText.includes('Demo data restored'), null, { timeout: 30000 }).catch(() => {})
+  ok((await one(`select count(*)::int n from customers where company_id = $1 and name like '%visitor%'`, [D])).n === 0 && (await one(`select count(*)::int n from customers where company_id = $1`, [D])).n === 6, 'the menu puts the sample data back, and the visitor stays signed in')
+  ok(await p.locator('[data-demo-banner]').isVisible(), 'still in the demo after the reset')
   const after = await realCounts()
   ok(JSON.stringify(after) === JSON.stringify(before), `real companies untouched (${JSON.stringify(after)})`)
 
