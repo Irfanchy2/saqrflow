@@ -4,6 +4,7 @@ import { ArrowRight, Boxes, CheckCircle2, Cardholder, HardHat, MapPin, Truck, Us
 import { Card, CardHeader, CardLink, EmptyState } from '@/components/ui/primitives'
 import { fmtMoney } from '@/lib/sales/money'
 import { formatShortDate } from '@/lib/time'
+import { ClockChip } from '@/components/dashboard/clock-chip'
 import { WO_LABEL, WO_STEPS, type FunnelStep } from '@/lib/dashboard-ops'
 import { cn } from '@/lib/utils'
 
@@ -18,8 +19,8 @@ const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w
  * The top of the dashboard: a live chip (time, what is on today), the greeting, today as a timeline from 7:00 to 19:00
  * (things with a time sit on the track, the rest below it) and the cash on hand across the company's accounts.
  */
-export function TodayHero({ greet, date, time, place, now, chip, events, cash, actions }: {
-  greet: string; date: string; time: string; place: string; now: string; chip: string[]; events: DayEvent[]
+export function TodayHero({ greet, date, time, tz, canEdit, demo, now, chip, events, cash, actions }: {
+  greet: string; date: string; time: string; tz: string; canEdit: boolean; demo: boolean; now: string; chip: string[]; events: DayEvent[]
   cash: { total: number; accounts: CashAccount[] } | 'none' | null; actions: ReactNode
 }) {
   const start = 7 * 60, span = 12 * 60, pos = (t: string) => Math.min(100, Math.max(0, ((mins(t) - start) / span) * 100))
@@ -29,9 +30,7 @@ export function TodayHero({ greet, date, time, place, now, chip, events, cash, a
     <div className="min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-surface/70 px-3 py-1.5 text-[12.5px] font-medium shadow-card backdrop-blur-xl dark:border-white/[.06]">
-            <span className="relative grid h-2 w-2 place-items-center" aria-hidden><span className="absolute h-2 w-2 animate-ping rounded-full bg-success/60 motion-reduce:hidden" /><span className="h-2 w-2 rounded-full bg-success" /></span>
-            <span className="tabular-nums">{time}</span><span className="text-muted">· {place}</span>{chip.map(c => <span key={c} className="text-muted">· {c}</span>)}</p>
+          <ClockChip tz={tz} initial={time} chip={chip} canEdit={canEdit} demo={demo} />
           <h1 className="mt-3 text-[30px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[44px]">{greet}</h1>
           <p className="mt-1.5 text-[14px] text-muted">{date}. Here is what the day looks like.</p>
         </div>

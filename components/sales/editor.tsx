@@ -5,7 +5,7 @@ import { clearDraft, draftAge, readDraft, writeDraft } from '@/lib/drafts'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Banknote, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle,
+  ArrowDown, ArrowLeft, ArrowUp, Banknote, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle, WhatsApp,
   MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, HardHat, Wallet,
 } from '@/components/icons'
 import { SalesPaper, docDiscount, vatOn, type Branding, type PaperItem } from './paper'
@@ -248,12 +248,13 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const waMain = waKinds[0]
   const payJump = !!statusView && !['draft', 'cancelled'].includes(doc.status)
   return <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
-    {/* phones: the two things people do with a finished document, always within thumb reach */}
-    <div className="dock no-print fixed inset-x-3 bottom-[calc(84px+env(safe-area-inset-bottom))] z-nav mx-auto flex max-w-md gap-2 rounded-[22px] border border-border/80 bg-surface/95 p-2 shadow-pop backdrop-blur-md lg:hidden">
+    {/* phones: what people do with a finished document, as a small lit capsule within thumb reach (names are on the
+        buttons for screen readers and as tooltips) */}
+    <div className="dock capsule no-print fixed bottom-[calc(86px+env(safe-area-inset-bottom))] end-3 z-nav flex gap-1.5 rounded-[22px] p-1.5 lg:hidden">
       {waMain && <WhatsAppSend kind={waMain[0]} recordId={doc.id} label={waMain[1]}
-        trigger={open => <button type="button" aria-label={`Send ${waMain[1] === 'WhatsApp' ? meta.label.toLowerCase() : waMain[1].toLowerCase()} via WhatsApp`} onClick={() => (dirty ? save(open) : open())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-[#16a34a] text-[15px] font-semibold text-white active:scale-[.99]"><MessageCircle size={18} aria-hidden /><span className="whitespace-nowrap"><span className={payJump ? 'hidden' : 'max-[379px]:hidden'}>Send via </span>WhatsApp</span></button>} />}
-      <button type="button" onClick={() => (dirty ? save(download) : download())} className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-primary text-[15px] font-semibold text-primary active:scale-[.99]"><Download size={18} aria-hidden /><span className="whitespace-nowrap">{payJump ? 'PDF' : 'Download PDF'}</span></button>
-      {payJump && <a href="#payment" className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[14px] bg-primary text-[15px] font-semibold text-primary-fg active:scale-[.99]" data-pay-jump><Banknote size={18} aria-hidden /><span className="whitespace-nowrap">Payment</span></a>}
+        trigger={open => <button type="button" title="Send via WhatsApp" aria-label={`Send ${waMain[1] === 'WhatsApp' ? meta.label.toLowerCase() : waMain[1].toLowerCase()} via WhatsApp`} onClick={() => (dirty ? save(open) : open())} className="capsule-btn h-12 w-12 cursor-pointer bg-[#1fae57] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.3),0_8px_20px_-8px_rgba(31,174,87,.8)]"><WhatsApp size={24} weight="fill" aria-hidden /></button>} />}
+      <button type="button" title="Download PDF" aria-label="Download PDF" onClick={() => (dirty ? save(download) : download())} className="capsule-btn h-12 w-12 cursor-pointer bg-white/[.07] text-white ring-1 ring-inset ring-white/10"><Download size={22} weight="bold" aria-hidden /></button>
+      {payJump && <a href="#payment" title="Record payment" aria-label="Payment" className="capsule-btn arc h-12 w-12" data-pay-jump><Banknote size={22} weight="fill" aria-hidden /></a>}
     </div>
     {/* toolbar */}
     <div className="no-print sticky top-16 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-surface/90 px-4 py-2.5 backdrop-blur sm:px-6">

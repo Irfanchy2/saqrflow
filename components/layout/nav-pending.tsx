@@ -1,23 +1,22 @@
 'use client'
-import { usePathname, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { DetailSkeleton, EditorSkeleton, ListSkeleton } from '@/components/ui/skeleton'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
-type Kind = 'list' | 'detail' | 'editor'
-const UUID = /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\/|$)/i
-const kindOf = (path: string): Kind => /^\/invoices\/[0-9a-f-]{36}$/i.test(path) ? 'editor' : UUID.test(path) ? 'detail' : 'list'
+const internal = (a: HTMLAnchorElement | null) => {
+  if (!a || a.target || a.hasAttribute('download') || a.closest('[data-no-prefetch]')) return null
+  const u = new URL(a.href, location.href)
+  if (u.origin !== location.origin || u.pathname.startsWith('/api/') || u.pathname.startsWith('/print/')) return null
+  if (u.pathname === location.pathname && u.search === location.search) return null
+  return u.pathname + u.search
+}
 
 /**
- * Instant answer to a tap: the moment a link to another page is clicked (or a table row, through RowNavigator), the content
- * area shows the skeleton of what is coming (list, record or document builder) until the new page has arrived complete.
- * This is done in the browser on purpose: route-level loading.tsx streams pages in pieces, and a later piece arriving after
- * the user has moved on breaks React's streaming insert. Tabs and filters inside a page (`.tabstrip`) keep the page
- * on screen and only show the top progress bar.
+ * Pages open without a loading screen: the current page stays until the next one is ready (the thin top bar shows it is
+ * on its way), and the next one is fetched the moment a finger or pointer lands on a link, so by the time the tap ends it
+ * is usually there already. Visited pages are kept for a few minutes (staleTimes in next.config), so going back is instant.
  */
 export function NavPending() {
-  const path = usePathname(), sp = useSearchParams()
-  const [kind, setKind] = useState<Kind | null>(null)
-  useEffect(() => setKind(null), [path, sp])
+  const router = useRouter()
   // entering the app from sign-in keeps the login page's scroll (a phone scrolls down to the form): start at the top,
   // except on a reload or back/forward, where the browser's restored position is the right one
   useEffect(() => {
@@ -25,20 +24,23 @@ export function NavPending() {
     if (nav?.type !== 'reload' && nav?.type !== 'back_forward' && !location.hash) scrollTo(0, 0)
   }, [])
   useEffect(() => {
-    const click = (e: MouseEvent) => {
-      // Next's <Link> always calls preventDefault (it navigates itself), so that flag cannot tell us anything; a handler that
-      // really cancels a navigation (the builder's unsaved-changes prompt) stops propagation, so this listener never runs.
-      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-      const a = (e.target as HTMLElement).closest('a'); if (!a || a.target || a.hasAttribute('download') || a.closest('.tabstrip, [data-no-pending]')) return
-      const u = new URL(a.href, location.href)
-      if (u.origin !== location.origin || u.pathname.startsWith('/api/') || u.pathname.startsWith('/print/') || u.pathname === location.pathname) return
-      setKind(kindOf(u.pathname))
+    const done = new Set<string>()
+    const warm = (href: string | null) => { if (!href || done.has(href)) return; done.add(href); router.prefetch(href) }
+    // a table row opens its record from anywhere in the row (RowNavigator): warm that record too
+    const linkOf = (t: EventTarget | null) => {
+      const el = t as Element | null; if (!el?.closest) return null
+      const a = el.closest('a'); if (a) return a as HTMLAnchorElement
+      const row = el.closest('.rtable tbody tr, [data-row-link]')
+      return row?.querySelector<HTMLAnchorElement>('a[data-row-primary], a[href]') ?? null
     }
-    addEventListener('click', click)
-    return () => removeEventListener('click', click)
-  }, [])
-  useEffect(() => { if (!kind) return; const t = setTimeout(() => setKind(null), 15000); return () => clearTimeout(t) }, [kind])
-  if (!kind) return null
-  return <div className="absolute inset-0 z-[5] overflow-hidden bg-bg px-4 pb-24 pt-5 sm:px-6 sm:pt-6 lg:px-8">
-    {kind === 'editor' ? <EditorSkeleton /> : kind === 'detail' ? <DetailSkeleton /> : <ListSkeleton />}</div>
+    const press = (e: Event) => warm(internal(linkOf(e.target)))
+    let dwell = 0
+    const over = (e: MouseEvent) => { clearTimeout(dwell); const a = linkOf(e.target); if (a) dwell = window.setTimeout(() => warm(internal(a)), 60) }
+    addEventListener('pointerdown', press, { passive: true, capture: true })
+    addEventListener('touchstart', press, { passive: true, capture: true })
+    addEventListener('focusin', press)
+    addEventListener('mouseover', over, { passive: true })
+    return () => { removeEventListener('pointerdown', press, true); removeEventListener('touchstart', press, true); removeEventListener('focusin', press); removeEventListener('mouseover', over); clearTimeout(dwell) }
+  }, [router])
+  return null
 }

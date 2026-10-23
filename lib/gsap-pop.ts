@@ -10,6 +10,8 @@ export function preloadGsap() {
   loading = import('gsap').then(m => (g = m.gsap)).catch(() => { loading = null; return null as never })
 }
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
+/** GSAP if it has loaded and motion is allowed; callers fall back to placing things without animation. */
+export const gsapNow = () => (g && !reduced() ? g : null)
 
 /** Panel drops in (fade, 6 px, slight scale from its anchor); its items follow 15 ms apart. */
 export function popIn(panel: HTMLElement | null, opts: { from?: 'top' | 'start'; items?: string } = {}) {

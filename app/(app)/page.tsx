@@ -176,7 +176,6 @@ export default async function Dashboard() {
   const quoteBars = months8.length ? bucket((quoteMonths?.data ?? []).map((r: any) => r.issue_date)) : []
   const dueMap = new Map<string, number>(); for (const s of sources.data ?? []) dueMap.set(s.due_date, (dueMap.get(s.due_date) ?? 0) + 1)
   const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: c.company.timezone || 'Asia/Dubai' }).format(new Date())
-  const place = tz === 'Asia/Dubai' ? 'Dubai, UAE' : tz.split('/').pop()!.replace(/_/g, ' ')
   const can = { sales: canFin && c.can('records.edit'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') }
   const ALERT_ICON: Record<string, [typeof FileText, string]> = { document: [FileText, 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300'], cheque: [Landmark, 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300'], followup: [CalendarDays, 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'], lead_followup: [CalendarDays, 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300'], task: [CheckCircle2, 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300'],
     invoice: [Receipt, 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'], milestone: [Flag, 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300'], asset: [Truck, 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'] }
@@ -268,7 +267,7 @@ export default async function Dashboard() {
   // the hero carries the page actions (Customize lists the widgets that have something to show, the hero included)
   const headerActions = <><span className="contents max-sm:hidden"><DashboardCustomize layout={layout} available={['banner', ...(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))]} /></span>
     <QuickActions label="Create new" can={can} /></>
-  W.banner = <TodayHero greet={`${greeting(tz)}${firstName ? `, ${firstName}` : ''}`} date={date} time={time} place={place} now={time} events={events} cash={cash}
+  W.banner = <TodayHero greet={`${greeting(tz)}${firstName ? `, ${firstName}` : ''}`} date={date} time={time} tz={tz} canEdit={c.can('settings.manage')} demo={!!c.company.is_demo} now={time} events={events} cash={cash}
       chip={[...(docsView ? [`${visitN} site visit${visitN === 1 ? '' : 's'}`] : []), ...(woTodayN ? [`${woTodayN} work order${woTodayN === 1 ? '' : 's'} due`] : [])]} actions={headerActions} />
   const visible = layout.items.filter(i => !i.hidden && W[i.key])
   const shown = new Set(visible.map(i => i.key))

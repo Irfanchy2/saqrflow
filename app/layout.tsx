@@ -8,6 +8,8 @@ import { isRtl } from '@/lib/i18n'
 
 // interface typeface: Urbanist (SIL OFL), served from our own build; Geist stays for printed documents and code
 const urbanist = localFont({ src: '../node_modules/@fontsource-variable/urbanist/files/urbanist-latin-wght-normal.woff2', weight: '100 900', variable: '--font-urbanist', display: 'swap' })
+// Chakra Petch (Google Fonts, SIL OFL): cut-corner letters like machined steel, only for the phone tab bar and the dashboard clock
+const chakra = localFont({ src: [{ path: '../node_modules/@fontsource/chakra-petch/files/chakra-petch-latin-500-normal.woff2', weight: '500' }, { path: '../node_modules/@fontsource/chakra-petch/files/chakra-petch-latin-600-normal.woff2', weight: '600' }], variable: '--font-tech', display: 'swap', preload: false })
 
 export const metadata: Metadata = {
   title: { default: 'Averiqo Business OS', template: '%s · Averiqo' },
@@ -25,7 +27,7 @@ const themeScript = `try{var t=localStorage.getItem('sf-theme');if(t==='dark'||(
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = (await cookies()).get('sf-locale')?.value ?? 'en', nonce = (await headers()).get('x-nonce') ?? undefined
-  return <html lang={locale} dir={isRtl(locale) ? 'rtl' : 'ltr'} className={`${urbanist.variable} ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+  return <html lang={locale} dir={isRtl(locale) ? 'rtl' : 'ltr'} className={`${urbanist.variable} ${chakra.variable} ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
     <head><script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
     <body>{children}</body></html>
 }
