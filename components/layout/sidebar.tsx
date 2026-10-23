@@ -33,8 +33,8 @@ const FOLD_KEY = 'averiqo:nav-folded'
 const fade = { duration: 0.14, ease: EASE }
 
 /**
- * Phones and tablets: the full navigation in a slide-in drawer on a deep navy surface (desktop uses the top tabs,
- * components/layout/top-nav.tsx). The current page carries a soft highlight and a filled icon; sections fold
+ * Phones and tablets: the full navigation in a slide-in drawer on the paper surface (desktop uses the top tabs,
+ * components/layout/top-nav.tsx). The current page is the ink pill with a filled icon, as on the tabs; sections fold
  * (remembered per browser) and the section holding the current page always stays open.
  */
 export function Sidebar({ items, company, rtl, user = '', role = '' }: { items: NavItem[]; company: string; rtl: boolean; user?: string; role?: string }) {
@@ -69,12 +69,11 @@ export function Sidebar({ items, company, rtl, user = '', role = '' }: { items: 
   const link = (i: NavItem, rail: boolean, where: string) => {
     const I = ICONS[i.key] ?? SquaresFourIcon, on = active(i)
     return <Link key={i.key} href={i.href} aria-label={rail ? i.label : undefined} aria-current={on ? 'page' : undefined}
-      className={cn('nav-item', on ? 'font-medium text-white' : 'text-sb-muted hover:text-sb-fg')}>
+      className={cn('nav-item', on ? 'text-ink-fg' : 'text-fg/80 hover:text-fg')}>
       {/* hover wash (static) and the active highlight (slides between items) */}
       {!on && <span aria-hidden className="nav-wash" />}
       {on && <m.span layoutId={`nav-on-${where}`} transition={{ duration: 0.26, ease: EASE }} aria-hidden
-        className="absolute inset-0 rounded-[inherit] bg-[linear-gradient(90deg,hsl(var(--sb-accent)/.26),hsl(var(--sb-accent)/.10))] ring-1 ring-inset ring-sb-accent/25">
-        <span className="absolute inset-y-2 start-0 w-[3px] rounded-e-full bg-sb-accent" /></m.span>}
+        className="absolute inset-0 rounded-[inherit] bg-ink shadow-[0_6px_16px_-8px_hsl(var(--shadow)/.6)]" />}
       <I size={19} weight={on ? 'fill' : 'regular'} aria-hidden
         className={cn('nav-ico', on && 'is-on')} />
       <m.span initial={false} animate={{ opacity: rail ? 0 : 1 }} transition={rail ? fade : { ...fade, delay: 0.06 }} className="relative min-w-0 flex-1 truncate">{i.label}</m.span>
@@ -86,13 +85,13 @@ export function Sidebar({ items, company, rtl, user = '', role = '' }: { items: 
       return <div key={g.name || '_'} className={cn(g.name && 'mt-2.5')}>
         {g.name && <div className="relative h-7">
           <button type="button" onClick={() => toggleGroup(g.name)} aria-expanded={!isFolded} tabIndex={rail ? -1 : 0} aria-hidden={rail || undefined}
-            className={cn('group/g flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md ps-[10px] pe-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-sb-muted/60 transition-[color,opacity,background-color] duration-150 hover:bg-white/[.03] hover:text-sb-fg', rail && 'pointer-events-none opacity-0')}>
+            className={cn('group/g flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-full ps-[14px] pe-2 text-[11px] font-semibold uppercase tracking-[0.09em] text-muted transition-[color,opacity,background-color] duration-150 hover:bg-fg/[.04] hover:text-fg', rail && 'pointer-events-none opacity-0')}>
             <span className="flex-1 truncate text-start">{g.name}</span>
             {/* a folded section says how much it holds */}
-            {isFolded && <span className="rounded-full bg-white/[.07] px-1.5 text-[10px] font-semibold leading-4 tracking-normal tabular-nums text-sb-muted">{g.items.length}</span>}
+            {isFolded && <span className="rounded-full bg-fg/[.07] px-1.5 text-[10px] font-semibold leading-4 tracking-normal tabular-nums text-muted">{g.items.length}</span>}
             <CaretDownIcon size={11} weight="bold" aria-hidden className={cn('opacity-40 transition-[transform,opacity] duration-200 group-hover/g:opacity-100 group-focus-visible/g:opacity-100', isFolded && '-rotate-90 rtl:rotate-90')} /></button>
           {/* in the rail a short rule marks where a section starts */}
-          <span aria-hidden className={cn('absolute start-[14px] top-1/2 h-px w-3 bg-sb-line transition-opacity duration-150', rail ? 'opacity-100' : 'opacity-0')} />
+          <span aria-hidden className={cn('absolute start-[14px] top-1/2 h-px w-3 bg-border transition-opacity duration-150', rail ? 'opacity-100' : 'opacity-0')} />
         </div>}
         <AnimatePresence initial={false}>{!isFolded && <m.div key="items" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22, ease: EASE }}
           className="flex flex-col gap-0.5 overflow-hidden">{g.items.map(i => link(i, rail, where))}</m.div>}</AnimatePresence>
@@ -100,27 +99,27 @@ export function Sidebar({ items, company, rtl, user = '', role = '' }: { items: 
     })}
   </nav>
   const search = (rail: boolean) => <button type="button" onClick={() => dispatchEvent(new Event('saqrflow:palette'))} aria-label={rail ? 'Search (Ctrl K)' : undefined}
-    className="group/s relative mx-3 mb-2 flex h-9 shrink-0 cursor-pointer items-center gap-3 rounded-[10px] bg-white/[.04] ps-[10px] pe-2 text-[13px] text-sb-muted ring-1 ring-inset ring-white/[.06] transition-colors duration-150 hover:bg-white/[.07] hover:text-sb-fg">
+    className="group/s relative mx-3 mb-3 flex h-11 shrink-0 cursor-pointer items-center gap-3 rounded-full bg-surface ps-[14px] pe-3 text-[14px] text-muted shadow-card ring-1 ring-border/70 transition-colors duration-150 hover:text-fg">
     <MagnifyingGlassIcon size={18} aria-hidden className="shrink-0 transition-transform duration-200 group-hover/s:scale-110" />
     <m.span initial={false} animate={{ opacity: rail ? 0 : 1 }} transition={rail ? fade : { ...fade, delay: 0.06 }} className="flex min-w-0 flex-1 items-center justify-between gap-2 whitespace-nowrap">
-      Search<kbd className="rounded-md bg-white/[.07] px-1.5 py-px font-sans text-[10.5px] text-sb-muted">Ctrl K</kbd></m.span></button>
+      Search pages, customers, invoices…</m.span></button>
   const brand = (rail: boolean) => <Link href="/" className="flex min-w-0 items-center gap-2.5 rounded-lg" aria-label="Averiqo home">
-    <AveriqoMark size={30} className="shrink-0" />
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-surface shadow-card ring-1 ring-white/70 dark:ring-white/[.06]"><AveriqoMark size={24} /></span>
     <m.span initial={false} animate={{ opacity: rail ? 0 : 1 }} transition={rail ? fade : { ...fade, delay: 0.06 }} className="min-w-0 whitespace-nowrap leading-tight">
-      <span className="block text-[17px] font-bold tracking-[-0.02em] text-white">Averiqo</span>
-      <span className="block truncate text-[11px] text-sb-muted" title={company}>{company}</span></m.span></Link>
+      <span className="block text-[17px] font-bold tracking-[-0.02em]">Averiqo</span>
+      <span className="block truncate text-[11.5px] text-muted" title={company}>{company}</span></m.span></Link>
 
   return <>
     {/* phones and tablets */}
-    <AnimatePresence>{open && <m.div key="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={T.fast} className="fixed inset-0 z-40 bg-[hsl(222_40%_4%/.5)] backdrop-blur-[2px] lg:hidden" onClick={() => setOpen(false)} aria-hidden />}</AnimatePresence>
+    <AnimatePresence>{open && <m.div key="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={T.fast} className="fixed inset-0 z-40 bg-[hsl(var(--shadow)/.35)] backdrop-blur-[3px] lg:hidden" onClick={() => setOpen(false)} aria-hidden />}</AnimatePresence>
     <m.aside aria-label="Navigation" aria-hidden={!open} inert={!open} initial={false} animate={{ x: open ? 0 : rtl ? '100%' : '-100%' }} transition={{ duration: 0.28, ease: EASE }} style={{ x: rtl ? '100%' : '-100%' }}
-      className="sb fixed inset-y-0 start-0 z-drawer flex w-[300px] max-w-[86vw] flex-col bg-sb text-sb-fg shadow-pop lg:hidden">
+      className="fixed inset-y-0 start-0 z-drawer flex w-[312px] max-w-[88vw] flex-col rounded-e-[28px] bg-bg text-fg shadow-pop lg:hidden">
       {(open || drawerReady) && <>
-      <div className="flex h-16 shrink-0 items-center gap-2 ps-[22px] pe-2"><div className="min-w-0 flex-1">{brand(false)}</div>
-        <button aria-label="Close menu" className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-sb-muted transition-colors hover:bg-white/[.06] hover:text-sb-fg" onClick={() => setOpen(false)}><XIcon size={18} /></button></div>
-      <Link href="/settings#account" className="mx-3 mb-3 flex items-center gap-3 rounded-xl bg-white/[.04] p-2.5 ring-1 ring-inset ring-white/[.06] transition-colors hover:bg-white/[.07]">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-[hsl(var(--sb-accent))] text-[12px] font-semibold text-white" aria-hidden>{user.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('')}</span>
-        <span className="min-w-0 leading-tight"><span className="block truncate text-[13.5px] font-semibold text-white">{user}</span><span className="block truncate text-[11.5px] capitalize text-sb-muted">{role.replace(/_/g, ' ')} · {company}</span></span></Link>
+      <div className="flex h-[72px] shrink-0 items-center gap-2 ps-4 pe-3"><div className="min-w-0 flex-1">{brand(false)}</div>
+        <button aria-label="Close menu" className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-surface text-fg shadow-card ring-1 ring-border/70 transition-transform active:scale-95" onClick={() => setOpen(false)}><XIcon size={17} /></button></div>
+      <Link href="/settings#account" className="mx-3 mb-3 flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-card ring-1 ring-border/60 transition-colors hover:bg-surface-2">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[hsl(185_30%_86%)] text-[13px] font-semibold text-[hsl(190_30%_20%)] dark:bg-[hsl(185_20%_24%)] dark:text-[hsl(185_30%_88%)]" aria-hidden>{user.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('')}</span>
+        <span className="min-w-0 leading-tight"><span className="block truncate text-[14px] font-semibold">{user}</span><span className="block truncate text-[12px] capitalize text-muted">{role.replace(/_/g, ' ')} · {company}</span></span></Link>
       {search(false)}
       {nav(false, 'drawer')}
       <div className="shrink-0 pb-[env(safe-area-inset-bottom)]" /></>}

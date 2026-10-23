@@ -92,8 +92,3 @@ export function CommandPalette({ links, canSales }: { links: PaletteLink[]; canS
     </ul>
   </dialog>
 }
-
-export function PaletteHint() {
-  return <button type="button" onClick={() => dispatchEvent(new Event('saqrflow:palette'))} className="absolute end-2 top-1/2 hidden h-6 -translate-y-1/2 cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-1.5 text-[11px] font-medium text-muted shadow-key transition-colors hover:text-fg md:inline-flex" aria-label="Open command palette (Ctrl+K)">
-    <kbd className="font-sans">Ctrl K</kbd></button>
-}
