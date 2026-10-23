@@ -288,7 +288,7 @@ try {
   ok(vs.n === `${yr + 1}-03-01` && vs.l !== null && (await body()).includes('Oil + filter change'), `maintenance recorded → next service ${vs.n} (feeds reminders)`)
   await p.goto(`${BASE}/`); await settle()
   const dt = await body()
-  ok(['Outstanding receivables', 'Sales this month', 'Recorded expenses this month', 'Estimated margin', 'Projects in progress'].every(s => dt.includes(s)) && /follow-ups? due/i.test(dt), 'dashboard: receivables, monthly sales / expenses / margin, follow-ups, active projects')
+  ok(['Receivables', 'Revenue this month', 'Recorded expenses this month', 'Estimated margin', 'Projects in progress'].every(s => dt.includes(s)) && /follow-ups? due/i.test(dt), 'dashboard: receivables, monthly sales / expenses / margin, follow-ups, active projects')
   await shot('X-dashboard')
 } catch (e) { ok(false, `aborted: ${e.stack || e}`); await p.screenshot({ path: `${OUT}/abort.png`, fullPage: true }).catch(() => {}) }
 await browser.close(); await db.end()

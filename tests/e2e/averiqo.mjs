@@ -206,7 +206,7 @@ try {
 
   console.log('\n[D] Dashboard')
   await p.goto(`${BASE}/`); await settle(); const dash = await main()
-  ok(dash.includes('Outstanding receivables') && dash.includes('Needs attention') && dash.includes('Operations'), 'dashboard: financial pulse, needs attention, operations')
+  ok(dash.includes('Receivables') && dash.includes('Needs attention') && dash.includes('Operations'), 'dashboard: financial pulse, needs attention, operations')
   ok(/AED 29,925\.00/.test(dash), 'outstanding shown as AED 29,925.00 (two decimals)')
   await shot('dashboard')
   await p.getByRole('button', { name: 'Create new', exact: true }).click(); ok(await p.getByRole('menuitem', { name: 'Vehicle' }).isVisible(), 'quick actions menu includes Vehicle')

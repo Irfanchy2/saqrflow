@@ -1,13 +1,18 @@
 // Dashboard widgets a user can show, hide, move between columns and reorder (stored in user_preferences 'dashboard.layout').
 export const WIDGETS = {
-  banner: { label: 'Today at a glance (banner)', col: 'top' },
+  banner: { label: 'Today: greeting, timeline, cash on hand', col: 'top' },
   finance: { label: 'Key figures', col: 'top' },
-  trend: { label: 'Sales overview (12 months)', col: 'left' },
+  trend: { label: 'Year at a glance (12 months)', col: 'left' },
+  funnel: { label: 'Sales funnel', col: 'left' },
+  floor: { label: 'On the floor (work orders)', col: 'left' },
+  road: { label: 'On the road (visits, deliveries)', col: 'left' },
   quick: { label: 'Quick actions', col: 'left' },
   recent: { label: 'Latest documents', col: 'left' },
-  activity: { label: 'Recent activity', col: 'left' },
+  activity: { label: 'Live activity', col: 'left' },
   projects: { label: 'Project progress', col: 'left' },
   inbox: { label: 'Smart Inbox', col: 'left' },
+  team: { label: 'Team today', col: 'right' },
+  lowstock: { label: 'Running low (stock)', col: 'right' },
   mytasks: { label: 'My tasks', col: 'right' },
   attention: { label: 'Needs attention', col: 'right' },
   calendar: { label: 'Calendar', col: 'right' },
@@ -19,7 +24,7 @@ export type WidgetCol = 'top' | 'left' | 'right'
 export interface DashboardLayout { items: { key: WidgetKey; col: WidgetCol; hidden: boolean }[] }
 
 /** The layout users get until they customise it. Saved layouts keep their choices; widgets added later are appended visible. */
-export const DEFAULT_LAYOUT: DashboardLayout = { items: (Object.keys(WIDGETS) as WidgetKey[]).map(k => ({ key: k, col: WIDGETS[k].col, hidden: k === 'approvals' })) }
+export const DEFAULT_LAYOUT: DashboardLayout = { items: (Object.keys(WIDGETS) as WidgetKey[]).map(k => ({ key: k, col: WIDGETS[k].col, hidden: k === 'approvals' || k === 'quick' })) }
 
 /** Accepts whatever was stored and returns a complete, valid layout (unknown keys dropped, new widgets appended). */
 export function normalizeLayout(raw: unknown): DashboardLayout {
