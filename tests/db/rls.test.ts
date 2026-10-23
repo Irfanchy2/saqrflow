@@ -1180,3 +1180,73 @@ describe('stock and bank accounts (0027)', () => {
     await fails(as(U.accA, `insert into payments(company_id,customer_id,amount,method,deposit_bank_id) values ($1,$2,10,'cash',$3)`, [A, cust, bAcct]), /another company/)
   })
 })
+
+describe('expenses: verification, Tally export batches and locking (0029)', () => {
+  let e1: string, e2: string, e3: string, eB: string
+  const exp = (uid: string, co: string, extra = '', vals: unknown[] = []) =>
+    as(uid, `insert into project_expenses(company_id,category,description,amount,vat_amount,reference${extra ? ',' + extra : ''}) values ($1,'material','MS angle 50x50',1000,50,'INV-77'${vals.map((_, i) => `,$${i + 2}`).join('')}) returning id`, [co, ...vals])
+  const create = (uid: string, ids: string[], total: number, vat: number) =>
+    as(uid, `select * from expense_export_create($1::uuid[], 'TallyPrime', '{}'::jsonb, '<ENVELOPE/>', 'abc', $2, $3)`, [ids, total, vat])
+  beforeAll(async () => {
+    e1 = (await exp(U.accA, A, 'verified_at', [new Date().toISOString()])).rows[0].id
+    e2 = (await exp(U.accA, A, 'verified_at', [new Date().toISOString()])).rows[0].id
+    e3 = (await exp(U.accA, A)).rows[0].id                                            // never verified
+    eB = (await exp(U.ownerB, B, 'verified_at', [new Date().toISOString()])).rows[0].id
+  })
+
+  it('new columns default safely; existing rows keep their values', async () => {
+    const r = (await sup('select payment_status, source, items, export_batch_id from project_expenses where id=$1', [e3])).rows[0]
+    expect(r).toMatchObject({ payment_status: 'paid', source: 'manual', items: [], export_batch_id: null })
+    await fails(as(U.accA, `update project_expenses set supplier_trn='12345' where id=$1`, [e3]), /supplier_trn/)
+  })
+  it('only verified, approved, not-yet-exported expenses of your own company can be exported; totals must match', async () => {
+    await fails(create(U.pmA, [e1], 1050, 50), /not allowed/)                       // project manager: no data.export
+    await fails(create(U.accA, [e3], 1050, 50), /not verified/)
+    await fails(create(U.accA, [e1, eB], 2100, 100), /no longer exist/)                // another company's expense is invisible
+    await fails(create(U.accA, [e1, e2], 2000, 100), /changed while the file/)
+    const b = (await create(U.accA, [e1, e2], 2100, 100)).rows[0]
+    expect(b.batch_ref).toMatch(/^EXP-\d{4}-0001$/)
+    const rows = (await sup('select export_batch_id, exported_at from project_expenses where id = any($1::uuid[])', [[e1, e2]])).rows
+    expect(rows.every((x: any) => x.export_batch_id === b.batch_id && x.exported_at)).toBe(true)
+    await fails(create(U.accA, [e1], 1050, 50), /exported a moment ago/)              // never twice
+    expect((await as(U.ownerB, 'select * from expense_exports')).rowCount).toBe(0)     // tenant isolation
+    expect((await as(U.pmA, 'select * from expense_exports')).rowCount).toBe(0)        // no finance.view
+    const audit = (await sup(`select changes from audit_logs where table_name='expense_exports' and record_id=$1`, [b.batch_id])).rows[0]
+    expect(audit.changes.content).toBeUndefined(); expect(audit.changes.ref).toBe(b.batch_ref)
+  })
+  it('an exported expense is locked: no changes to amounts or ledgers, no delete; notes can change', async () => {
+    await fails(as(U.accA, `update project_expenses set amount=1 where id=$1`, [e1]), /exported to Tally \(EXP-/)
+    await fails(as(U.accA, `update project_expenses set payment_status='unpaid' where id=$1`, [e1]), /exported to Tally/)
+    await fails(as(U.ownerA, `delete from project_expenses where id=$1`, [e1]), /Undo that export before deleting/)
+    await as(U.accA, `update project_expenses set notes='checked by auditor' where id=$1`, [e1])
+    await fails(as(U.accA, `update project_expenses set export_batch_id=null where id=$1`, [e1]), /only by a Tally export/)   // no silent un-export
+    await fails(as(U.accA, `update project_expenses set export_batch_id=(select export_batch_id from project_expenses where id=$2) where id=$1`, [e3, e1]), /only by a Tally export/)
+    await fails(as(U.accA, `insert into project_expenses(company_id,category,description,amount,exported_at) values ($1,'other','x',1,now())`, [A]), /only by a Tally export/)
+    await fails(as(U.accA, `insert into expense_exports(company_id,ref,expense_count,total,vat_total,file_name,content,checksum) values ($1,'EXP-X',1,1,0,'x','x','x')`, [A]), /row-level security/)
+    expect((await as(U.ownerA, `update expense_exports set content='tampered' returning id`)).rowCount).toBe(0)
+  })
+  it('undoing an export (with a reason) unlocks the expenses and they can be exported again', async () => {
+    const id = (await sup(`select id from expense_exports where company_id=$1 order by created_at limit 1`, [A])).rows[0].id
+    await fails(as(U.pmA, `select expense_export_release($1,'wrong')`, [id]), /not allowed/)
+    await fails(as(U.accA, `select expense_export_release($1,'')`, [id]), /Say why/)
+    expect((await as(U.accA, `select expense_export_release($1,'Imported into the wrong Tally company') n`, [id])).rows[0].n).toBe(2)
+    await fails(as(U.accA, `select expense_export_release($1,'again')`, [id]), /already undone/)
+    expect((await sup('select export_batch_id, exported_at from project_expenses where id=$1', [e1])).rows[0]).toMatchObject({ export_batch_id: null, exported_at: null })
+    await as(U.accA, `update project_expenses set amount=900 where id=$1`, [e1])
+    const b = (await create(U.accA, [e1], 950, 50)).rows[0]
+    expect(b.batch_ref).toMatch(/-0002$/)
+  })
+  it('Tally settings: finance staff who can export may edit; others cannot; per company', async () => {
+    await as(U.accA, `insert into expense_tally_settings(company_id,tally_company,vat_ledger) values ($1,'Al Saqr Steels LLC','Input VAT 5%')`, [A])
+    expect((await as(U.pmA, `update expense_tally_settings set vat_ledger='x' where company_id=$1 returning 1`, [A])).rowCount).toBe(0)
+    expect((await as(U.ownerB, 'select * from expense_tally_settings')).rowCount).toBe(0)
+    await fails(as(U.accA, `insert into expense_tally_settings(company_id) values ($1)`, [B]), /row-level security/)
+  })
+  it('removing a batch (company deletion / demo wipe) unlocks its expenses instead of failing', async () => {
+    const id = (await sup(`select export_batch_id from project_expenses where id=$1`, [e1])).rows[0].export_batch_id
+    expect(id).toBeTruthy()
+    await sup('delete from expense_exports where id=$1', [id])
+    expect((await sup('select export_batch_id, exported_at from project_expenses where id=$1', [e1])).rows[0]).toMatchObject({ export_batch_id: null, exported_at: null })
+    await as(U.ownerA, 'delete from project_expenses where id=$1', [e1])
+  })
+})

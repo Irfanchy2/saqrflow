@@ -279,7 +279,7 @@ try {
   ok((await one(`select count(*)::int n from project_expenses where company_id=$1`, [co])).n === 1, 'expense saved once (double click safe)')
   const scan = await ctx.request.post(`${BASE}/api/expenses/scan`, { multipart: { file: { name: 'r.png', mimeType: 'image/png', buffer: PNG } } })
   const sj = await scan.json().catch(() => ({}))
-  ok([200, 422].includes(scan.status()) && (sj.fields || sj.error) && (await one(`select count(*)::int n from project_expenses where company_id=$1`, [co])).n === 1, `receipt OCR endpoint answers safely (${scan.status()}${sj.error ? ': ' + sj.error.slice(0, 60) : ''}) — suggestions only, nothing saved`)
+  ok([200, 422].includes(scan.status()) && (sj.read || sj.error) && (await one(`select count(*)::int n from project_expenses where company_id=$1`, [co])).n === 1, `receipt OCR endpoint answers safely (${scan.status()}${sj.error ? ': ' + sj.error.slice(0, 60) : ''}) — suggestions only, nothing saved`)
   const veh = (await one(`insert into assets(company_id,kind,name,plate_or_serial) values ($1,'vehicle','Nissan Navara','DXB 12345') returning id`, [co])).id
   await p.goto(`${BASE}/assets/${veh}?tab=maintenance`); await settle()
   await p.getByRole('button', { name: 'Add record' }).click(); await dlg().getByLabel('Work done *').fill('Oil + filter change'); await dlg().getByLabel('Cost (AED)').fill('350'); await dlg().getByLabel('Next due').fill(`${yr + 1}-03-01`)

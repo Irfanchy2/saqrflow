@@ -8,6 +8,7 @@ import { saveVersion } from '@/lib/doc-upload'
 import type { ActionState } from '@/lib/utils'
 import { readParty } from '@/lib/parties'
 import { PHOTO_CATS } from '@/lib/projects'
+import { findDuplicate, resolveSupplier } from '@/lib/expenses/suppliers'
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a valid date')
 const uuid = z.string().uuid()
@@ -59,17 +60,38 @@ export async function updateProgress(id: string, _: ActionState, fd: FormData): 
   })
 }
 
+const money2 = (n: number) => Math.round(n * 100) / 100
+const lineSchema = z.object({ description: z.string().trim().min(1).max(300), quantity: z.number().positive().max(1e7).nullable().optional(), unit_price: z.number().min(0).max(1e10).nullable().optional(), amount: z.number().min(0).max(1e10) })
+const jsonOf = <T,>(schema: z.ZodType<T>, fallback: T) => z.string().optional().transform((s, ctx) => {
+  if (!s) return fallback
+  try { const r = schema.safeParse(JSON.parse(s)); if (r.success) return r.data } catch {}
+  ctx.addIssue({ code: 'custom', message: 'The line items could not be read. Remove them and try again.' }); return z.NEVER
+})
 const expenseSchema = z.object({
   spent_on: date, category: z.enum(['material', 'labour', 'transport', 'fuel', 'equipment', 'subcontract', 'accommodation', 'food', 'maintenance', 'other'], { message: 'Choose a category' }),
-  description: z.string().min(1, 'Describe the expense').max(500), amount: z.coerce.number({ message: 'Enter the amount' }).positive('Amount must be greater than zero').max(1e10).transform(n => Math.round(n * 100) / 100),
-  vat_amount: z.coerce.number({ message: 'VAT must be a number' }).min(0, 'VAT cannot be negative').max(1e10).default(0).transform(n => Math.round(n * 100) / 100),
+  description: z.string().min(1, 'Describe the expense').max(500), amount: z.coerce.number({ message: 'Enter the amount' }).positive('Amount must be greater than zero').max(1e10).transform(money2),
+  vat_amount: z.coerce.number({ message: 'VAT must be a number' }).min(0, 'VAT cannot be negative').max(1e10).default(0).transform(money2),
+  vat_rate: z.coerce.number().min(0).max(100).optional(),
   reference: z.string().max(120).optional(), supplier_id: uuid.optional(), supplier_name: z.string().max(200).optional(),
-  payment_method: z.enum(['cash', 'bank_transfer', 'cheque', 'card', 'credit', 'other']).optional(), employee_id: uuid.optional(), project_id: uuid.optional(), asset_id: uuid.optional(),
+  supplier_trn: z.string().transform(s => s.replace(/[\s-]/g, '')).pipe(z.string().regex(/^\d{15}$/, 'A UAE TRN has 15 digits')).optional(),
+  quantity: z.coerce.number().positive('Quantity must be more than zero').max(1e7).optional(),
+  payment_method: z.enum(['cash', 'bank_transfer', 'cheque', 'card', 'credit', 'other']).optional(), payment_status: z.enum(['paid', 'unpaid']).default('paid'),
+  payment_ref: z.string().max(120).optional(), employee_id: uuid.optional(), project_id: uuid.optional(), asset_id: uuid.optional(),
   notes: z.string().max(2000).optional(), idempotency_key: uuid.optional(), paid_from_bank_id: uuid.optional(),
+  items: jsonOf(z.array(lineSchema).max(200), []), source: z.enum(['manual', 'scan']).default('manual'),
+  ocr_suggested: jsonOf(z.record(z.string(), z.unknown()).refine(o => JSON.stringify(o).length <= 20000, 'Scan data too large'), null as Record<string, unknown> | null),
+  verified: z.string().optional(), allow_duplicate: z.string().optional(),
 }).refine(v => v.vat_amount <= v.amount, { message: 'VAT looks larger than the amount. Enter the amount before VAT', path: ['vat_amount'] })
-const EXP_KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_id', 'supplier_name', 'payment_method', 'employee_id', 'project_id', 'asset_id', 'notes', 'idempotency_key', 'paid_from_bank_id']
+  .refine(v => v.payment_status === 'paid' || !!(v.supplier_id || v.supplier_name), { message: 'An unpaid bill needs the supplier it is owed to', path: ['supplier_name'] })
+  .refine(v => v.source !== 'scan' || v.verified === 'on', { message: 'Tick “I checked these details against the receipt” before saving a scanned receipt', path: ['verified'] })
+const EXP_KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'vat_rate', 'reference', 'supplier_id', 'supplier_name', 'supplier_trn', 'quantity', 'payment_method', 'payment_status', 'payment_ref', 'employee_id', 'project_id', 'asset_id', 'notes', 'idempotency_key', 'paid_from_bank_id', 'items', 'source', 'ocr_suggested', 'verified', 'allow_duplicate']
 
-/** Expense with optional project and receipt file. Receipt OCR only pre-fills the form — this saves exactly what the user confirmed. */
+/**
+ * Expense / supplier purchase with optional project and receipt file. A scan only pre-fills the form: this saves exactly
+ * what the person confirmed (and, for a scan, only after they ticked that they checked it against the receipt).
+ * The supplier is linked (or created) by id, TRN or name; a second bill with the same supplier and invoice number is
+ * refused unless the person says it is a different bill. Saving marks the expense verified by the person who saved it.
+ */
 export async function saveExpense(id: string | null, fixedProject: string | null, _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit'); need(c, 'finance.view')
@@ -78,21 +100,39 @@ export async function saveExpense(id: string | null, fixedProject: string | null
     const v = r.data
     if (v.spent_on > c.today) return { error: 'The expense date cannot be in the future.', fieldErrors: { spent_on: 'In the future' } }
     if (!id && v.idempotency_key) { const { data: dup } = await c.supabase.from('project_expenses').select('id').eq('idempotency_key', v.idempotency_key).maybeSingle(); if (dup) return { ok: true, message: 'Expense already saved.' } }
+    const supplier = await resolveSupplier(c, { id: v.supplier_id, name: v.supplier_name, trn: v.supplier_trn })
+    if (v.reference && supplier && v.allow_duplicate !== 'on') {
+      const dup = await findDuplicate(c, { supplierId: supplier.id, supplierName: supplier.name, reference: v.reference, excludeId: id })
+      if (dup) return { error: `${supplier.name} bill ${dup.reference} is already saved (${dup.spent_on}, AED ${(dup.amount + dup.vat_amount).toFixed(2)}). If this is a different bill, tick “Save anyway”.`, fieldErrors: { reference: 'Already saved for this supplier' } }
+    }
     const projectId = fixedProject ?? v.project_id ?? null
     let receiptId: string | null = null
     const f = fd.get('file')
     if (f instanceof File && f.size > 0 && c.can('documents.upload')) {
-      const { data: d, error: de } = await c.supabase.from('documents').insert({ company_id: c.company.id, owner_type: projectId ? 'project' : v.asset_id ? 'asset' : 'vault', owner_id: projectId ?? v.asset_id ?? null, name: `Receipt: ${v.supplier_name ?? v.description}`.slice(0, 250), reference_no: v.reference ?? null, issue_date: v.spent_on, folder: 'Expenses/Receipts', reminders_active: false, created_by: c.userId }).select('id').single()
+      const { data: d, error: de } = await c.supabase.from('documents').insert({ company_id: c.company.id, owner_type: projectId ? 'project' : v.asset_id ? 'asset' : 'vault', owner_id: projectId ?? v.asset_id ?? null, name: `Receipt: ${supplier?.name ?? v.supplier_name ?? v.description}${v.reference ? ` ${v.reference}` : ''}`.slice(0, 250), reference_no: v.reference ?? null, issue_date: v.spent_on, folder: 'Expenses/Receipts', reminders_active: false, created_by: c.userId }).select('id').single()
       if (de) throw de
       try { await saveVersion(c, d.id, f) } catch (e) { await c.supabase.from('documents').update({ deleted_at: new Date().toISOString() }).eq('id', d.id); return { error: `Expense not saved. The receipt was rejected: ${(e as Error).message}` } }
       receiptId = d.id
     }
-    const row = { ...v, project_id: projectId, supplier_name: v.supplier_name ?? null, reference: v.reference ?? null, notes: v.notes ?? null, payment_method: v.payment_method ?? null, employee_id: v.employee_id ?? null, asset_id: v.asset_id ?? null, ...(fd.has('paid_from_bank_id') ? { paid_from_bank_id: v.paid_from_bank_id ?? null } : {}), ...(receiptId ? { receipt_document_id: receiptId } : {}) }
-    const { error } = id ? await c.supabase.from('project_expenses').update({ ...row, idempotency_key: undefined }).eq('id', id)
-      : await c.supabase.from('project_expenses').insert({ ...row, company_id: c.company.id, created_by: c.userId })
+    const unpaid = v.payment_status === 'unpaid'
+    const row = {
+      spent_on: v.spent_on, category: v.category, description: v.description, amount: v.amount, vat_amount: v.vat_amount,
+      vat_rate: v.vat_rate ?? (v.amount > 0 ? Math.round((v.vat_amount / v.amount) * 10000) / 100 : null),
+      project_id: projectId, supplier_id: supplier?.id ?? null, supplier_name: supplier?.name ?? v.supplier_name ?? null, supplier_trn: v.supplier_trn ?? supplier?.trn ?? null,
+      reference: v.reference ?? null, quantity: v.quantity ?? null, notes: v.notes ?? null,
+      payment_status: v.payment_status, payment_method: unpaid ? 'credit' : v.payment_method ?? null, payment_ref: unpaid ? null : v.payment_ref ?? null,
+      employee_id: v.employee_id ?? null, asset_id: v.asset_id ?? null,
+      ...(fd.has('paid_from_bank_id') || unpaid ? { paid_from_bank_id: unpaid ? null : v.paid_from_bank_id ?? null } : {}),
+      ...(fd.has('items') ? { items: v.items } : {}),
+      ...(receiptId ? { receipt_document_id: receiptId } : {}),
+      ...(!id ? { source: v.source, ocr_suggested: v.ocr_suggested } : {}),
+      verified_at: new Date().toISOString(), verified_by: c.userId,
+    }
+    const { error } = id ? await c.supabase.from('project_expenses').update(row).eq('id', id)
+      : await c.supabase.from('project_expenses').insert({ ...row, idempotency_key: v.idempotency_key ?? null, company_id: c.company.id, created_by: c.userId })
     if (error) { if (error.code === '23505') return { ok: true, message: 'Expense already saved.' }; throw error }
     touch(projectId ?? undefined); revalidatePath('/expenses'); revalidatePath('/'); if (v.asset_id) revalidatePath(`/assets/${v.asset_id}`)
-    return { ok: true, message: id ? 'Expense updated.' : 'Expense added.' }
+    return { ok: true, message: id ? 'Expense updated.' : 'Expense saved.' }
   })
 }
 /** kept for the project page's existing form */
