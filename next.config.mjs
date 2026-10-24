@@ -7,10 +7,10 @@ export default {
   // the fallback) — keep these unbundled and ship the model files.
   serverExternalPackages: ['tesseract.js', 'tesseract.js-core', 'onnxruntime-node', 'paddleocr'],
   // Only the routes that can run OCR (Smart Inbox, its processing API, receipt scan, the AI settings test and the assistant)
-  // ship the OCR models (~31 MB PaddleOCR + ~11 MB Tesseract) and the Linux ONNX Runtime. Every other page's server function
+  // ship the OCR models (~37 MB PaddleOCR + ~20 MB Tesseract: every wasm build, it picks one by CPU at run time) and the Linux ONNX Runtime. Every other page's server function
   // stays small, so it starts faster.
   outputFileTracingIncludes: Object.fromEntries(['/inbox', '/inbox/[id]', '/settings', '/assistant', '/api/inbox/[id]/process', '/api/expenses/scan']
-    .map(r => [r, ['./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**', './node_modules/tesseract.js-core/*-lstm.wasm',
+    .map(r => [r, ['./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**', './node_modules/tesseract.js-core/*.wasm',
       './ocr-models/ppocrv6-small/*.onnx', './ocr-models/ppocrv6-small/dict.txt', './ocr-models/ppocrv6-tiny/*',
       './node_modules/onnxruntime-node/bin/napi-v6/linux/x64/onnxruntime_binding.node', './node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime.so.1',
       './node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_shared.so']])),
