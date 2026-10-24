@@ -15,7 +15,7 @@ import { OCR_MODES } from '@/lib/ai/ocr'
 
 export const metadata = { title: 'Review document' }
 export const maxDuration = 120
-const ENGINE: Record<string, string> = { text_layer: 'PDF text layer', ocrspace: 'OCR.Space', google_vision: 'Google Vision', tesseract: 'local OCR', cache: 'cached reading' }
+const ENGINE: Record<string, string> = { text_layer: 'PDF text layer', ocrspace: 'OCR.Space', google_vision: 'Google Vision', tesseract: 'local OCR (PaddleOCR)', cache: 'cached reading' }
 
 export default async function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params; const c = await getCtx()

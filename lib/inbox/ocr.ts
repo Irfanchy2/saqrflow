@@ -1,13 +1,23 @@
 import 'server-only'
 import path from 'node:path'
+import { paddleOcr, PADDLE_ENGINE } from '../ai/ocr/paddle'
 
 const LANG_PATH = path.join(process.cwd(), 'node_modules/@tesseract.js-data/eng/4.0.0_best_int')
 const OCR_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 export const OCR_ENGINE = 'tesseract-5-eng'
 
-/** On-server OCR for photos and scans (no data leaves the server). Returns '' when OCR is unavailable or the image can't be read. */
-export async function ocrImage(buf: Uint8Array, mime: string, timeoutMs = 25_000): Promise<{ text: string; confidence: number }> {
-  if (!OCR_MIMES.has(mime) || process.env.SAQRFLOW_DISABLE_OCR === '1') return { text: '', confidence: 0 }
+/**
+ * On-server OCR for photos and scans (no data leaves the server): PaddleOCR first, Tesseract when PaddleOCR cannot run or
+ * finds nothing. Returns '' when OCR is unavailable or the image can't be read.
+ */
+export async function ocrImage(buf: Uint8Array, mime: string, timeoutMs = 25_000): Promise<{ text: string; confidence: number; engine: string }> {
+  if (!OCR_MIMES.has(mime) || process.env.SAQRFLOW_DISABLE_OCR === '1') return { text: '', confidence: 0, engine: OCR_ENGINE }
+  const p = await paddleOcr(buf, mime, { timeoutMs: Math.max(timeoutMs, 30_000) })
+  if (p?.text.trim()) return { text: p.text, confidence: p.confidence, engine: PADDLE_ENGINE }
+  return { ...(await tesseractImage(buf, timeoutMs)), engine: OCR_ENGINE }
+}
+
+async function tesseractImage(buf: Uint8Array, timeoutMs: number): Promise<{ text: string; confidence: number }> {
   let worker: { recognize: (b: Buffer) => Promise<{ data: { text: string; confidence: number } }>; terminate: () => Promise<unknown> } | null = null
   try {
     const { createWorker } = await import('tesseract.js')

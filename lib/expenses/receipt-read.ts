@@ -24,15 +24,49 @@ const lastOf = (t: string, label: string) => {
 const SKIP_LINE = /(sub\s*-?\s*total|grand\s*total|^total|\btotal\b|vat|tax|discount|balance|amount\s*(due|paid|payable)|paid|change|cash|card|round|net\s*amount|invoice|receipt|date|trn|tel|phone|fax|p\.?\s*o\.?\s*box|www\.|@)/i
 const COMPANY = /\b(l\.?\s?l\.?\s?c\.?|llc|est\.?|establishment|trading|fz[ce]|fzco|fz-llc|co\.|company|group|industries|enterprises|contracting|materials|services|hardware|steel|metal)\b/i
 
+/**
+ * Repairs the usual OCR slips on receipt text before it is read: letters inside numbers (O→0, l/I/|→1, S→5, B→8),
+ * "3.200.00" thousands dots, "160,00" decimal commas, broken labels (T0TAL, Sub-Tota1, V.A.T), Arabic labels
+ * (الإجمالي, ضريبة القيمة المضافة, رقم الفاتورة…) and Arabic-Indic digits. Only obvious slips are changed.
+ */
+export function cleanOcrText(text: string): string {
+  let t = text.replace(/\r/g, '').replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
+  t = t.replace(/[‘’`´]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-')
+  // letters read inside a number
+  for (let i = 0; i < 2; i++) t = t.replace(/(\d)[oO](?=[\d.,])/g, '$10').replace(/(\d[.,])[oO](?=\d|\b)/g, '$10')
+    .replace(/(\d)[lI|!](?=[\d.,])/g, '$11').replace(/([.,]\d)[lI|](?=\b)/g, '$11').replace(/(\d)S(?=\d)/g, '$15').replace(/(\d)B(?=\d)/g, '$18')
+  t = t.replace(/\b(\d{1,3})\.(\d{3})\.(\d{2})\b/g, '$1,$2.$3')                 // 3.200.00 → 3,200.00
+    .replace(/\b(\d{1,3}(?:\.\d{3})+),(\d{2})\b/g, (_, a: string, b: string) => `${a.replace(/\./g, ',')}.${b}`)   // 3.200,00 → 3,200.00
+    .replace(/(^|[^\d,.])(\d{1,7}),(\d{2})(?![\d,])/gm, '$1$2.$3')             // 160,00 → 160.00
+    .replace(/(\d)\s+\.\s*(\d{2})\b/g, '$1.$2')                                // 160 .00 → 160.00
+  // labels
+  t = t.replace(/\bT[0O]TA[L1I]\b/gi, 'TOTAL').replace(/\bTOTA[1I]\b/gi, 'TOTAL').replace(/\bSUB[\s-]*T[0O]TA[L1I]\b/gi, 'SUBTOTAL')
+    .replace(/\bV\s*\.\s*A\s*\.\s*T\.?/gi, 'VAT').replace(/\bVAT\s*\(\s*5\s*%?\s*\)/gi, 'VAT 5%').replace(/\b(AE0|AEO|A\.E\.D\.?)\b/g, 'AED')
+    .replace(/\bVAT\s*5\s*[5sS%]\s*(?=\d[\d,]*\.\d{2}\b)/g, 'VAT 5% ')                              // "VAT 55 160.00": the % read as 5
+    .replace(/\b([A-Z]{3,})(LLC|L\.L\.C\.?)(?=\s|$)/gm, '$1 $2')                                     // "MATERIALSLLC" → "MATERIALS LLC"
+    .replace(/\bT\s*R\s*N\b/g, 'TRN').replace(/\bInv\s*#/gi, 'Invoice No:').replace(/\bBill\s*#/gi, 'Bill No:').replace(/\bReceipt\s*#/gi, 'Receipt No:')
+  // Arabic labels → the English words the reader looks for (kept next to the Arabic)
+  const AR: [RegExp, string][] = [
+    [/(المجموع الفرعي|الإجمالي قبل الضريبة|المبلغ قبل الضريبة)/g, '$1 Subtotal'],
+    [/(الإجمالي شامل الضريبة|المبلغ الإجمالي|المجموع الكلي|الإجمالي|الاجمالي|المجموع)(?! Subtotal)(?! (?:الفرعي|قبل))/g, '$1 Total'],
+    [/(ضريبة القيمة المضافة|القيمة المضافة|الضريبة)/g, '$1 VAT'],
+    [/(رقم الفاتورة|فاتورة رقم)/g, '$1 Invoice No:'], [/(التاريخ|تاريخ الفاتورة)/g, '$1 Date:'], [/(الرقم الضريبي|رقم التسجيل الضريبي)/g, '$1 TRN:'],
+    [/(فاتورة ضريبية)/g, '$1 TAX INVOICE'],
+  ]
+  for (const [re, rep] of AR) t = t.replace(re, rep)
+  return t
+}
+
 /** Reads OCR text. `today` (company date) bounds the date: receipts are never in the future. */
-export function readReceipt(text: string, today: string): ReceiptRead {
+export function readReceipt(rawText: string, today: string): ReceiptRead {
+  const text = cleanOcrText(rawText)
   const t = text.replace(/\r/g, '').replace(/[ \t]+/g, ' ')
   const lines = t.split('\n').map(l => l.trim()).filter(Boolean)
   const base = parseReceipt(text, today)
   const out: ReceiptRead = { lines: [], confidence: {}, warnings: [] }
 
   // supplier: a company-looking line near the top, else the first plain line the simple reader picked
-  const top = lines.slice(0, 8).find(l => COMPANY.test(l) && l.length <= 90 && !/^(tax\s*invoice|invoice|receipt|bill\s*to|customer|sold\s*to)/i.test(l))
+  const top = lines.slice(0, 8).find(l => COMPANY.test(l) && l.length <= 90 && !/\d[\d,]*\.\d{2}\b/.test(l) && !/^(tax\s*invoice|invoice|receipt|bill\s*to|customer|sold\s*to)/i.test(l))
   if (top) { out.supplier = top.replace(/\s{2,}/g, ' '); out.confidence.supplier = 'high' }
   else if (base.supplier) { out.supplier = base.supplier; out.confidence.supplier = 'low' }
 
@@ -110,32 +144,47 @@ export function seenInText(text: string, v: string | number | undefined | null):
 }
 
 /**
- * Combines the local reading with an AI model's reading. The AI fills gaps and adds line items, but a value it gives
- * is only used when it can be found on the receipt; the three amounts are taken as a set that adds up.
+ * Adds the AI reading to the rules reading. The AI only fills gaps or replaces values the rules were unsure of, and never
+ * produces a 'high' value. With `image` the AI looked at the photo itself, so a value it read may be missing from the OCR
+ * text: it is still accepted when it checks out (amounts that add up, a valid TRN, a real date not in the future), but marked
+ * for review. Nothing here is saved: the person checks every field.
  */
-export function mergeAi(rules: ReceiptRead, ai: Partial<ReceiptRead> | null, text: string): ReceiptRead {
+export function mergeAi(rules: ReceiptRead, ai: Partial<ReceiptRead> | null, text: string, opts: { image?: boolean; today?: string } = {}): ReceiptRead {
   if (!ai) return rules
   const out: ReceiptRead = { ...rules, confidence: { ...rules.confidence }, warnings: [...rules.warnings], lines: rules.lines }
+  const img = !!opts.image
   for (const k of ['supplier', 'trn', 'invoice_no'] as const) {
-    const v = ai[k]; if (typeof v !== 'string' || !v.trim()) continue
-    if (!out[k] && seenInText(text, v)) { out[k] = v.trim(); out.confidence[k] = 'medium' }
-    else if (out[k] && out.confidence[k] === 'low' && seenInText(text, v)) { out[k] = v.trim(); out.confidence[k] = 'medium' }
+    let v = ai[k]; if (typeof v !== 'string' || !v.trim()) continue
+    v = v.trim()
+    if (k === 'trn') { v = v.replace(/[\s-]/g, ''); if (!/^100\d{12}$/.test(v)) continue }
+    const seen = seenInText(text, v)
+    if (!seen && !img) continue
+    const conf: Conf = seen || k === 'trn' ? 'medium' : 'low'
+    if (!out[k] || (out.confidence[k] === 'low' && out[k] !== v)) { out[k] = k === 'supplier' ? v.slice(0, 200) : v.slice(0, 60); out.confidence[k] = conf }
   }
-  if (!out.date && typeof ai.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ai.date)) { out.date = ai.date; out.confidence.date = 'low' }
+  if (typeof ai.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ai.date) && !Number.isNaN(Date.parse(ai.date)) && (!opts.today || ai.date <= opts.today) && ai.date >= '2000-01-01') {
+    if (!out.date) { out.date = ai.date; out.confidence.date = img ? 'medium' : 'low' }
+    else if (out.confidence.date === 'low' && img && out.date !== ai.date) { out.date = ai.date; out.confidence.date = 'medium' }
+  }
   const adds = (s?: number, v?: number, t?: number) => s !== undefined && v !== undefined && t !== undefined && Math.abs(s + v - t) <= 0.05
+  const num = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n < 1e9
   const mine = adds(rules.subtotal, rules.vat, rules.total)
-  const theirs = [ai.subtotal, ai.vat, ai.total].every(n => typeof n === 'number' && seenInText(text, n)) && adds(ai.subtotal, ai.vat, ai.total)
+  const theirs = num(ai.subtotal) && num(ai.vat) && num(ai.total) && adds(ai.subtotal, ai.vat, ai.total) && (img || [ai.subtotal, ai.vat, ai.total].every(n => seenInText(text, n)))
   if (!mine && theirs) {
     out.subtotal = r2(ai.subtotal!); out.vat = r2(ai.vat!); out.total = r2(ai.total!)
     out.confidence.subtotal = out.confidence.vat = out.confidence.total = 'medium'
     out.vat_rate = out.subtotal > 0 ? Math.round((out.vat / out.subtotal) * 1000) / 10 : out.vat_rate
-    out.warnings = out.warnings.filter(w => !/does not equal|worked out as 5%/.test(w))
+    out.warnings = out.warnings.filter(w => !/does not equal|worked out as 5%|No total/i.test(w))
+  } else if (out.total === undefined && num(ai.total) && ai.total > 0 && (img || seenInText(text, ai.total)) && (ai.vat === null || ai.vat === undefined || ai.vat === 0)) {
+    out.total = r2(ai.total); out.confidence.total = 'medium'                          // a plain receipt without VAT
+    out.warnings = out.warnings.filter(w => !/No total/i.test(w))
   }
-  const aiLines = (ai.lines ?? []).filter(l => l && typeof l.description === 'string' && typeof l.amount === 'number' && l.amount > 0 && seenInText(text, l.amount))
-  if (aiLines.length && (!rules.lines.length || rules.confidence.lines === 'low')) {
-    out.lines = aiLines.slice(0, 100).map(l => ({ description: l.description.slice(0, 300), quantity: typeof l.quantity === 'number' && l.quantity > 0 ? l.quantity : null, unit_price: typeof l.unit_price === 'number' ? r2(l.unit_price) : null, amount: r2(l.amount) }))
-    const sum = r2(out.lines.reduce((s, x) => s + x.amount, 0))
-    out.confidence.lines = out.subtotal !== undefined && Math.abs(sum - out.subtotal) <= 0.05 ? 'high' : 'medium'
+  const aiLines = (ai.lines ?? []).filter(l => l && typeof l.description === 'string' && l.description.trim() && num(l.amount) && l.amount > 0 && (img || seenInText(text, l.amount)))
+  const aiSum = r2(aiLines.reduce((s, x) => s + x.amount, 0))
+  const fits = out.subtotal !== undefined && Math.abs(aiSum - out.subtotal) <= 0.05
+  if (aiLines.length && (!rules.lines.length || rules.confidence.lines === 'low') && (!img || fits || out.subtotal === undefined)) {
+    out.lines = aiLines.slice(0, 100).map(l => ({ description: l.description.trim().slice(0, 300), quantity: num(l.quantity) && l.quantity > 0 ? l.quantity : null, unit_price: num(l.unit_price) ? r2(l.unit_price) : null, amount: r2(l.amount) }))
+    out.confidence.lines = fits ? 'high' : 'medium'
     out.warnings = out.warnings.filter(w => !/line items add up/.test(w))
   }
   return out
@@ -152,7 +201,14 @@ export const RECEIPT_SCHEMA = {
   },
   required: ['lines'],
 }
-export const RECEIPT_PROMPT = `You read UAE supplier receipts and tax invoices from OCR text and return strict JSON.
-Return the supplier (seller) name, the supplier TRN (15 digits), the invoice or receipt number, the invoice date as YYYY-MM-DD,
-the subtotal before VAT, the VAT amount, the total including VAT, and the line items (description, quantity, unit price, line amount before VAT).
-Copy numbers exactly as printed. Use null when a value is not on the receipt. Never guess.`
+export const RECEIPT_PROMPT = `You read UAE supplier receipts and tax invoices and return strict JSON. You get the OCR text, and sometimes the photo
+itself: when the photo is given, read the values from the photo and use the OCR text only as a hint (it can contain misread characters).
+Return:
+- supplier: the SELLER's business name as printed at the top or on the stamp (not the customer / "bill to", not the cashier)
+- trn: the SELLER's VAT TRN, 15 digits starting with 100, digits only (not the customer's TRN)
+- invoice_no: the invoice / bill / receipt number exactly as printed (keep letters, dashes and slashes)
+- date: the invoice date as YYYY-MM-DD; UAE dates are day first (03/04/2026 is 2026-04-03)
+- subtotal: amount before VAT; vat: the VAT amount (5% standard rate in the UAE); total: the amount including VAT (grand total / net payable)
+- lines: each item with description, quantity, unit price and line amount before VAT
+Amounts are plain numbers without currency or thousands separators (1,250.50 → 1250.5). Ignore cash tendered, change and card slips.
+Use null when a value is not on the receipt or cannot be read clearly. Never guess or calculate a value that is not printed.`

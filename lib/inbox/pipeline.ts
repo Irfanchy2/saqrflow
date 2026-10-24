@@ -46,7 +46,7 @@ export async function processInboxItem(c: Ctx, item: { id: string; sha256: strin
     const warnings: string[] = [], reasons: string[] = []
 
     // ── 1. text: cache → PDF text layer → OCR providers ──
-    let text = '', ocrProvider: OcrProviderId | 'cache' | null = null, ocrLang: string | null = null, ocrMs = 0
+    let text = '', ocrProvider: OcrProviderId | 'cache' | null = null, ocrLang: string | null = null, ocrMs = 0, ocrEngine: string | undefined
     let cachedAi: Extraction | null = null
     if (!opts.force) {
       const { data: prev } = await c.supabase.from('document_inbox').select('id').eq('sha256', item.sha256).neq('id', item.id).not('processed_at', 'is', null).order('processed_at', { ascending: false }).limit(5)
@@ -71,7 +71,7 @@ export async function processInboxItem(c: Ctx, item: { id: string; sha256: strin
       const { result, attempts } = await runOcr({ bytes: buf, mime: item.mime_type, name: item.file_name ?? 'document' }, providers)
       for (const a of attempts) await log(c, 'ocr_logs', { inbox_id: item.id, provider: a.provider, ok: a.ok, chars: a.chars, pages: a.pages, language: a.language, processing_ms: a.ms, error: a.error })
       if (result) {
-        text = result.text; ocrProvider = result.provider; ocrLang = result.language; ocrMs = result.ms
+        text = result.text; ocrProvider = result.provider; ocrLang = result.language; ocrMs = result.ms; ocrEngine = result.engine
         const failed = attempts.filter(a => !a.ok)
         if (failed.length) warnings.push(`Read with ${label(result.provider)} after ${failed.map(f => `${label(f.provider)} failed (${f.error})`).join('; ')}`)
       } else if (attempts.length) {
@@ -86,7 +86,7 @@ export async function processInboxItem(c: Ctx, item: { id: string; sha256: strin
     // ── 2. classification: local rules always; AI on top when configured ──
     const local: Extraction = rulesExtract(text)
     if (ocrProvider && !['text_layer', 'cache'].includes(ocrProvider)) {
-      local.engineVersion = `${RULES_VERSION}+${ocrProvider === 'tesseract' ? 'tesseract-5-eng' : ocrProvider}`
+      local.engineVersion = `${RULES_VERSION}+${ocrProvider === 'tesseract' ? ocrEngine ?? 'tesseract-5-eng' : ocrProvider}`
       for (const f of Object.values(local.fields)) if (f) f.confidence = Math.min(f.confidence, ocrProvider === 'tesseract' ? 0.85 : 0.9)
     }
     let x: Extraction = local, aiProviderId = 'rules', aiMs = 0
@@ -219,7 +219,7 @@ export async function processInboxItem(c: Ctx, item: { id: string; sha256: strin
   }
 }
 
-const LABELS: Record<string, string> = { ocrspace: 'OCR.Space', google_vision: 'Google Vision', tesseract: 'local OCR', text_layer: 'PDF text', auto: 'Auto' }
+const LABELS: Record<string, string> = { ocrspace: 'OCR.Space', google_vision: 'Google Vision', tesseract: 'local OCR (PaddleOCR)', text_layer: 'PDF text', auto: 'Auto' }
 const label = (p: string) => LABELS[p] ?? p
 
 /** Run async tasks with a concurrency limit. */

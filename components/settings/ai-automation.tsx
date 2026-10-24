@@ -43,6 +43,7 @@ export async function AiAutomation({ c, wa }: { c: Ctx; wa: WaStatus | null }) {
           <Field label="OCR provider"><Select name="ocr_provider" defaultValue={s.ocr}>{OCR_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</Select></Field>
           <Field label="AI classification"><Select name="ai_provider" defaultValue={s.ai}>{AI_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</Select></Field>
         </div>
+        <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted"><b className="text-fg">Receipts cost nothing to read in most cases:</b> every receipt photo is read on this server with PaddleOCR first. The OCR service above is used only when that reading is incomplete or its amounts do not add up, and Gemini only after that (it then gets the photo, unless it shows ID or card numbers and the option below is on).</p>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="redact" defaultChecked={s.redact} className="mt-0.5" /><span><b>Remove ID numbers before AI</b> (recommended): Emirates ID, passport MRZ, IBAN and card numbers are replaced with placeholders before text is sent to Gemini; Averiqo reads and checks those numbers itself.</span></label>
         {!encOk && <Alert tone="amber">Keys typed here need <code>SETTINGS_ENCRYPTION_KEY</code> on the server. Without it, set them as environment variables instead.</Alert>}
         <KeyRow name="ocr_space_api_key" hint="OCR.Space API key (K…)" />
