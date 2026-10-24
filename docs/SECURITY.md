@@ -130,3 +130,16 @@ See [BACKUP.md](BACKUP.md). In short:
    - check Users → Activity and the Audit log.
 2. **Leaked key:** rotate it (see *Secrets*) and check `security_events` for `api_key_rejected`.
 3. **Data changed wrongly:** use the Audit log, Trash and revisions; for bulk changes, restore from backup to a new project and copy the rows back.
+
+## Employee Portal (migration 0030)
+
+An `employee` login is confined to its own portal (`/me`), enforced in four layers:
+
+1. **Middleware** passes the verified request path to the server (`x-averiqo-verified-path`, signed like the user id).
+2. **`getCtx()`** sends an employee to `/me` from any page, server action or API outside `lib/portal-paths.ts` (the portal, receipt scan, own documents, own payslips, own notifications and photo).
+3. **Server actions** check permissions (`need()`); employees hold none. Portal actions (`app/actions/me.ts`) act only on the caller's own employee record.
+4. **RLS** (authoritative): `my_employee_id()` limits salary, advances, compensation, attendance and leave to the caller's own rows; restrictive policies hide colleagues' profiles and company configuration; employees cannot write HR records.
+
+Expense claims (`expense_claims`) never touch `project_expenses` (or Tally exports) until an approver (`expenses.approve` or `approvals.decide`) approves them through `decide_expense_claim()`. That function locks the claim, refuses the approver's own claim, needs a reason to reject or send back, and inserts the company expense exactly once (unique links both ways). A trigger guard blocks every other change to decisions, links or the receipt. Every submission, edit, decision and withdrawal is kept in `expense_claim_events` and `audit_logs`. Receipts are validated (type from bytes, size, active content) and stored by the server as the claim's own document (`owner_type = 'expense_claim'`), visible to the employee and to finance/approvers only.
+
+Self check-in (`attendance_punch()`) is off until Settings → Employee portal turns it on. It uses the server's clock and the company's date, once in and once out per day.

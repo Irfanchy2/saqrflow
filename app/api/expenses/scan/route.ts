@@ -3,6 +3,7 @@ import { getCtx } from '@/lib/auth'
 import { rateLimit } from '@/lib/security'
 import { tinyAvailable, warmPaddle } from '@/lib/ai/ocr/paddle'
 import { scanReceipt } from '@/lib/expenses/scan'
+import { getMe } from '@/lib/me'
 
 export const runtime = 'nodejs'
 
@@ -28,7 +29,8 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
   const c = await getCtx().catch(() => null)
   if (!c) return NextResponse.json({ error: 'Your session has expired. Sign in again.' }, { status: 401 })
-  if (!c.can('records.edit') || !c.can('finance.view')) return NextResponse.json({ error: 'You are not allowed to add expenses.' }, { status: 403 })
+  // staff who add expenses, or an employee (Employee Portal) reading the receipt for their own expense claim
+  if (!(c.can('records.edit') && c.can('finance.view')) && !(await getMe()).emp) return NextResponse.json({ error: 'You are not allowed to add expenses.' }, { status: 403 })
   if (!(await rateLimit(`receipt-scan:${c.userId}`, 40, 600))) return NextResponse.json({ error: 'Too many receipts read in the last few minutes. Wait a little, or enter the details by hand.' }, { status: 429 })
   const f = (await req.formData().catch(() => null))?.get('file')
   if (!(f instanceof File) || !f.size) return NextResponse.json({ error: 'Choose a receipt photo or PDF.' }, { status: 400 })

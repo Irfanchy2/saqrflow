@@ -29,10 +29,13 @@ const RATES: [string, string][] = [['5', '5% standard'], ['0', '0% / exempt'], [
  * A scanned expense saves only after "I checked these details against the receipt" is ticked; the receipt file is kept
  * with the expense. Field names match the save action (and the older form) so every page using it keeps working.
  */
-export function ExpenseFields({ e, today, projects, assets, employees, suppliers, fixedProject, initialFile }: {
+export function ExpenseFields({ e, today, projects, assets, employees, suppliers, fixedProject, initialFile, claim }: {
   e?: Record<string, any>; today: string; projects?: Opt[]; assets?: Opt[]; employees: Opt[]; suppliers: (string | SupplierOpt)[]; fixedProject?: boolean
   /** a receipt picked before the form opened (the "Scan receipt" button): read immediately */
   initialFile?: File | null
+  /** an employee's expense claim (Employee Portal): only what the employee knows; payment account, project and links are
+   *  chosen by the approver */
+  claim?: boolean
 }) {
   const box = useRef<HTMLDivElement>(null), fileRef = useRef<HTMLInputElement>(null)
   const sups = useMemo(() => suppliers.map(s => typeof s === 'string' ? { id: '', name: s, trn: null as string | null } : { ...s, trn: s.trn ?? null }), [suppliers])
@@ -159,17 +162,17 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
     </div>
 
     {/* supplier */}
-    <Field label="Supplier" hint={known ? (known.trn ? `Saved supplier · TRN ${known.trn}` : 'Saved supplier') : supplier.trim() ? 'New: added to your suppliers when you save' : 'Pick a saved supplier or type a new name'}>
+    <Field label="Supplier" hint={claim ? 'The shop or company on the receipt' : known ? (known.trn ? `Saved supplier · TRN ${known.trn}` : 'Saved supplier') : supplier.trim() ? 'New: added to your suppliers when you save' : 'Pick a saved supplier or type a new name'}>
       <Input name="supplier_name" maxLength={200} list="exp-suppliers" value={supplier} className={tint('supplier')}
         onChange={ev => { setSupplier(ev.target.value); const k = sups.find(s => s.name.toLowerCase() === ev.target.value.trim().toLowerCase()); if (k?.trn && !trn) setTrn(k.trn) }} />
       <datalist id="exp-suppliers">{sups.map(s => <option key={s.id || s.name} value={s.name} />)}</datalist></Field>
-    {known?.id && <input type="hidden" name="supplier_id" value={known.id} />}
+    {!claim && known?.id && <input type="hidden" name="supplier_id" value={known.id} />}
     <Field label="Supplier TRN" hint="15 digits, on their tax invoice"><Input name="supplier_trn" inputMode="numeric" maxLength={20} value={trn} onChange={ev => setTrn(ev.target.value)} placeholder="100xxxxxxxxxxxx" className={tint('trn')} /></Field>
 
     {/* the bill */}
     <Field label="Invoice / receipt no." hint="The supplier's number on the bill"><Input name="reference" maxLength={120} defaultValue={e?.reference ?? ''} /></Field>
     <Field label="Date *"><Input name="spent_on" type="date" required max={today} defaultValue={e?.spent_on ?? today} /></Field>
-    <label className={cn('dup-anyway hidden items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-[13px] text-danger sm:col-span-2', scan.result?.duplicate && '!flex')}><input type="checkbox" name="allow_duplicate" className="h-4 w-4 accent-[hsl(var(--danger))]" />This is a different bill with the same number: save anyway</label>
+    {!claim && <label className={cn('dup-anyway hidden items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-[13px] text-danger sm:col-span-2', scan.result?.duplicate && '!flex')}><input type="checkbox" name="allow_duplicate" className="h-4 w-4 accent-[hsl(var(--danger))]" />This is a different bill with the same number: save anyway</label>}
     <Field label="Category *"><Select name="category" defaultValue={e?.category ?? 'material'}>{Object.entries(EXPENSE_CATS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
     <Field label="Quantity" hint="Optional (e.g. 40 pcs)"><Input name="quantity" type="number" step="0.001" min="0" inputMode="decimal" defaultValue={e?.quantity ?? ''} /></Field>
     <Field label="Description *" className="sm:col-span-2"><Input name="description" required maxLength={500} defaultValue={e?.description ?? ''} placeholder="e.g. MS hollow section 100×50×3: 40 pcs" /></Field>
@@ -184,19 +187,20 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
     <div className="flex flex-col justify-end"><div className="rounded-xl bg-surface-2 px-3.5 py-2.5"><div className="text-[12px] text-muted">Total incl. VAT</div><div className="text-[19px] font-semibold tabular-nums tracking-[-0.01em]" data-total>AED {total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div></div>
 
     {/* payment */}
-    <fieldset className="sm:col-span-2"><legend className="mb-1.5 text-[13px] font-medium">Payment</legend>
+    {claim ? <Field label="How did you pay?"><Select name="paid_with" defaultValue={e?.paid_with ?? 'cash'}>{[['cash', 'Cash'], ['card', 'Card'], ['bank_transfer', 'Bank transfer'], ['other', 'Other']].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+    : <><fieldset className="sm:col-span-2"><legend className="mb-1.5 text-[13px] font-medium">Payment</legend>
       <div className="inline-flex flex-wrap rounded-xl bg-surface-2 p-1">{(['paid', 'unpaid'] as const).map(k => <label key={k} className={cn('cursor-pointer rounded-lg px-4 py-2 text-[14px] font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40', status === k ? 'bg-surface shadow-card' : 'text-muted')}>
         <input type="radio" name="payment_status" value={k} checked={status === k} onChange={() => setStatus(k)} className="sr-only" />{k === 'paid' ? 'Paid' : 'Unpaid (owed to supplier)'}</label>)}</div></fieldset>
     {status === 'paid' ? <>
       <Field label="Payment method"><Select name="payment_method" defaultValue={e?.payment_method && e.payment_method !== 'credit' ? e.payment_method : 'cash'}>{Object.entries(PAYMENT_METHODS).filter(([k]) => k !== 'credit').map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
       <AccountSelect name="paid_from_bank_id" label="Paid from" value={e ? e.paid_from_bank_id ?? null : undefined} />
       <Field label="Payment reference" hint="Cheque no., transfer ref., card slip"><Input name="payment_ref" maxLength={120} defaultValue={e?.payment_ref ?? ''} /></Field>
-    </> : <p className="self-center text-[13px] text-muted sm:col-span-2">Saved as a bill owed to {supplier.trim() || 'the supplier'}. In Tally it is booked as a purchase against the supplier&apos;s ledger.</p>}
+    </> : <p className="self-center text-[13px] text-muted sm:col-span-2">Saved as a bill owed to {supplier.trim() || 'the supplier'}. In Tally it is booked as a purchase against the supplier&apos;s ledger.</p>}</>}
 
     {/* links */}
-    {!fixedProject && projects && <Field label="Project"><Select name="project_id" defaultValue={e?.project_id ?? ''}><option value="">— General / no project —</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}
-    {assets && assets.length > 0 && <Field label="Vehicle / asset" hint="Fuel, Salik, parts or repairs for one item"><Select name="asset_id" defaultValue={e?.asset_id ?? ''}><option value="">None</option>{assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>}
-    <Field label="Employee" hint="Who paid / used it"><Select name="employee_id" defaultValue={e?.employee_id ?? ''}><option value="">—</option>{employees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+    {!claim && !fixedProject && projects && <Field label="Project"><Select name="project_id" defaultValue={e?.project_id ?? ''}><option value="">— General / no project —</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}
+    {!claim && assets && assets.length > 0 && <Field label="Vehicle / asset" hint="Fuel, Salik, parts or repairs for one item"><Select name="asset_id" defaultValue={e?.asset_id ?? ''}><option value="">None</option>{assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>}
+    {!claim && <Field label="Employee" hint="Who paid / used it"><Select name="employee_id" defaultValue={e?.employee_id ?? ''}><option value="">—</option>{employees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}
 
     {/* line items */}
     <div className="sm:col-span-2">

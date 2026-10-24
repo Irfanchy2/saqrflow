@@ -35,7 +35,8 @@ const monthStart = (iso: string, n = 0) => { const d = new Date(`${iso.slice(0, 
 const monthLabel = (iso: string) => new Date(`${iso.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 /** What a message type says and attaches, read with the user's own session (RLS) after the permission check. */
-export async function resolveMessage(c: Ctx, kind: string, recordId: string): Promise<Resolved> {
+/** `ownEmployeeId`: an employee downloading their own payslip (Employee Portal) instead of someone with salary access. */
+export async function resolveMessage(c: Ctx, kind: string, recordId: string, opts?: { ownEmployeeId?: string }): Promise<Resolved> {
   if (!KINDS[kind]) fail('Unknown message type.')
   if (!/^[0-9a-f-]{36}$/i.test(recordId)) fail('Unknown record.')
   const company = c.company.name, sb = c.supabase
@@ -81,10 +82,11 @@ export async function resolveMessage(c: Ctx, kind: string, recordId: string): Pr
     }
   }
   if (kind === 'payslip') {
-    need(c, 'salary.view')
+    if (!opts?.ownEmployeeId) need(c, 'salary.view')
     const { data: s } = await sb.from('salary_payments').select('id,period,amount,paid_on,method,employee:employees(id,full_name,employee_no,designation,phone)').eq('id', recordId).maybeSingle()
     if (!s) fail('Salary payment not found.')
     const e: any = (s as any).employee
+    if (opts?.ownEmployeeId && e?.id !== opts.ownEmployeeId) fail('Salary payment not found.')
     const { data: adv } = await sb.from('employee_advances').select('kind,amount,given_on').eq('employee_id', e.id).gte('given_on', monthStart(s!.period)).lt('given_on', monthStart(s!.period, 1))
     const ded = (adv ?? []).filter((a: any) => a.kind === 'deduction')
     return {

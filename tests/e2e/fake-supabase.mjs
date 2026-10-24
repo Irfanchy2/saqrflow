@@ -51,6 +51,12 @@ http.createServer(async (req, res) => {
       if (grant === 'password') { const { rows } = await pool.query('select id,email from auth.users where email=$1', [b.email]); if (!rows[0] || passwords.get(b.email) !== b.password) return json(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' }); return json(res, 200, session(rows[0])) }
       if (grant === 'refresh_token') { const r = refresh.get(b.refresh_token); if (!r) return json(res, 400, { error: 'invalid_grant' }); const { rows } = await pool.query('select id,email from auth.users where id=$1', [r.id]); return json(res, 200, session(rows[0], r.sid)) }
     }
+    if (path === '/auth/v1/invite' && req.method === 'POST') {        // admin invite (service role): the invited user signs in with a fixed test password
+      const c = verify((req.headers.authorization ?? '').replace(/^Bearer /, '')); if (!c || c.role !== 'service_role') return json(res, 403, { code: 403, msg: 'not admin' })
+      const { email } = JSON.parse((await body(req)).toString())
+      if (passwords.has(email) || (await pool.query('select 1 from auth.users where email=$1', [email])).rows.length) return json(res, 422, { code: 422, error_code: 'email_exists', msg: 'A user with this email address has already been registered' })
+      const { rows } = await pool.query('insert into auth.users(email) values ($1) returning id,email', [email]); passwords.set(email, 'invited-password-123'); return json(res, 200, user(rows[0]))
+    }
     if (path === '/auth/v1/user') {
       const c = verify((req.headers.authorization ?? '').replace(/^Bearer /, '')); if (!c || c.role !== 'authenticated') return json(res, 401, { code: 401, msg: 'invalid JWT' })
       return json(res, 200, user({ id: c.sub, email: c.email }))

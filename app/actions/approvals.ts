@@ -91,3 +91,19 @@ export async function saveApprovalRules(_: ActionState, fd: FormData): Promise<A
     revalidatePath('/settings'); return { ok: true, message: 'Approval rules saved. They apply to new records from now on.' }
   })
 }
+
+/** Settings → Employee portal: self check-in on/off and the salary-advance limit shown to employees. */
+export async function savePortalSettings(_: ActionState, fd: FormData): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'settings.manage')
+    const raw = str(fd, 'advance_limit_pct'), pct = raw ? Number(raw) : 0
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) return { error: 'The advance limit is a percentage between 0 and 100.', fieldErrors: { advance_limit_pct: '0 to 100' } }
+    const rows = [
+      { key: 'portal.checkin', value: fd.get('checkin') === 'on' },
+      { key: 'portal.advance_limit_pct', value: Math.round(pct) },
+    ].map(r => ({ ...r, company_id: c.company.id, updated_at: new Date().toISOString() }))
+    const { error } = await c.supabase.from('app_settings').upsert(rows)
+    if (error) throw error
+    revalidatePath('/settings'); revalidatePath('/me'); return { ok: true, message: 'Employee portal settings saved.' }
+  })
+}
