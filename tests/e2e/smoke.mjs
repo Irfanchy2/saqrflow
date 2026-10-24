@@ -52,6 +52,31 @@ try {
   await p.getByLabel('Email').fill('nobody@x.ae'); await p.getByRole('button', { name: 'Send reset link' }).click(); await settle(p)
   ok((await bodyText(p)).includes('If an account uses this email'), 'password reset answers the same for any email')
   await p.goto(`${BASE}/login/reset`); ok((await bodyText(p)).includes('expired'), 'the reset page without a valid link asks for a new one')
+  // reset links that Supabase sends to another page of the app (its Site URL) still end on "Choose a new password"
+  for (const e of ['reset-hash@alsaqr.test', 'reset-hash2@alsaqr.test']) await db.query(`insert into auth.users(email) values ($1)`, [e])
+  {
+    const rc = await browser.newContext(), rp = await rc.newPage()
+    await rp.goto(`${BASE}/?token_hash=${encodeURIComponent('e2e-recovery:reset-hash@alsaqr.test')}&type=recovery`); await settle(rp)
+    ok(new URL(rp.url()).pathname === '/login/reset' && (await bodyText(rp)).includes('Choose a new password'), 'reset link (token_hash) landing on the front page opens “Choose a new password”')
+    await rc.close()
+  }
+  {
+    const s2 = await (await fetch(`${GW}/auth/v1/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'recovery', token_hash: 'e2e-recovery:reset-hash2@alsaqr.test' }) })).json()
+    const rc = await browser.newContext(), rp = await rc.newPage()
+    await rp.goto(`${BASE}/#access_token=${s2.access_token}&refresh_token=${s2.refresh_token}&expires_in=3600&token_type=bearer&type=recovery`)
+    await rp.waitForURL('**/login/reset', { timeout: 15000 }).catch(() => {}); await settle(rp)
+    ok(new URL(rp.url()).pathname === '/login/reset' && (await bodyText(rp)).includes('Choose a new password'), 'older reset link (#access_token… on the front page) opens “Choose a new password”')
+    await rc.close()
+  }
+  {
+    const rc = await browser.newContext(), rp = await rc.newPage()
+    await rp.goto(`${BASE}/login#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`)
+    await rp.waitForURL('**/login/reset?expired=1', { timeout: 15000 }).catch(() => {}); await settle(rp)
+    ok((await bodyText(rp)).includes('expired'), 'an expired reset link says it expired (instead of a plain sign-in form)')
+    await rp.goto(`${BASE}/?code=not-a-real-code`); await settle(rp)
+    ok(new URL(rp.url()).pathname === '/login' && (await bodyText(rp)).includes('expired or was already used'), 'a used or foreign one-time code says the link expired')
+    await rc.close()
+  }
   await signup(p, 'owner@alsaqr.test', 'Al Saqr Steels', 'Faisal Al Saqr')
   ok((await bodyText(p)).includes('Dashboard') && (await bodyText(p)).includes('Al Saqr Steels') && p.url() === `${BASE}/`, 'owner lands on the dashboard after onboarding')
   ok((await bodyText(p)).includes('Set up Averiqo'), 'empty dashboard shows the setup guide (no fake data)')

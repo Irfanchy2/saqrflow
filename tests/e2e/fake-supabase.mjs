@@ -15,9 +15,9 @@ const verify = t => { try { const [h, p, s] = t.split('.'); if (crypto.createHma
 const pool = new pg.Pool({ connectionString: DATABASE_URL })
 const passwords = new Map(), refresh = new Map(), objects = new Map(), tokens = new Map()
 const now = () => Math.floor(Date.now() / 1000)
-const session = (u, sid = crypto.randomUUID()) => {   // like GoTrue, a refresh keeps the session id
+const session = (u, sid = crypto.randomUUID(), method = 'password') => {   // like GoTrue, a refresh keeps the session id
   const exp = now() + 3600
-  const access_token = sign({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', aal: 'aal1', exp, session_id: sid })
+  const access_token = sign({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', aal: 'aal1', amr: [{ method, timestamp: now() }], exp, session_id: sid })
   const refresh_token = crypto.randomUUID(); refresh.set(refresh_token, { id: u.id, sid })
   return { access_token, token_type: 'bearer', expires_in: 3600, expires_at: exp, refresh_token, user: user(u) }
 }
@@ -35,6 +35,10 @@ http.createServer(async (req, res) => {
   if (path === '/__stats') { const n = restCalls; if (url.searchParams.has('reset')) restCalls = 0; return json(res, 200, { rest: n }) }
   if (LATENCY) await new Promise(r => setTimeout(r, LATENCY))
   if (path.startsWith('/rest/v1/')) restCalls++
+  if (path.startsWith('/auth/v1/')) {                                   // the browser talks to auth directly (like Supabase: CORS allowed)
+    res.setHeader('access-control-allow-origin', req.headers.origin ?? '*'); res.setHeader('access-control-allow-headers', req.headers['access-control-request-headers'] ?? '*')
+    res.setHeader('access-control-allow-methods', 'GET,POST,PUT,DELETE,OPTIONS'); if (req.method === 'OPTIONS') { res.writeHead(204); return res.end() }
+  }
   try {
     if (path.startsWith('/rest/v1/')) {                                   // ── PostgREST proxy
       const buf = await body(req); const headers = { ...req.headers }; delete headers.host; delete headers.connection
@@ -50,6 +54,12 @@ http.createServer(async (req, res) => {
       const grant = url.searchParams.get('grant_type'); const b = JSON.parse((await body(req)).toString())
       if (grant === 'password') { const { rows } = await pool.query('select id,email from auth.users where email=$1', [b.email]); if (!rows[0] || passwords.get(b.email) !== b.password) return json(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' }); return json(res, 200, session(rows[0])) }
       if (grant === 'refresh_token') { const r = refresh.get(b.refresh_token); if (!r) return json(res, 400, { error: 'invalid_grant' }); const { rows } = await pool.query('select id,email from auth.users where id=$1', [r.id]); return json(res, 200, session(rows[0], r.sid)) }
+    }
+    if (path === '/auth/v1/verify' && req.method === 'POST') {        // email link with token_hash (test tokens: "e2e-<type>:<email>")
+      const b = JSON.parse((await body(req)).toString()), m = /^e2e-(\w+):(.+)$/.exec(b.token_hash ?? '')
+      if (!m || m[1] !== b.type) return json(res, 403, { code: 403, error_code: 'otp_expired', msg: 'Email link is invalid or has expired' })
+      const { rows } = await pool.query('select id,email from auth.users where email=$1', [m[2]]); if (!rows[0]) return json(res, 403, { code: 403, error_code: 'otp_expired', msg: 'Email link is invalid or has expired' })
+      return json(res, 200, session(rows[0], undefined, b.type === 'recovery' ? 'recovery' : 'otp'))
     }
     if (path === '/auth/v1/invite' && req.method === 'POST') {        // admin invite (service role): the invited user signs in with a fixed test password
       const c = verify((req.headers.authorization ?? '').replace(/^Bearer /, '')); if (!c || c.role !== 'service_role') return json(res, 403, { code: 403, msg: 'not admin' })
