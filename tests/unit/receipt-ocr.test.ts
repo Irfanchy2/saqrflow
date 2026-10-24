@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import sharp from 'sharp'
 import { cleanOcrText, mergeAi, readReceipt } from '@/lib/expenses/receipt-read'
 import { goodEnough, localReceiptOcr } from '@/lib/expenses/local-ocr'
-import { boxesToLines, paddleOcr } from '@/lib/ai/ocr/paddle'
+import { boxesToLines, paddleOcr, tinyAvailable } from '@/lib/ai/ocr/paddle'
 import { ocrImage } from '@/lib/inbox/ocr'
 
 const TODAY = '2026-10-20'
@@ -108,6 +108,15 @@ describe('turbo OCR', () => {
     expect([r?.read.subtotal, r?.read.vat, r?.read.total]).toEqual([sub, vat, Math.round((sub + vat) * 100) / 100])
     expect(r?.read.trn).toBe('100234567800003'); expect(r?.read.invoice_no).toBe('INV-55821')
     expect(goodEnough(r!.read)).toBe(true)
+  }, 60_000)
+  it.skipIf(!tinyAvailable())('reads with the tiny models first when they are installed (about 3× faster), small as fallback', async () => {
+    const img = await receiptImage(RECEIPT, { tilt: 2.5, blur: 1.1, jpeg: 55, width: 520 })
+    const r = await localReceiptOcr(img, 'image/jpeg', TODAY)
+    expect(r?.engine).toBe('paddleocr-ppocrv6-tiny'); expect(r?.passes).toBe(1)
+    expectFields(r!.read)
+    const fuzzy = await localReceiptOcr(await receiptImage(RECEIPT, { tilt: 3, blur: 2.2, jpeg: 30, width: 420, contrast: 0.5 }), 'image/jpeg', TODAY)
+    console.log(`very poor photo: ${fuzzy?.passes} pass(es), read by ${fuzzy?.engine}`)
+    expect(fuzzy?.passes).toBeGreaterThan(1); expect(fuzzy?.engine).toBe('paddleocr-ppocrv6-small')   // tiny was not enough → small tried
   }, 60_000)
   it('reads long thin receipts at a larger size so their lines stay readable', async () => {
     const { readSize } = await import('@/lib/ai/ocr/paddle')

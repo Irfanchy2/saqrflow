@@ -1,15 +1,26 @@
 import 'server-only'
 import path from 'node:path'
 import os from 'node:os'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 
 // PaddleOCR (PP-OCRv6 small, from PaddlePaddle — https://github.com/PaddlePaddle/PaddleOCR) running on this server through
 // ONNX Runtime. Free and private: no file leaves the server. Much better than Tesseract on phone photos (tilt, blur, low
-// contrast, thermal paper). Models live in ocr-models/ppocrv6-small (see the README there for where they come from).
+// contrast, thermal paper). Models live in ocr-models/ (see the README there for where they come from):
+//   small — in the repository, the accurate reader;
+//   tiny  — ~3× faster, downloaded and verified at build time (scripts/fetch-ocr-models.mjs); used first for receipts
+//           when it is there, with small as the fallback.
 
-const MODEL_DIR = path.join(process.cwd(), 'ocr-models/ppocrv6-small')
+export type PaddleModel = 'small' | 'tiny'
+const MODELS: Record<PaddleModel, { dir: string; preset: 'PP-OCRv6_small' | 'PP-OCRv6_tiny' }> = {
+  small: { dir: path.join(process.cwd(), 'ocr-models/ppocrv6-small'), preset: 'PP-OCRv6_small' },
+  tiny: { dir: path.join(process.cwd(), 'ocr-models/ppocrv6-tiny'), preset: 'PP-OCRv6_tiny' },
+}
 const MIMES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 export const PADDLE_ENGINE = 'paddleocr-ppocrv6-small'
+const engineOf = (m: PaddleModel) => `paddleocr-ppocrv6-${m}`
+/** The tiny models were installed (and verified) at build time. */
+export const tinyAvailable = () => ['det.onnx', 'rec.onnx', 'dict.txt'].every(f => existsSync(path.join(MODELS.tiny.dir, f)))
 
 type Box = { x: number; y: number; width: number; height: number; points?: { x: number; y: number }[] }
 type Rec = { text: string; confidence: number; box: Box }
@@ -18,10 +29,11 @@ type Service = { recognize: (img: { width: number; height: number; data: Uint8Ar
 export const paddleEnabled = () => process.env.SAQRFLOW_DISABLE_OCR !== '1' && process.env.SAQRFLOW_DISABLE_PADDLE !== '1'
 export const paddleSupports = (mime: string) => MIMES.has(mime)
 
-let service: Promise<Service> | null = null
+const services: Partial<Record<PaddleModel, Promise<Service>>> = {}
 /** The models are loaded once per server instance (about a quarter of a second) and kept for later requests. */
-function loadService(): Promise<Service> {
-  service ??= (async () => {
+function loadService(model: PaddleModel = 'small'): Promise<Service> {
+  const MODEL_DIR = MODELS[model].dir
+  services[model] ??= (async () => {
     const [ort0, { PaddleOcrService }, det, rec, dict] = await Promise.all([
       import('onnxruntime-node'), import('paddleocr'),
       readFile(path.join(MODEL_DIR, 'det.onnx')), readFile(path.join(MODEL_DIR, 'rec.onnx')), readFile(path.join(MODEL_DIR, 'dict.txt'), 'utf8'),
@@ -31,15 +43,15 @@ function loadService(): Promise<Service> {
     const opts = { intraOpNumThreads: Math.max(1, os.availableParallelism?.() ?? os.cpus().length), interOpNumThreads: 1, graphOptimizationLevel: 'all', executionMode: 'sequential' }
     const ort = { ...ort0, InferenceSession: { ...ort0.InferenceSession, create: (b: ArrayBuffer, o?: object) => ort0.InferenceSession.create(b, { ...opts, ...o } as never) } }
     const svc = await PaddleOcrService.createInstance({
-      ort: ort as never, modelPreset: 'PP-OCRv6_small',
+      ort: ort as never, modelPreset: MODELS[model].preset,
       detection: { modelBuffer: ab(det) },
       // the model's classes are: CTC blank + the dictionary + a space
       recognition: { modelBuffer: ab(rec), charactersDictionary: dict.replace(/\r/g, '').trimEnd().split('\n').concat(' ') },
     })
     batchRecognition(svc)
     return svc as unknown as Service
-  })().catch(e => { service = null; throw e })
-  return service
+  })().catch(e => { delete services[model]; throw e })
+  return services[model]!
 }
 
 type Img = { width: number; height: number; cropRotated(p: unknown): Img; crop(b: unknown): Img; resize(s: { width: number; height: number }): Img; tensor(o: object): Float32Array }
@@ -78,7 +90,7 @@ function batchRecognition(svc: unknown, batchSize = 6, minWidth = 160) {
 /** Loads the models now (e.g. while the person is still taking the photo), so the scan itself starts at once. */
 export async function warmPaddle(): Promise<boolean> {
   if (!paddleEnabled()) return false
-  try { await loadService(); return true } catch { return false }
+  try { await Promise.all([loadService('small'), ...(tinyAvailable() ? [loadService('tiny')] : [])]); return true } catch { return false }
 }
 
 // One image at a time per server instance: keeps memory flat when several people scan at once.
@@ -154,19 +166,20 @@ export interface PaddleResult { text: string; confidence: number; lines: number;
  * reads a smaller copy of the photo, `turbo: false` the detailed one.
  * Returns null when it cannot run here (disabled, unsupported type, models missing); never throws.
  */
-export async function paddleOcr(bytes: Uint8Array, mime: string, opts: { enhance?: boolean; timeoutMs?: number; turbo?: boolean } = {}): Promise<PaddleResult | null> {
-  if (!paddleEnabled() || !paddleSupports(mime)) return null
+export async function paddleOcr(bytes: Uint8Array, mime: string, opts: { enhance?: boolean; timeoutMs?: number; turbo?: boolean; model?: PaddleModel } = {}): Promise<PaddleResult | null> {
+  const model = opts.model ?? 'small'
+  if (!paddleEnabled() || !paddleSupports(mime) || (model === 'tiny' && !tinyAvailable())) return null
   const t0 = Date.now()
   try {
     const work = serial(async () => {
-      const [svc, img] = await Promise.all([loadService(), decode(bytes, !!opts.enhance, opts.turbo !== false)])
+      const [svc, img] = await Promise.all([loadService(model), decode(bytes, !!opts.enhance, opts.turbo !== false)])
       return svc.recognize(img)
     })
     const recs = await Promise.race([work, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('PaddleOCR timed out')), opts.timeoutMs ?? 45_000))])
     const lines = boxesToLines(recs)
     const text = lines.map(l => l.text).join('\n').slice(0, 200_000)
     const confidence = lines.length ? lines.reduce((s, l) => s + l.confidence, 0) / lines.length : 0
-    return { text, confidence, lines: lines.length, ms: Date.now() - t0, engine: PADDLE_ENGINE }
+    return { text, confidence, lines: lines.length, ms: Date.now() - t0, engine: engineOf(model) }
   } catch (e) {
     console.warn('[paddleocr]', (e as Error).message)
     return null

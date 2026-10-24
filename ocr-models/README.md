@@ -18,5 +18,24 @@ Averiqo reads photos (receipts, IDs, scanned documents) on its own server with
 - **Arabic:** these models do not read Arabic letters. Arabic receipts fall back to the cloud OCR / Google AI when they
   are set up; numbers on Arabic receipts are still read.
 
+## Tiny models (turbo, downloaded at build time)
+
+Receipts are read first with the PP-OCRv6 **tiny** models, about 3× faster: a 12 MP phone photo takes ~1.5 s on one CPU
+instead of ~4.4 s. When that reading is not complete (amounts that do not add up, a TRN that could not be read…) the
+small models above read it again.
+
+The tiny models are **not** in the repository. `npm run build` runs `scripts/fetch-ocr-models.mjs` first, which downloads
+them from RapidAI's official RapidOCR store (ModelScope, release v3.10.0) into `ppocrv6-tiny/` and keeps them only when
+their SHA-256 matches RapidAI's published value:
+
+| File | Source | SHA-256 |
+| --- | --- | --- |
+| `ppocrv6-tiny/det.onnx` | `onnx/PP-OCRv6/det/PP-OCRv6_det_tiny.onnx` | `f42c0fbd294d95eac1a550e131b277dac97462c8025fa4b6c3cec1b7894bd3d5` |
+| `ppocrv6-tiny/rec.onnx` | `onnx/PP-OCRv6/rec/PP-OCRv6_rec_tiny.onnx` | `e16e242de5937ad92609223f19bc2aff3727ee40b095f996907c24749bad251b` |
+| `ppocrv6-tiny/dict.txt` | read from the recognition model's own `character` metadata (6,904 characters) | |
+
+If the download fails or a hash does not match, nothing is installed, the build continues and receipts are read with
+the small models (as before). Set `SAQRFLOW_SKIP_TINY_OCR=1` to skip the download.
+
 To replace a model, keep the file names, update the hashes here and run `npm test` (the receipt tests read real
 rendered receipts with these models).

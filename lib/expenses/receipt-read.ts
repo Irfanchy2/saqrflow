@@ -27,10 +27,11 @@ const COMPANY = /\b(l\.?\s?l\.?\s?c\.?|llc|est\.?|establishment|trading|fz[ce]|f
 /**
  * Repairs the usual OCR slips on receipt text before it is read: letters inside numbers (O→0, l/I/|→1, S→5, B→8),
  * "3.200.00" thousands dots, "160,00" decimal commas, broken labels (T0TAL, Sub-Tota1, V.A.T), Arabic labels
- * (الإجمالي, ضريبة القيمة المضافة, رقم الفاتورة…) and Arabic-Indic digits. Only obvious slips are changed.
+ * (الإجمالي, ضريبة القيمة المضافة, رقم الفاتورة…), Arabic-Indic and full-width digits / punctuation ("TRN："). Only obvious
+ * slips are changed.
  */
 export function cleanOcrText(text: string): string {
-  let t = text.replace(/\r/g, '').replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
+  let t = text.normalize('NFKC').replace(/\r/g, '').replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
   t = t.replace(/[‘’`´]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-')
   // letters read inside a number
   for (let i = 0; i < 2; i++) t = t.replace(/(\d)[oO](?=[\d.,])/g, '$10').replace(/(\d[.,])[oO](?=\d|\b)/g, '$10')

@@ -5,3 +5,4 @@ node_modules
 *.tsbuildinfo
 next-env.d.ts
 tests/e2e/shots
+ocr-models/ppocrv6-tiny

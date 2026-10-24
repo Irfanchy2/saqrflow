@@ -11,7 +11,7 @@ export default {
   // stays small, so it starts faster.
   outputFileTracingIncludes: Object.fromEntries(['/inbox', '/inbox/[id]', '/settings', '/assistant', '/api/inbox/[id]/process', '/api/expenses/scan']
     .map(r => [r, ['./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**', './node_modules/tesseract.js-core/*-lstm.wasm',
-      './ocr-models/ppocrv6-small/*.onnx', './ocr-models/ppocrv6-small/dict.txt',
+      './ocr-models/ppocrv6-small/*.onnx', './ocr-models/ppocrv6-small/dict.txt', './ocr-models/ppocrv6-tiny/*',
       './node_modules/onnxruntime-node/bin/napi-v6/linux/x64/onnxruntime_binding.node', './node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime.so.1',
       './node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_shared.so']])),
   // ONNX Runtime ships add-ons for every platform and GPU: the server only needs the Linux x64 CPU one.

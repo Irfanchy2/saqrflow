@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
   const s = await aiSettings(c)
   type Reading = { text: string; read: ReceiptRead; provider: string }
   let best = null as Reading | null
+  let localEngine: string | null = null
   const errors: string[] = []
   const take = (text: string, provider: string, read = readReceipt(text, c.today)) => { if (!best || receiptScore(read) > receiptScore(best.read)) best = { text, read, provider } }
 
@@ -49,10 +50,10 @@ export async function POST(req: NextRequest) {
   if (mime === 'application/pdf') { const layer = await extractText(buf, mime).catch(() => ''); if (layer.replace(/\s/g, '').length >= 30) take(layer, 'text_layer') }
   else {
     const local = await localReceiptOcr(buf, mime, c.today, 30_000, s.turbo)
-    if (local) take(local.text, local.engine.startsWith('paddle') ? 'paddleocr' : 'tesseract', local.read)
+    if (local) { localEngine = local.engine; take(local.text, local.engine.startsWith('paddle') ? 'paddleocr' : 'tesseract', local.read) }
   }
   // 2. paid OCR, only when the free reading is missing or not good enough (and the company has not chosen local only)
-  if ((!best || !goodEnough(best.read)) && s.ocr !== 'tesseract' && (mime === 'application/pdf' ? !best : true)) {
+  if ((!best || !goodEnough(best.read, best.text)) && s.ocr !== 'tesseract' && (mime === 'application/pdf' ? !best : true)) {
     const providers = providerOrder(s.ocr, await ocrProviders(c.company.id), mime).filter(p => p.id !== 'tesseract')
     if (providers.length) {
       const { result, attempts } = await runOcr({ bytes: buf, mime, name: f.name }, providers)
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
   //    private (Settings → remove ID numbers) and the text shows some; then it gets the text with those numbers removed.
   let engine: 'rules' | 'rules+gemini' = 'rules', aiNote: string | null = null, aiSaw: 'photo' | 'text' | null = null
   const cur = best
-  if ((!cur || !goodEnough(cur.read)) && (s.ai === 'auto' || s.ai === 'gemini')) {
+  if ((!cur || !goodEnough(cur.read, cur.text)) && (s.ai === 'auto' || s.ai === 'gemini')) {
     const { gemini } = await aiProviders(c.company.id)
     const canSee = /^image\/(jpeg|png|webp|heic|heif)$/.test(mime) || mime === 'application/pdf'
     const red = redactForAi(cur?.text ?? '')
@@ -88,5 +89,5 @@ export async function POST(req: NextRequest) {
   const read = done.read
   const supplier = await matchSupplier(c, read.supplier ?? null, read.trn ?? null)
   const duplicate = read.invoice_no ? await findDuplicate(c, { supplierId: supplier?.id ?? null, supplierName: supplier?.name ?? read.supplier ?? null, reference: read.invoice_no }) : null
-  return NextResponse.json({ read, provider: done.provider, engine, aiSaw, aiNote, chars: done.text.length, bytes: buf.length, supplier, duplicate })
+  return NextResponse.json({ read, provider: done.provider, engine, aiSaw, aiNote, chars: done.text.length, bytes: buf.length, localEngine, supplier, duplicate })
 }
