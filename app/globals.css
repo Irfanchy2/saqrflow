@@ -72,6 +72,10 @@ dialog .form-actions:not(:last-child) { position: static; border-top: 0; margin:
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .toast-in { animation: toast-in .16s ease-out; }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
+/* receipt being read: a soft light passes down the photo */
+.scan-sweep::after { content: ''; position: absolute; inset-inline: 0; top: 0; height: 38%; background: linear-gradient(180deg, transparent, hsl(var(--primary) / .22) 70%, hsl(var(--primary) / .55)); animation: scan-sweep 1.4s cubic-bezier(.45,0,.55,1) infinite; pointer-events: none; }
+@keyframes scan-sweep { from { transform: translateY(-100%); } to { transform: translateY(270%); } }
+@media (prefers-reduced-motion: reduce) { .scan-sweep::after { animation: none; opacity: .35; transform: none; height: 100%; } }
 .skeleton { @apply relative overflow-hidden rounded-md bg-surface-2; }
 .skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--fg) / .055) 50%, transparent); animation: shimmer 1.6s cubic-bezier(.4,0,.2,1) infinite; }
 /* Overdue payment badge: a soft ring that pulses a few times when it appears, then stays still (never blinks). */

@@ -75,7 +75,7 @@ try {
   await fixtures({ ocr: { [sha(img)]: RECEIPT.replace('Grand Total AED 3,696.00', 'Grand Total AED 3,896.00') }, gemini: [{ needle: 'INV-55821', response: { supplier: 'Al Fahim Building Materials LLC', trn: '100234567800003', invoice_no: 'INV-55821', date: `${yr}-10-03`, subtotal: 3520, vat: 176, total: 3696, lines: [{ description: 'MS Hollow Section 100x50x3', quantity: 40, unit_price: 80, amount: 3200 }, { description: 'Welding rods E6013 2.5mm', quantity: 5, unit_price: 64, amount: 320 }] } }] })
   await p.goto(`${BASE}/expenses`); await settle()
   await p.locator('input[data-scan-upload]').setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: img })
-  await dlg().locator('[data-scan-summary]').waitFor({ timeout: 20000 }); await settle(300)
+  await dlg().locator('[data-scan-done]').waitFor({ timeout: 20000 }); await settle(300)
   const d = dlg(); await d.screenshot({ path: `${OUT}/scan-review.png` })
   ok(await d.locator('input[name=supplier_name]').inputValue() === 'AL FAHIM BUILDING MATERIALS L.L.C' && await d.getByLabel('Supplier TRN').inputValue() === '100234567800003', 'supplier and TRN read from the receipt')
   ok(await d.getByLabel('Invoice / receipt no.').inputValue() === 'INV-55821' && await d.getByLabel('Date *').inputValue() === `${yr}-10-03`, 'invoice number and date read')
@@ -111,6 +111,17 @@ try {
   ok(sj3.read?.subtotal === 100 && sj3.read?.vat === 5 && sj3.read?.total === 105 && sj3.read?.lines?.length === 2, 'subtotal 100.00 + VAT 5.00 = total 105.00, two line items')
   ok(c1.ocrspace.length === c0.ocrspace.length && c1.gemini.length === c0.gemini.length, 'no paid OCR and no Google AI call for a photo the server could read')
 
+  console.log('\n[3b+] Instant feel: streamed reading and rescans')
+  const misread = png('stream'), geminiAt = (await calls()).gemini.length
+  await fixtures({ ocr: { [sha(misread)]: RECEIPT.replace('Grand Total AED 3,696.00', 'Grand Total AED 3,896.00').replace('INV-55821', 'INV-77001') }, gemini: [{ needle: 'INV-77001', response: { supplier: 'Al Fahim Building Materials LLC', trn: '100234567800003', invoice_no: 'INV-77001', date: `${yr}-10-03`, subtotal: 3520, vat: 176, total: 3696, lines: [] } }] })
+  const ndjson = async buf => (await (await ctx.request.post(`${BASE}/api/expenses/scan`, { headers: { accept: 'application/x-ndjson' }, multipart: { file: { name: 'r.png', mimeType: 'image/png', buffer: buf } } })).text()).trim().split('\n').map(l => JSON.parse(l))
+  const ev = await ndjson(misread), kinds = ev.map(e => e.type === 'stage' ? `stage:${e.stage}` : e.type)
+  const part = ev.find(e => e.type === 'partial'), fin = ev.find(e => e.type === 'final')
+  ok(kinds.join(' ') === 'stage:local stage:cloud partial stage:ai final', `streamed in order: ${kinds.join(' → ')}`)
+  ok(part?.read?.total === 3896 && part?.engine === 'rules' && fin?.read?.total === 3696 && fin?.engine === 'rules+gemini', 'the OCR reading arrives first (form fills at once), then Google AI corrects the total')
+  const t2 = Date.now(), rescan = await ndjson(misread), took2 = Date.now() - t2
+  ok(rescan.length === 1 && rescan[0].type === 'final' && rescan[0].cached === true && rescan[0].read.total === 3696 && (await calls()).gemini.length === geminiAt + 1, `the same photo scanned again comes back at once from the cache (${took2} ms, no second Google AI call)`)
+
   console.log('\n[3c] Turbo: a full-size 12 MP phone photo through the Scan button')
   const warm = await (await ctx.request.get(`${BASE}/api/expenses/scan`)).json().catch(() => ({}))
   ok(warm.ready === true, 'tapping Scan receipt warms the OCR models on the server')
@@ -119,10 +130,10 @@ try {
   const big = await sharp({ create: { width: 3024, height: 4032, channels: 3, background: '#6b5d4f' } }).composite([{ input: sheet, left: Math.max(0, (3024 - sm.width) >> 1), top: Math.max(0, (4032 - sm.height) >> 1) }])
     .blur(1).jpeg({ quality: 92 }).toBuffer()
   await p.goto(`${BASE}/expenses`); await settle()
-  const t1 = Date.now(), resp = p.waitForResponse(r => r.url().endsWith('/api/expenses/scan') && r.request().method() === 'POST', { timeout: 30000 })
+  const t1 = Date.now()
   await p.locator('input[data-scan-upload]').setInputFiles({ name: 'IMG_4032.jpg', mimeType: 'image/jpeg', buffer: big })
-  const sent = (await (await resp).json().catch(() => ({}))).bytes ?? 0
-  await dlg().locator('[data-scan-summary]').waitFor({ timeout: 30000 }); const took = Date.now() - t1
+  await dlg().locator('[data-scan-done]').waitFor({ timeout: 30000 }); const took = Date.now() - t1
+  const sent = Number(await dlg().locator('[data-scan-done]').getAttribute('data-scan-bytes')) || 0
   ok(sent > 0 && sent < big.length / 2, `the phone sends a smaller copy (${Math.round(big.length / 1024)} KB photo → ${Math.round(sent / 1024)} KB)`)
   ok(/PaddleOCR on this server, free/.test(await dlg().locator('[data-scan-summary]').innerText()) && await dlg().getByLabel('Invoice / receipt no.').inputValue() === 'GH-7781', `read by turbo PaddleOCR in ${took} ms (photo picked → fields filled)`)
   await p.keyboard.press('Escape'); await settle(300)
