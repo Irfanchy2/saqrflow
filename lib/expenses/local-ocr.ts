@@ -47,11 +47,11 @@ export async function prepareReceiptImage(bytes: Uint8Array): Promise<{ gray: Bu
 }
 
 /**
- * Reads a receipt photo on this server. PaddleOCR reads the photo as taken, then (if the reading is not good enough) a
- * contrast-evened copy; Tesseract runs only when PaddleOCR cannot (and tries the photo in three ways). The reading that
- * makes the most sense as a receipt wins, and it stops as soon as one is good enough.
+ * Reads a receipt photo on this server. PaddleOCR reads the photo as taken (turbo: a smaller copy, ~1 s), then — only if
+ * that reading is not good enough — a contrast-evened, detailed copy; Tesseract runs only when PaddleOCR cannot (and tries
+ * the photo in three ways). The reading that makes the most sense as a receipt wins; it stops as soon as one is good enough.
  */
-export async function localReceiptOcr(bytes: Uint8Array, mime: string, today: string, budgetMs = 40_000): Promise<{ text: string; read: ReceiptRead; passes: number; ms: number; engine: string } | null> {
+export async function localReceiptOcr(bytes: Uint8Array, mime: string, today: string, budgetMs = 40_000, turbo = true): Promise<{ text: string; read: ReceiptRead; passes: number; ms: number; engine: string } | null> {
   if (!IMAGES.has(mime) || process.env.SAQRFLOW_DISABLE_OCR === '1') return null
   const t0 = Date.now()
   let best: { text: string; read: ReceiptRead; score: number; engine: string } | null = null, passes = 0
@@ -65,7 +65,7 @@ export async function localReceiptOcr(bytes: Uint8Array, mime: string, today: st
   let paddleRan = false
   for (const enhance of [false, true]) {
     const left = budgetMs - (Date.now() - t0); if (left < 4000) break
-    const r = await paddleOcr(bytes, mime, { enhance, timeoutMs: left })
+    const r = await paddleOcr(bytes, mime, { enhance, timeoutMs: left, turbo: turbo && !enhance })
     if (!r) break
     paddleRan = true; passes++
     if (r.text.trim() && consider(r.text, r.engine)) return done()

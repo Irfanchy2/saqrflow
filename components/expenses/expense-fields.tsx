@@ -5,6 +5,7 @@ import { AlertTriangle, Camera, CheckCircle2, Loader2, Plus, ScanText, Trash2, U
 import { Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { EXPENSE_CATS, PAYMENT_METHODS } from '@/lib/projects'
 import { cn } from '@/lib/utils'
+import { shrinkForScan, warmScan } from '@/lib/expenses/scan-turbo'
 import type { ReceiptLine, ReceiptRead } from '@/lib/expenses/receipt-read'
 
 type Opt = { id: string; name: string }
@@ -57,7 +58,8 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
     setScan({ busy: true, file: file.name })
     setPreview(p => { if (p) URL.revokeObjectURL(p); return file.type.startsWith('image/') ? URL.createObjectURL(file) : null })
     try {
-      const fd = new FormData(); fd.append('file', file)
+      const send = await shrinkForScan(file)                      // turbo: a smaller copy is read; the original is what gets saved
+      const fd = new FormData(); fd.append('file', send, send.name)
       const r = await fetch('/api/expenses/scan', { method: 'POST', body: fd }); const j = await r.json().catch(() => ({}))
       if (!r.ok) { setScan({ busy: false, err: j.error ?? 'The receipt could not be read. Enter the details by hand.', file: file.name }); return }
       const res = j as ScanResult, g = res.read
@@ -94,9 +96,9 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
     <div className="rounded-2xl border border-dashed border-border bg-surface-2/40 p-3 sm:col-span-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="me-auto text-sm font-medium">{scan.file ? <>Receipt: <span className="text-muted">{scan.file}</span></> : e?.receipt_document_id ? 'A receipt is attached. Add another to replace it.' : 'Receipt (optional)'}</span>
-        <label className={cn(pick, 'bg-ink text-ink-fg hover:opacity-90')}><Camera size={17} aria-hidden />Take photo
+        <label onPointerDown={warmScan} className={cn(pick, 'bg-ink text-ink-fg hover:opacity-90')}><Camera size={17} aria-hidden />Take photo
           <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label="Take a photo of the receipt" onChange={ev => attach(ev.target.files?.[0])} /></label>
-        <label className={cn(pick, 'border border-border bg-surface hover:bg-surface-2')}><Upload size={16} aria-hidden />Upload image or PDF
+        <label onPointerDown={warmScan} className={cn(pick, 'border border-border bg-surface hover:bg-surface-2')}><Upload size={16} aria-hidden />Upload image or PDF
           <input ref={fileRef} type="file" name="file" accept="image/*,application/pdf" className="sr-only" aria-label="Receipt file" onChange={ev => { const f = ev.target.files?.[0]; if (f) void read(f) }} /></label>
       </div>
       {scan.busy && <p className="mt-2.5 flex items-center gap-2 text-[13px] text-muted" role="status"><Loader2 size={14} className="animate-spin" aria-hidden />Reading the receipt…</p>}

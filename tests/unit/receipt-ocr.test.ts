@@ -88,6 +88,35 @@ describe('receipt reading on this server (PaddleOCR)', () => {
   }, 30_000)
 })
 
+describe('turbo OCR', () => {
+  it('reads a 12 MP phone photo of a long receipt (34 lines) in one fast pass, every amount right', async () => {
+    const items = Array.from({ length: 20 }, (_, i) => [`Item ${String.fromCharCode(65 + i)} steel part ${i + 1}`, (i % 4) + 1, 10 + i * 7.5] as const)
+    const sub = items.reduce((s, [, q, p]) => s + q * p, 0), vat = Math.round(sub * 5) / 100
+    const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 })
+    const lines = ['AL FAHIM BUILDING MATERIALS LLC', 'Musaffah M-14, Abu Dhabi', 'TRN: 100234567800003', 'TAX INVOICE', 'Invoice No: INV-55821', 'Date: 14/10/2026',
+      ...items.map(([d, q, p]) => `${d.padEnd(26)} ${q} x ${p.toFixed(2).padStart(6)} ${(q * p).toFixed(2).padStart(8)}`),
+      `Subtotal ${money(sub).padStart(34)}`, `VAT 5% ${money(vat).padStart(36)}`, `TOTAL AED ${money(sub + vat).padStart(33)}`, 'Thank you']
+    const page = await receiptImage(lines)
+    const sheet = await sharp(Buffer.from(page)).resize({ height: 3600 }).rotate(1.5, { background: '#6b5d4f' }).png().toBuffer()
+    const m = await sharp(sheet).metadata()
+    const photo = new Uint8Array(await sharp({ create: { width: 3024, height: 4032, channels: 3, background: '#6b5d4f' } })
+      .composite([{ input: sheet, left: Math.max(0, (3024 - m.width!) >> 1), top: Math.max(0, (4032 - m.height!) >> 1) }]).blur(1.2).jpeg({ quality: 85 }).toBuffer())
+    await paddleOcr(new Uint8Array(await sharp(Buffer.from(page)).png().toBuffer()), 'image/png')   // models loaded (a warm server)
+    const t0 = Date.now(), r = await localReceiptOcr(photo, 'image/jpeg', TODAY)
+    console.log(`turbo: 12 MP phone photo read in ${Date.now() - t0} ms (${r?.passes} pass)`)
+    expect(r?.passes).toBe(1)
+    expect([r?.read.subtotal, r?.read.vat, r?.read.total]).toEqual([sub, vat, Math.round((sub + vat) * 100) / 100])
+    expect(r?.read.trn).toBe('100234567800003'); expect(r?.read.invoice_no).toBe('INV-55821')
+    expect(goodEnough(r!.read)).toBe(true)
+  }, 60_000)
+  it('reads long thin receipts at a larger size so their lines stay readable', async () => {
+    const { readSize } = await import('@/lib/ai/ocr/paddle')
+    expect(readSize(3024, 4032, true)).toBe(1280)                    // ordinary phone photo
+    expect(readSize(1000, 4000, true)).toBe(2200)                    // long till roll, cropped
+    expect(readSize(3024, 4032, false)).toBe(2600)                   // turbo off: detailed reading
+  })
+})
+
 describe('AI reading merged with the OCR reading', () => {
   const ocr = 'AL FAHIM BUILDING MATERIALS LLC\nTRN 1002345678OO003\nInvoice No: INV-55821\nSubtotal 3,200.00\nVAT 5% 160.00\nTOTAL 3,860.00'
   const ai = { supplier: 'Al Fahim Building Materials LLC', trn: '100234567800003', invoice_no: 'INV-55821', date: '2026-10-14', subtotal: 3200, vat: 160, total: 3360, lines: [{ description: 'Steel angle', quantity: 2, unit_price: 800, amount: 1600 }, { description: 'Welding rods', quantity: 4, unit_price: 400, amount: 1600 }] }

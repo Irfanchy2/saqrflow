@@ -10,14 +10,14 @@ import { isOcrMode, ocrProviders, providerOrder, runOcr, type OcrMode, type OcrP
 import { aiProviders, isAiMode, pickAi, AiError, type AiMode } from '../ai/llm'
 import { redactForAi } from '../ai/redact'
 
-export interface AiSettings { ocr: OcrMode; ai: AiMode; redact: boolean }
+export interface AiSettings { ocr: OcrMode; ai: AiMode; redact: boolean; /** fast local OCR (default on) */ turbo: boolean }
 /** Company choice (Settings → AI & Automation), falling back to OCR_PROVIDER / AI_PROVIDER env, then AUTO. */
 export async function aiSettings(c: Ctx): Promise<AiSettings> {
-  const { data } = await c.supabase.from('app_settings').select('key,value').in('key', ['ocr.provider', 'ai.provider', 'ai.ocr_provider', 'ai.redact_ids'])
+  const { data } = await c.supabase.from('app_settings').select('key,value').in('key', ['ocr.provider', 'ai.provider', 'ai.ocr_provider', 'ai.redact_ids', 'ocr.turbo'])
   const m = Object.fromEntries((data ?? []).map(r => [r.key, r.value]))
   const envOcr = process.env.OCR_PROVIDER, envAi = process.env.AI_PROVIDER
   const ai: AiMode = isAiMode(m['ai.provider']) ? m['ai.provider'] : m['ai.ocr_provider'] === 'claude' ? 'claude' : m['ai.ocr_provider'] === 'rules' ? 'rules' : isAiMode(envAi) ? envAi : 'auto'
-  return { ocr: isOcrMode(m['ocr.provider']) ? m['ocr.provider'] : isOcrMode(envOcr) ? envOcr : 'auto', ai, redact: m['ai.redact_ids'] !== false }
+  return { ocr: isOcrMode(m['ocr.provider']) ? m['ocr.provider'] : isOcrMode(envOcr) ? envOcr : 'auto', ai, redact: m['ai.redact_ids'] !== false, turbo: m['ocr.turbo'] !== false }
 }
 /** Is any AI classifier active for this company? (used for the inbox banner) */
 export async function aiEnabled(c: Ctx) {
