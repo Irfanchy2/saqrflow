@@ -110,6 +110,22 @@ try {
   ok(sj3.read?.supplier === 'GULF HARDWARE TRADING LLC' && sj3.read?.trn === '100456789100003' && sj3.read?.invoice_no === 'GH-7781' && sj3.read?.date === `${yr}-10-12`, 'supplier, TRN, invoice number and date read from the photo')
   ok(sj3.read?.subtotal === 100 && sj3.read?.vat === 5 && sj3.read?.total === 105 && sj3.read?.lines?.length === 2, 'subtotal 100.00 + VAT 5.00 = total 105.00, two line items')
   ok(c1.ocrspace.length === c0.ocrspace.length && c1.gemini.length === c0.gemini.length, 'no paid OCR and no Google AI call for a photo the server could read')
+
+  console.log('\n[3c] Turbo: a full-size 12 MP phone photo through the Scan button')
+  const warm = await (await ctx.request.get(`${BASE}/api/expenses/scan`)).json().catch(() => ({}))
+  ok(warm.ready === true, 'tapping Scan receipt warms the OCR models on the server')
+  const sheet = await sharp(await sharp(Buffer.from(svg)).png().toBuffer()).resize({ width: 2800, height: 3700, fit: 'inside' }).rotate(1.5, { background: '#6b5d4f' }).png().toBuffer()
+  const sm = await sharp(sheet).metadata()
+  const big = await sharp({ create: { width: 3024, height: 4032, channels: 3, background: '#6b5d4f' } }).composite([{ input: sheet, left: Math.max(0, (3024 - sm.width) >> 1), top: Math.max(0, (4032 - sm.height) >> 1) }])
+    .blur(1).jpeg({ quality: 92 }).toBuffer()
+  await p.goto(`${BASE}/expenses`); await settle()
+  const t1 = Date.now(), resp = p.waitForResponse(r => r.url().endsWith('/api/expenses/scan') && r.request().method() === 'POST', { timeout: 30000 })
+  await p.locator('input[data-scan-upload]').setInputFiles({ name: 'IMG_4032.jpg', mimeType: 'image/jpeg', buffer: big })
+  const sent = (await (await resp).json().catch(() => ({}))).bytes ?? 0
+  await dlg().locator('[data-scan-summary]').waitFor({ timeout: 30000 }); const took = Date.now() - t1
+  ok(sent > 0 && sent < big.length / 2, `the phone sends a smaller copy (${Math.round(big.length / 1024)} KB photo → ${Math.round(sent / 1024)} KB)`)
+  ok(/PaddleOCR on this server, free/.test(await dlg().locator('[data-scan-summary]').innerText()) && await dlg().getByLabel('Invoice / receipt no.').inputValue() === 'GH-7781', `read by turbo PaddleOCR in ${took} ms (photo picked → fields filled)`)
+  await p.keyboard.press('Escape'); await settle(300)
   const bad = await ctx.request.post(`${BASE}/api/expenses/scan`, { multipart: { file: { name: 'x.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') } } })
   ok(bad.status() === 400, 'a text file is refused (only photos or PDF)')
 

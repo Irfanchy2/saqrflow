@@ -26,6 +26,7 @@ export async function saveAiSettings(_: ActionState, fd: FormData): Promise<Acti
     if (!isOcrMode(ocr) || !isAiMode(ai)) return { error: 'Choose an OCR and an AI provider.' }
     const { error } = await c.supabase.from('app_settings').upsert([
       setting(c.company.id, 'ocr.provider', ocr), setting(c.company.id, 'ai.provider', ai), setting(c.company.id, 'ai.redact_ids', fd.get('redact') === 'on'),
+      setting(c.company.id, 'ocr.turbo', fd.get('turbo') === 'on'),
     ])
     if (error) throw error
     const secrets: [SecretName, string | undefined][] = [

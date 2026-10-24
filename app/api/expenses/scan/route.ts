@@ -8,9 +8,17 @@ import { redactForAi } from '@/lib/ai/redact'
 import { rateLimit } from '@/lib/security'
 import { mergeAi, readReceipt, RECEIPT_PROMPT, RECEIPT_SCHEMA, type ReceiptRead } from '@/lib/expenses/receipt-read'
 import { goodEnough, localReceiptOcr, receiptScore } from '@/lib/expenses/local-ocr'
+import { warmPaddle } from '@/lib/ai/ocr/paddle'
 import { findDuplicate, matchSupplier } from '@/lib/expenses/suppliers'
 
 export const runtime = 'nodejs'
+
+/** Warm-up: called when the person taps Scan receipt, so the OCR models are loaded while they take the photo. */
+export async function GET() {
+  const c = await getCtx().catch(() => null)
+  if (!c) return new NextResponse(null, { status: 401 })
+  return NextResponse.json({ ready: await warmPaddle() }, { headers: { 'cache-control': 'no-store' } })
+}
 export const maxDuration = 60
 /**
  * Reads a receipt / supplier invoice and returns SUGGESTED fields with how sure each one is, warnings when the numbers do not
@@ -40,7 +48,7 @@ export async function POST(req: NextRequest) {
   // 1. free: the PDF's text layer, or PaddleOCR on this server
   if (mime === 'application/pdf') { const layer = await extractText(buf, mime).catch(() => ''); if (layer.replace(/\s/g, '').length >= 30) take(layer, 'text_layer') }
   else {
-    const local = await localReceiptOcr(buf, mime, c.today, 30_000)
+    const local = await localReceiptOcr(buf, mime, c.today, 30_000, s.turbo)
     if (local) take(local.text, local.engine.startsWith('paddle') ? 'paddleocr' : 'tesseract', local.read)
   }
   // 2. paid OCR, only when the free reading is missing or not good enough (and the company has not chosen local only)
@@ -80,5 +88,5 @@ export async function POST(req: NextRequest) {
   const read = done.read
   const supplier = await matchSupplier(c, read.supplier ?? null, read.trn ?? null)
   const duplicate = read.invoice_no ? await findDuplicate(c, { supplierId: supplier?.id ?? null, supplierName: supplier?.name ?? read.supplier ?? null, reference: read.invoice_no }) : null
-  return NextResponse.json({ read, provider: done.provider, engine, aiSaw, aiNote, chars: done.text.length, supplier, duplicate })
+  return NextResponse.json({ read, provider: done.provider, engine, aiSaw, aiNote, chars: done.text.length, bytes: buf.length, supplier, duplicate })
 }

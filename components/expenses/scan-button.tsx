@@ -6,6 +6,7 @@ import { ActionForm } from '@/components/ui/action-form'
 import { ExpenseFields, type SupplierOpt } from '@/components/expenses/expense-fields'
 import { saveExpense } from '@/app/actions/projects'
 import { cn } from '@/lib/utils'
+import { warmScan } from '@/lib/expenses/scan-turbo'
 
 type Opt = { id: string; name: string }
 /**
@@ -17,8 +18,8 @@ export function ScanReceiptButton({ today, projects, assets, employees, supplier
   const take = (ev: React.ChangeEvent<HTMLInputElement>) => { const f = ev.target.files?.[0]; ev.target.value = ''; if (f) setFile(f) }
   return <>
     <div className="inline-flex overflow-hidden rounded-xl shadow-card">
-      <button type="button" onClick={() => cam.current?.click()} className={cn('arc inline-flex h-10 cursor-pointer items-center gap-2 px-4 text-[14px] font-semibold', compact && 'px-3')}><Camera size={17} aria-hidden />Scan receipt</button>
-      <button type="button" onClick={() => up.current?.click()} aria-label="Upload a receipt image or PDF" title="Upload a receipt image or PDF" className="arc inline-flex h-10 w-10 cursor-pointer items-center justify-center border-s border-white/25"><Upload size={16} aria-hidden /></button>
+      <button type="button" onClick={() => { warmScan(); cam.current?.click() }} className={cn('arc inline-flex h-10 cursor-pointer items-center gap-2 px-4 text-[14px] font-semibold', compact && 'px-3')}><Camera size={17} aria-hidden />Scan receipt</button>
+      <button type="button" onClick={() => { warmScan(); up.current?.click() }} aria-label="Upload a receipt image or PDF" title="Upload a receipt image or PDF" className="arc inline-flex h-10 w-10 cursor-pointer items-center justify-center border-s border-white/25"><Upload size={16} aria-hidden /></button>
     </div>
     <input ref={cam} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden onChange={take} />
     <input ref={up} type="file" accept="image/*,application/pdf" className="sr-only" tabIndex={-1} aria-hidden onChange={take} data-scan-upload />
