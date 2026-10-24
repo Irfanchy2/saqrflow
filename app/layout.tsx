@@ -5,6 +5,7 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import localFont from 'next/font/local'
 import { isRtl } from '@/lib/i18n'
+import { AuthLinkCatcher } from '@/components/auth/link-catcher'
 
 // interface typeface: Urbanist (SIL OFL), served from our own build; Geist stays for printed documents and code
 const urbanist = localFont({ src: '../node_modules/@fontsource-variable/urbanist/files/urbanist-latin-wght-normal.woff2', weight: '100 900', variable: '--font-urbanist', display: 'swap' })
@@ -29,5 +30,5 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = (await cookies()).get('sf-locale')?.value ?? 'en', nonce = (await headers()).get('x-nonce') ?? undefined
   return <html lang={locale} dir={isRtl(locale) ? 'rtl' : 'ltr'} className={`${urbanist.variable} ${chakra.variable} ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
     <head><script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
-    <body>{children}</body></html>
+    <body>{children}<AuthLinkCatcher /></body></html>
 }
