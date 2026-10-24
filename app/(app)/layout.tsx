@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { supabaseConfigured } from '@/lib/env'
 import { SetupRequired } from '@/components/layout/setup-required'
 import { getCtx } from '@/lib/auth'
@@ -28,6 +29,7 @@ export const dynamic = 'force-dynamic'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!supabaseConfigured()) return <SetupRequired />
   const c = await getCtx()
+  if (c.profile.role === 'employee') redirect('/me')          // employees use the Employee Portal only (also enforced in getCtx and the database)
   const l = c.profile.locale
   // grouped by job; the first group needs no label. Every entry is enforced again on the server (pages + RLS), hiding is only convenience.
   const items: (TopItem & { show: boolean })[] = [

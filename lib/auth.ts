@@ -1,7 +1,8 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { VERIFIED_EMAIL, VERIFIED_SIG, VERIFIED_UID, verifiedToken } from './verified-user'
+import { VERIFIED_EMAIL, VERIFIED_PATH, VERIFIED_SIG, VERIFIED_UID, verifiedToken } from './verified-user'
+import { EMPLOYEE_HOME, employeeMayUse } from './portal-paths'
 import { cache } from 'react'
 import { createClient } from './supabase/server'
 import { can, ForbiddenError, type Permission, type Role } from './permissions'
@@ -51,6 +52,10 @@ export const getCtx = cache(async (): Promise<Ctx> => {
   const company = (Array.isArray(row.company) ? row.company[0] : row.company) as Ctx['company'] | null
   if (!company) redirect('/onboarding')
   const role = row.role as Role
+  // An employee login lives in the Employee Portal: any other page, action or API sends it back there (the database
+  // shows it nothing else either). The path comes from our middleware only (same proof as the user id).
+  const path = trusted ? h.get(VERIFIED_PATH) : null
+  if (role === 'employee' && path && !employeeMayUse(path)) redirect(EMPLOYEE_HOME)
   const profile = { id: row.id, company_id: row.company_id, full_name: row.full_name, role, locale: row.locale }
   return { supabase, userId, email, profile, company, today: todayInTz(new Date(), company.timezone), can: p => can(role, p) }
 })

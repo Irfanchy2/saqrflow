@@ -238,7 +238,7 @@ html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
    whole single-column mobile layout past the screen, where main's overflow clip hides it. Let tracks shrink instead. */
 main .grid > * { min-width: 0; }
 main input, main select, main textarea { max-width: 100%; }
-main input[type=file] { width: 100%; font-size: 14px; }
+main input[type=file]:not(.sr-only) { width: 100%; font-size: 14px; }
 main :where(p, dd, li, h1, h2, h3, label) { overflow-wrap: break-word; }
 
 @media (max-width: 639px) {

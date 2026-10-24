@@ -7,6 +7,7 @@ export const PERMISSIONS = [
   'documents.view','documents.upload','records.edit','salary.view','finance.view','cheques.manage',
   'reminders.create','data.export','records.delete','users.manage','employees.view',
   'employees.view_sensitive','audit.view','settings.manage','sales.approve','records.purge','crm.view','approvals.decide',
+  'expenses.approve',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -14,7 +15,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   super_admin: PERMISSIONS,
   company_owner: PERMISSIONS,
   hr_manager: ['documents.view','documents.upload','records.edit','salary.view','employees.view','employees.view_sensitive','reminders.create','data.export'],
-  accountant: ['documents.view','records.edit','salary.view','finance.view','cheques.manage','reminders.create','data.export','crm.view'],
+  accountant: ['documents.view','records.edit','salary.view','finance.view','cheques.manage','reminders.create','data.export','crm.view','expenses.approve'],
   project_manager: ['documents.view','documents.upload','records.edit','employees.view','reminders.create','crm.view'],
   employee: [],
   viewer: ['documents.view','employees.view','crm.view'],

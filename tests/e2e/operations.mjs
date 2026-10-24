@@ -180,21 +180,17 @@ try {
   await p.goto(`${BASE}/search?q=${encodeURIComponent(wo.number)}`); await settle()
   ok((await main()).includes('Work orders'), 'global search finds the work order by number')
 
-  console.log('\n[R] Permissions: an employee login sees only their own tasks, no CRM')
+  console.log('\n[R] Permissions: an employee login is confined to the Employee Portal (no tasks board, no CRM)')
   const EMP = `ops-emp-${Date.now()}@alsaqr.test`
   const ectx = await browser.newContext(); const ep = await ectx.newPage()
   await ep.goto(`${BASE}/signup`); await ep.getByLabel('Work email').fill(EMP); await ep.getByLabel('Password').fill('correct-horse-battery'); await ep.getByRole('button', { name: 'Create account' }).click(); await ep.waitForURL('**/onboarding')
   const eu = (await one(`select id from auth.users where email=$1`, [EMP])).id
   await db.query(`insert into profiles(id,company_id,full_name,role) values ($1,$2,'Site Hand','employee')`, [eu, co])
-  await db.query(`insert into tasks(company_id,title,owner_id,due_date) values ($1,'Collect scaffolding',$2,$3)`, [co, eu, day(0)])
-  await ep.goto(`${BASE}/tasks`); await ep.waitForLoadState('networkidle')
-  const et = await ep.locator('main').innerText()
-  ok(et.includes('Collect scaffolding') && !et.includes('Install treads'), 'employee sees their own task only')
-  await ep.goto(`${BASE}/leads`); await ep.waitForLoadState('networkidle')
-  ok(!ep.url().includes('/leads'), 'employee is sent away from Leads (no crm.view)')
-  await ep.goto(`${BASE}/tasks`); await ep.getByRole('button', { name: 'Mark done: Collect scaffolding' }).click(); await ep.waitForTimeout(1200)
-  ok((await one(`select status from tasks where title='Collect scaffolding' and company_id=$1`, [co])).status === 'completed', 'employee can complete their own task')
-  ok((await one(`select count(*)::int n from in_app_notifications where user_id=(select id from auth.users where email=$1) and title like 'Task completed:%'`, [EMAIL])).n === 0, 'no self-notification (task was created by SQL, creator unknown)')
+  for (const path of ['/tasks', '/leads', '/work-orders', `/projects/${wo.project_id}`]) {
+    await ep.goto(BASE + path); await ep.waitForLoadState('networkidle')
+    ok(new URL(ep.url()).pathname === '/me', `employee is sent from ${path} to their portal`)
+  }
+  ok((await ep.locator('main').innerText()).includes('not linked'), 'an employee login without an employee record is told to ask HR to link it')
   await ectx.close()
 
   console.log('\n[M] Mobile 390 px')

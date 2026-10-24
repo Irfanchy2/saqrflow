@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Command, Loader2, LogOut, Moon, RotateCw, Settings, Smartphone, Sun, User } from '@/components/icons'
+import { Check, Command, Loader2, LogOut, Moon, RotateCw, Settings, Smartphone, Sun, User, Wallet } from '@/components/icons'
 import { signOut } from '@/app/actions/auth'
 import { resetDemoData } from '@/app/actions/demo'
 import { toast } from '@/components/ui/toast'
@@ -48,6 +48,7 @@ export function UserMenu({ name, isDemo }: { name: string; isDemo?: boolean }) {
     {open && <div ref={panel} role="menu" aria-label="Account" onKeyDown={move}
       className="absolute end-0 top-[calc(100%+12px)] z-pop w-[19rem] max-w-[calc(100vw-2rem)] origin-top-right rounded-[22px] border border-border/80 bg-surface p-2 shadow-pop rtl:origin-top-left">
       <Link role="menuitem" href="/settings#account" onClick={() => close()} className={item}><User size={20} aria-hidden />My profile</Link>
+      <Link role="menuitem" href="/me" onClick={() => close()} className={item}><Wallet size={20} aria-hidden />My portal (my expenses, salary)</Link>
       <Link role="menuitem" href="/settings" onClick={() => close()} className={item}><Settings size={20} aria-hidden />Settings</Link>
       <button role="menuitem" type="button" className={item} onClick={() => { close(); dispatchEvent(new Event('saqrflow:shortcuts')) }}><Command size={20} aria-hidden />Keyboard shortcuts</button>
       {sep}

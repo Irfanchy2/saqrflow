@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { supabaseConfigured, supabasePublishableKey, supabaseUrl } from './lib/env'
-import { VERIFIED_EMAIL, VERIFIED_SIG, VERIFIED_UID, verifiedToken } from './lib/verified-user'
+import { VERIFIED_EMAIL, VERIFIED_SIG, VERIFIED_PATH, VERIFIED_UID, verifiedToken } from './lib/verified-user'
 
 // ── naive per-instance rate limiter (fixed window). Use Redis/Upstash when running >1 instance. ──
 const hits = new Map<string, { n: number; reset: number }>()
@@ -85,9 +85,9 @@ export async function middleware(req: NextRequest) {
   // The user verified above is handed to the page (lib/auth reads it) so the request does not ask the auth server a second time.
   // A client-supplied copy of these headers is always removed first: only this middleware can set them.
   const headers = new Headers(req.headers)
-  headers.delete(VERIFIED_UID); headers.delete(VERIFIED_EMAIL); headers.delete(VERIFIED_SIG)
+  headers.delete(VERIFIED_UID); headers.delete(VERIFIED_EMAIL); headers.delete(VERIFIED_SIG); headers.delete(VERIFIED_PATH)
   const token = await verifiedToken()
-  if (user && token) { headers.set(VERIFIED_UID, user.id); headers.set(VERIFIED_EMAIL, encodeURIComponent(user.email ?? '')); headers.set(VERIFIED_SIG, token) }
+  if (user && token) { headers.set(VERIFIED_UID, user.id); headers.set(VERIFIED_EMAIL, encodeURIComponent(user.email ?? '')); headers.set(VERIFIED_SIG, token); headers.set(VERIFIED_PATH, pathname) }
   // Next reads the nonce from the request's CSP header and puts it on every script it renders
   if (csp) { headers.set('x-nonce', nonce); headers.set('Content-Security-Policy', csp) }
   const res = NextResponse.next({ request: { headers } })

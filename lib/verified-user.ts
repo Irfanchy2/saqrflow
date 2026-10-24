@@ -3,6 +3,8 @@
 export const VERIFIED_UID = 'x-averiqo-verified-uid'
 export const VERIFIED_EMAIL = 'x-averiqo-verified-email'
 export const VERIFIED_SIG = 'x-averiqo-verified-sig'
+/** the path the middleware saw: lib/auth keeps an employee login inside the Employee Portal (lib/portal-paths.ts) */
+export const VERIFIED_PATH = 'x-averiqo-verified-path'
 let cached: Promise<string | null> | null = null
 export function verifiedToken(): Promise<string | null> {
   return (cached ??= (async () => {

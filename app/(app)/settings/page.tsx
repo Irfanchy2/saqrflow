@@ -14,6 +14,7 @@ import { TemplatesSettings } from '@/components/settings/templates'
 import { TemplateBuilderSection } from '@/components/settings/templates-section'
 import { DataBackup } from '@/components/settings/data-backup'
 import { ApprovalRules } from '@/components/settings/approval-rules'
+import { PortalSettingsCard } from '@/components/settings/portal-settings'
 import { CustomFieldsSettings } from '@/components/settings/custom-fields'
 import { PublicFormsSettings } from '@/components/settings/public-forms'
 import { NotificationRules } from '@/components/settings/notification-rules'
@@ -64,6 +65,7 @@ export default async function Settings() {
 
       {admin && <NumberingSettings c={c} />}
       {admin && <ApprovalRules c={c} />}
+      {admin && <PortalSettingsCard c={c} />}
       {admin && <CustomFieldsSettings c={c} />}
       {admin && <PublicFormsSettings c={c} />}
 

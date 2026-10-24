@@ -98,7 +98,8 @@ describe('tenant isolation', () => {
 
 describe('permissions: salary & sensitive HR data enforced in the database', () => {
   it('salary visible to HR, accountant, owner only', async () => {
-    for (const [u, n] of [[U.hrA, 1], [U.accA, 1], [U.ownerA, 1], [U.pmA, 0], [U.viewerA, 0], [U.empA, 0]] as const) {
+    // the employee sees exactly one row: their own (0030); never a colleague's (see the Employee portal tests)
+    for (const [u, n] of [[U.hrA, 1], [U.accA, 1], [U.ownerA, 1], [U.pmA, 0], [U.viewerA, 0], [U.empA, 1]] as const) {
       const r = await as(u, 'select count(*)::int n from employee_compensation')
       expect(r.rows[0].n, u).toBe(n)
     }
@@ -1248,5 +1249,107 @@ describe('expenses: verification, Tally export batches and locking (0029)', () =
     await sup('delete from expense_exports where id=$1', [id])
     expect((await sup('select export_batch_id, exported_at from project_expenses where id=$1', [e1])).rows[0]).toMatchObject({ export_batch_id: null, exported_at: null })
     await as(U.ownerA, 'delete from project_expenses where id=$1', [e1])
+  })
+})
+
+describe('Employee portal & employee expense claims (0030)', () => {
+  let claim: string, claimOther: string, accEmp: string
+  beforeAll(async () => {
+    await as(U.hrA, `insert into salary_payments(company_id,employee_id,period,amount,paid_on,method) values ($1,$2,'2026-09-01',2500,'2026-09-30','wps'),($1,$3,'2026-09-01',3100,'2026-09-30','wps')`, [A, empRecA, empRecA2])
+    await as(U.hrA, `insert into employee_advances(company_id,employee_id,kind,amount) values ($1,$2,'advance',500),($1,$3,'advance',900)`, [A, empRecA, empRecA2])
+    await as(U.hrA, `insert into attendance_records(company_id,employee_id,work_date,status) values ($1,$2,'2026-10-01','present'),($1,$3,'2026-10-01','absent')`, [A, empRecA, empRecA2])
+    claimOther = (await sup(`insert into expense_claims(company_id,employee_id,spent_on,description,amount) values ($1,$2,'2026-10-10','Fuel for van',100) returning id`, [A, empRecA2])).rows[0].id
+  })
+
+  it('an employee reads only their own salary, advances, attendance and compensation', async () => {
+    for (const [t, n] of [['salary_payments', 1], ['employee_advances', 1], ['attendance_records', 1], ['employee_compensation', 1]] as const) {
+      const r = await as(U.empA, `select employee_id from ${t}`)
+      expect(r.rows.length, t).toBe(n); expect(r.rows.every(x => x.employee_id === empRecA), t).toBe(true)
+    }
+    expect((await as(U.empA, `select amount::float from salary_payments`)).rows[0].amount).toBe(2500)
+  })
+  it('an employee sees no colleague, no company configuration and no company finance', async () => {
+    expect((await as(U.empA, `select id from profiles`)).rows.map(r => r.id)).toEqual([U.empA])
+    expect((await as(U.empA, `select id from employees`)).rows.map(r => r.id)).toEqual([empRecA])
+    await sup(`insert into app_settings(company_id,key,value) values ($1,'approvals.expense_threshold','100'::jsonb),($1,'portal.checkin','false'::jsonb),($1,'branding.company_address','"Musaffah"'::jsonb),($1,'tally.company','"X"'::jsonb) on conflict (company_id,key) do update set value = excluded.value`, [A])
+    const keys = (await as(U.empA, `select key from app_settings`)).rows.map(r => r.key)
+    expect(keys).toContain('portal.checkin'); expect(keys).toContain('branding.company_address')   // letterhead on their own payslip
+    expect(keys).not.toContain('approvals.expense_threshold'); expect(keys).not.toContain('tally.company')
+    for (const t of ['project_expenses', 'invoices', 'projects', 'cheques', 'suppliers', 'custom_field_defs', 'document_number_formats']) {
+      expect((await as(U.empA, `select count(*)::int n from ${t}`)).rows[0].n, t).toBe(0)
+    }
+    expect((await as(U.ownerA, `select count(*)::int n from profiles`)).rows[0].n).toBeGreaterThan(1)   // others are not narrowed
+  })
+  it('an employee cannot write salary, advances or attendance', async () => {
+    await fails(as(U.empA, `insert into salary_payments(company_id,employee_id,period,amount) values ($1,$2,'2026-10-01',99999)`, [A, empRecA]))
+    await fails(as(U.empA, `insert into employee_advances(company_id,employee_id,kind,amount) values ($1,$2,'advance',1)`, [A, empRecA]))
+    await fails(as(U.empA, `insert into attendance_records(company_id,employee_id,work_date,status) values ($1,$2,'2026-10-02','present')`, [A, empRecA]))
+    const u = await as(U.empA, `update attendance_records set status = 'present' where employee_id = $1 returning id`, [empRecA2])
+    expect(u.rows.length).toBe(0)
+  })
+  it('self check-in / check-out: off by default, then once each per day, in order', async () => {
+    await fails(as(U.empA, `select attendance_punch('in')`), /not turned on/)
+    await sup(`update app_settings set value = 'true'::jsonb where company_id = $1 and key = 'portal.checkin'`, [A])
+    await fails(as(U.empA, `select attendance_punch('out')`), /Check in first/)
+    const r = (await as(U.empA, `select * from attendance_punch('in')`)).rows[0]
+    expect(r.status).toBe('present'); expect(r.source).toBe('self'); expect(r.check_in_at).not.toBeNull()
+    await fails(as(U.empA, `select attendance_punch('in')`), /already checked in/)
+    expect((await as(U.empA, `select check_out_at from attendance_punch('out')`)).rows[0].check_out_at).not.toBeNull()
+    await fails(as(U.empA, `select attendance_punch('out')`), /already checked out/)
+    await fails(as(U.hrA, `select attendance_punch('in')`), /not linked/)
+  })
+
+  it('an employee submits a claim only for themselves, only as pending', async () => {
+    await fails(as(U.empA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount) values ($1,$2,'2026-10-12','x',10)`, [A, empRecA2]))
+    await fails(as(U.empA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount,status) values ($1,$2,'2026-10-12','x',10,'approved')`, [A, empRecA]))
+    claim = (await as(U.empA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount,vat_amount,supplier_name,reference,category,paid_with) values ($1,$2,'2026-10-12','Cutting discs',200,10,'Gulf Hardware','GH-1','material','cash') returning id`, [A, empRecA])).rows[0].id
+    expect((await as(U.empA, `select id from expense_claims`)).rows.map(r => r.id)).toEqual([claim])        // not the colleague's
+    expect((await as(U.ownerA, `select count(*)::int n from project_expenses where description = 'Cutting discs'`)).rows[0].n).toBe(0)
+  })
+  it('an employee cannot approve, link an expense or attach someone else’s file', async () => {
+    await fails(as(U.empA, `select decide_expense_claim($1,'approved')`, [claim]), /not allowed/)
+    await fails(as(U.empA, `update expense_claims set status = 'approved' where id = $1`, [claim]))
+    await fails(as(U.empA, `update expense_claims set decision_note = 'ok' where id = $1`, [claim]), /approver/)
+    await fails(as(U.empA, `update expense_claims set receipt_document_id = $2 where id = $1`, [claim, docCompany]), /server/)
+    await fails(as(U.pmA, `select decide_expense_claim($1,'approved')`, [claim]), /not allowed/)
+    expect((await as(U.pmA, `select count(*)::int n from expense_claims`)).rows[0].n).toBe(0)
+  })
+  it('send back for correction (reason required) → employee fixes it → it is pending again', async () => {
+    await fails(as(U.accA, `select decide_expense_claim($1,'correction_requested')`, [claim]), /reason/)
+    await as(U.accA, `select decide_expense_claim($1,'correction_requested','VAT should be 10.00, please attach the full receipt')`, [claim])
+    const n = (await as(U.empA, `select title, body from in_app_notifications where title like 'Correction needed%'`)).rows
+    expect(n.length).toBe(1); expect(n[0].body).toMatch(/full receipt/)
+    await as(U.empA, `update expense_claims set amount = 190, status = 'pending' where id = $1`, [claim])
+    expect((await as(U.empA, `select status, amount::float from expense_claims where id = $1`, [claim])).rows[0]).toEqual({ status: 'pending', amount: 190 })
+  })
+  it('approval adds it to company expenses exactly once: verified, approved, with the employee; threshold does not re-open it', async () => {
+    const e1 = (await as(U.accA, `select decide_expense_claim($1,'approved',null,'transport') id`, [claim])).rows[0].id
+    const e2 = (await as(U.accA, `select decide_expense_claim($1,'approved') id`, [claim])).rows[0].id
+    expect(e2).toBe(e1)
+    const rows = (await as(U.accA, `select id, employee_id, approval_status, verified_at, category, amount::float, vat_amount::float, expense_claim_id from project_expenses where expense_claim_id = $1`, [claim])).rows
+    expect(rows.length).toBe(1)
+    expect(rows[0]).toMatchObject({ id: e1, employee_id: empRecA, approval_status: 'approved', category: 'transport', amount: 190, vat_amount: 10, expense_claim_id: claim })
+    expect(rows[0].verified_at).not.toBeNull()
+    expect((await as(U.accA, `select count(*)::int n from approval_requests where entity_id = $1`, [e1])).rows[0].n).toBe(0)
+    await fails(as(U.accA, `select decide_expense_claim($1,'rejected','too late')`, [claim]), /approved/)
+    expect((await as(U.empA, `update expense_claims set amount = 1 where id = $1`, [claim])).rowCount).toBe(0)   // decided: no longer the employee's to edit
+    expect((await as(U.empA, `select amount::float from expense_claims where id = $1`, [claim])).rows[0].amount).toBe(190)
+    const kinds = (await as(U.empA, `select kind from expense_claim_events where claim_id = $1 order by created_at, kind`, [claim])).rows.map(r => r.kind)
+    expect(kinds).toEqual(expect.arrayContaining(['submitted', 'correction_requested', 'resubmitted', 'approved']))
+    expect((await as(U.ownerA, `select count(*)::int n from audit_logs where table_name = 'expense_claims' and record_id = $1`, [claim])).rows[0].n).toBeGreaterThanOrEqual(3)
+  })
+  it('a rejection needs a reason and never creates an expense; nobody decides their own claim', async () => {
+    await as(U.accA, `select decide_expense_claim($1,'rejected','Personal purchase')`, [claimOther])
+    expect((await as(U.accA, `select count(*)::int n from project_expenses where expense_claim_id = $1`, [claimOther])).rows[0].n).toBe(0)
+    accEmp = (await as(U.hrA, `insert into employees(company_id,employee_no,full_name,user_id) values ($1,'E-003','Accountant Self',$2) returning id`, [A, U.accA])).rows[0].id
+    const own = (await as(U.accA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount) values ($1,$2,'2026-10-12','Taxi',40) returning id`, [A, accEmp])).rows[0].id
+    await fails(as(U.accA, `select decide_expense_claim($1,'approved')`, [own]), /your own/)
+  })
+  it('claim receipts: the employee and finance see them, other roles do not', async () => {
+    const d = (await sup(`insert into documents(company_id,owner_type,owner_id,name) values ($1,'expense_claim',$2,'Receipt') returning id`, [A, claim])).rows[0].id
+    expect((await as(U.empA, `select count(*)::int n from documents where id = $1`, [d])).rows[0].n).toBe(1)
+    expect((await as(U.accA, `select count(*)::int n from documents where id = $1`, [d])).rows[0].n).toBe(1)
+    expect((await as(U.pmA, `select count(*)::int n from documents where id = $1`, [d])).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, `select count(*)::int n from documents where id = $1`, [d])).rows[0].n).toBe(0)
   })
 })
