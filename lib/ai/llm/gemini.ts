@@ -12,9 +12,9 @@ export function geminiProvider(o: GeminiOptions): AIProvider {
   const fail = (m: string, code: AiError['code']) => new AiError(m, code, 'gemini')
 
   /** Free-tier keys allow ~10 requests/minute: on 429 wait for Google's suggested retryDelay (≤ 25 s) and try again, twice at most. */
-  async function generate(system: string, user: string, schema: object): Promise<unknown> {
+  async function generate(system: string, user: string, schema: object, image?: { bytes: Uint8Array; mime: string }): Promise<unknown> {
     for (let attempt = 0; ; attempt++) {
-      try { return await generateOnce(system, user, schema) }
+      try { return await generateOnce(system, user, schema, image) }
       catch (e) {
         const wait = e instanceof AiError && e.code === 'rate_limited' ? (e as AiError & { retryMs?: number }).retryMs ?? 0 : 0
         if (!wait || attempt >= 2 || wait > (o.maxRetryWaitMs ?? 25_000)) throw e
@@ -23,7 +23,7 @@ export function geminiProvider(o: GeminiOptions): AIProvider {
     }
   }
 
-  async function generateOnce(system: string, user: string, schema: object): Promise<unknown> {
+  async function generateOnce(system: string, user: string, schema: object, image?: { bytes: Uint8Array; mime: string }): Promise<unknown> {
     if (!o.apiKey) throw fail('GEMINI_API_KEY is not configured', 'not_configured')
     let res: Response
     try {
@@ -31,7 +31,8 @@ export function geminiProvider(o: GeminiOptions): AIProvider {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': o.apiKey }, signal: AbortSignal.timeout(timeoutMs),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: 'user', parts: [{ text: user }] }],
+          // the text part comes first; the photo (when given) follows as inline data
+          contents: [{ role: 'user', parts: [{ text: user }, ...(image ? [{ inline_data: { mime_type: image.mime, data: Buffer.from(image.bytes).toString('base64') } }] : [])] }],
           generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0 },
         }),
       })
@@ -71,7 +72,7 @@ export function geminiProvider(o: GeminiOptions): AIProvider {
     },
     extractMetadata: input => p.classifyDocument(input),
     matchEntity: (name, candidates) => matchByName(name, candidates),
-    async generateStructuredOutput(system, user, schema, validate) { return validate(await generate(system, user, schema)) },
+    async generateStructuredOutput(system, user, schema, validate, opts) { return validate(await generate(system, user, schema, opts?.image)) },
     async healthCheck() {
       const t0 = Date.now()
       try {

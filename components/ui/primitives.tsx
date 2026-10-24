@@ -150,8 +150,9 @@ export function Metrics({ children, className, cols }: { children: ReactNode; cl
   // tablets: three columns only when the cards fill the rows (3, 6, 9…) or leave a pair (5); 4 or 8 cards read better 2-up
   const md3 = n >= 3 && (kids.length % 3 === 0 || kids.length === 5)
   let i = 0
-  // phones: one swipeable strip of compact cards, so the list below starts near the top of the screen
-  return <div className={cn('metrics tabstrip -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:w-[46%] [&>*]:min-w-[158px] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto sm:[&>*]:min-w-0', md3 && 'md:grid-cols-3', lg, className)}>
+  // phones: one swipeable strip of compact cards, so the list below starts near the top of the screen. Every card has the
+  // same width and stretches to the tallest one (a card's own h-full would stop the stretch, so it is reset to auto there)
+  return <div className={cn('metrics tabstrip -mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 items-stretch [&>*]:w-[46%] [&>*]:min-w-[158px] [&>*]:max-w-[220px] [&>*]:shrink-0 [&>*]:snap-start max-sm:[&>*]:!h-auto sm:[&>*]:w-auto sm:[&>*]:min-w-0 sm:[&>*]:max-w-none', md3 && 'md:grid-cols-3', lg, className)}>
     {kids.map(k => isValidElement(k) && k.type === StatCard ? cloneElement(k as React.ReactElement<{ index?: number }>, { index: (k.props as { index?: number }).index ?? i++ }) : k)}</div>
 }
 

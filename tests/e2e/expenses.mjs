@@ -6,6 +6,8 @@ import { chromium } from 'playwright-core'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import pg from 'pg'
+import { createRequire } from 'node:module'
+const sharp = createRequire(import.meta.url)('sharp')
 
 const BASE = process.env.E2E_BASE, GW = process.env.E2E_GATEWAY
 const OUT = 'tests/e2e/shots/expenses'; fs.mkdirSync(OUT, { recursive: true })
@@ -21,6 +23,7 @@ const settle = async (ms = 600, page = p) => { await page.waitForLoadState('netw
 const dlg = (page = p) => page.locator('dialog[open]')
 const toasts = () => p.locator('[role=status], [role=alert]').allInnerTexts().then(t => t.join(' | '))
 const fixtures = o => fetch(`${GW}/mock/fixtures`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(o) })
+const calls = async () => (await fetch(`${GW}/mock/calls`)).json()
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
 const png = tag => Buffer.concat([PNG1, Buffer.from(`averiqo-${tag}-${Date.now()}`)])   // same image, different bytes → its own OCR fixture
 const sha = b => crypto.createHash('sha256').update(b).digest('hex')
@@ -67,9 +70,9 @@ try {
   ok((await one(`select count(*)::int n from suppliers where company_id=$1`, [co])).n === 1, 'the same supplier was matched (no second “L.L.C” supplier)')
   await p.keyboard.press('Escape'); await settle(300)
 
-  console.log('\n[3] Scan a receipt: OCR + AI fill the form, nothing saved until confirmed')
-  const img = png('receipt')
-  await fixtures({ ocr: { [sha(img)]: RECEIPT }, gemini: [{ needle: 'INV-55821', response: { supplier: 'Al Fahim Building Materials LLC', trn: '100234567800003', invoice_no: 'INV-55821', date: `${yr}-10-03`, subtotal: 3520, vat: 176, total: 3696, lines: [{ description: 'MS Hollow Section 100x50x3', quantity: 40, unit_price: 80, amount: 3200 }, { description: 'Welding rods E6013 2.5mm', quantity: 5, unit_price: 64, amount: 320 }] } }] })
+  console.log('\n[3] Scan a receipt the OCR misread: Google AI checks the photo, nothing saved until confirmed')
+  const img = png('receipt'), geminiBefore = (await calls()).gemini.length
+  await fixtures({ ocr: { [sha(img)]: RECEIPT.replace('Grand Total AED 3,696.00', 'Grand Total AED 3,896.00') }, gemini: [{ needle: 'INV-55821', response: { supplier: 'Al Fahim Building Materials LLC', trn: '100234567800003', invoice_no: 'INV-55821', date: `${yr}-10-03`, subtotal: 3520, vat: 176, total: 3696, lines: [{ description: 'MS Hollow Section 100x50x3', quantity: 40, unit_price: 80, amount: 3200 }, { description: 'Welding rods E6013 2.5mm', quantity: 5, unit_price: 64, amount: 320 }] } }] })
   await p.goto(`${BASE}/expenses`); await settle()
   await p.locator('input[data-scan-upload]').setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: img })
   await dlg().locator('[data-scan-summary]').waitFor({ timeout: 20000 }); await settle(300)
@@ -78,7 +81,9 @@ try {
   ok(await d.getByLabel('Invoice / receipt no.').inputValue() === 'INV-55821' && await d.getByLabel('Date *').inputValue() === `${yr}-10-03`, 'invoice number and date read')
   ok(await d.getByLabel('Amount excl. VAT (AED) *').inputValue() === '3520.00' && await d.getByLabel(/^VAT \(AED\)/).inputValue() === '176.00' && (await d.locator('[data-total]').innerText()).includes('3,696.00'), 'subtotal 3,520.00 + VAT 176.00 = total 3,696.00')
   ok(await d.getByLabel('Item 2 description').inputValue() === 'Welding rods E6013 2.5mm' && await d.getByLabel('Item 1 amount').inputValue() === '3200.00', 'line items read (2 lines)')
-  ok(/OCR \+ AI/.test(await d.locator('[data-scan-summary]').innerText()), 'the summary says how it was read (OCR + AI) and asks for a check')
+  ok(/OCR\.Space \+ Google AI \(photo\)/.test(await d.locator('[data-scan-summary]').innerText()), 'the summary says how it was read (OCR.Space + Google AI with the photo) and asks for a check')
+  const gcall = (await calls()).gemini.slice(geminiBefore)
+  ok(gcall.length === 1 && gcall[0].image === 'image/png', 'Google AI was asked once, with the photo, because the OCR total did not add up')
   const before = (await one(`select count(*)::int n from project_expenses where company_id=$1`, [co])).n
   await d.getByRole('button', { name: 'Save expense' }).click(); await settle(600)
   ok((await one(`select count(*)::int n from project_expenses where company_id=$1`, [co])).n === before, 'not saved without ticking “I checked these details against the receipt”')
@@ -92,6 +97,19 @@ try {
   await fixtures({ ocr: { [sha(Buffer.concat([img, Buffer.from('y')]))]: RECEIPT } })
   const sj2 = await (await ctx.request.post(`${BASE}/api/expenses/scan`, { multipart: { file: { name: 'dup.png', mimeType: 'image/png', buffer: Buffer.concat([img, Buffer.from('y')]) } } })).json()
   ok(sj2.duplicate?.reference === 'INV-55821' && sj2.supplier?.name === 'AL FAHIM BUILDING MATERIALS L.L.C', 'scanning the same bill again warns: already saved, matched to the saved supplier')
+  ok(sj2.engine === 'rules' && sj2.provider === 'ocrspace' && !sj2.aiNote, 'a clean OCR reading that adds up is used as it is: Google AI is not asked (no cost)')
+
+  console.log('\n[3b] A receipt photo read on this server with PaddleOCR: free, no cloud OCR, no AI')
+  const lines = ['GULF HARDWARE TRADING LLC', 'TRN: 100456789100003', 'TAX INVOICE', 'Invoice No: GH-7781', `Date: 12/10/${yr}`, 'Cutting disc 4in      10 x 6.00     60.00', 'Grinding disc         5 x 8.00      40.00', 'Subtotal                         100.00', 'VAT 5%                             5.00', 'TOTAL AED                        105.00']
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="620" height="${70 + lines.length * 32}"><rect width="100%" height="100%" fill="#f6f3ea"/>${lines.map((l, i) => `<text x="26" y="${48 + i * 32}" font-family="DejaVu Sans Mono, monospace" font-size="19" fill="#333" xml:space="preserve">${l}</text>`).join('')}</svg>`
+  const photo = await sharp(await sharp(Buffer.from(svg)).png().toBuffer()).rotate(2, { background: '#d9d4c7' }).blur(0.8).jpeg({ quality: 60 }).toBuffer()
+  const c0 = await calls(), t0 = Date.now()
+  const sj3 = await (await ctx.request.post(`${BASE}/api/expenses/scan`, { multipart: { file: { name: 'photo.jpg', mimeType: 'image/jpeg', buffer: photo } } })).json()
+  const c1 = await calls()
+  ok(sj3.provider === 'paddleocr' && sj3.engine === 'rules', `read by PaddleOCR on the server (${Date.now() - t0} ms)`)
+  ok(sj3.read?.supplier === 'GULF HARDWARE TRADING LLC' && sj3.read?.trn === '100456789100003' && sj3.read?.invoice_no === 'GH-7781' && sj3.read?.date === `${yr}-10-12`, 'supplier, TRN, invoice number and date read from the photo')
+  ok(sj3.read?.subtotal === 100 && sj3.read?.vat === 5 && sj3.read?.total === 105 && sj3.read?.lines?.length === 2, 'subtotal 100.00 + VAT 5.00 = total 105.00, two line items')
+  ok(c1.ocrspace.length === c0.ocrspace.length && c1.gemini.length === c0.gemini.length, 'no paid OCR and no Google AI call for a photo the server could read')
   const bad = await ctx.request.post(`${BASE}/api/expenses/scan`, { multipart: { file: { name: 'x.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') } } })
   ok(bad.status() === 400, 'a text file is refused (only photos or PDF)')
 

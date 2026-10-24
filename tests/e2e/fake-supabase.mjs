@@ -107,7 +107,7 @@ http.createServer(async (req, res) => {
       const b = JSON.parse((await body(req)).toString())
       if (req.headers['x-goog-api-key'] !== 'test-gemini-key') return json(res, 400, { error: { code: 400, message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT' } })
       const prompt = b.contents?.[0]?.parts?.[0]?.text ?? ''
-      mockCalls.gemini.push({ model: decodeURIComponent(path.split('/').pop()), prompt, schema: !!b.generationConfig?.responseSchema, mime: b.generationConfig?.responseMimeType })
+      mockCalls.gemini.push({ model: decodeURIComponent(path.split('/').pop()), prompt, schema: !!b.generationConfig?.responseSchema, mime: b.generationConfig?.responseMimeType, image: b.contents?.[0]?.parts?.find(x => x.inline_data)?.inline_data?.mime_type ?? null })
       const fx = geminiFixtures.find(g => prompt.includes(g.needle))
       if (fx?.response === '__DOWN__') return json(res, 503, { error: { code: 503, message: 'The model is overloaded. Please try again later.', status: 'UNAVAILABLE' } })
       return json(res, 200, { candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify(fx ? fx.response : UNKNOWN_DOC) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 100 } })

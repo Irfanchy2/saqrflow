@@ -2,7 +2,7 @@
 export type OcrProviderId = 'text_layer' | 'ocrspace' | 'google_vision' | 'tesseract'
 export type OcrMode = 'auto' | 'google_vision' | 'ocrspace' | 'tesseract'
 export interface OcrFile { bytes: Uint8Array; mime: string; name: string }
-export interface OcrResult { provider: OcrProviderId; text: string; language: string | null; pages: number | null; ms: number }
+export interface OcrResult { provider: OcrProviderId; text: string; language: string | null; pages: number | null; ms: number; /** the local reader that ran (PaddleOCR or Tesseract) */ engine?: string }
 export interface OcrDocument extends OcrResult { pageTexts: string[] }
 export type OcrErrorCode = 'not_configured' | 'unsupported' | 'too_large' | 'rate_limited' | 'timeout' | 'auth' | 'invalid_document' | 'empty' | 'provider'
 export class OcrError extends Error {

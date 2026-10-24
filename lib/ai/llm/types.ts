@@ -19,7 +19,7 @@ export interface AIProvider {
   classifyDocument(input: ClassifyInput): Promise<ClassifyOutput>
   extractMetadata(input: ClassifyInput): Promise<ClassifyOutput>
   matchEntity(name: string, candidates: { id: string; name: string }[]): Match[]
-  /** generic strict-JSON call (used by AI search) */
-  generateStructuredOutput<T>(system: string, user: string, responseSchema: object, validate: (raw: unknown) => T): Promise<T>
+  /** generic strict-JSON call (AI search, receipts); `image` is sent alongside the text when the provider can see images */
+  generateStructuredOutput<T>(system: string, user: string, responseSchema: object, validate: (raw: unknown) => T, opts?: { image?: { bytes: Uint8Array; mime: string } }): Promise<T>
   healthCheck(): Promise<{ ok: boolean; message: string; ms: number }>
 }

@@ -9,7 +9,13 @@ import type { ReceiptLine, ReceiptRead } from '@/lib/expenses/receipt-read'
 
 type Opt = { id: string; name: string }
 export type SupplierOpt = { id: string; name: string; trn?: string | null }
-export type ScanResult = { read: ReceiptRead; provider: string | null; engine: string; aiNote?: string | null; supplier: { id: string; name: string; trn: string | null } | null; duplicate: { id: string; spent_on: string; amount: number; vat_amount: number; reference: string } | null }
+const READERS: Record<string, string> = { paddleocr: 'PaddleOCR on this server, free', tesseract: 'local OCR on this server, free', text_layer: 'the PDF text, free', google_vision: 'Google Vision', ocrspace: 'OCR.Space', gemini: 'Google AI' }
+/** Who read the receipt, in words: e.g. "PaddleOCR on this server, free + Google AI (photo)". */
+const readBy = (r: { provider: string | null; engine: string; aiSaw?: 'photo' | 'text' | null }) => {
+  const ocr = r.provider === 'gemini' ? 'Google AI (photo)' : READERS[r.provider ?? ''] ?? 'OCR'
+  return r.engine === 'rules+gemini' && r.provider !== 'gemini' ? `${ocr} + Google AI${r.aiSaw === 'photo' ? ' (photo)' : ''}` : ocr
+}
+export type ScanResult = { read: ReceiptRead; provider: string | null; engine: string; aiSaw?: 'photo' | 'text' | null; aiNote?: string | null; supplier: { id: string; name: string; trn: string | null } | null; duplicate: { id: string; spent_on: string; amount: number; vat_amount: number; reference: string } | null }
 type Line = { description: string; quantity: string; unit_price: string; amount: string }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
@@ -98,7 +104,7 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
       {scan.result && <div className="mt-3 grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
         {preview ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={preview} alt="The receipt you scanned" className="max-h-44 w-full rounded-lg border border-border bg-surface object-contain" /> : <div className="grid h-20 place-items-center rounded-lg border border-border bg-surface text-xs text-muted">PDF</div>}
         <div className="min-w-0 space-y-2 text-[13px]" role="status" data-scan-summary>
-          <p className="flex items-start gap-1.5 font-medium"><ScanText size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden />Filled from the receipt ({scan.result.engine === 'rules+gemini' ? 'OCR + AI' : 'OCR'}). Tinted fields are suggestions: check each one against the receipt.</p>
+          <p className="flex items-start gap-1.5 font-medium"><ScanText size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden />Filled from the receipt ({readBy(scan.result)}). Tinted fields are suggestions: check each one against the receipt.</p>
           {scan.result.supplier && <p className="flex items-center gap-1.5 text-success"><CheckCircle2 size={14} aria-hidden />Matched your saved supplier {scan.result.supplier.name}</p>}
           {scan.result.duplicate && <p className="flex items-start gap-1.5 rounded-lg bg-danger/10 px-2.5 py-1.5 text-danger"><AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />Already saved: bill {scan.result.duplicate.reference} from this supplier on {scan.result.duplicate.spent_on} (AED {(scan.result.duplicate.amount + scan.result.duplicate.vat_amount).toFixed(2)}).</p>}
           {[...scan.result.read.warnings, ...(scan.result.aiNote ? [scan.result.aiNote] : [])].map(w => <p key={w} className="flex items-start gap-1.5 text-warning"><AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />{w}</p>)}

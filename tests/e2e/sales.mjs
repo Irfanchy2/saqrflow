@@ -156,7 +156,7 @@ try {
   await dlg().locator('input[type=file]').setInputFiles({ name: 'eid-photo.png', mimeType: 'image/png', buffer: fs.readFileSync('tests/fixtures/emirates-id-photo.png') })
   await dlg().getByRole('button', { name: 'Upload & analyse' }).click(); await p.waitForURL(/\/inbox\?batch=/, { timeout: 90000 }); await settle()
   const ocr = await one(`select i.status, i.doc_type, i.suggestion, x.fields, x.engine_version from document_inbox i join document_extractions x on x.inbox_id=i.id where i.company_id=$1 and i.file_name='eid-photo.png'`, [co])
-  ok(ocr?.doc_type === 'emirates_id' && ocr.engine_version.includes('tesseract'), `photo read on the server (engine ${ocr?.engine_version})`)
+  ok(ocr?.doc_type === 'emirates_id' && ocr.engine_version.includes('paddleocr'), `photo read on the server with PaddleOCR (engine ${ocr?.engine_version})`)
   ok(ocr?.fields?.document_number?.value === '784-1990-1234567-6' && ocr.fields.expiry_date?.value === '2027-01-09', 'ID number (check digit verified) and expiry extracted from the image')
   ok(ocr?.suggestion?.owner?.id === ayub, 'matched to employee Mohammed Ayub')
 
