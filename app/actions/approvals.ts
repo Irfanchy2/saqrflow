@@ -98,9 +98,15 @@ export async function savePortalSettings(_: ActionState, fd: FormData): Promise<
     const c = await getCtx(); need(c, 'settings.manage')
     const raw = str(fd, 'advance_limit_pct'), pct = raw ? Number(raw) : 0
     if (!Number.isFinite(pct) || pct < 0 || pct > 100) return { error: 'The advance limit is a percentage between 0 and 100.', fieldErrors: { advance_limit_pct: '0 to 100' } }
+    const hm = /^([01]\d|2[0-3]):[0-5]\d$/, ws = str(fd, 'work_start') ?? '08:00', we = str(fd, 'work_end') ?? '18:00', ot = Number(str(fd, 'overtime_max_hours') ?? 5)
+    if (!hm.test(ws) || !hm.test(we)) return { error: 'Enter the working hours as HH:MM.' }
+    if (we <= ws) return { error: 'The working day must end after it starts.', fieldErrors: { work_end: 'After the start' } }
+    if (!Number.isFinite(ot) || ot <= 0 || ot > 12) return { error: 'The overtime limit is between 0.5 and 12 hours.', fieldErrors: { overtime_max_hours: '0.5 to 12' } }
     const rows = [
       { key: 'portal.checkin', value: fd.get('checkin') === 'on' },
       { key: 'portal.advance_limit_pct', value: Math.round(pct) },
+      { key: 'portal.work_start', value: ws }, { key: 'portal.work_end', value: we },
+      { key: 'portal.overtime_max_hours', value: Math.round(ot * 2) / 2 },
     ].map(r => ({ ...r, company_id: c.company.id, updated_at: new Date().toISOString() }))
     const { error } = await c.supabase.from('app_settings').upsert(rows)
     if (error) throw error

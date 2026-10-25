@@ -9,6 +9,7 @@ import { redactForAi } from '@/lib/ai/redact'
 import { mergeAi, readReceipt, RECEIPT_PROMPT, RECEIPT_SCHEMA, type ReceiptRead } from './receipt-read'
 import { goodEnough, localReceiptOcr, receiptScore } from './local-ocr'
 import { findDuplicate, matchSupplier, type DuplicateHit, type SupplierHit } from './suppliers'
+import { findClaimDuplicate, matchClaimSupplier } from './claim-suppliers'
 
 export type ScanStage = 'local' | 'cloud' | 'ai'
 export interface ScanBody {
@@ -33,7 +34,11 @@ function remember(k: string, v: Cached) {
   while (cache.size > MAX) cache.delete(cache.keys().next().value!)
 }
 
-async function finish(c: Ctx, v: Cached, bytes: number, cached: boolean): Promise<ScanBody> {
+async function finish(c: Ctx, v: Cached, bytes: number, cached: boolean, claimant?: string): Promise<ScanBody> {
+  if (claimant) {     // an employee's claim: their own supplier memory + the company's match; duplicates among their own claims
+    const supplier = await matchClaimSupplier(c, claimant, v.read.supplier ?? null, v.read.trn ?? null)
+    return { ...v, bytes, cached, supplier, duplicate: await findClaimDuplicate(c, claimant, v.read.invoice_no ?? null) }
+  }
   const supplier = await matchSupplier(c, v.read.supplier ?? null, v.read.trn ?? null)
   const duplicate = v.read.invoice_no ? await findDuplicate(c, { supplierId: supplier?.id ?? null, supplierName: supplier?.name ?? v.read.supplier ?? null, reference: v.read.invoice_no }) : null
   return { ...v, bytes, cached, supplier, duplicate }
@@ -47,12 +52,12 @@ async function finish(c: Ctx, v: Cached, bytes: number, cached: boolean): Promis
  * reading is not good enough: the company's cloud OCR next, then Gemini (with the photo, so it can read what OCR missed).
  * Nothing is stored: the person reviews every field in the form and saves (with the receipt attached) themselves.
  */
-export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: string; name: string }, on: ScanEvents = {}): Promise<{ ok: true; body: ScanBody } | { ok: false; error: string }> {
+export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: string; name: string }, on: ScanEvents = {}, claimant?: string): Promise<{ ok: true; body: ScanBody } | { ok: false; error: string }> {
   const { bytes: buf, mime } = file
   const s = await aiSettings(c)
   const key = `${c.company.id}:${crypto.createHash('sha256').update(buf).digest('hex')}:${s.ocr}:${s.ai}:${s.redact}:${s.turbo}`
   const hit = cache.get(key), t0 = Date.now()
-  if (hit && Date.now() - hit.at < TTL) { console.info(`[receipt-scan] cached ${hit.v.provider} ${Date.now() - t0}ms`); return { ok: true, body: await finish(c, hit.v, buf.length, true) } }
+  if (hit && Date.now() - hit.at < TTL) { console.info(`[receipt-scan] cached ${hit.v.provider} ${Date.now() - t0}ms`); return { ok: true, body: await finish(c, hit.v, buf.length, true, claimant) } }
 
   type Reading = { text: string; read: ReceiptRead; provider: string }
   let best = null as Reading | null, localEngine: string | null = null
@@ -63,7 +68,7 @@ export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: strin
   const partial = async () => {        // the free reading goes to the screen now; a paid reader then checks it
     if (sentPartial || !best || !on.partial) return
     sentPartial = true
-    on.partial(await finish(c, { read: best.read, provider: best.provider, engine: 'rules', aiSaw: null, aiNote: null, chars: best.text.length, localEngine }, buf.length, false))
+    on.partial(await finish(c, { read: best.read, provider: best.provider, engine: 'rules', aiSaw: null, aiNote: null, chars: best.text.length, localEngine }, buf.length, false, claimant))
   }
 
   // 1. free: the PDF's text layer, or PaddleOCR on this server
@@ -113,5 +118,5 @@ export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: strin
   }
   const v: Cached = { read: done.read, provider: done.provider, engine, aiSaw, aiNote, chars: done.text.length, localEngine }
   if (!aiNote) remember(key, v)                           // a reading where a service failed is not kept: the next try may do better
-  return { ok: true, body: await finish(c, v, buf.length, false) }
+  return { ok: true, body: await finish(c, v, buf.length, false, claimant) }
 }

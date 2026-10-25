@@ -7,7 +7,8 @@ import { NewClaim } from '@/components/portal/new-claim'
 import { ClaimList, CLAIM_COLS, type ClaimRow } from '@/components/portal/claim-list'
 import { PortalCard, PortalStat } from '@/components/portal/stat'
 import { PrivateValue } from '@/components/portal/private-value'
-import { PunchButton } from '@/components/portal/punch'
+import { Today } from '@/components/portal/today'
+import { claimSuppliers } from '@/lib/expenses/claim-suppliers'
 
 export const metadata = { title: 'My portal' }
 
@@ -16,7 +17,8 @@ export default async function MyHome() {
   const { c, emp } = await getMe()
   if (!emp) return null
   const month = startOfMonth(c.today), monthEnd = endOfMonth(c.today), sb = c.supabase
-  const [settings, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
+  const [sups, settings, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
+    claimSuppliers(c, emp.id),
     portalSettings(c),
     sb.from('expense_claims').select('status,amount,vat_amount,spent_on').eq('employee_id', emp.id).limit(5000),
     sb.from('expense_claims').select(CLAIM_COLS).eq('employee_id', emp.id).order('created_at', { ascending: false }).limit(5),
@@ -33,6 +35,7 @@ export default async function MyHome() {
   const today = (att ?? []).find(a => a.work_date === c.today)
   const salary = comp ? Number(comp.monthly_salary) : null
   const bal = advanceBalance(salary, adv ?? [], settings.advanceLimitPct)
+  const lastAdv = (adv ?? []).filter(a => a.kind === 'advance').sort((a, b) => b.given_on.localeCompare(a.given_on))[0]
   const paidNow = (pays ?? []).find(p => p.period.slice(0, 7) === month.slice(0, 7) && p.paid_on), last = (pays ?? []).find(p => p.paid_on)
   const hour = Number(localHm(new Date(), c.company.timezone).slice(0, 2))
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -48,13 +51,10 @@ export default async function MyHome() {
       <AlertTriangle size={18} aria-hidden className="shrink-0" />{attention === 1 ? 'One expense needs a correction from you.' : `${attention} expenses need a correction from you.`}<span className="ms-auto shrink-0 underline-offset-2">Fix now</span></Link>}
 
     <PortalCard title="Add an expense" sub="Photograph the receipt: the details fill in for you to check.">
-      <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} /></div>
+      <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} /></div>
     </PortalCard>
 
-    {settings.checkin && <PortalCard title="Today" sub={today?.check_in_at ? `Checked in at ${clock(today.check_in_at, tz)}${today.check_out_at ? ` · out at ${clock(today.check_out_at, tz)}` : ''}` : today && today.status !== 'present' ? `Recorded as ${today.status.replace('_', ' ')}` : 'Not checked in yet'}>
-      <div className="px-4 pb-4 sm:px-5" data-today>{!today?.check_in_at ? (today && ['leave', 'holiday'].includes(today.status) ? <p className="text-[14px] text-muted">No check-in needed today.</p> : <PunchButton kind="in" />)
-        : !today.check_out_at ? <PunchButton kind="out" /> : <p className="flex items-center gap-2 text-[14px] font-medium text-success"><CheckCircle2 size={17} aria-hidden />Day complete. See you tomorrow.</p>}</div>
-    </PortalCard>}
+    {settings.checkin && <Today c={c} empId={emp.id} settings={settings} />}
 
     <div className="grid grid-cols-2 gap-3" data-expense-stats>
       <PortalStat label={`Expenses in ${monthName(month).split(' ')[0]}`} icon={Receipt} tone="blue" testId="month-count" href="/me/expenses"
@@ -72,6 +72,8 @@ export default async function MyHome() {
         <div><dt className="text-[12.5px] text-muted">Monthly salary</dt><dd className="mt-1 text-[19px] font-semibold tabular-nums">{salary !== null ? <PrivateValue><Money value={salary} /></PrivateValue> : <span className="text-[14px] font-normal text-muted">Not set</span>}</dd></div>
         <div><dt className="text-[12.5px] text-muted">{monthName(month)}</dt><dd className="mt-1.5">{paidNow ? <Badge tone="green">Paid {formatShortDate(paidNow.paid_on!)}</Badge> : <Badge tone="amber">Not paid yet</Badge>}</dd></div>
         <div><dt className="text-[12.5px] text-muted">Last payment</dt><dd className="mt-1 text-[14px] font-medium">{last ? <><span className="block">{monthName(last.period)}</span><PrivateValue><Money value={last.amount} /></PrivateValue></> : <span className="font-normal text-muted">None yet</span>}</dd></div>
+        {lastAdv && <div className="col-span-2 flex items-center justify-between gap-3 rounded-xl border border-border/80 px-3.5 py-2.5" data-last-advance><dt className="text-[13px] text-muted">Last advance received</dt>
+          <dd className="text-end text-[13.5px] font-medium">{formatShortDate(lastAdv.given_on)} · <PrivateValue><Money value={lastAdv.amount} /></PrivateValue></dd></div>}
         <div><dt className="text-[12.5px] text-muted">Advances to repay</dt><dd className="mt-1 text-[14px] font-medium"><PrivateValue><Money value={bal.outstanding} /></PrivateValue></dd></div>
         {bal.available !== null && <div className="col-span-2 flex items-center gap-3 rounded-xl bg-surface-2 px-3.5 py-3"><Banknote size={18} className="shrink-0 text-success" aria-hidden />
           <span className="text-[13.5px]">Advance you can still ask for: <b className="font-semibold"><PrivateValue><Money value={bal.available} /></PrivateValue></b></span></div>}

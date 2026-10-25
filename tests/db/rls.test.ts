@@ -1290,12 +1290,14 @@ describe('Employee portal & employee expense claims (0030)', () => {
   it('self check-in / check-out: off by default, then once each per day, in order', async () => {
     await fails(as(U.empA, `select attendance_punch('in')`), /not turned on/)
     await sup(`update app_settings set value = 'true'::jsonb where company_id = $1 and key = 'portal.checkin'`, [A])
+    // a working day that covers "now" whenever the suite runs (0031: check-in closes at the end of the working day)
+    await sup(`insert into app_settings(company_id,key,value) values ($1,'portal.work_start','"00:00"'::jsonb),($1,'portal.work_end','"23:59"'::jsonb) on conflict (company_id,key) do update set value = excluded.value`, [A])
     await fails(as(U.empA, `select attendance_punch('out')`), /Check in first/)
     const r = (await as(U.empA, `select * from attendance_punch('in')`)).rows[0]
     expect(r.status).toBe('present'); expect(r.source).toBe('self'); expect(r.check_in_at).not.toBeNull()
     await fails(as(U.empA, `select attendance_punch('in')`), /already checked in/)
     expect((await as(U.empA, `select check_out_at from attendance_punch('out')`)).rows[0].check_out_at).not.toBeNull()
-    await fails(as(U.empA, `select attendance_punch('out')`), /already checked out/)
+    await fails(as(U.empA, `select attendance_punch('out')`), /already ended/)
     await fails(as(U.hrA, `select attendance_punch('in')`), /not linked/)
   })
 
@@ -1351,5 +1353,56 @@ describe('Employee portal & employee expense claims (0030)', () => {
     expect((await as(U.accA, `select count(*)::int n from documents where id = $1`, [d])).rows[0].n).toBe(1)
     expect((await as(U.pmA, `select count(*)::int n from documents where id = $1`, [d])).rows[0].n).toBe(0)
     expect((await as(U.ownerB, `select count(*)::int n from documents where id = $1`, [d])).rows[0].n).toBe(0)
+  })
+})
+
+describe('Working hours, overtime and payment notices (0031)', () => {
+  const dubaiToday = async () => (await sup(`select (now() at time zone 'Asia/Dubai')::date::text d`)).rows[0].d as string
+  beforeAll(async () => {
+    await sup(`update app_settings set value = 'true'::jsonb where company_id = $1 and key = 'portal.checkin'`, [A])
+    await sup(`delete from attendance_records where employee_id = $1`, [empRecA])
+  })
+  it('a check-in left open closes at that day\'s end time; forgotten overtime stops at the limit', async () => {
+    await sup(`insert into app_settings(company_id,key,value) values ($1,'portal.work_start','"08:00"'::jsonb),($1,'portal.work_end','"18:00"'::jsonb),($1,'portal.overtime_max_hours','5'::jsonb) on conflict (company_id,key) do update set value = excluded.value`, [A])
+    await sup(`insert into attendance_records(company_id,employee_id,work_date,status,check_in_at,overtime_start_at,source)
+      values ($1,$2,'2026-01-05','present','2026-01-05 08:02+04','2026-01-05 18:30+04','self')`, [A, empRecA])
+    expect((await as(U.empA, `select attendance_autoclose() n`)).rows[0].n).toBeGreaterThanOrEqual(2)
+    const r = (await sup(`select check_out_at, overtime_end_at, overtime_hours::float h from attendance_records where employee_id=$1 and work_date='2026-01-05'`, [empRecA])).rows[0]
+    expect(new Date(r.check_out_at).toISOString()).toBe('2026-01-05T14:00:00.000Z')   // 18:00 Dubai
+    expect(new Date(r.overtime_end_at).toISOString()).toBe('2026-01-05T19:30:00.000Z') // 18:30 + 5 h
+    expect(r.h).toBe(5)
+    // another company's open records are not touched by this company's users
+    expect((await as(U.ownerB, `select attendance_autoclose() n`)).rows[0].n).toBe(0)
+  })
+  it('overtime starts only after the working day, once a day, and stops on request', async () => {
+    const today = await dubaiToday()
+    await sup(`insert into app_settings(company_id,key,value) values ($1,'portal.work_start','"00:00"'::jsonb),($1,'portal.work_end','"00:01"'::jsonb) on conflict (company_id,key) do update set value = excluded.value`, [A])
+    await fails(as(U.empA, `select attendance_punch('in')`), /working day ended/)
+    await fails(as(U.empA, `select attendance_punch('ot_start')`), /Check in first/)
+    await sup(`insert into attendance_records(company_id,employee_id,work_date,status,check_in_at,source) values ($1,$2,$3,'present',($3::date + time '00:00') at time zone 'Asia/Dubai','self')`, [A, empRecA, today])
+    const s1 = (await as(U.empA, `select * from attendance_punch('ot_start')`)).rows[0]
+    expect(s1.overtime_start_at).not.toBeNull(); expect(s1.check_out_at).not.toBeNull()   // the day was closed at its end time
+    await fails(as(U.empA, `select attendance_punch('ot_start')`), /already recorded/)
+    const s2 = (await as(U.empA, `select * from attendance_punch('ot_stop')`)).rows[0]
+    expect(s2.overtime_end_at).not.toBeNull(); expect(Number(s2.overtime_hours)).toBeLessThan(0.1)
+    await fails(as(U.empA, `select attendance_punch('ot_stop')`), /no overtime running/)
+  })
+  it('overtime cannot start during the working day', async () => {
+    await sup(`delete from attendance_records where employee_id = $1 and work_date = $2::date`, [empRecA, await dubaiToday()])
+    await sup(`insert into app_settings(company_id,key,value) values ($1,'portal.work_start','"00:00"'::jsonb),($1,'portal.work_end','"23:59"'::jsonb) on conflict (company_id,key) do update set value = excluded.value`, [A])
+    await as(U.empA, `select * from attendance_punch('in')`)
+    await fails(as(U.empA, `select attendance_punch('ot_start')`), /starts after the working day/)
+  })
+  it('the employee is told when HR pays an advance or salary (no amounts in the notice)', async () => {
+    await sup(`delete from in_app_notifications where link = '/me/salary'`)   // earlier tests' payments notified too
+    await as(U.hrA, `insert into employee_advances(company_id,employee_id,kind,amount,given_on) values ($1,$2,'advance',750,'2026-10-20')`, [A, empRecA])
+    await as(U.hrA, `insert into salary_payments(company_id,employee_id,period,amount) values ($1,$2,'2026-11-01',2500)`, [A, empRecA])
+    await as(U.hrA, `update salary_payments set paid_on = '2026-11-30' where employee_id = $1 and period = '2026-11-01'`, [empRecA])
+    const n = (await as(U.empA, `select title, body from in_app_notifications where link = '/me/salary' order by created_at`)).rows
+    expect(n.map(x => x.title)).toEqual(['Salary advance paid to you', 'Salary paid: November 2026'])
+    expect(n.every(x => !/750|2500|2,500/.test(x.body))).toBe(true)
+    // an employee without a login, or other people, get nothing
+    await as(U.hrA, `insert into employee_advances(company_id,employee_id,kind,amount) values ($1,$2,'advance',10)`, [A, empRecA2])
+    expect((await as(U.hrA, `select count(*)::int n from in_app_notifications where link = '/me/salary'`)).rows[0].n).toBe(0)
   })
 })

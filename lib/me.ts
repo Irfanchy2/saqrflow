@@ -9,7 +9,7 @@ export interface MyEmployee {
   id: string; employee_no: string; full_name: string; department: string | null; designation: string | null; phone: string | null
   nationality: string | null; joining_date: string | null; status: string; work_location: string | null; photo_path: string | null
 }
-export interface PortalSettings { checkin: boolean; advanceLimitPct: number }
+export interface PortalSettings { checkin: boolean; advanceLimitPct: number; workStart: string; workEnd: string; overtimeMaxHours: number }
 
 /** The signed-in user and the employee record linked to their login (null when the login is not linked to one). */
 export const getMe = cache(async (): Promise<{ c: Ctx; emp: MyEmployee | null }> => {
@@ -22,10 +22,14 @@ export const getMe = cache(async (): Promise<{ c: Ctx; emp: MyEmployee | null }>
 
 /** Company switches for the portal (Settings → Employee portal). */
 export async function portalSettings(c: Ctx): Promise<PortalSettings> {
-  const { data } = await c.supabase.from('app_settings').select('key,value').in('key', ['portal.checkin', 'portal.advance_limit_pct'])
+  const { data } = await c.supabase.from('app_settings').select('key,value').in('key', ['portal.checkin', 'portal.advance_limit_pct', 'portal.work_start', 'portal.work_end', 'portal.overtime_max_hours'])
   const m = Object.fromEntries((data ?? []).map(r => [r.key, r.value]))
-  const pct = Number(m['portal.advance_limit_pct'])
-  return { checkin: m['portal.checkin'] === true, advanceLimitPct: Number.isFinite(pct) && pct > 0 ? Math.min(100, pct) : 0 }
+  const pct = Number(m['portal.advance_limit_pct']), ot = Number(m['portal.overtime_max_hours'])
+  const hm = (v: unknown, d: string) => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : d)
+  let workStart = hm(m['portal.work_start'], '08:00'), workEnd = hm(m['portal.work_end'], '18:00')
+  if (workEnd <= workStart) { workStart = workStart < '17:00' ? workStart : '17:00'; workEnd = '18:00' }   // same rule as attendance_settings()
+  return { checkin: m['portal.checkin'] === true, advanceLimitPct: Number.isFinite(pct) && pct > 0 ? Math.min(100, pct) : 0, workStart, workEnd,
+    overtimeMaxHours: Number.isFinite(ot) && ot > 0 && ot <= 12 ? ot : 5 }
 }
 
 /** Advances not yet settled, and how much more may be asked for (a share of the monthly salary set by the company). */
@@ -57,3 +61,6 @@ export const ATTENDANCE: Record<string, { label: string; tone: 'green' | 'red' |
   present: { label: 'Present', tone: 'green' }, absent: { label: 'Absent', tone: 'red' }, half_day: { label: 'Half day', tone: 'amber' },
   leave: { label: 'Leave', tone: 'blue' }, holiday: { label: 'Holiday', tone: 'neutral' },
 }
+
+/** Hours between two times as "3 h 05 min". */
+export const duration = (ms: number) => { const m = Math.max(0, Math.floor(ms / 60000)); return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` }

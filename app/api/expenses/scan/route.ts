@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
   const c = await getCtx().catch(() => null)
   if (!c) return NextResponse.json({ error: 'Your session has expired. Sign in again.' }, { status: 401 })
   // staff who add expenses, or an employee (Employee Portal) reading the receipt for their own expense claim
-  if (!(c.can('records.edit') && c.can('finance.view')) && !(await getMe()).emp) return NextResponse.json({ error: 'You are not allowed to add expenses.' }, { status: 403 })
+  const staff = c.can('records.edit') && c.can('finance.view'), claimant = staff ? undefined : (await getMe()).emp?.id
+  if (!staff && !claimant) return NextResponse.json({ error: 'You are not allowed to add expenses.' }, { status: 403 })
   if (!(await rateLimit(`receipt-scan:${c.userId}`, 40, 600))) return NextResponse.json({ error: 'Too many receipts read in the last few minutes. Wait a little, or enter the details by hand.' }, { status: 429 })
   const f = (await req.formData().catch(() => null))?.get('file')
   if (!(f instanceof File) || !f.size) return NextResponse.json({ error: 'Choose a receipt photo or PDF.' }, { status: 400 })
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   const file = { bytes: new Uint8Array(await f.arrayBuffer()), mime, name: f.name }
 
   if (!(req.headers.get('accept') ?? '').includes('application/x-ndjson')) {
-    const r = await scanReceipt(c, file)
+    const r = await scanReceipt(c, file, {}, claimant)
     return r.ok ? NextResponse.json(r.body) : NextResponse.json({ error: r.error }, { status: 422 })
   }
   const enc = new TextEncoder()
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     async start(ctrl) {
       const send = (o: object) => ctrl.enqueue(enc.encode(JSON.stringify(o) + '\n'))
       try {
-        const r = await scanReceipt(c, file, { stage: stage => send({ type: 'stage', stage }), partial: b => send({ type: 'partial', ...b }) })
+        const r = await scanReceipt(c, file, { stage: stage => send({ type: 'stage', stage }), partial: b => send({ type: 'partial', ...b }) }, claimant)
         send(r.ok ? { type: 'final', ...r.body } : { type: 'error', error: r.error })
       } catch (e) {
         console.error('[receipt-scan]', e)

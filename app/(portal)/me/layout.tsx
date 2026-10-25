@@ -41,8 +41,10 @@ export default async function PortalLayout({ children }: { children: React.React
         <span className="grid h-10 w-10 place-items-center rounded-full bg-surface/80 shadow-card ring-1 ring-white/70 dark:ring-white/[.06]"><NotificationBell items={notes ?? []} unread={unread ?? 0} /></span>
         <form action={signOut}><button aria-label="Sign out" title="Sign out" className="grid h-10 w-10 cursor-pointer place-items-center rounded-full text-muted transition-colors hover:bg-fg/[.05] hover:text-fg"><LogOut size={18} aria-hidden /></button></form>
       </div>
-      {emp && <PortalNav />}
+      {emp && <PortalNav part="tabs" />}
     </header>
+    {/* the phone tab bar lives outside the header: the header's backdrop blur would pin a fixed bar to the header itself */}
+    {emp && <PortalNav part="bar" />}
     <main id="main" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-4 sm:pb-12 sm:pt-6">
       {emp ? children : <div className="mt-10 rounded-2xl border border-border/80 bg-surface shadow-card">
         <EmptyState icon={UserRound} title="Your login is not linked to an employee record yet"
