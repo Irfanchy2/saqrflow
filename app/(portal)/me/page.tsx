@@ -9,6 +9,7 @@ import { PortalCard, PortalStat } from '@/components/portal/stat'
 import { PrivateValue } from '@/components/portal/private-value'
 import { Today } from '@/components/portal/today'
 import { claimSuppliers } from '@/lib/expenses/claim-suppliers'
+import { companyCards } from '@/lib/cards'
 
 export const metadata = { title: 'My portal' }
 
@@ -17,7 +18,8 @@ export default async function MyHome() {
   const { c, emp } = await getMe()
   if (!emp) return null
   const month = startOfMonth(c.today), monthEnd = endOfMonth(c.today), sb = c.supabase
-  const [sups, settings, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
+  const [cards, sups, settings, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
+    companyCards(c),
     claimSuppliers(c, emp.id),
     portalSettings(c),
     sb.from('expense_claims').select('status,amount,vat_amount,spent_on').eq('employee_id', emp.id).limit(5000),
@@ -51,7 +53,7 @@ export default async function MyHome() {
       <AlertTriangle size={18} aria-hidden className="shrink-0" />{attention === 1 ? 'One expense needs a correction from you.' : `${attention} expenses need a correction from you.`}<span className="ms-auto shrink-0 underline-offset-2">Fix now</span></Link>}
 
     <PortalCard title="Add an expense" sub="Photograph the receipt: the details fill in for you to check.">
-      <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} /></div>
+      <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} cards={cards} /></div>
     </PortalCard>
 
     {settings.checkin && <Today c={c} empId={emp.id} settings={settings} />}

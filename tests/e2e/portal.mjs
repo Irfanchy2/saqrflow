@@ -63,6 +63,15 @@ try {
   ok((await one(`select value::text v from app_settings where company_id=$1 and key='portal.checkin'`, [co]))?.v === 'true', 'portal.checkin saved as true')
   ok((await one(`select value::text v from app_settings where company_id=$1 and key='portal.work_end'`, [co]))?.v === '"23:59"' && (await one(`select value::text v from app_settings where company_id=$1 and key='portal.overtime_max_hours'`, [co]))?.v === '5', 'working hours and overtime limit saved')
   ok((await one(`select value::text v from app_settings where company_id=$1 and key='portal.advance_limit_pct'`, [co]))?.v === '25', 'advance limit saved (25%)')
+  const cards = p.locator('#company-cards')
+  for (const [label, num, kind] of [['Company credit card', '4111 2222 3333 249865', 'credit'], ['Fuel card', '1234', 'debit']]) {
+    await cards.locator('input[name=label]').fill(label); await cards.locator('input[name=last4]').fill(num.slice(-4)); await cards.locator('select[name=kind]').selectOption(kind)
+    await cards.getByRole('button', { name: 'Add card' }).click(); await settle(p, 900)
+  }
+  const cardRows = (await db.query(`select id, label, last4, kind from company_cards where company_id=$1 order by created_at`, [co])).rows
+  ok(cardRows.length === 2 && cardRows[0].last4 === '9865' && cardRows[1].kind === 'debit', 'Settings → Company cards: two cards saved (last 4 digits only)')
+  ok((await cards.innerText()).includes('••9865'), 'the card list shows ••9865')
+  const card9865 = cardRows[0].id
 
   console.log('\n[2] Admin gives Rashid portal access (invite by email → Employee login linked to his record)')
   await p.goto(`${BASE}/employees/${emp}`); await settle()
@@ -173,20 +182,31 @@ try {
 
   console.log('\n[7] By hand, and the same receipt twice is refused')
   await m.goto(`${BASE}/me/expenses`); await settle(m)
-  const manual = async (ref, desc, amount) => {
+  const manual = async (ref, desc, amount, card) => {
     await m.locator('[data-claim-manual]:visible').first().click(); await settle(m, 300)
     await dlg(m).locator('input[name=supplier_name]').fill('Al Madina Hypermarket'); await dlg(m).getByLabel('Invoice / receipt no.').fill(ref)
     await dlg(m).getByLabel('Description *').fill(desc); await dlg(m).getByLabel('Amount excl. VAT (AED) *').fill(amount); await dlg(m).getByLabel('Category *').selectOption('food')
+    if (card) {
+      ok(await dlg(m).locator('select[name=card_id]').count() === 0, 'no card question for a cash payment')
+      await dlg(m).locator('select[name=paid_with]').selectOption('card')
+      const sel = dlg(m).locator('select[name=card_id]')
+      ok(await sel.isVisible() && await sel.evaluate(el => el.required) && await sel.inputValue() === '', 'paid by card: “Which card?” appears, required, nothing pre-chosen with two cards')
+      ok((await sel.locator('option').allInnerTexts()).some(t => t.includes('Company credit card ••9865')), 'the card list shows “Company credit card ••9865”')
+      await dlg(m).getByRole('button', { name: 'Send for approval' }).click(); await settle(m, 500)
+      ok((await one(`select count(*)::int n from expense_claims where employee_id=$1 and reference=$2`, [emp, ref])).n === 0, 'not sent until the card is chosen')
+      await sel.selectOption(card)
+    }
     await dlg(m).getByRole('button', { name: 'Send for approval' }).click(); await settle(m, 1000)
   }
   await m.locator('[data-claim-manual]:visible').first().click(); await settle(m, 300)
   await dlg(m).locator('input[name=supplier_name]').fill('ENOC SERVICE STATION'); await m.waitForTimeout(200)
   ok(await dlg(m).getByLabel('Supplier TRN').inputValue() === '100345678900003', 'a supplier used before fills in its TRN by itself')
   await m.keyboard.press('Escape'); await settle(m, 300)
-  await manual('AM-501', 'Water and snacks for crew', '80'); await manual('AM-777', 'Cold drinks for site', '20')
+  await manual('AM-501', 'Water and snacks for crew', '80', card9865); await manual('AM-777', 'Cold drinks for site', '20')
   await manual('am 501', 'Water again', '80')
   ok(/already sent/i.test(await dlg(m).innerText()) && (await one(`select count(*)::int n from expense_claims where employee_id=$1 and lower(reference) like 'am%501'`, [emp])).n === 1, 'second claim for receipt AM-501 refused: “You already sent receipt…”')
   await m.keyboard.press('Escape'); await settle(m, 300)
+  ok((await one(`select paid_with, card_id from expense_claims where employee_id=$1 and reference='AM-501'`, [emp]))?.card_id === card9865, 'card claim saved with the chosen card')
   const c2 = (await one(`select id from expense_claims where employee_id=$1 and reference='AM-501'`, [emp])).id, c3 = (await one(`select id from expense_claims where employee_id=$1 and reference='AM-777'`, [emp])).id
   await m.goto(`${BASE}/me/expenses`); await settle(m)
   const list = await m.locator('[data-claim-list]').innerText()
@@ -217,20 +237,28 @@ try {
   await m.goto(`${BASE}/me/expenses/${c1.id}`); await settle(m)
   ok((await m.locator('[data-decision-note]').innerText()).includes('litres'), 'the approver’s note is shown on the claim')
   await m.getByRole('button', { name: 'Correct and send again' }).click(); await settle(m, 300)
-  await dlg(m).getByLabel('Notes').fill('40 litres diesel'); await dlg(m).getByRole('button', { name: 'Send for approval' }).click(); await settle(m, 1100)
-  const c1b = await one(`select status, notes, amount::float from expense_claims where id=$1`, [c1.id])
+  await dlg(m).getByLabel('Notes').fill('40 litres diesel')
+  await dlg(m).locator('select[name=paid_with]').selectOption('card'); await dlg(m).locator('select[name=card_id]').selectOption(card9865)
+  await dlg(m).getByRole('button', { name: 'Send for approval' }).click(); await settle(m, 1100)
+  const c1b = await one(`select status, notes, amount::float, card_id from expense_claims where id=$1`, [c1.id])
+  ok(c1b.card_id === card9865, 'corrected to a card payment with the card chosen')
+  await m.goto(`${BASE}/me/expenses/${c1.id}`); await settle(m)
+  ok((await m.locator('main').innerText()).includes('Company credit card ••9865'), 'the employee sees which card was used')
   ok(c1b.status === 'pending' && c1b.notes === '40 litres diesel' && c1b.amount === 124, 'corrected and pending again (amount kept)')
   ok((await one(`select count(*)::int n from expense_claim_events where claim_id=$1 and kind='resubmitted'`, [c1.id])).n === 1, 'audit trail: resubmitted')
 
   const proj = (await one(`insert into projects(company_id,name,status) values ($1,'Villa 214 Fit-out','active') returning id`, [co])).id
   // two approver screens open on the same claim (or a double click): both press Approve
   const p2 = watch(await ctx.newPage())
-  await p.goto(`${BASE}/expenses?tab=claims&open=${c1.id}`); await settle(); await p2.goto(`${BASE}/expenses?tab=claims&open=${c1.id}`); await settle(p2)
+  await p.goto(`${BASE}/expenses?tab=claims&open=${c1.id}`); await settle()
+  ok((await p.locator(`[data-claim-detail="${c1.id}"]`).innerText()).includes('••9865'), 'the approver sees which card was used')
+  await p2.goto(`${BASE}/expenses?tab=claims&open=${c1.id}`); await settle(p2)
   await p.locator('[data-claim-decide] select[name=project_id]').selectOption(proj)
   await p.locator('[data-claim-decide]').getByRole('button', { name: 'Save decision' }).click(); await settle(p, 1200)
   await p2.locator('[data-claim-decide]').getByRole('button', { name: 'Save decision' }).click(); await settle(p2, 1200); await p2.close()
   const ap = await one(`select c.status, c.expense_id, e.id eid, e.employee_id, e.receipt_document_id, e.project_id, e.approval_status, e.verified_at, e.payment_status, e.amount::float, e.vat_amount::float, e.category, e.supplier_id, e.expense_claim_id from expense_claims c left join project_expenses e on e.id=c.expense_id where c.id=$1`, [c1.id])
   ok(ap.status === 'approved' && ap.eid && ap.expense_claim_id === c1.id, 'approved: linked both ways to one new company expense')
+  ok((await one(`select card_id from project_expenses where id=$1`, [ap.eid])).card_id === card9865, 'the card goes onto the company expense')
   ok(ap.employee_id === emp && ap.receipt_document_id === c1.receipt_document_id && ap.project_id === proj, 'expense carries the employee, the original receipt and the chosen project')
   ok(ap.approval_status === 'approved' && ap.verified_at && ap.payment_status === 'paid' && ap.amount === 124 && ap.vat_amount === 6.2 && ap.category === 'fuel' && ap.supplier_id, 'verified, approved, paid, same amounts; supplier linked')
   ok((await one(`select count(*)::int n from project_expenses where company_id=$1`, [co])).n === exp1Before + 1, 'exactly one expense added')

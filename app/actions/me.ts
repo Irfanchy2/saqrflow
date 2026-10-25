@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { scanUpload, sha256Hex, storagePath, validateUpload } from '@/lib/files'
 import { securityEvent } from '@/lib/security'
 import { normRef } from '@/lib/expenses/suppliers'
+import { companyCards } from '@/lib/cards'
 
 // Employee Portal actions. Everything runs as the signed-in employee (RLS: only their own claims, only while pending or
 // sent back for correction; decisions are impossible from here). The receipt file is the one exception: after it is
@@ -31,14 +32,14 @@ const claimSchema = z.object({
   reference: z.string().max(120).optional(), supplier_name: z.string().max(200).optional(),
   supplier_trn: z.string().transform(s => s.replace(/[\s-]/g, '')).pipe(z.string().regex(/^\d{15}$/, 'A UAE TRN has 15 digits')).optional(),
   quantity: z.coerce.number().positive('Quantity must be more than zero').max(1e7).optional(),
-  paid_with: z.enum(['cash', 'card', 'bank_transfer', 'other']).default('cash'),
+  paid_with: z.enum(['cash', 'card', 'bank_transfer', 'other']).default('cash'), card_id: z.string().uuid('Choose the card').optional(),
   notes: z.string().max(2000).optional(), idempotency_key: z.string().uuid().optional(),
   items: jsonOf(z.array(line).max(200), []), source: z.enum(['manual', 'scan']).default('manual'),
   ocr_suggested: jsonOf(z.record(z.string(), z.unknown()).refine(o => JSON.stringify(o).length <= 20000, 'Scan data too large'), null as Record<string, unknown> | null),
   verified: z.string().optional(),
 }).refine(v => v.vat_amount <= v.amount, { message: 'VAT looks larger than the amount. Enter the amount before VAT', path: ['vat_amount'] })
   .refine(v => v.source !== 'scan' || v.verified === 'on', { message: 'Tick “I checked these details against the receipt” before sending a scanned receipt', path: ['verified'] })
-const KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_name', 'supplier_trn', 'quantity', 'paid_with', 'notes', 'idempotency_key', 'items', 'source', 'ocr_suggested', 'verified']
+const KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_name', 'supplier_trn', 'quantity', 'paid_with', 'card_id', 'notes', 'idempotency_key', 'items', 'source', 'ocr_suggested', 'verified']
 type Claim = z.infer<typeof claimSchema>
 
 const touch = () => { revalidatePath('/me'); revalidatePath('/me/expenses'); revalidatePath('/expenses') }
@@ -47,8 +48,16 @@ const invalid = (e: z.ZodError): ActionState => ({ error: e.issues[0].message, f
 const fields = (v: Claim) => ({
   spent_on: v.spent_on, category: v.category, description: v.description, amount: v.amount, vat_amount: v.vat_amount,
   reference: v.reference ?? null, supplier_name: v.supplier_name ?? null, supplier_trn: v.supplier_trn ?? null, quantity: v.quantity ?? null,
-  paid_with: v.paid_with, notes: v.notes ?? null, items: v.items,
+  paid_with: v.paid_with, card_id: v.paid_with === 'card' ? v.card_id ?? null : null, notes: v.notes ?? null, items: v.items,
 })
+/** Paid by card: which company card is required once the company has listed its cards (the database checks it again). */
+async function cardProblem(c: Ctx, v: Claim): Promise<ActionState | null> {
+  if (v.paid_with !== 'card') return null
+  const cards = await companyCards(c)
+  if (!cards.length) return null
+  if (!v.card_id || !cards.some(k => k.id === v.card_id)) return { error: 'Choose which card you paid with.', fieldErrors: { card_id: 'Required for a card payment' } }
+  return null
+}
 
 /** Reads and checks a receipt file (type from its bytes, size, active content) before anything is written. */
 async function readReceipt(c: Ctx, fd: FormData): Promise<{ file: File; buf: Uint8Array; mime: string } | { error: string } | null> {
@@ -105,6 +114,7 @@ export async function submitClaim(_: ActionState, fd: FormData): Promise<ActionS
     const r = parse(fd); if (!r.success) return invalid(r.error)
     const v = r.data
     if (v.spent_on > c.today) return { error: 'The expense date cannot be in the future.', fieldErrors: { spent_on: 'In the future' } }
+    const cardErr = await cardProblem(c, v); if (cardErr) return cardErr
     if (v.idempotency_key) { const { data: dup } = await c.supabase.from('expense_claims').select('id').eq('idempotency_key', v.idempotency_key).maybeSingle(); if (dup) return { ok: true, message: 'Expense already sent for approval.' } }
     const twice = await alreadyClaimed(c, emp.id, v)
     if (twice) return { error: `You already sent receipt ${v.reference} (${twice.spent_on}). Open it under My expenses instead of sending it again.`, fieldErrors: { reference: 'Already sent' } }
@@ -138,6 +148,7 @@ export async function updateClaim(id: string, _: ActionState, fd: FormData): Pro
     const r = parse(fd); if (!r.success) return invalid(r.error)
     const v = r.data
     if (v.spent_on > c.today) return { error: 'The expense date cannot be in the future.', fieldErrors: { spent_on: 'In the future' } }
+    const cardErr = await cardProblem(c, v); if (cardErr) return cardErr
     const twice = await alreadyClaimed(c, emp.id, v, id)
     if (twice) return { error: `You already sent receipt ${v.reference} in another expense (${twice.spent_on}).`, fieldErrors: { reference: 'Already sent' } }
     const receipt = await readReceipt(c, fd)

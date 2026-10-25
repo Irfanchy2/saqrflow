@@ -24,7 +24,7 @@ const UUID = /^[0-9a-f-]{36}$/i
 export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<string, string | undefined>; projects: { id: string; name: string }[] }) {
   const canDecide = c.can('expenses.approve') || c.can('approvals.decide')
   const status = FILTERS.some(([k]) => k === sp.status) ? sp.status! : 'pending'
-  const cols = 'id,employee_id,spent_on,category,supplier_name,supplier_trn,reference,description,amount,vat_amount,paid_with,quantity,items,notes,status,source,receipt_document_id,decision_note,decided_at,expense_id,created_at,employee:employees(full_name,employee_no,user_id)'
+  const cols = 'id,employee_id,spent_on,category,supplier_name,supplier_trn,reference,description,amount,vat_amount,paid_with,card:company_cards(label,last4),quantity,items,notes,status,source,receipt_document_id,decision_note,decided_at,expense_id,created_at,employee:employees(full_name,employee_no,user_id)'
   let q = c.supabase.from('expense_claims').select(cols)
   if (status !== 'all') q = q.eq('status', status)
   const [{ data: rows }, { data: counts }, focusRes] = await Promise.all([
@@ -57,7 +57,7 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
         <div className="space-y-4 min-w-0">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[14px] sm:grid-cols-3">
             {([['Total', <Money key="t" value={Number(f.amount) + Number(f.vat_amount)} className="font-semibold" />], ['Excl. VAT', <Money key="a" value={f.amount} />], ['VAT', <Money key="v" value={f.vat_amount} />],
-              ['Date', formatShortDate(f.spent_on)], ['Category', EXPENSE_CATS[f.category] ?? f.category], ['Paid with', PAID[f.paid_with] ?? f.paid_with],
+              ['Date', formatShortDate(f.spent_on)], ['Category', EXPENSE_CATS[f.category] ?? f.category], ['Paid with', `${PAID[f.paid_with] ?? f.paid_with}${f.card ? ` · ${f.card.label} ••${f.card.last4}` : ''}`],
               ['Receipt no.', f.reference ?? '—'], ['Supplier TRN', f.supplier_trn ?? '—'], ['Entered', f.source === 'scan' ? 'Scanned receipt' : 'By hand']] as [string, React.ReactNode][]).map(([k, v]) =>
               <div key={k} className="min-w-0"><dt className="text-[12px] text-muted">{k}</dt><dd className="mt-0.5 font-medium [overflow-wrap:anywhere]">{v}</dd></div>)}
           </dl>
