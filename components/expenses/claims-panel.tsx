@@ -24,7 +24,7 @@ const UUID = /^[0-9a-f-]{36}$/i
 export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<string, string | undefined>; projects: { id: string; name: string }[] }) {
   const canDecide = c.can('expenses.approve') || c.can('approvals.decide')
   const status = FILTERS.some(([k]) => k === sp.status) ? sp.status! : 'pending'
-  const cols = 'id,employee_id,spent_on,category,supplier_name,supplier_trn,reference,description,amount,vat_amount,paid_with,card:company_cards(label,last4),quantity,items,notes,status,source,receipt_document_id,decision_note,decided_at,expense_id,created_at,employee:employees(full_name,employee_no,user_id)'
+  const cols = 'id,employee_id,spent_on,category,supplier_name,supplier_trn,reference,description,amount,vat_amount,paid_with,card:company_cards(label,last4),project_id,project:projects(name),quantity,items,notes,status,source,receipt_document_id,decision_note,decided_at,expense_id,created_at,employee:employees(full_name,employee_no,user_id)'
   let q = c.supabase.from('expense_claims').select(cols)
   if (status !== 'all') q = q.eq('status', status)
   const [{ data: rows }, { data: counts }, focusRes] = await Promise.all([
@@ -58,7 +58,7 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[14px] sm:grid-cols-3">
             {([['Total', <Money key="t" value={Number(f.amount) + Number(f.vat_amount)} className="font-semibold" />], ['Excl. VAT', <Money key="a" value={f.amount} />], ['VAT', <Money key="v" value={f.vat_amount} />],
               ['Date', formatShortDate(f.spent_on)], ['Category', EXPENSE_CATS[f.category] ?? f.category], ['Paid with', `${PAID[f.paid_with] ?? f.paid_with}${f.card ? ` · ${f.card.label} ••${f.card.last4}` : ''}`],
-              ['Receipt no.', f.reference ?? '—'], ['Supplier TRN', f.supplier_trn ?? '—'], ['Entered', f.source === 'scan' ? 'Scanned receipt' : 'By hand']] as [string, React.ReactNode][]).map(([k, v]) =>
+              ['Project', f.project?.name ?? '—'], ['Receipt no.', f.reference ?? '—'], ['Supplier TRN', f.supplier_trn ?? '—'], ['Entered', f.source === 'scan' ? 'Scanned receipt' : 'By hand']] as [string, React.ReactNode][]).map(([k, v]) =>
               <div key={k} className="min-w-0"><dt className="text-[12px] text-muted">{k}</dt><dd className="mt-0.5 font-medium [overflow-wrap:anywhere]">{v}</dd></div>)}
           </dl>
           {Array.isArray(f.items) && f.items.length > 0 && <ul className="space-y-1 rounded-xl border border-border bg-surface p-3 text-[13.5px]">{f.items.map((l: any, i: number) => <li key={i} className="flex justify-between gap-3"><span className="min-w-0 [overflow-wrap:anywhere]">{l.description}{l.quantity ? ` × ${l.quantity}` : ''}</span><Money value={l.amount} /></li>)}</ul>}
@@ -86,7 +86,7 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
                     <input type="radio" name="decision" value={k} defaultChecked={i === 0} className="h-4 w-4 accent-[hsl(var(--primary))]" />{l}</label>)}</div></fieldset>
               <Field label="Note to the employee" hint="Required when sending back or rejecting"><Textarea name="note" rows={2} maxLength={2000} /></Field>
               <Field label="Category"><Select name="category" defaultValue={f.category}>{Object.entries(EXPENSE_CATS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
-              <Field label="Project" hint="When approving"><Select name="project_id" defaultValue=""><option value="">— General / no project —</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+              <Field label="Project" hint={f.project_id ? 'The employee chose this project; change it if needed' : 'When approving'}><Select name="project_id" defaultValue={f.project_id ?? ''}><option value="">— General / no project —</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
               <AccountSelect name="paid_from_bank_id" label="Paid back from" />
             </div>
           </ActionForm></div>}

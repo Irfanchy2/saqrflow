@@ -52,6 +52,8 @@ try {
   await db.query(`insert into employee_advances(company_id,employee_id,kind,amount,given_on,monthly_recovery) values ($1,$2,'advance',600,$4,200),($1,$3,'advance',9999,$4,null)`, [co, emp, other, month])
   await db.query(`insert into attendance_records(company_id,employee_id,work_date,status,overtime_hours) values ($1,$2,$3,'present',2),($1,$4,$3,'absent',0)`, [co, emp, month, other])
   const otherClaim = (await one(`insert into expense_claims(company_id,employee_id,spent_on,description,amount,supplier_name) values ($1,$2,$3,'Imran taxi fare',45,'Dubai Taxi') returning id`, [co, other, today])).id
+  const siteProj = (await one(`insert into projects(company_id,name,status) values ($1,'Marina Tower Steel','active') returning id`, [co])).id
+  await db.query(`insert into projects(company_id,name,status) values ($1,'Old Depot','completed')`, [co])
   const ownerDoc = (await one(`insert into documents(company_id,name,owner_type) values ($1,'Trade licence','company') returning id`, [co])).id
 
   console.log('\n[1] Settings → Employee portal: self check-in on, advance limit 25%')
@@ -167,7 +169,9 @@ try {
   await m.locator('input[data-claim-file]').setInputFiles({ name: 'enoc.png', mimeType: 'image/png', buffer: img })
   await dlg(m).locator('[data-scan-done]').waitFor({ timeout: 25000 }); await m.waitForTimeout(300)
   ok(await dlg(m).getByLabel('Invoice / receipt no.').inputValue() === 'ENOC-7781' && Number(await dlg(m).getByLabel('Amount excl. VAT (AED) *').inputValue()) === 124, 'receipt read: number ENOC-7781, amount 124.00')
-  ok(await dlg(m).locator('select[name=paid_with]').isVisible() && await dlg(m).locator('select[name=project_id]').count() === 0 && await dlg(m).locator('select[name=employee_id]').count() === 0, 'claim form: “How did you pay?”, no project / employee / bank pickers')
+  ok(await dlg(m).locator('select[name=paid_with]').isVisible() && await dlg(m).locator('select[name=employee_id]').count() === 0 && await dlg(m).locator('select[name=paid_from_bank_id]').count() === 0, 'claim form: “How did you pay?”, no employee / bank pickers')
+  const projOpts = await dlg(m).locator('select[name=project_id] option').allInnerTexts()
+  ok(projOpts.includes('No project') && projOpts.includes('Marina Tower Steel') && !projOpts.includes('Old Depot'), 'optional “Project” list: current projects only (no finished ones)')
   await dlg(m).getByLabel('Category *').selectOption('fuel'); await dlg(m).getByLabel('Description *').fill('Diesel for site van')
   await m.screenshot({ path: `${OUT}/m-claim-form.png` })
   await dlg(m).getByRole('button', { name: 'Send for approval' }).click(); await settle(m, 800)
@@ -182,7 +186,7 @@ try {
 
   console.log('\n[7] By hand, and the same receipt twice is refused')
   await m.goto(`${BASE}/me/expenses`); await settle(m)
-  const manual = async (ref, desc, amount, card) => {
+  const manual = async (ref, desc, amount, card, project) => {
     await m.locator('[data-claim-manual]:visible').first().click(); await settle(m, 300)
     await dlg(m).locator('input[name=supplier_name]').fill('Al Madina Hypermarket'); await dlg(m).getByLabel('Invoice / receipt no.').fill(ref)
     await dlg(m).getByLabel('Description *').fill(desc); await dlg(m).getByLabel('Amount excl. VAT (AED) *').fill(amount); await dlg(m).getByLabel('Category *').selectOption('food')
@@ -196,17 +200,30 @@ try {
       ok((await one(`select count(*)::int n from expense_claims where employee_id=$1 and reference=$2`, [emp, ref])).n === 0, 'not sent until the card is chosen')
       await sel.selectOption(card)
     }
+    if (project) await dlg(m).locator('select[name=project_id]').selectOption(project)
     await dlg(m).getByRole('button', { name: 'Send for approval' }).click(); await settle(m, 1000)
   }
   await m.locator('[data-claim-manual]:visible').first().click(); await settle(m, 300)
   await dlg(m).locator('input[name=supplier_name]').fill('ENOC SERVICE STATION'); await m.waitForTimeout(200)
   ok(await dlg(m).getByLabel('Supplier TRN').inputValue() === '100345678900003', 'a supplier used before fills in its TRN by itself')
   await m.keyboard.press('Escape'); await settle(m, 300)
-  await manual('AM-501', 'Water and snacks for crew', '80', card9865); await manual('AM-777', 'Cold drinks for site', '20')
+  await manual('AM-501', 'Water and snacks for crew', '80', card9865, siteProj); await manual('AM-777', 'Cold drinks for site', '20')
   await manual('am 501', 'Water again', '80')
   ok(/already sent/i.test(await dlg(m).innerText()) && (await one(`select count(*)::int n from expense_claims where employee_id=$1 and lower(reference) like 'am%501'`, [emp])).n === 1, 'second claim for receipt AM-501 refused: “You already sent receipt…”')
   await m.keyboard.press('Escape'); await settle(m, 300)
+  const claimsNow = (await one(`select count(*)::int n from expense_claims where employee_id=$1`, [emp])).n
+  await manual('', 'Cold drinks again', '20')
+  ok(/already sent this expense/i.test(await dlg(m).innerText()) && (await one(`select count(*)::int n from expense_claims where employee_id=$1`, [emp])).n === claimsNow, 'without a receipt number, the same day + supplier + amount again is refused')
+  await m.keyboard.press('Escape'); await settle(m, 300)
+  await m.goto(`${BASE}/me`); await settle(m)
+  await m.locator('input[data-claim-file]').setInputFiles({ name: 'enoc-again.png', mimeType: 'image/png', buffer: img })
+  await dlg(m).locator('[data-scan-done]').waitFor({ timeout: 25000 }); await m.waitForTimeout(300)
+  await dlg(m).getByLabel('Invoice / receipt no.').fill('ENOC-9999'); await dlg(m).getByLabel('Description *').fill('Diesel again'); await dlg(m).getByLabel('Category *').selectOption('fuel')
+  await dlg(m).locator('input[name=verified]').check(); await dlg(m).getByRole('button', { name: 'Send for approval' }).click(); await settle(m, 1200)
+  ok(/already attached to another of your expenses/i.test(await dlg(m).innerText()) && (await one(`select count(*)::int n from expense_claims where employee_id=$1`, [emp])).n === claimsNow, 'the same receipt photo sent again (other number typed) is refused')
+  await m.keyboard.press('Escape'); await settle(m, 300)
   ok((await one(`select paid_with, card_id from expense_claims where employee_id=$1 and reference='AM-501'`, [emp]))?.card_id === card9865, 'card claim saved with the chosen card')
+  ok((await one(`select project_id from expense_claims where employee_id=$1 and reference='AM-501'`, [emp]))?.project_id === siteProj && (await one(`select project_id from expense_claims where employee_id=$1 and reference='AM-777'`, [emp]))?.project_id === null, 'the chosen project is saved; “No project” leaves it empty')
   const c2 = (await one(`select id from expense_claims where employee_id=$1 and reference='AM-501'`, [emp])).id, c3 = (await one(`select id from expense_claims where employee_id=$1 and reference='AM-777'`, [emp])).id
   await m.goto(`${BASE}/me/expenses`); await settle(m)
   const list = await m.locator('[data-claim-list]').innerText()
@@ -271,6 +288,7 @@ try {
 
   console.log('\n[9] Rejection with a reason')
   await p.goto(`${BASE}/expenses?tab=claims&open=${c2}`); await settle()
+  ok((await p.locator(`[data-claim-detail="${c2}"]`).innerText()).includes('Marina Tower Steel') && await p.locator('[data-claim-decide] select[name=project_id]').inputValue() === siteProj, 'the approver sees the employee’s project, already chosen in the decision')
   await p.locator('[data-claim-decide] input[value=rejected]').check(); await p.locator('[data-claim-decide] textarea[name=note]').fill('Food is covered by the daily allowance')
   await p.locator('[data-claim-decide]').getByRole('button', { name: 'Save decision' }).click(); await settle(p, 1000)
   ok((await one(`select status from expense_claims where id=$1`, [c2])).status === 'rejected' && (await one(`select count(*)::int n from project_expenses where expense_claim_id=$1`, [c2])).n === 0, 'rejected, and not an expense')
