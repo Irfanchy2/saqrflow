@@ -61,6 +61,14 @@ export async function middleware(req: NextRequest) {
   const nonce = btoa(crypto.randomUUID())
   const csp = pathname.startsWith('/api') ? null : contentSecurityPolicy(nonce, pathname.startsWith('/f/'), (req.headers.get('x-forwarded-proto') ?? req.nextUrl.protocol.replace(':', '')) === 'https')
 
+  // Email links (password reset, invitation, sign-up confirmation) that Supabase sent to another page of this app (its "Site
+  // URL", used whenever the address the app asked for is not on the project's redirect list) go on to /auth/callback, which
+  // signs the person in for that step instead of the page showing a plain sign-in form.
+  const q = req.nextUrl.searchParams
+  if (req.method === 'GET' && pathname !== '/auth/callback' && !pathname.startsWith('/api') && (q.has('code') || (q.has('token_hash') && q.has('type')))) {
+    const u = req.nextUrl.clone(); u.pathname = '/auth/callback'; return NextResponse.redirect(u)
+  }
+
   if (!supabaseConfigured()) return NextResponse.next()      // setup screen is rendered by the layout
   const refreshed: { name: string; value: string; options: CookieOptions }[] = []
   const supabase = createServerClient(supabaseUrl(), supabasePublishableKey(), {

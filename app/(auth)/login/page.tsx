@@ -4,9 +4,10 @@ import { ActionForm } from '@/components/ui/action-form'
 import { signIn, signInDemo } from '@/app/actions/auth'
 import { DEMO_EMAIL, DEMO_PASSWORD } from '@/lib/demo-account'
 export const metadata = { title: 'Sign in' }
-export default async function Login({ searchParams }: { searchParams: Promise<{ next?: string; m?: string }> }) {
-  const { next, m } = await searchParams
+export default async function Login({ searchParams }: { searchParams: Promise<{ next?: string; m?: string; link?: string }> }) {
+  const { next, m, link } = await searchParams
   return <Card className="p-6"><h1 className="mb-1 text-xl font-bold tracking-[-0.02em]">Sign in</h1><p className="mb-5 text-sm text-muted">Welcome back.</p>
+    {link === 'expired' && <div className="mb-4"><Alert tone="amber">That email link has expired or was already used. Sign in, or use “Forgot password?” to get a new link.</Alert></div>}
     {m === 'revoked' && <div className="mb-4"><Alert tone="amber">This device was signed out from another device or by your administrator, or after 24 hours without activity. Sign in again to continue.</Alert></div>}
     <ActionForm action={signIn} submit="Sign in" resetOnSuccess={false} variant="blue" block>
       <input type="hidden" name="next" value={next ?? ''} />
