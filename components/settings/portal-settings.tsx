@@ -10,7 +10,7 @@ export async function PortalSettingsCard({ c }: { c: Ctx }) {
   const s = await portalSettings(c)
   return <Card id="employee-portal"><CardHeader title="Employee portal" sub="Employees sign in to see only their own expenses, attendance, salary and payslips, and to send receipts for approval." />
     <div className="p-4"><ActionForm action={savePortalSettings} resetOnSuccess={false} submit="Save portal settings">
-      <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="checkin" defaultChecked={s.checkin} className="mt-0.5" /><span>Employees check in and out themselves<span className="block text-xs text-muted">One tap per day; the time is the server&apos;s, never the phone&apos;s. HR can still correct any day.</span></span></label>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="checkin" defaultChecked={s.checkin} className="mt-0.5" /><span>Employees check in and out themselves<span className="block text-xs text-muted">When off, the portal tells employees that HR records their attendance. One tap per day; the time is the server&apos;s, never the phone&apos;s. HR can still correct any day.</span></span></label>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Working day starts"><Input name="work_start" type="time" defaultValue={s.workStart} required /></Field>
         <Field label="Working day ends" hint="A check-in stops by itself at this time"><Input name="work_end" type="time" defaultValue={s.workEnd} required /></Field>

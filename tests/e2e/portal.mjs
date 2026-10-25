@@ -103,6 +103,13 @@ try {
   ok((await m.locator('[data-salary]').innerText()).includes('400.00'), 'available advance = 25% of 4,000 − 600 still owed = AED 400.00')
   await m.screenshot({ path: `${OUT}/m-home.png`, fullPage: true })
 
+  await db.query(`update app_settings set value='false'::jsonb where company_id=$1 and key='portal.checkin'`, [co])
+  await m.goto(`${BASE}/me/attendance`); await settle(m)
+  ok((await m.locator('[data-checkin-off]').innerText()).includes('recorded by HR') && await m.locator('[data-punch]').count() === 0, 'check-in turned off: Attendance says HR records it (no buttons)')
+  await db.query(`update app_settings set value='true'::jsonb where company_id=$1 and key='portal.checkin'`, [co])
+  await m.goto(`${BASE}/me/attendance`); await settle(m)
+  ok(await m.locator('[data-checkin-off]').count() === 0 && await m.locator('[data-punch=in]').isVisible(), 'check-in turned on: the Check in button shows on Attendance')
+
   console.log('\n[4] Confinement: every company page and API sends the employee back to the portal')
   for (const path of ['/', '/expenses', '/expenses?tab=claims', '/invoices', '/projects', '/employees', `/employees/${other}`, `/employees/${emp}`, '/settings', '/reports', '/users', '/approvals', '/documents', '/vault', '/tasks', '/banking', '/audit']) {
     await m.goto(BASE + path); await m.waitForLoadState('domcontentloaded')
