@@ -292,20 +292,39 @@ async function copyDoc(c: Ctx, id: string, to: SalesType, link: boolean, tok?: s
   if (!src) throw new Error('Document not found.')
   const s = await salesSettings(c)
   const d = src.doc as any
-  const items = lineQty ? src.items.filter(it => (lineQty.get(it.id) ?? 0) > 0).map(it => ({ ...it, quantity: lineQty.get(it.id)! })) : src.items
+  let items = lineQty ? src.items.filter(it => (lineQty.get(it.id) ?? 0) > 0).map(it => ({ ...it, quantity: lineQty.get(it.id)! })) : src.items
   if (!items.length && lineQty) throw new Error('Choose at least one line with a quantity to deliver.')
+  // A delivery note carries no prices, so an invoice made from one takes them from the quotation it was delivered from
+  // (each line through source_item_id, else the same description). The quotation's discount comes along when it is a
+  // percentage, or when this delivery note delivers the whole quotation.
+  let priceDiscount: { type: 'amount' | 'percent'; value: number } | null = null
+  if (to === 'invoice' && d.doc_type === 'delivery_note' && d.quotation_id) {
+    const [{ data: q }, { data: qItems }] = await Promise.all([
+      c.supabase.from('invoices').select('discount_type,discount_value,discount').eq('id', d.quotation_id).maybeSingle(),
+      c.supabase.from('invoice_items').select('id,description,quantity,unit_price,discount_pct,vat_category').eq('invoice_id', d.quotation_id).order('position'),
+    ])
+    const ql = qItems ?? [], byId = new Map(ql.map(x => [x.id as string, x]))
+    items = items.map(it => {
+      const m = ((it as any).source_item_id && byId.get((it as any).source_item_id)) || ql.find(x => x.description === it.description)
+      return m ? { ...it, unit_price: Number(m.unit_price), discount_pct: Number(m.discount_pct ?? 0), vat_category: m.vat_category ?? (it as any).vat_category } : it
+    })
+    const whole = ql.length > 0 && ql.length === items.length && ql.every(x => items.some(it => (it as any).source_item_id === x.id && Number(it.quantity) === Number(x.quantity)))
+    const value = Number(q?.discount_value ?? q?.discount ?? 0), type = (q?.discount_type ?? 'amount') as 'amount' | 'percent'
+    if (q && value > 0 && (type === 'percent' || whole)) priceDiscount = { type, value }
+  }
   const number = await nextNumber(c, to)
   const same = to === d.doc_type
   const credit = to === 'invoice' && d.customer_id ? (await c.supabase.from('customers').select('credit_days').eq('id', d.customer_id).maybeSingle()).data?.credit_days : null
   const keepDiscount = same || (d.doc_type === 'quotation' && to === 'invoice') || to === 'credit_note'
-  const tot = computeTotals(items, Number(d.vat_rate), keepDiscount ? { type: d.discount_type ?? 'amount', value: Number(d.discount_value ?? d.discount) } : 0, vatApplies(to, d.apply_vat))
+  const disc = priceDiscount ?? (keepDiscount ? { type: d.discount_type ?? 'amount', value: Number(d.discount_value ?? d.discount) } : null)
+  const tot = computeTotals(items, Number(d.vat_rate), disc ?? 0, vatApplies(to, d.apply_vat))
   const { data, error } = await c.supabase.from('invoices').insert({
     company_id: c.company.id, doc_type: to, number, status: 'draft', issue_date: c.today, created_by: c.userId, client_token: tok ?? null,
     salesperson_id: d.salesperson_id ?? c.userId, customer_id: d.customer_id, project_id: d.project_id, attention: d.attention, customer_name: d.customer_name, customer_address: d.customer_address,
     customer_trn: d.customer_trn, customer_phone: d.customer_phone, customer_email: d.customer_email, site: d.site, subject: d.subject, reference: d.reference, lpo_ref: d.lpo_ref,
     vat_rate: d.vat_rate, show_total: d.show_total, notes: d.notes, apply_vat: to === 'quotation' ? d.apply_vat : null,
     advance_applied: link && d.project_id && to !== 'credit_note' && !(d.doc_type === 'invoice' && d.status !== 'draft') ? Number(d.advance_applied ?? 0) : 0,   // carried quotation → invoice / delivery note
-    discount_type: tot.discount ? d.discount_type ?? 'amount' : 'amount', discount_value: tot.discount ? Number(d.discount_value ?? d.discount) : 0,
+    discount_type: tot.discount && disc ? disc.type : 'amount', discount_value: tot.discount && disc ? disc.value : 0,
     intro: to === 'quotation' ? d.intro ?? s.intro : null, closing: to === 'quotation' ? d.closing ?? s.closing : null,
     terms: to === 'quotation' || to === 'invoice' ? d.terms : [], payment_terms: to === 'delivery_note' ? [] : d.payment_terms,
     due_date: to === 'invoice' ? addDays(c.today, credit ?? s.dueDays) : null, valid_until: to === 'quotation' ? addDays(c.today, s.validityDays) : null,

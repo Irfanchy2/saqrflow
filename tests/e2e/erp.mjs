@@ -126,7 +126,8 @@ try {
   const inputs = dlg().getByLabel(/Deliver now:/)
   await inputs.first().fill('60'); for (let i = 1; i < await inputs.count(); i++) await inputs.nth(i).fill('0')
   await dlg().getByRole('button', { name: 'Create delivery note' }).click(); await p.waitForURL(u => !u.href.includes(qid)); await settle()
-  const dn = await one(`select i.number, i.quotation_id, (select quantity::text from invoice_items where invoice_id=i.id) q from invoices i where i.id=$1`, [docId()])
+  const dnId = docId()
+  const dn = await one(`select i.number, i.quotation_id, (select quantity::text from invoice_items where invoice_id=i.id) q from invoices i where i.id=$1`, [dnId])
   ok(/^DL-\d+$/.test(dn.number) && dn.quotation_id === qid && dn.q === '60.000', `delivery note ${dn.number}: 60 delivered, linked to the quotation`)
   await p.goto(`${BASE}/invoices/${qid}`); await settle()
   const qd = await one(`select ordered::text o, delivered::text d from quotation_delivery where quotation_id=$1 order by ordered desc limit 1`, [qid])
@@ -290,6 +291,13 @@ try {
   const dt = await body()
   ok(['Receivables', 'Revenue this month', 'Recorded expenses this month', 'Estimated margin', 'Projects in progress'].every(s => dt.includes(s)) && /follow-ups? due/i.test(dt), 'dashboard: receivables, monthly sales / expenses / margin, follow-ups, active projects')
   await shot('X-dashboard')
+
+  console.log('\n[X2] Delivery note → invoice: prices come from the quotation')
+  await p.goto(`${BASE}/invoices/${dnId}`); await settle()
+  await menu('Create tax invoice'); await p.waitForURL(u => !u.href.includes(dnId)); await settle()
+  const fromDn = await one(`select i.total::float t, i.subtotal::float s, it.quantity::float q, it.unit_price::float up, (select unit_price::float from invoice_items where invoice_id=$2 order by position limit 1) qp
+    from invoices i join invoice_items it on it.invoice_id=i.id where i.id=$1`, [docId(), qid])
+  ok(fromDn && fromDn.q === 60 && fromDn.up === fromDn.qp && fromDn.up > 0 && fromDn.t > 0, `invoice from the delivery note: 60 × ${fromDn?.up} (the quotation's price), total ${fromDn?.t}, not 0.00`)
 } catch (e) { ok(false, `aborted: ${e.stack || e}`); await p.screenshot({ path: `${OUT}/abort.png`, fullPage: true }).catch(() => {}) }
 await browser.close(); await db.end()
 const failed = results.filter(r => !r[0]).length
