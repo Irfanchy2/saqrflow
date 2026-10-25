@@ -3,7 +3,7 @@ import { getMe, portalSettings, attendanceSummary, monthName, clock, workedHours
 import { flat } from '@/lib/queries'
 import { addMonths, endOfMonth, formatShortDate, startOfMonth } from '@/lib/time'
 import { Badge, EmptyState } from '@/components/ui/primitives'
-import { CalendarCheck, ChevronRight, ArrowLeft, CheckCircle2 } from '@/components/icons'
+import { CalendarCheck, ChevronRight, ArrowLeft, CheckCircle2, Info } from '@/components/icons'
 import { PortalCard } from '@/components/portal/stat'
 import { Today } from '@/components/portal/today'
 
@@ -38,7 +38,9 @@ export default async function MyAttendance({ searchParams }: { searchParams: Pro
       </div>
     </div>
 
-    {settings.checkin && month === cur && <Today c={c} empId={emp.id} settings={settings} />}
+    {month === cur && (settings.checkin ? <Today c={c} empId={emp.id} settings={settings} />
+      : <p className="flex items-start gap-2.5 rounded-2xl border border-border/80 bg-surface px-4 py-3 text-[14px] text-muted shadow-card" data-checkin-off>
+        <Info size={17} className="mt-0.5 shrink-0 text-primary" aria-hidden />Your attendance is recorded by HR. Self check-in is not turned on for your company.</p>)}
 
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" data-attendance-summary>
       {([['Present', sum.present], ['Half day', sum.half_day], ['Absent', sum.absent], ['Leave', sum.leave], ['Holiday', sum.holiday], ['Overtime h', sum.overtime]] as const).map(([l, v]) =>
