@@ -84,25 +84,48 @@ const roleEnum = z.enum(ROLES)
 async function ownersLeft(c: Awaited<ReturnType<typeof getCtx>>, exceptId: string) {
   const { count } = await c.supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['company_owner', 'super_admin']).eq('is_active', true).neq('id', exceptId); return count ?? 0
 }
+// Which employee record a login belongs to (employees.user_id): the Employee Portal shows that person's own records only.
+// An "employee"-role login must have one, otherwise its portal is empty. One login per employee record.
+type Ctx = Awaited<ReturnType<typeof getCtx>>
+async function employeeChoice(c: Ctx, fd: FormData, role: Role, userId: string | null): Promise<{ id: string | null } | { error: string; fieldErrors: Record<string, string> } | undefined> {
+  if (!fd.has('employee_id')) return undefined                                   // the form did not offer the choice: leave the link alone
+  const raw = str(fd, 'employee_id') ?? ''
+  if (!raw) return role === 'employee' ? { error: 'Choose which employee this login belongs to. An Employee login only sees that person’s own expenses, attendance and salary.', fieldErrors: { employee_id: 'Required for the Employee role' } } : { id: null }
+  need(c, 'employees.view_sensitive')
+  const id = z.string().uuid().parse(raw)
+  const { data: e } = await c.supabase.from('employees').select('id,full_name,user_id').eq('id', id).is('deleted_at', null).maybeSingle()
+  if (!e) return { error: 'Employee not found.', fieldErrors: { employee_id: 'Not found' } }
+  if (e.user_id && e.user_id !== userId) return { error: `${e.full_name} is already linked to another login. Unlink it there first.`, fieldErrors: { employee_id: 'Already linked' } }
+  return { id }
+}
+async function linkEmployee(c: Ctx, userId: string, employeeId: string | null) {
+  const { error: e1 } = await c.supabase.from('employees').update({ user_id: null }).eq('user_id', userId).neq('id', employeeId ?? '00000000-0000-0000-0000-000000000000'); if (e1) throw e1
+  if (employeeId) { const { error: e2 } = await c.supabase.from('employees').update({ user_id: userId }).eq('id', employeeId).or(`user_id.is.null,user_id.eq.${userId}`); if (e2) throw e2 }
+  revalidatePath('/employees')
+}
 export async function inviteUser(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); demoGuard(c, 'inviting users'); need(c, 'users.manage')
     const v = z.object({ email: z.string().email('Enter a valid email'), name: z.string().min(2, 'Enter a name').max(120), role: roleEnum }).parse({ email: str(fd, 'email'), name: str(fd, 'name'), role: str(fd, 'role') })
     if (v.role === 'super_admin' && c.profile.role !== 'super_admin') return { error: 'Only a Super Admin can create another Super Admin.' }
+    const emp = await employeeChoice(c, fd, v.role as Role, null); if (emp && 'error' in emp) return emp
     const admin = createAdminClient()
     const { data, error } = await admin.auth.admin.inviteUserByEmail(v.email, { redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/callback` })
     if (error || !data.user) return { error: error?.message?.includes('registered') ? 'That email already has an account.' : 'Could not send the invitation.' }
     const { error: e2 } = await admin.from('profiles').insert({ id: data.user.id, company_id: c.company.id, full_name: v.name, role: v.role }); if (e2) throw e2
+    if (emp?.id) await linkEmployee(c, data.user.id, emp.id)
     revalidatePath('/users'); return { ok: true, message: `Invitation sent to ${v.email}.` }
   })
 }
 export async function changeRole(id: string, _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
-    const c = await getCtx(); demoGuard(c, 'changing user roles'); need(c, 'users.manage'); const role = roleEnum.parse(str(fd, 'role')) as Role
+    const c = await getCtx(); demoGuard(c, 'changing user roles'); need(c, 'users.manage'); z.string().uuid().parse(id); const role = roleEnum.parse(str(fd, 'role')) as Role
     if (!['company_owner', 'super_admin'].includes(role) && (await ownersLeft(c, id)) < 1) return { error: 'The company must keep at least one owner.' }
+    const emp = await employeeChoice(c, fd, role, id); if (emp && 'error' in emp) return emp
     const { data, error } = await c.supabase.from('profiles').update({ role }).eq('id', id).select('id'); if (error) throw error
     if (!data?.length) return { error: 'User not found.' }
-    revalidatePath('/users'); return { ok: true, message: 'Role updated.' }
+    if (emp) await linkEmployee(c, id, emp.id)
+    revalidatePath('/users'); return { ok: true, message: emp?.id ? 'Role and employee record saved.' : 'Role updated.' }
   })
 }
 export async function setUserActive(id: string, active: boolean): Promise<ActionState> {

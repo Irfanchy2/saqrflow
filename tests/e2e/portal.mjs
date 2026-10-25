@@ -71,6 +71,22 @@ try {
   ok((await one(`select user_id from employees where id=$1`, [emp])).user_id === eu?.id, 'employee record linked to the new login')
   ok((await p.locator('[data-portal-access]').innerText()).includes('Active'), 'employee page shows the active portal login')
 
+  console.log('\n[2b] Users page: an Employee login must be tied to its employee record')
+  const lu = (await one(`insert into auth.users(email) values ($1) returning id`, [`portal-imran-${stamp}@alsaqr.test`])).id
+  await db.query(`insert into profiles(id,company_id,full_name,role) values ($1,$2,'Imran login','viewer')`, [lu, co])
+  await p.goto(`${BASE}/users`); await settle()
+  const userRow = () => p.locator('tr').filter({ has: p.locator('td:first-child', { hasText: 'Imran login' }) }), row = userRow()
+  ok(await row.locator('select[name=employee_id] option', { hasText: 'Rashid Khan' }).isDisabled(), 'an employee already linked to another login cannot be picked twice')
+  await row.locator('select[name=role]').selectOption('employee'); await row.getByRole('button', { name: 'Save' }).click(); await settle(p, 900)
+  ok((await one(`select role from profiles where id=$1`, [lu])).role === 'viewer' && /Choose which employee/.test(await p.locator('main').innerText()), 'Employee role without an employee record is refused, with the reason')
+  await row.locator('select[name=role]').selectOption('employee'); await row.locator('select[name=employee_id]').selectOption(other)
+  await row.getByRole('button', { name: 'Save' }).click(); await settle(p, 900)
+  ok((await one(`select role from profiles where id=$1`, [lu])).role === 'employee' && (await one(`select user_id from employees where id=$1`, [other])).user_id === lu, 'role Employee + record Imran Ali saved: the login is linked to his record')
+  await p.goto(`${BASE}/users`); await settle()
+  await userRow().locator('select[name=employee_id]').selectOption(''); await userRow().locator('select[name=role]').selectOption('viewer')
+  await userRow().getByRole('button', { name: 'Save' }).click(); await settle(p, 900)
+  ok((await one(`select user_id from employees where id=$1`, [other])).user_id === null, 'choosing “No employee record” unlinks it again')
+
   console.log('\n[3] The employee signs in on a phone and lands in the portal')
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }); const m = watch(await mctx.newPage())
   await m.goto(`${BASE}/login`); await m.getByLabel('Email').fill(EMP); await m.getByLabel('Password').fill('invited-password-123'); await m.getByRole('button', { name: 'Sign in' }).click()
