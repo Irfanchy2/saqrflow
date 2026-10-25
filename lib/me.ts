@@ -43,6 +43,12 @@ export function leftRunning(rows: { work_date: string; check_in_at?: string | nu
     || (r.overtime_start_at && !r.overtime_end_at && now >= new Date(r.overtime_start_at).getTime() + s.overtimeMaxHours * 36e5))
 }
 
+/** Current project names the employee can put an expense on (no project figures: see my_project_choices() in 0033). */
+export async function myProjects(c: Ctx): Promise<{ id: string; name: string }[]> {
+  const { data } = await c.supabase.rpc('my_project_choices')
+  return ((data ?? []) as { id: string; name: string; code: string | null }[]).map(p => ({ id: p.id, name: p.code ? `${p.name} (${p.code})` : p.name }))
+}
+
 /** Advances not yet settled, and how much more may be asked for (a share of the monthly salary set by the company). */
 export function advanceBalance(salary: number | null, advances: { kind: string; amount: number | string; settled: boolean }[], limitPct: number) {
   const outstanding = Math.round(advances.filter(a => a.kind === 'advance' && !a.settled).reduce((s, a) => s + Number(a.amount), 0) * 100) / 100

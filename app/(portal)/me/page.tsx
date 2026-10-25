@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getMe, portalSettings, advanceBalance, attendanceSummary, monthName, clock } from '@/lib/me'
+import { getMe, myProjects, portalSettings, advanceBalance, attendanceSummary, monthName, clock } from '@/lib/me'
 import { endOfMonth, formatShortDate, localHm, startOfMonth } from '@/lib/time'
 import { Badge, EmptyState, Money } from '@/components/ui/primitives'
 import { AlertTriangle, Banknote, CalendarCheck, CheckCircle2, Clock, Receipt, Wallet } from '@/components/icons'
@@ -19,8 +19,9 @@ export default async function MyHome() {
   if (!emp) return null
   const month = startOfMonth(c.today), monthEnd = endOfMonth(c.today), sb = c.supabase
   const settingsP = portalSettings(c)
-  const [cards, sups, settings, todayRec, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
+  const [cards, projects, sups, settings, todayRec, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
     companyCards(c),
+    myProjects(c),
     claimSuppliers(c, emp.id),
     settingsP,
     loadToday(c, emp.id, settingsP),
@@ -55,7 +56,7 @@ export default async function MyHome() {
       <AlertTriangle size={18} aria-hidden className="shrink-0" />{attention === 1 ? 'One expense needs a correction from you.' : `${attention} expenses need a correction from you.`}<span className="ms-auto shrink-0 underline-offset-2">Fix now</span></Link>}
 
     <PortalCard title="Add an expense" sub="Photograph the receipt: the details fill in for you to check.">
-      <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} cards={cards} /></div>
+      <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} cards={cards} projects={projects} /></div>
     </PortalCard>
 
     {settings.checkin && <Today c={c} rec={todayRec} settings={settings} />}

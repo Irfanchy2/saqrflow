@@ -1422,10 +1422,10 @@ describe('Company cards on card payments (0032)', () => {
     expect((await as(U.ownerA, `select count(*)::int n from audit_logs where table_name = 'company_cards' and record_id = $1`, [card])).rows[0].n).toBe(1)
   })
   it('a card payment needs one of the company\'s active cards; other payments carry none', async () => {
-    const ins = (cardId: string | null, paid = 'card') => as(U.empA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount,paid_with,card_id) values ($1,$2,'2026-10-14','Welding rods',120,$3,$4) returning id, card_id`, [A, empRecA, paid, cardId])
+    const ins = (cardId: string | null, paid = 'card', amount = 120) => as(U.empA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount,paid_with,card_id) values ($1,$2,'2026-10-14','Welding rods',$5,$3,$4) returning id, card_id`, [A, empRecA, paid, cardId, amount])
     await fails(ins(null), /which card/)
     await fails(ins(cardB), /company's cards/)
-    expect((await ins(card, 'cash')).rows[0].card_id).toBeNull()
+    expect((await ins(card, 'cash', 119)).rows[0].card_id).toBeNull()
     claim = (await ins(card)).rows[0].id
     await as(U.ownerA, `update company_cards set active = false where id = $1`, [card])
     await as(U.empA, `update expense_claims set amount = 125 where id = $1`, [claim])   // an unchanged card stays valid
@@ -1436,5 +1436,46 @@ describe('Company cards on card payments (0032)', () => {
   it('the card goes onto the company expense when approved', async () => {
     const e = (await as(U.accA, `select decide_expense_claim($1,'approved') id`, [claim])).rows[0].id
     expect((await as(U.accA, `select card_id, amount::float from project_expenses where id = $1`, [e])).rows[0]).toEqual({ card_id: card, amount: 125 })
+  })
+})
+
+describe('Employee claims: project choice and no duplicates (0033)', () => {
+  let active: string, done: string, other: string
+  const claim = (desc: string, extra: Record<string, unknown> = {}) => {
+    const row: Record<string, unknown> = { company_id: A, employee_id: empRecA, spent_on: '2026-10-20', description: desc, amount: 50, ...extra }
+    const cols = Object.keys(row), vals = Object.values(row)
+    return as(U.empA, `insert into expense_claims(${cols.join(',')}) values (${vals.map((_, i) => `$${i + 1}`).join(',')}) returning id`, vals)
+  }
+  beforeAll(async () => {
+    active = (await as(U.ownerA, `insert into projects(company_id,name,status) values ($1,'Villa 9 Steel','active') returning id`, [A])).rows[0].id
+    done = (await as(U.ownerA, `insert into projects(company_id,name,status) values ($1,'Old Warehouse','completed') returning id`, [A])).rows[0].id
+    other = (await as(U.ownerB, `insert into projects(company_id,name,status) values ($1,'Rival Tower','active') returning id`, [B])).rows[0].id
+  })
+  it('an employee sees current project names only, never the projects table', async () => {
+    const names = (await as(U.empA, `select name from my_project_choices()`)).rows.map(r => r.name)
+    expect(names).toContain('Villa 9 Steel'); expect(names).not.toContain('Old Warehouse'); expect(names).not.toContain('Rival Tower')
+    expect((await as(U.empA, `select count(*)::int n from projects`)).rows[0].n).toBe(0)
+    expect((await as(U.ownerB, `select name from my_project_choices()`)).rows.map(r => r.name)).toEqual(['Rival Tower'])   // each company its own
+  })
+  it('a claim may name a current project of the company, nothing else', async () => {
+    await fails(claim('Bolts', { project_id: other, reference: 'P-1' }), /current projects/)
+    await fails(claim('Bolts', { project_id: done, reference: 'P-1' }), /current projects/)
+    const id = (await claim('Bolts', { project_id: active, reference: 'P-1' })).rows[0].id
+    const e = (await as(U.accA, `select decide_expense_claim($1,'approved') id`, [id])).rows[0].id
+    expect((await as(U.accA, `select project_id from project_expenses where id = $1`, [e])).rows[0].project_id).toBe(active)
+  })
+  it('the same receipt number twice is refused (written differently too), until the first is withdrawn', async () => {
+    const first = (await claim('Paint', { reference: 'INV-0077', supplier_name: 'Ace' })).rows[0].id
+    await fails(claim('Paint again', { reference: 'inv 0077', supplier_name: 'Ace', amount: 51 }), /already sent receipt INV-0077/)
+    await as(U.empA, `update expense_claims set status = 'withdrawn' where id = $1`, [first])
+    expect((await claim('Paint', { reference: 'inv 0077', supplier_name: 'Ace' })).rows.length).toBe(1)
+  })
+  it('without a receipt number: the same day, supplier and amounts is refused; a different receipt number is not', async () => {
+    await claim('Taxi', { supplier_name: 'Dubai Taxi', amount: 25 })
+    await fails(claim('Taxi back', { supplier_name: 'DUBAI TAXI', amount: 25 }), /already sent this expense/)
+    expect((await claim('Taxi back', { supplier_name: 'Dubai Taxi', amount: 25, reference: 'T-2' })).rows.length).toBe(1)
+    // editing another claim into a copy is refused too
+    const x = (await claim('Taxi 3', { supplier_name: 'Dubai Taxi', amount: 30 })).rows[0].id
+    await fails(as(U.empA, `update expense_claims set amount = 25 where id = $1`, [x]), /already sent/)
   })
 })

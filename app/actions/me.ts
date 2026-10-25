@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { scanUpload, sha256Hex, storagePath, validateUpload } from '@/lib/files'
 import { securityEvent } from '@/lib/security'
 import { normRef } from '@/lib/expenses/suppliers'
+import { formatShortDate } from '@/lib/time'
 import { companyCards } from '@/lib/cards'
 
 // Employee Portal actions. Everything runs as the signed-in employee (RLS: only their own claims, only while pending or
@@ -32,14 +33,14 @@ const claimSchema = z.object({
   reference: z.string().max(120).optional(), supplier_name: z.string().max(200).optional(),
   supplier_trn: z.string().transform(s => s.replace(/[\s-]/g, '')).pipe(z.string().regex(/^\d{15}$/, 'A UAE TRN has 15 digits')).optional(),
   quantity: z.coerce.number().positive('Quantity must be more than zero').max(1e7).optional(),
-  paid_with: z.enum(['cash', 'card', 'bank_transfer', 'other']).default('cash'), card_id: z.string().uuid('Choose the card').optional(),
+  paid_with: z.enum(['cash', 'card', 'bank_transfer', 'other']).default('cash'), card_id: z.string().uuid('Choose the card').optional(), project_id: z.string().uuid('Choose a project from the list').optional(),
   notes: z.string().max(2000).optional(), idempotency_key: z.string().uuid().optional(),
   items: jsonOf(z.array(line).max(200), []), source: z.enum(['manual', 'scan']).default('manual'),
   ocr_suggested: jsonOf(z.record(z.string(), z.unknown()).refine(o => JSON.stringify(o).length <= 20000, 'Scan data too large'), null as Record<string, unknown> | null),
   verified: z.string().optional(),
 }).refine(v => v.vat_amount <= v.amount, { message: 'VAT looks larger than the amount. Enter the amount before VAT', path: ['vat_amount'] })
   .refine(v => v.source !== 'scan' || v.verified === 'on', { message: 'Tick “I checked these details against the receipt” before sending a scanned receipt', path: ['verified'] })
-const KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_name', 'supplier_trn', 'quantity', 'paid_with', 'card_id', 'notes', 'idempotency_key', 'items', 'source', 'ocr_suggested', 'verified']
+const KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_name', 'supplier_trn', 'quantity', 'paid_with', 'card_id', 'project_id', 'notes', 'idempotency_key', 'items', 'source', 'ocr_suggested', 'verified']
 type Claim = z.infer<typeof claimSchema>
 
 const touch = () => { revalidatePath('/me'); revalidatePath('/me/expenses'); revalidatePath('/expenses') }
@@ -48,7 +49,7 @@ const invalid = (e: z.ZodError): ActionState => ({ error: e.issues[0].message, f
 const fields = (v: Claim) => ({
   spent_on: v.spent_on, category: v.category, description: v.description, amount: v.amount, vat_amount: v.vat_amount,
   reference: v.reference ?? null, supplier_name: v.supplier_name ?? null, supplier_trn: v.supplier_trn ?? null, quantity: v.quantity ?? null,
-  paid_with: v.paid_with, card_id: v.paid_with === 'card' ? v.card_id ?? null : null, notes: v.notes ?? null, items: v.items,
+  paid_with: v.paid_with, card_id: v.paid_with === 'card' ? v.card_id ?? null : null, project_id: v.project_id ?? null, notes: v.notes ?? null, items: v.items,
 })
 /** Paid by card: which company card is required once the company has listed its cards (the database checks it again). */
 async function cardProblem(c: Ctx, v: Claim): Promise<ActionState | null> {
@@ -101,11 +102,34 @@ async function storeReceipt(c: Ctx, claimId: string, docId: string | null, r: { 
 
 /** The employee's own claim with the same receipt number (written any way: "AM-501" = "am 501"), not withdrawn or
  *  rejected: almost always the same receipt sent twice. */
-async function alreadyClaimed(c: Ctx, empId: string, v: Claim, exclude?: string) {
-  if (!v.reference || !normRef(v.reference)) return null
-  const { data } = await c.supabase.from('expense_claims').select('id,spent_on,reference').eq('employee_id', empId).not('reference', 'is', null).not('status', 'in', '(withdrawn,rejected)').limit(2000)
-  return (data ?? []).find(r => r.id !== exclude && normRef(r.reference ?? '') === normRef(v.reference!)) ?? null
+/**
+ * The same expense sent twice (withdrawn and rejected ones do not count): the same receipt number, or, for one sent without
+ * a receipt number, the same day, supplier and amounts. The database refuses it too (0033); this gives the friendly message
+ * before the receipt is uploaded.
+ */
+async function alreadyClaimed(c: Ctx, empId: string, v: Claim, exclude?: string): Promise<ActionState | null> {
+  const ref = v.reference ? normRef(v.reference) : '', sup = (s: string | null) => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const { data } = await c.supabase.from('expense_claims').select('id,spent_on,reference,supplier_name,amount,vat_amount').eq('employee_id', empId).not('status', 'in', '(withdrawn,rejected)').limit(5000)
+  const others = (data ?? []).filter(r => r.id !== exclude)
+  const byRef = ref ? others.find(r => normRef(r.reference ?? '') === ref) : undefined
+  if (byRef) return { error: `You already sent receipt ${byRef.reference} (${formatShortDate(byRef.spent_on)}). Open it under My expenses instead of sending it again.`, fieldErrors: { reference: 'Already sent' } }
+  const same = ref ? undefined : others.find(r => r.spent_on === v.spent_on && Number(r.amount) === v.amount && Number(r.vat_amount) === v.vat_amount && sup(r.supplier_name) === sup(v.supplier_name ?? null))
+  if (same) return { error: `You already sent this expense (${formatShortDate(same.spent_on)} · AED ${(Number(same.amount) + Number(same.vat_amount)).toFixed(2)}). Open it under My expenses instead of sending it again. If it is a different expense, add its receipt number.`, fieldErrors: { amount: 'Already sent' } }
+  return null
 }
+
+/** The same receipt photo / PDF already attached to another of the employee's open or approved expenses. */
+async function receiptUsed(c: Ctx, empId: string, buf: Uint8Array, exclude?: string): Promise<ActionState | null> {
+  const { data: mine } = await c.supabase.from('expense_claims').select('id,receipt_document_id').eq('employee_id', empId).not('status', 'in', '(withdrawn,rejected)').not('receipt_document_id', 'is', null).limit(5000)
+  const docs = (mine ?? []).filter(r => r.id !== exclude).map(r => r.receipt_document_id as string)
+  if (!docs.length) return null
+  // server side, limited to this employee's own receipts (their claims were read above under their own access)
+  const { data: hit } = await createAdminClient().from('document_versions').select('id').eq('company_id', c.company.id).eq('sha256', sha256Hex(buf)).in('document_id', docs).limit(1)
+  return hit?.length ? { error: 'This receipt is already attached to another of your expenses. Open that one under My expenses instead of sending it again.' } : null
+}
+/** The database's own refusal (0033 duplicate / project rules), shown as it is. */
+const refusal = (e: { code?: string; message?: string }): ActionState | null =>
+  e.code === 'P0001' && /already sent|current projects/.test(e.message ?? '') ? { error: e.message! } : null
 
 export async function submitClaim(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
@@ -117,9 +141,11 @@ export async function submitClaim(_: ActionState, fd: FormData): Promise<ActionS
     const cardErr = await cardProblem(c, v); if (cardErr) return cardErr
     if (v.idempotency_key) { const { data: dup } = await c.supabase.from('expense_claims').select('id').eq('idempotency_key', v.idempotency_key).maybeSingle(); if (dup) return { ok: true, message: 'Expense already sent for approval.' } }
     const twice = await alreadyClaimed(c, emp.id, v)
-    if (twice) return { error: `You already sent receipt ${v.reference} (${twice.spent_on}). Open it under My expenses instead of sending it again.`, fieldErrors: { reference: 'Already sent' } }
+    if (twice) return twice
     const receipt = await readReceipt(c, fd)
     if (receipt && 'error' in receipt) return { error: receipt.error }
+    const used = receipt ? await receiptUsed(c, emp.id, receipt.buf) : null
+    if (used) return used
 
     const id = crypto.randomUUID()
     // the receipt is stored first (as this claim's document), so a claim never exists without the file the employee sent
@@ -130,6 +156,7 @@ export async function submitClaim(_: ActionState, fd: FormData): Promise<ActionS
     if (error) {
       if (docId) await createAdminClient().from('documents').update({ deleted_at: new Date().toISOString() }).eq('id', docId)
       if (error.code === '23505') return { ok: true, message: 'Expense already sent for approval.' }
+      const r = refusal(error); if (r) return r
       throw error
     }
     if (docId) { const { error: le } = await createAdminClient().from('expense_claims').update({ receipt_document_id: docId }).eq('id', id); if (le) throw le }
@@ -150,11 +177,13 @@ export async function updateClaim(id: string, _: ActionState, fd: FormData): Pro
     if (v.spent_on > c.today) return { error: 'The expense date cannot be in the future.', fieldErrors: { spent_on: 'In the future' } }
     const cardErr = await cardProblem(c, v); if (cardErr) return cardErr
     const twice = await alreadyClaimed(c, emp.id, v, id)
-    if (twice) return { error: `You already sent receipt ${v.reference} in another expense (${twice.spent_on}).`, fieldErrors: { reference: 'Already sent' } }
+    if (twice) return twice
     const receipt = await readReceipt(c, fd)
     if (receipt && 'error' in receipt) return { error: receipt.error }
+    const used = receipt ? await receiptUsed(c, emp.id, receipt.buf, id) : null
+    if (used) return used
     const { data, error } = await c.supabase.from('expense_claims').update({ ...fields(v), status: 'pending' }).eq('id', id).in('status', ['pending', 'correction_requested']).select('id')
-    if (error) throw error
+    if (error) { const r = refusal(error); if (r) return r; throw error }
     if (!data?.length) return { error: 'This expense was decided meanwhile and can no longer be changed.' }
     if (receipt) {
       const docId = await storeReceipt(c, id, cur.receipt_document_id, receipt, v, emp.full_name)

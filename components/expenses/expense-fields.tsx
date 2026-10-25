@@ -196,7 +196,9 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
       {paidWith === 'card' && cards.length > 0 && <Field label="Which card? *" hint="The company card you paid with">
         <Select name="card_id" required defaultValue={cards.some(k => k.id === e?.card_id) ? e!.card_id : cards.length === 1 ? cards[0].id : ''} data-card-select>
           {cards.length > 1 && <option value="">Choose the card…</option>}
-          {cards.map(k => <option key={k.id} value={k.id}>{k.label} ••{k.last4}</option>)}</Select></Field>}</>
+          {cards.map(k => <option key={k.id} value={k.id}>{k.label} ••{k.last4}</option>)}</Select></Field>}
+      {projects && projects.length > 0 && <Field label="Project" hint="Optional: the job this was for"><Select name="project_id" defaultValue={projects.some(p => p.id === e?.project_id) ? e!.project_id : ''} data-claim-project>
+        <option value="">No project</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}</>
     : <><fieldset className="sm:col-span-2"><legend className="mb-1.5 text-[13px] font-medium">Payment</legend>
       <div className="inline-flex flex-wrap rounded-xl bg-surface-2 p-1">{(['paid', 'unpaid'] as const).map(k => <label key={k} className={cn('cursor-pointer rounded-lg px-4 py-2 text-[14px] font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40', status === k ? 'bg-surface shadow-card' : 'text-muted')}>
         <input type="radio" name="payment_status" value={k} checked={status === k} onChange={() => setStatus(k)} className="sr-only" />{k === 'paid' ? 'Paid' : 'Unpaid (owed to supplier)'}</label>)}</div></fieldset>
