@@ -3,7 +3,7 @@ import { useRef, useState } from 'react'
 import { Camera, Pencil, Upload } from '@/components/icons'
 import { Modal } from '@/components/ui/dialog'
 import { ActionForm } from '@/components/ui/action-form'
-import { ExpenseFields } from '@/components/expenses/expense-fields'
+import { ExpenseFields, type CardOpt } from '@/components/expenses/expense-fields'
 import { submitClaim } from '@/app/actions/me'
 import { warmScan } from '@/lib/expenses/scan-turbo'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
  * already on the phone, and "Enter by hand". The receipt is read on the server and the form fills; the employee checks
  * every field and sends it for approval. Nothing reaches the company's expenses until an approver approves it.
  */
-export function NewClaim({ today, size = 'lg', suppliers = [] }: { today: string; size?: 'lg' | 'sm'; /** the employee's own earlier suppliers (name + TRN fill in by themselves) */ suppliers?: { id: string; name: string; trn: string | null }[] }) {
+export function NewClaim({ today, size = 'lg', suppliers = [], cards = [] }: { today: string; size?: 'lg' | 'sm'; /** the employee's own earlier suppliers (name + TRN fill in by themselves) */ suppliers?: { id: string; name: string; trn: string | null }[]; cards?: CardOpt[] }) {
   const [open, setOpen] = useState<{ file: File | null } | null>(null)
   const cam = useRef<HTMLInputElement>(null), up = useRef<HTMLInputElement>(null)
   const take = (ev: React.ChangeEvent<HTMLInputElement>) => { const f = ev.target.files?.[0]; ev.target.value = ''; if (f) setOpen({ file: f }) }
@@ -31,7 +31,7 @@ export function NewClaim({ today, size = 'lg', suppliers = [] }: { today: string
     <input ref={up} type="file" accept="image/*,application/pdf" className="sr-only" tabIndex={-1} aria-hidden onChange={take} data-claim-file />
     {open && <Modal title={open.file ? 'Check the receipt and send' : 'New expense'} wide onClose={() => setOpen(null)}>
       <ActionForm action={submitClaim} submit="Send for approval" idempotent>
-        <ExpenseFields claim today={today} employees={[]} suppliers={suppliers} initialFile={open.file} />
+        <ExpenseFields claim today={today} employees={[]} suppliers={suppliers} cards={cards} initialFile={open.file} />
         <p className="mt-4 text-[12.5px] leading-relaxed text-muted">Your manager approves it before it is paid back or added to the company&apos;s expenses. You can change or withdraw it until then.</p>
       </ActionForm>
     </Modal>}

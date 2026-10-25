@@ -1406,3 +1406,35 @@ describe('Working hours, overtime and payment notices (0031)', () => {
     expect((await as(U.hrA, `select count(*)::int n from in_app_notifications where link = '/me/salary'`)).rows[0].n).toBe(0)
   })
 })
+
+describe('Company cards on card payments (0032)', () => {
+  let card: string, cardB: string, claim: string
+  beforeAll(async () => {
+    cardB = (await as(U.ownerB, `insert into company_cards(company_id,label,last4) values ($1,'Rival card','1111') returning id`, [B])).rows[0].id
+  })
+  it('settings managers add cards; employees only see their own company\'s; nobody deletes one', async () => {
+    await fails(as(U.empA, `insert into company_cards(company_id,label,last4) values ($1,'Mine','1234')`, [A]))
+    await fails(as(U.ownerA, `insert into company_cards(company_id,label,last4) values ($1,'Bad','12345')`, [A]))
+    card = (await as(U.ownerA, `insert into company_cards(company_id,label,last4) values ($1,'Company credit card','9865') returning id`, [A])).rows[0].id
+    expect((await as(U.empA, `select id from company_cards`)).rows.map(r => r.id)).toEqual([card])
+    expect((await as(U.empA, `update company_cards set active = false where id = $1 returning id`, [card])).rows.length).toBe(0)
+    expect((await as(U.ownerA, `delete from company_cards where id = $1 returning id`, [card])).rows.length).toBe(0)
+    expect((await as(U.ownerA, `select count(*)::int n from audit_logs where table_name = 'company_cards' and record_id = $1`, [card])).rows[0].n).toBe(1)
+  })
+  it('a card payment needs one of the company\'s active cards; other payments carry none', async () => {
+    const ins = (cardId: string | null, paid = 'card') => as(U.empA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount,paid_with,card_id) values ($1,$2,'2026-10-14','Welding rods',120,$3,$4) returning id, card_id`, [A, empRecA, paid, cardId])
+    await fails(ins(null), /which card/)
+    await fails(ins(cardB), /company's cards/)
+    expect((await ins(card, 'cash')).rows[0].card_id).toBeNull()
+    claim = (await ins(card)).rows[0].id
+    await as(U.ownerA, `update company_cards set active = false where id = $1`, [card])
+    await as(U.empA, `update expense_claims set amount = 125 where id = $1`, [claim])   // an unchanged card stays valid
+    await fails(as(U.empA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount,paid_with,card_id) values ($1,$2,'2026-10-14','x',5,'card',$3)`, [A, empRecA, card]), /company's cards/)
+    expect((await as(U.empA, `insert into expense_claims(company_id,employee_id,spent_on,description,amount,paid_with) values ($1,$2,'2026-10-14','No cards on file',5,'card') returning id`, [A, empRecA])).rows.length).toBe(1)
+    await as(U.ownerA, `update company_cards set active = true where id = $1`, [card])
+  })
+  it('the card goes onto the company expense when approved', async () => {
+    const e = (await as(U.accA, `select decide_expense_claim($1,'approved') id`, [claim])).rows[0].id
+    expect((await as(U.accA, `select card_id, amount::float from project_expenses where id = $1`, [e])).rows[0]).toEqual({ card_id: card, amount: 125 })
+  })
+})

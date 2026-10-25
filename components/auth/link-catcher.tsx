@@ -1,6 +1,5 @@
 'use client'
 import { useEffect } from 'react'
-import { createBrowser } from '@/lib/supabase/browser'
 
 /**
  * Older email links put the sign-in in the address after "#" (access_token=…&type=recovery), which the server never sees.
@@ -14,7 +13,8 @@ export function AuthLinkCatcher() {
     const access_token = h.get('access_token'), refresh_token = h.get('refresh_token')
     if (!access_token || !refresh_token) return
     const type = h.get('type')
-    createBrowser().auth.setSession({ access_token, refresh_token }).then(({ error }) => {
+    // the browser client is loaded only when such a link was opened (this component is on every page)
+    import('@/lib/supabase/browser').then(({ createBrowser }) => createBrowser().auth.setSession({ access_token, refresh_token })).then(({ error }) => {
       if (error) location.replace(type === 'recovery' ? '/login/reset?expired=1' : '/login?link=expired')
       else location.replace(type === 'recovery' ? '/login/reset' : '/')
     })

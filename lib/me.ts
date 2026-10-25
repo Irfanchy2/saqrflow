@@ -1,6 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
-import { getCtx, type Ctx } from './auth'
+import { getCtx, requestUser, type Ctx } from './auth'
+import { zonedToUtc } from './time'
 
 // The Employee Portal reads only through the signed-in user's own session: the database (0030) shows an employee
 // nothing but their own employee record, salary, advances, attendance, leave, documents and expense claims.
@@ -13,10 +14,11 @@ export interface PortalSettings { checkin: boolean; advanceLimitPct: number; wor
 
 /** The signed-in user and the employee record linked to their login (null when the login is not linked to one). */
 export const getMe = cache(async (): Promise<{ c: Ctx; emp: MyEmployee | null }> => {
-  const c = await getCtx()
-  const { data } = await c.supabase.from('employees')
+  const { supabase, userId } = await requestUser()
+  // the employee record is read together with the profile (one round trip, not two); RLS still decides what it returns
+  const [c, { data }] = await Promise.all([getCtx(), supabase.from('employees')
     .select('id,employee_no,full_name,department,designation,phone,nationality,joining_date,status,work_location,photo_path')
-    .eq('user_id', c.userId).is('deleted_at', null).maybeSingle()
+    .eq('user_id', userId).is('deleted_at', null).maybeSingle()])
   return { c, emp: (data as MyEmployee | null) ?? null }
 })
 
@@ -30,6 +32,15 @@ export async function portalSettings(c: Ctx): Promise<PortalSettings> {
   if (workEnd <= workStart) { workStart = workStart < '17:00' ? workStart : '17:00'; workEnd = '18:00' }   // same rule as attendance_settings()
   return { checkin: m['portal.checkin'] === true, advanceLimitPct: Number.isFinite(pct) && pct > 0 ? Math.min(100, pct) : 0, workStart, workEnd,
     overtimeMaxHours: Number.isFinite(ot) && ot > 0 && ot <= 12 ? ot : 5 }
+}
+
+/**
+ * A check-in past the end of its working day, or overtime past the maximum, that nobody stopped (same rules as
+ * attendance_autoclose() in 0031). Pages close those before showing them, and skip that round trip otherwise.
+ */
+export function leftRunning(rows: { work_date: string; check_in_at?: string | null; check_out_at?: string | null; overtime_start_at?: string | null; overtime_end_at?: string | null }[], s: PortalSettings, tz: string, now = Date.now()) {
+  return rows.some(r => (r.check_in_at && !r.check_out_at && now >= zonedToUtc(r.work_date, s.workEnd, tz).getTime())
+    || (r.overtime_start_at && !r.overtime_end_at && now >= new Date(r.overtime_start_at).getTime() + s.overtimeMaxHours * 36e5))
 }
 
 /** Advances not yet settled, and how much more may be asked for (a share of the monthly salary set by the company). */

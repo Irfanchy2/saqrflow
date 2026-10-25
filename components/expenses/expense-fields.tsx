@@ -29,13 +29,16 @@ const RATES: [string, string][] = [['5', '5% standard'], ['0', '0% / exempt'], [
  * A scanned expense saves only after "I checked these details against the receipt" is ticked; the receipt file is kept
  * with the expense. Field names match the save action (and the older form) so every page using it keeps working.
  */
-export function ExpenseFields({ e, today, projects, assets, employees, suppliers, fixedProject, initialFile, claim }: {
+export type CardOpt = { id: string; label: string; last4: string }
+export function ExpenseFields({ e, today, projects, assets, employees, suppliers, fixedProject, initialFile, claim, cards = [] }: {
   e?: Record<string, any>; today: string; projects?: Opt[]; assets?: Opt[]; employees: Opt[]; suppliers: (string | SupplierOpt)[]; fixedProject?: boolean
   /** a receipt picked before the form opened (the "Scan receipt" button): read immediately */
   initialFile?: File | null
   /** an employee's expense claim (Employee Portal): only what the employee knows; payment account, project and links are
    *  chosen by the approver */
   claim?: boolean
+  /** the company's cards (claim mode): which one was used is asked when the employee paid by card */
+  cards?: CardOpt[]
 }) {
   const box = useRef<HTMLDivElement>(null), fileRef = useRef<HTMLInputElement>(null)
   const sups = useMemo(() => suppliers.map(s => typeof s === 'string' ? { id: '', name: s, trn: null as string | null } : { ...s, trn: s.trn ?? null }), [suppliers])
@@ -48,6 +51,7 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
   const [rate, setRate] = useState(initRate)
   const [vat, setVat] = useState<string>(e?.vat_amount != null ? String(e.vat_amount) : '')
   const [status, setStatus] = useState<'paid' | 'unpaid'>(e?.payment_status ?? 'paid')
+  const [paidWith, setPaidWith] = useState<string>(e?.paid_with ?? 'cash')
   const [lines, setLines] = useState<Line[]>(() => (Array.isArray(e?.items) ? e!.items : []).map((l: ReceiptLine) => ({ description: l.description, quantity: l.quantity == null ? '' : String(l.quantity), unit_price: l.unit_price == null ? '' : String(l.unit_price), amount: String(l.amount) })))
   const [showLines, setShowLines] = useState(lines.length > 0)
   const known = sups.find(s => s.name.toLowerCase() === supplier.trim().toLowerCase())
@@ -187,7 +191,12 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
     <div className="flex flex-col justify-end"><div className="rounded-xl bg-surface-2 px-3.5 py-2.5"><div className="text-[12px] text-muted">Total incl. VAT</div><div className="text-[19px] font-semibold tabular-nums tracking-[-0.01em]" data-total>AED {total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div></div>
 
     {/* payment */}
-    {claim ? <Field label="How did you pay?"><Select name="paid_with" defaultValue={e?.paid_with ?? 'cash'}>{[['cash', 'Cash'], ['card', 'Card'], ['bank_transfer', 'Bank transfer'], ['other', 'Other']].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+    {claim ? <>
+      <Field label="How did you pay?"><Select name="paid_with" value={paidWith} onChange={ev => setPaidWith(ev.target.value)}>{[['cash', 'Cash'], ['card', 'Card'], ['bank_transfer', 'Bank transfer'], ['other', 'Other']].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+      {paidWith === 'card' && cards.length > 0 && <Field label="Which card? *" hint="The company card you paid with">
+        <Select name="card_id" required defaultValue={cards.some(k => k.id === e?.card_id) ? e!.card_id : cards.length === 1 ? cards[0].id : ''} data-card-select>
+          {cards.length > 1 && <option value="">Choose the card…</option>}
+          {cards.map(k => <option key={k.id} value={k.id}>{k.label} ••{k.last4}</option>)}</Select></Field>}</>
     : <><fieldset className="sm:col-span-2"><legend className="mb-1.5 text-[13px] font-medium">Payment</legend>
       <div className="inline-flex flex-wrap rounded-xl bg-surface-2 p-1">{(['paid', 'unpaid'] as const).map(k => <label key={k} className={cn('cursor-pointer rounded-lg px-4 py-2 text-[14px] font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40', status === k ? 'bg-surface shadow-card' : 'text-muted')}>
         <input type="radio" name="payment_status" value={k} checked={status === k} onChange={() => setStatus(k)} className="sr-only" />{k === 'paid' ? 'Paid' : 'Unpaid (owed to supplier)'}</label>)}</div></fieldset>
