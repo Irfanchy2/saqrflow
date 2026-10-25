@@ -19,11 +19,10 @@ export interface Ctx {
 }
 
 /**
- * Loads the signed-in user, profile, company. Redirects to login/onboarding as needed. Cached per request.
- * The middleware has already verified the session with the auth server and passes the user id on (it strips any
- * client-sent copy), so a normal request needs one database round trip here instead of three.
+ * The signed-in user of this request, without any database query (the middleware vouches for it; otherwise the auth
+ * server is asked). Cached per request, so getCtx and the Employee Portal start their first queries together.
  */
-export const getCtx = cache(async (): Promise<Ctx> => {
+export const requestUser = cache(async () => {
   const supabase = await createClient()
   const h = await headers()
   const token = await verifiedToken()
@@ -34,6 +33,16 @@ export const getCtx = cache(async (): Promise<Ctx> => {
     if (!user) redirect('/login')
     userId = user.id; email = user.email ?? ''
   }
+  return { supabase, h, trusted, userId, email }
+})
+
+/**
+ * Loads the signed-in user, profile, company. Redirects to login/onboarding as needed. Cached per request.
+ * The middleware has already verified the session with the auth server and passes the user id on (it strips any
+ * client-sent copy), so a normal request needs one database round trip here instead of three.
+ */
+export const getCtx = cache(async (): Promise<Ctx> => {
+  const { supabase, h, trusted, userId, email } = await requestUser()
   const sid = sessionIdFromJwt((await supabase.auth.getSession()).data.session?.access_token)
   const ip = (h.get('x-forwarded-for')?.split(',')[0]?.trim() || '').slice(0, 64) || null, ua = (h.get('user-agent') ?? '').slice(0, 300) || null
   const [{ data: row }, touch] = await Promise.all([

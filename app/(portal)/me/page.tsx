@@ -7,7 +7,7 @@ import { NewClaim } from '@/components/portal/new-claim'
 import { ClaimList, CLAIM_COLS, type ClaimRow } from '@/components/portal/claim-list'
 import { PortalCard, PortalStat } from '@/components/portal/stat'
 import { PrivateValue } from '@/components/portal/private-value'
-import { Today } from '@/components/portal/today'
+import { Today, loadToday } from '@/components/portal/today'
 import { claimSuppliers } from '@/lib/expenses/claim-suppliers'
 import { companyCards } from '@/lib/cards'
 
@@ -18,10 +18,12 @@ export default async function MyHome() {
   const { c, emp } = await getMe()
   if (!emp) return null
   const month = startOfMonth(c.today), monthEnd = endOfMonth(c.today), sb = c.supabase
-  const [cards, sups, settings, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
+  const settingsP = portalSettings(c)
+  const [cards, sups, settings, todayRec, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
     companyCards(c),
     claimSuppliers(c, emp.id),
-    portalSettings(c),
+    settingsP,
+    loadToday(c, emp.id, settingsP),
     sb.from('expense_claims').select('status,amount,vat_amount,spent_on').eq('employee_id', emp.id).limit(5000),
     sb.from('expense_claims').select(CLAIM_COLS).eq('employee_id', emp.id).order('created_at', { ascending: false }).limit(5),
     sb.from('attendance_records').select('work_date,status,overtime_hours,check_in_at,check_out_at').eq('employee_id', emp.id).gte('work_date', month).lte('work_date', monthEnd),
@@ -56,7 +58,7 @@ export default async function MyHome() {
       <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} cards={cards} /></div>
     </PortalCard>
 
-    {settings.checkin && <Today c={c} empId={emp.id} settings={settings} />}
+    {settings.checkin && <Today c={c} rec={todayRec} settings={settings} />}
 
     <div className="grid grid-cols-2 gap-3" data-expense-stats>
       <PortalStat label={`Expenses in ${monthName(month).split(' ')[0]}`} icon={Receipt} tone="blue" testId="month-count" href="/me/expenses"

@@ -27,6 +27,13 @@ pages fast.
 - **Long lists are bounded.**
   - Lists paginate or `limit()`. Show "All N …" links rather than rendering hundreds of rows.
   - Expenses on a project: the latest 50 plus a count.
+- **The Employee Portal reads the employee record with the profile.**
+  - `requestUser()` (lib/auth) knows the signed-in user before any query.
+  - `getMe()` starts the employee lookup alongside `getCtx()`'s profile query, so it is one round trip, not two.
+- **Attendance closes forgotten check-ins only when there is one.**
+  - `leftRunning()` (lib/me) checks the rows the page already read against the working day and the overtime limit.
+  - `attendance_autoclose()` runs, and the rows are read again, only when it finds one. Otherwise there is no extra round trip.
+  - The Today card loads inside the page's own `Promise.all` (`loadToday`).
 
 ## Do not ship data the page is not showing
 
@@ -40,6 +47,9 @@ pages fast.
 - **OCR stays in the routes that use it.** The ~11 MB of Tesseract language data and wasm are traced only into the Smart
   Inbox, its processing API, receipt scan, AI settings and the assistant (`next.config.mjs`). Every other server function
   stays small and starts faster.
+- **No animation library on the login page or in the Employee Portal.**
+  - The toast (in every form's bundle) animates with CSS (`.toast-in`), not framer-motion.
+  - The email-link catcher in the root layout loads the Supabase browser client only when a link with a token was opened.
 
 ## Database
 

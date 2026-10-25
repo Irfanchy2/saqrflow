@@ -13,7 +13,7 @@ import { EmployeeFields } from '@/components/employees/employee-fields'
 import { DocFields } from '@/components/documents/doc-fields'
 import { StatusBadge } from '@/components/documents/status-badge'
 import { addAdvance, addLeave, addSalaryPayment, grantPortalAccess, markAttendance, revokePortalAccess, setSalary, updateEmployee, uploadPhoto } from '@/app/actions/employees'
-import { ATTENDANCE, attendanceSummary, clock, monthName } from '@/lib/me'
+import { ATTENDANCE, attendanceSummary, clock, leftRunning, monthName, portalSettings } from '@/lib/me'
 import { ROLE_LABELS, type Role } from '@/lib/permissions'
 import { createDocument } from '@/app/actions/documents'
 import { employeeChecklist } from '@/lib/compliance'
@@ -163,8 +163,14 @@ async function PortalAccess({ id, c, e }: { id: string; c: Awaited<ReturnType<ty
 async function AttendanceTab({ id, c, m }: { id: string; c: Awaited<ReturnType<typeof getCtx>>; m?: string }) {
   const cur = c.today.slice(0, 7), month = m && /^\d{4}-\d{2}$/.test(m) && m <= cur ? m : cur
   const start = `${month}-01`, [y, mo] = month.split('-').map(Number), end = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10)
-  await c.supabase.rpc('attendance_autoclose', { p_company: null })        // a forgotten check-out / overtime is closed before it is shown
-  const { data: rows } = await c.supabase.from('attendance_records').select('id,work_date,status,overtime_hours,notes,check_in_at,check_out_at,overtime_start_at,overtime_end_at,source').eq('employee_id', id).gte('work_date', start).lte('work_date', end).order('work_date', { ascending: false })
+  // `again` adds a tie-break order: Next reuses an identical GET from earlier in the same render, which would be the stale rows
+  const readMonth = (again = false) => { const q = c.supabase.from('attendance_records').select('id,work_date,status,overtime_hours,notes,check_in_at,check_out_at,overtime_start_at,overtime_end_at,source').eq('employee_id', id).gte('work_date', start).lte('work_date', end).order('work_date', { ascending: false }); return again ? q.order('id') : q }
+  const [settings, first] = await Promise.all([portalSettings(c), readMonth()])
+  let rows = first.data
+  if (leftRunning(rows ?? [], settings, c.company.timezone)) {      // a forgotten check-out / overtime is closed before it is shown
+    await c.supabase.rpc('attendance_autoclose', { p_company: null })
+    rows = (await readMonth(true)).data
+  }
   const sum = attendanceSummary(rows ?? []), tz = c.company.timezone
   const prev = new Date(Date.UTC(y, mo - 2, 1)).toISOString().slice(0, 7), next = month < cur ? new Date(Date.UTC(y, mo, 1)).toISOString().slice(0, 7) : null
   return <Card><CardHeader title={`Attendance · ${monthName(start)}`} sub={`Present ${sum.present} · half days ${sum.half_day} · absent ${sum.absent} · leave ${sum.leave} · holidays ${sum.holiday} · overtime ${sum.overtime} h`}

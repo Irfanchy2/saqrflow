@@ -36,8 +36,8 @@ function remember(k: string, v: Cached) {
 
 async function finish(c: Ctx, v: Cached, bytes: number, cached: boolean, claimant?: string): Promise<ScanBody> {
   if (claimant) {     // an employee's claim: their own supplier memory + the company's match; duplicates among their own claims
-    const supplier = await matchClaimSupplier(c, claimant, v.read.supplier ?? null, v.read.trn ?? null)
-    return { ...v, bytes, cached, supplier, duplicate: await findClaimDuplicate(c, claimant, v.read.invoice_no ?? null) }
+    const [supplier, duplicate] = await Promise.all([matchClaimSupplier(c, claimant, v.read.supplier ?? null, v.read.trn ?? null), findClaimDuplicate(c, claimant, v.read.invoice_no ?? null)])
+    return { ...v, bytes, cached, supplier, duplicate }
   }
   const supplier = await matchSupplier(c, v.read.supplier ?? null, v.read.trn ?? null)
   const duplicate = v.read.invoice_no ? await findDuplicate(c, { supplierId: supplier?.id ?? null, supplierName: supplier?.name ?? v.read.supplier ?? null, reference: v.read.invoice_no }) : null
@@ -71,6 +71,9 @@ export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: strin
     on.partial(await finish(c, { read: best.read, provider: best.provider, engine: 'rules', aiSaw: null, aiNote: null, chars: best.text.length, localEngine }, buf.length, false, claimant))
   }
 
+  // the company's paid readers are looked up while the free reading runs, so a hand-over to them does not wait for it
+  const ocrList = ocrProviders(c.company.id), aiList = aiProviders(c.company.id)
+  ocrList.catch(() => {}); aiList.catch(() => {})       // awaited (and their errors seen) only when they are needed
   // 1. free: the PDF's text layer, or PaddleOCR on this server
   on.stage?.('local')
   if (mime === 'application/pdf') { const layer = await extractText(buf, mime).catch(() => ''); if (layer.replace(/\s/g, '').length >= 30) take(layer, 'text_layer') }
@@ -80,7 +83,7 @@ export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: strin
   }
   // 2. paid OCR, only when the free reading is missing or not good enough (and the company has not chosen local only)
   if (!settled() && s.ocr !== 'tesseract' && (mime === 'application/pdf' ? !best : true)) {
-    const providers = providerOrder(s.ocr, await ocrProviders(c.company.id), mime).filter(p => p.id !== 'tesseract')
+    const providers = providerOrder(s.ocr, await ocrList, mime).filter(p => p.id !== 'tesseract')
     if (providers.length) {
       await partial(); on.stage?.('cloud')
       const { result, attempts } = await runOcr({ bytes: buf, mime, name: file.name }, providers)
@@ -93,7 +96,7 @@ export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: strin
   let engine: 'rules' | 'rules+gemini' = 'rules', aiNote: string | null = null, aiSaw: 'photo' | 'text' | null = null
   const cur = best
   if (!settled() && (s.ai === 'auto' || s.ai === 'gemini')) {
-    const { gemini } = await aiProviders(c.company.id)
+    const { gemini } = await aiList
     const canSee = /^image\/(jpeg|png|webp|heic|heif)$/.test(mime) || mime === 'application/pdf'
     const red = redactForAi(cur?.text ?? '')
     const withImage = canSee && (!s.redact || !red.redacted)

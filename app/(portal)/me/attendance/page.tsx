@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { getMe, portalSettings, attendanceSummary, monthName, clock, workedHours, ATTENDANCE } from '@/lib/me'
+import { getMe, portalSettings, attendanceSummary, monthName, clock, workedHours, leftRunning, ATTENDANCE } from '@/lib/me'
 import { flat } from '@/lib/queries'
 import { addMonths, endOfMonth, formatShortDate, startOfMonth } from '@/lib/time'
 import { Badge, EmptyState } from '@/components/ui/primitives'
 import { CalendarCheck, ChevronRight, ArrowLeft, CheckCircle2, Info } from '@/components/icons'
 import { PortalCard } from '@/components/portal/stat'
-import { Today } from '@/components/portal/today'
+import { Today, loadToday } from '@/components/portal/today'
 
 export const metadata = { title: 'My attendance' }
 const LEAVE: Record<string, string> = { annual: 'Annual leave', sick: 'Sick leave', unpaid: 'Unpaid leave', emergency: 'Emergency leave', other: 'Leave' }
@@ -18,12 +18,21 @@ export default async function MyAttendance({ searchParams }: { searchParams: Pro
   const cur = startOfMonth(c.today)
   const month = sp.m && /^\d{4}-\d{2}$/.test(sp.m) && `${sp.m}-01` <= cur ? `${sp.m}-01` : cur
   const end = endOfMonth(month), tz = c.company.timezone
-  await c.supabase.rpc('attendance_autoclose', { p_company: null })      // a forgotten check-out / overtime is closed before it is shown
-  const [settings, { data: rows }, { data: leave }] = await Promise.all([
-    portalSettings(c),
-    c.supabase.from('attendance_records').select('id,work_date,status,overtime_hours,notes,check_in_at,check_out_at,overtime_start_at,overtime_end_at,source').eq('employee_id', emp.id).gte('work_date', month).lte('work_date', end).order('work_date', { ascending: false }),
+  const cols = 'id,work_date,status,overtime_hours,notes,check_in_at,check_out_at,overtime_start_at,overtime_end_at,source'
+  // `again` adds a tie-break order: Next reuses an identical GET from earlier in the same render, which would be the stale rows
+  const readMonth = (again = false) => { const q = c.supabase.from('attendance_records').select(cols).eq('employee_id', emp.id).gte('work_date', month).lte('work_date', end).order('work_date', { ascending: false }); return again ? q.order('id') : q }
+  const settingsP = portalSettings(c)
+  const [settings, todayRec, first, { data: leave }] = await Promise.all([
+    settingsP,
+    month === cur ? loadToday(c, emp.id, settingsP) : null,
+    readMonth(),
     c.supabase.from('leave_records').select('id,leave_type,start_date,end_date,status').eq('employee_id', emp.id).lte('start_date', end).gte('end_date', month).order('start_date', { ascending: false }),
   ])
+  let rows = first.data
+  if (leftRunning(rows ?? [], settings, tz)) {      // a forgotten check-out / overtime is closed before it is shown
+    await c.supabase.rpc('attendance_autoclose', { p_company: null })
+    rows = (await readMonth(true)).data
+  }
   const sum = attendanceSummary(rows ?? [])
   const today = month === cur ? (rows ?? []).find(r => r.work_date === c.today) : undefined
   const prev = addMonths(month, -1).slice(0, 7), next = month < cur ? addMonths(month, 1).slice(0, 7) : null
@@ -38,7 +47,7 @@ export default async function MyAttendance({ searchParams }: { searchParams: Pro
       </div>
     </div>
 
-    {month === cur && (settings.checkin ? <Today c={c} empId={emp.id} settings={settings} />
+    {month === cur && (settings.checkin ? <Today c={c} rec={todayRec} settings={settings} />
       : <p className="flex items-start gap-2.5 rounded-2xl border border-border/80 bg-surface px-4 py-3 text-[14px] text-muted shadow-card" data-checkin-off>
         <Info size={17} className="mt-0.5 shrink-0 text-primary" aria-hidden />Your attendance is recorded by HR. Self check-in is not turned on for your company.</p>)}
 
