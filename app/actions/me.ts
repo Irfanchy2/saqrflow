@@ -166,15 +166,16 @@ export async function withdrawClaim(id: string): Promise<ActionState> {
   })
 }
 
-/** Self check-in / check-out for today (server time, the company's date). Only when the company turned it on. */
-export async function punch(kind: 'in' | 'out'): Promise<ActionState> {
+/** Self check-in / check-out and overtime start / stop (server time, the company's date). Only when the company turned it on. */
+const PUNCH: Record<string, string> = { in: 'Checked in.', out: 'Checked out.', ot_start: 'Overtime started.', ot_stop: 'Overtime stopped.' }
+export async function punch(kind: 'in' | 'out' | 'ot_start' | 'ot_stop'): Promise<ActionState> {
   return safe(async () => {
     const { c, emp } = await getMe()
     if (!emp) return { error: 'Your login is not linked to an employee record.' }
-    if (kind !== 'in' && kind !== 'out') return { error: 'Unknown attendance action.' }
+    if (!(kind in PUNCH)) return { error: 'Unknown attendance action.' }
     const { error } = await c.supabase.rpc('attendance_punch', { p_kind: kind })
     if (error) return { error: error.message }
     revalidatePath('/me'); revalidatePath('/me/attendance')
-    return { ok: true, message: kind === 'in' ? 'Checked in.' : 'Checked out.' }
+    return { ok: true, message: PUNCH[kind] }
   })
 }

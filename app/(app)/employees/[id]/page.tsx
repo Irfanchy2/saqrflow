@@ -163,7 +163,8 @@ async function PortalAccess({ id, c, e }: { id: string; c: Awaited<ReturnType<ty
 async function AttendanceTab({ id, c, m }: { id: string; c: Awaited<ReturnType<typeof getCtx>>; m?: string }) {
   const cur = c.today.slice(0, 7), month = m && /^\d{4}-\d{2}$/.test(m) && m <= cur ? m : cur
   const start = `${month}-01`, [y, mo] = month.split('-').map(Number), end = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10)
-  const { data: rows } = await c.supabase.from('attendance_records').select('id,work_date,status,overtime_hours,notes,check_in_at,check_out_at,source').eq('employee_id', id).gte('work_date', start).lte('work_date', end).order('work_date', { ascending: false })
+  await c.supabase.rpc('attendance_autoclose', { p_company: null })        // a forgotten check-out / overtime is closed before it is shown
+  const { data: rows } = await c.supabase.from('attendance_records').select('id,work_date,status,overtime_hours,notes,check_in_at,check_out_at,overtime_start_at,overtime_end_at,source').eq('employee_id', id).gte('work_date', start).lte('work_date', end).order('work_date', { ascending: false })
   const sum = attendanceSummary(rows ?? []), tz = c.company.timezone
   const prev = new Date(Date.UTC(y, mo - 2, 1)).toISOString().slice(0, 7), next = month < cur ? new Date(Date.UTC(y, mo, 1)).toISOString().slice(0, 7) : null
   return <Card><CardHeader title={`Attendance · ${monthName(start)}`} sub={`Present ${sum.present} · half days ${sum.half_day} · absent ${sum.absent} · leave ${sum.leave} · holidays ${sum.holiday} · overtime ${sum.overtime} h`}
@@ -177,6 +178,6 @@ async function AttendanceTab({ id, c, m }: { id: string; c: Awaited<ReturnType<t
           <p className="mt-3 text-xs text-muted">Saving a day that is already recorded corrects it. The employee sees it in their portal; they cannot change it.</p></ActionForm></DialogButton></div>} />
     {!rows?.length ? <EmptyState title="No attendance recorded this month" /> : <TableWrap><thead className="border-b border-border"><tr><Th>Day</Th><Th>Status</Th><Th>In</Th><Th>Out</Th><Th>Overtime</Th><Th>Notes</Th></tr></thead>
       <tbody className="divide-y divide-border">{rows.map(r => <tr key={r.id}><Td className="tabular-nums">{r.work_date}</Td><Td><Badge tone={ATTENDANCE[r.status]?.tone}>{ATTENDANCE[r.status]?.label ?? r.status}</Badge>{r.source === 'self' && <span className="ms-2 text-xs text-muted">self check-in</span>}</Td>
-        <Td className="tabular-nums">{clock(r.check_in_at, tz) ?? '—'}</Td><Td className="tabular-nums">{clock(r.check_out_at, tz) ?? '—'}</Td><Td className="tabular-nums">{Number(r.overtime_hours) ? `${Number(r.overtime_hours)} h` : '—'}</Td><Td className="text-muted">{r.notes ?? ''}</Td></tr>)}</tbody></TableWrap>}
+        <Td className="tabular-nums">{clock(r.check_in_at, tz) ?? '—'}</Td><Td className="tabular-nums">{clock(r.check_out_at, tz) ?? '—'}</Td><Td className="tabular-nums">{Number(r.overtime_hours) ? `${Number(r.overtime_hours)} h` : '—'}{r.overtime_start_at && <span className="block text-xs text-muted">{clock(r.overtime_start_at, tz)}–{r.overtime_end_at ? clock(r.overtime_end_at, tz) : 'running'}</span>}</Td><Td className="text-muted">{r.notes ?? ''}</Td></tr>)}</tbody></TableWrap>}
   </Card>
 }

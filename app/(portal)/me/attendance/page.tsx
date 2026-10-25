@@ -5,7 +5,7 @@ import { addMonths, endOfMonth, formatShortDate, startOfMonth } from '@/lib/time
 import { Badge, EmptyState } from '@/components/ui/primitives'
 import { CalendarCheck, ChevronRight, ArrowLeft, CheckCircle2 } from '@/components/icons'
 import { PortalCard } from '@/components/portal/stat'
-import { PunchButton } from '@/components/portal/punch'
+import { Today } from '@/components/portal/today'
 
 export const metadata = { title: 'My attendance' }
 const LEAVE: Record<string, string> = { annual: 'Annual leave', sick: 'Sick leave', unpaid: 'Unpaid leave', emergency: 'Emergency leave', other: 'Leave' }
@@ -18,9 +18,10 @@ export default async function MyAttendance({ searchParams }: { searchParams: Pro
   const cur = startOfMonth(c.today)
   const month = sp.m && /^\d{4}-\d{2}$/.test(sp.m) && `${sp.m}-01` <= cur ? `${sp.m}-01` : cur
   const end = endOfMonth(month), tz = c.company.timezone
+  await c.supabase.rpc('attendance_autoclose', { p_company: null })      // a forgotten check-out / overtime is closed before it is shown
   const [settings, { data: rows }, { data: leave }] = await Promise.all([
     portalSettings(c),
-    c.supabase.from('attendance_records').select('id,work_date,status,overtime_hours,notes,check_in_at,check_out_at,source').eq('employee_id', emp.id).gte('work_date', month).lte('work_date', end).order('work_date', { ascending: false }),
+    c.supabase.from('attendance_records').select('id,work_date,status,overtime_hours,notes,check_in_at,check_out_at,overtime_start_at,overtime_end_at,source').eq('employee_id', emp.id).gte('work_date', month).lte('work_date', end).order('work_date', { ascending: false }),
     c.supabase.from('leave_records').select('id,leave_type,start_date,end_date,status').eq('employee_id', emp.id).lte('start_date', end).gte('end_date', month).order('start_date', { ascending: false }),
   ])
   const sum = attendanceSummary(rows ?? [])
@@ -37,10 +38,7 @@ export default async function MyAttendance({ searchParams }: { searchParams: Pro
       </div>
     </div>
 
-    {settings.checkin && month === cur && <PortalCard title="Today" sub={today?.check_in_at ? `In at ${clock(today.check_in_at, tz)}${today.check_out_at ? ` · out at ${clock(today.check_out_at, tz)}` : ''}` : 'Not checked in yet'}>
-      <div className="px-4 pb-4 sm:px-5">{!today?.check_in_at ? (today && ['leave', 'holiday'].includes(today.status) ? <p className="text-[14px] text-muted">No check-in needed today.</p> : <PunchButton kind="in" />)
-        : !today.check_out_at ? <PunchButton kind="out" /> : <p className="flex items-center gap-2 text-[14px] font-medium text-success"><CheckCircle2 size={17} aria-hidden />Day complete ({workedHours(today.check_in_at, today.check_out_at)} h).</p>}</div>
-    </PortalCard>}
+    {settings.checkin && month === cur && <Today c={c} empId={emp.id} settings={settings} />}
 
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" data-attendance-summary>
       {([['Present', sum.present], ['Half day', sum.half_day], ['Absent', sum.absent], ['Leave', sum.leave], ['Holiday', sum.holiday], ['Overtime h', sum.overtime]] as const).map(([l, v]) =>
@@ -52,7 +50,8 @@ export default async function MyAttendance({ searchParams }: { searchParams: Pro
         return <li key={r.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
           <div className="w-12 shrink-0 text-center"><div className="text-[18px] font-semibold leading-none tabular-nums">{Number(r.work_date.slice(8))}</div><div className="mt-1 text-[11px] uppercase text-muted">{new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' }).format(new Date(`${r.work_date}T00:00:00Z`))}</div></div>
           <div className="min-w-0 flex-1 text-[13px] text-muted">{r.check_in_at ? <>In {clock(r.check_in_at, tz)}{r.check_out_at ? ` · Out ${clock(r.check_out_at, tz)}` : ''}{h !== null ? ` · ${h} h` : ''}</> : r.source === 'admin' ? 'Recorded by HR' : ''}
-            {Number(r.overtime_hours) > 0 && <span className="text-fg"> · {Number(r.overtime_hours)} h overtime</span>}{r.notes && <span className="block truncate">{r.notes}</span>}</div>
+            {r.overtime_start_at ? <span className="text-warning"> · Overtime {clock(r.overtime_start_at, tz)}{r.overtime_end_at ? `–${clock(r.overtime_end_at, tz)}` : ' (running)'}{Number(r.overtime_hours) > 0 ? ` · ${Number(r.overtime_hours)} h` : ''}</span>
+              : Number(r.overtime_hours) > 0 && <span className="text-fg"> · {Number(r.overtime_hours)} h overtime</span>}{r.notes && <span className="block truncate">{r.notes}</span>}</div>
           <Badge tone={a.tone}>{a.label}</Badge></li> })}</ul>
         : <EmptyState compact icon={CalendarCheck} title="No records this month" body="Days appear here once HR records them." />}
     </PortalCard>

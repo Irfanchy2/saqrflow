@@ -23,12 +23,13 @@ async function handle(req: NextRequest) {
   const started = Date.now(), admin = createAdminClient()
   try {
     const r = await recordRun(admin, 'cron', async () => {
+      const attendance = await admin.rpc('attendance_autoclose', { p_company: null }).then(r => r.data ?? 0, () => 0)   // check-ins / overtime left running
       const events = await processEvents(admin, 1000)
       const reports = await runDueSchedules(admin)
       const reminders = await runReminderCycle(admin)
       const webhooks = await deliverWebhooks(admin, 100)
       const demo = await resetDemo(admin).catch(e => ({ demoError: (e as Error).message }))   // never blocks the real work above
-      return { events, reports, webhooks, ...reminders, ...demo }
+      return { attendance, events, reports, webhooks, ...reminders, ...demo }
     })
     return NextResponse.json({ ok: true, ms: Date.now() - started, ...r })
   } catch (e) { console.error('[cron/reminders]', e); return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 }) }
