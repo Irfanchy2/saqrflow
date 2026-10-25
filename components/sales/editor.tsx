@@ -48,12 +48,14 @@ function ago(ts: number | null, now: number) {
   return s < 10 ? 'Saved just now' : s < 60 ? `Saved ${Math.floor(s / 5) * 5} seconds ago` : s < 3600 ? `Saved ${Math.floor(s / 60)} min ago` : 'Saved'
 }
 
-export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false, statusView }: {
+export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false, statusView, invoicedAs = null }: {
   doc: Record<string, any>; items: (PaperItem & { id?: string })[]; branding: Branding; paid: number; customers: CustomerOpt[]; projects: ProjectOpt[]
   catalog: CatalogOpt[]; templates: TemplateOpt[]; salespeople: { id: string; full_name: string }[]; delivery: Record<string, { ordered: number; delivered: number }>
   editable: boolean; lockedReason?: string | null; canStatus: boolean; canDelete: boolean; canVault: boolean; requireApproval: boolean; canRenumber?: boolean
   /** invoices: document status and payment status, shown side by side ("Sent | Unpaid") instead of one combined status */
   statusView?: { doc: DocState; pay: PayState | null; daysLate: number }
+  /** delivery notes: the invoice that already bills it (no second invoice is offered) */
+  invoicedAs?: string | null
 }) {
   const t = doc.doc_type as SalesType, meta = DOC_META[t], isTax = isTaxDoc(t), isInv = t === 'invoice', isQtn = t === 'quotation', isDn = t === 'delivery_note', isCn = t === 'credit_note'
   const draft = doc.status === 'draft'
@@ -288,7 +290,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
           {waPhone.length >= 9 && <MenuItem icon={MessageCircle} href={wa} external onClick={() => void logSalesEvent(doc.id, 'whatsapp')}>Share on WhatsApp…</MenuItem>}
           {isQtn && requireApproval && canStatus && (!approval || approval === 'changes_requested' || approval === 'rejected') && <MenuItem icon={Send} onClick={() => run(() => requestApproval(doc.id), { saveFirst: true })}>Request approval</MenuItem>}
           {canDeliver && <MenuItem icon={Truck} onClick={() => (dirty ? save(() => setShowDelivery(true)) : setShowDelivery(true))}>Create delivery note (choose quantities)…</MenuItem>}
-          {canStatus && (CONVERSIONS[t] ?? []).filter(to => !(isQtn && to === 'delivery_note')).filter(to => to !== 'credit_note' || !draft).map(to => <MenuItem key={to} icon={to === 'credit_note' ? FileMinus : Repeat}
+          {canStatus && (CONVERSIONS[t] ?? []).filter(to => !(isQtn && to === 'delivery_note')).filter(to => to !== 'credit_note' || !draft).filter(to => !(to === 'invoice' && invoicedAs)).map(to => <MenuItem key={to} icon={to === 'credit_note' ? FileMinus : Repeat}
             onClick={() => run(() => convertSalesDoc(doc.id, to, tok(`convert-${to}`)), { saveFirst: true })}>{isQtn && to === 'invoice' ? 'Convert to invoice' : `Create ${DOC_META[to].label.toLowerCase()}`}</MenuItem>)}
           {isQtn && canStatus && ['accepted', 'converted'].includes(doc.status) && <>
             <MenuItem icon={ClipboardList} onClick={() => run(() => createWorkOrderFromQuotation(doc.id, tok('work-order')), { saveFirst: true })}>Create work order (and project)</MenuItem>
@@ -445,7 +447,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
           </Section>}
 
           <Section icon={PenLine} title="Internal notes" sub="Never printed" collapsed={!head.notes}>
-            <Textarea rows={3} value={head.notes ?? ''} onChange={e => set('notes', e.target.value)} placeholder="Notes for your team only" />
+            <Textarea rows={3} aria-label="Internal notes" value={head.notes ?? ''} onChange={e => set('notes', e.target.value)} placeholder="Notes for your team only" />
           </Section>
         </fieldset>
       </div>

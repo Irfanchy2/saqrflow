@@ -66,7 +66,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         {canSens && <Card><CardHeader title="Emergency contact" /><div className="p-4 text-sm">{e.emergency_contact_name ? <><div className="font-medium">{e.emergency_contact_name}</div><div className="text-muted">{e.emergency_contact_phone}</div></> : <span className="text-muted">Not recorded</span>}</div></Card>}
         {canSens && <Card><CardHeader title="Accommodation" /><div className="p-4 text-sm">{e.accommodation ?? <span className="text-muted">Not recorded</span>}</div></Card>}
         {c.can('users.manage') && canSens && <PortalAccess id={id} c={c} e={e} />}
-        {canEdit && <Card><CardHeader title="Photograph" /><div className="p-4"><ActionForm action={uploadPhoto.bind(null, id)} submit="Upload photo"><input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp" className="text-sm" required /></ActionForm></div></Card>}
+        {canEdit && <Card><CardHeader title="Photograph" /><div className="p-4"><ActionForm action={uploadPhoto.bind(null, id)} submit="Upload photo"><input type="file" name="photo" aria-label="Employee photo" accept=".jpg,.jpeg,.png,.webp" className="text-sm" required /></ActionForm></div></Card>}
       </div></div>}
 
     {tab === 'documents' && <div className="grid gap-5 lg:grid-cols-3">

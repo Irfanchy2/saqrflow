@@ -21,9 +21,10 @@ type Acct = { id: string; name: string; account_display_name: string | null; acc
 const label = (a: Pick<Acct, 'name' | 'account_display_name'>) => [a.name, a.account_display_name].filter(Boolean).join(' · ')
 
 function AccountFields({ a, banks }: { a?: Acct; banks: string[] }) {
+  const list = `bank-names-${a?.id ?? 'new'}`   // one form per account on the page: each its own suggestion list
   return <>
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Bank *" hint="For cash in the office, enter “Petty cash” and choose Cash."><Input name="name" required maxLength={120} list="bank-names" defaultValue={a?.name} placeholder="e.g. Emirates NBD" /></Field>
+      <Field label="Bank *" hint="For cash in the office, enter “Petty cash” and choose Cash."><Input name="name" required maxLength={120} list={list} defaultValue={a?.name} placeholder="e.g. Emirates NBD" /></Field>
       <Field label="Label" hint="e.g. “Current ••4417”. Never the full account number."><Input name="account_display_name" maxLength={120} defaultValue={a?.account_display_name ?? ''} /></Field>
       <Field label="Type *"><Select name="account_type" defaultValue={a?.account_type ?? 'current'}>{Object.entries(TYPES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
       <Field label="Opening balance (AED)" hint="The balance on the opening date. Everything after it is added from payments, expenses and entries."><Input name="opening_balance" type="number" step="0.01" defaultValue={a ? Number(a.opening_balance) : ''} /></Field>
@@ -31,7 +32,7 @@ function AccountFields({ a, banks }: { a?: Acct; banks: string[] }) {
       <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="is_default" defaultChecked={a?.is_default} className="h-4 w-4" />Default account for new payments</label>
     </div>
     <Field label="Notes"><Textarea name="notes" rows={2} maxLength={1000} defaultValue={a?.notes ?? ''} /></Field>
-    <datalist id="bank-names">{banks.map(b => <option key={b} value={b} />)}</datalist>
+    <datalist id={list}>{banks.map(b => <option key={b} value={b} />)}</datalist>
   </>
 }
 

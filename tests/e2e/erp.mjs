@@ -298,6 +298,13 @@ try {
   const fromDn = await one(`select i.total::float t, i.subtotal::float s, it.quantity::float q, it.unit_price::float up, (select unit_price::float from invoice_items where invoice_id=$2 order by position limit 1) qp
     from invoices i join invoice_items it on it.invoice_id=i.id where i.id=$1`, [docId(), qid])
   ok(fromDn && fromDn.q === 60 && fromDn.up === fromDn.qp && fromDn.up > 0 && fromDn.t > 0, `invoice from the delivery note: 60 × ${fromDn?.up} (the quotation's price), total ${fromDn?.t}, not 0.00`)
+  // the delivery note is now billed: no second invoice from it (menu item gone; the server refuses too)
+  const before2 = (await one(`select count(*)::int n from invoices where doc_type='invoice' and quotation_id=$1`, [qid])).n
+  await p.goto(`${BASE}/invoices/${dnId}`); await settle()
+  await p.getByRole('button', { name: 'More actions' }).click(); await p.waitForTimeout(300)
+  ok(await p.getByRole('menuitem', { name: 'Create tax invoice' }).count() === 0, 'an invoiced delivery note no longer offers “Create tax invoice”')
+  await p.keyboard.press('Escape')
+  ok((await one(`select count(*)::int n from invoices where doc_type='invoice' and quotation_id=$1`, [qid])).n === before2, 'still one invoice for that delivery')
 } catch (e) { ok(false, `aborted: ${e.stack || e}`); await p.screenshot({ path: `${OUT}/abort.png`, fullPage: true }).catch(() => {}) }
 await browser.close(); await db.end()
 const failed = results.filter(r => !r[0]).length

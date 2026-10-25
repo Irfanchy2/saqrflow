@@ -156,6 +156,8 @@ export async function newSalesDoc(type: string, opts: { customerId?: string; pro
 export async function saveSalesDoc(id: string, input: SalesDocInput, opts: { expected?: string | null; autosave?: boolean } = {}): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'records.edit')
+    // the line limit is checked before validation, so an oversized list is refused without validating every line first
+    if (Array.isArray((input as { items?: unknown })?.items) && (input as { items: unknown[] }).items.length > 300) return { error: 'A document can have up to 300 lines' }
     const parsed = docSchema.safeParse(input)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form.', fieldErrors: Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.'), i.message])) }
     const v = parsed.data
@@ -366,8 +368,13 @@ export async function convertSalesDoc(id: string, to: string, tok?: string): Pro
     const c = await getCtx(); need(c, 'records.edit')
     const target = typeSchema.parse(to), t = token.parse(tok)
     if ((newId = await existingByToken(c, t))) return
-    const { data: cur } = await c.supabase.from('invoices').select('doc_type,status').eq('id', id).maybeSingle()
+    const { data: cur } = await c.supabase.from('invoices').select('doc_type,status,source_invoice_id').eq('id', id).maybeSingle()
     if (!cur) return { error: 'Document not found.' }
+    // a delivery note already billed (made from an invoice, or converted before) gets no second invoice while that one stands
+    if (cur.doc_type === 'delivery_note' && target === 'invoice' && cur.source_invoice_id) {
+      const { data: inv } = await c.supabase.from('invoices').select('number,status').eq('id', cur.source_invoice_id).eq('doc_type', 'invoice').is('deleted_at', null).maybeSingle()
+      if (inv && inv.status !== 'cancelled') return { error: `This delivery note is already invoiced as ${inv.number}. Open that invoice instead of creating a second one.` }
+    }
     if (!(CONVERSIONS[cur.doc_type as SalesType] ?? []).includes(target)) return { error: `A ${DOC_META[cur.doc_type as SalesType].label} cannot be converted to a ${DOC_META[target].label}.` }
     if (cur.status === 'cancelled') return { error: 'A cancelled document cannot be converted.' }
     if (target === 'credit_note' && cur.status === 'draft') return { error: 'Issue the invoice before creating a credit note.' }

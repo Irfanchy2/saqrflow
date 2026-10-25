@@ -22,7 +22,8 @@ const money2 = (n: number) => Math.round(n * 100) / 100
 const line = z.object({ description: z.string().trim().min(1).max(300), quantity: z.number().positive().max(1e7).nullable().optional(), unit_price: z.number().min(0).max(1e10).nullable().optional(), amount: z.number().min(0).max(1e10) })
 const jsonOf = <T,>(schema: z.ZodType<T>, fallback: T) => z.string().optional().transform((s, ctx) => {
   if (!s) return fallback
-  try { const r = schema.safeParse(JSON.parse(s)); if (r.success) return r.data } catch {}
+  // a bounded size before parsing: an oversized list cannot tie up the server while it is validated
+  if (s.length <= 200_000) try { const r = schema.safeParse(JSON.parse(s)); if (r.success) return r.data } catch {}
   ctx.addIssue({ code: 'custom', message: 'The line items could not be read. Remove them and try again.' }); return z.NEVER
 })
 const claimSchema = z.object({

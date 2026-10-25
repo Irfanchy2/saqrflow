@@ -18,12 +18,13 @@ type Item = { id: string; name: string; sku: string | null; category: string | n
 const isLow = (i: Item) => Number(i.reorder_level) > 0 && Number(i.on_hand) <= Number(i.reorder_level)
 
 function ItemFields({ i, units, cats, suppliers }: { i?: Item; units: string[]; cats: string[]; suppliers: { id: string; name: string }[] }) {
+  const k = i?.id ?? 'new'   // one form per item on the page: the suggestion lists need their own ids
   return <>
     <div className="grid gap-4 sm:grid-cols-3">
       <Field label="Item name *" className="sm:col-span-2"><Input name="name" required maxLength={200} defaultValue={i?.name} placeholder="e.g. MS Plate 6mm 1250×2500" /></Field>
       <Field label="Code / SKU"><Input name="sku" maxLength={40} defaultValue={i?.sku ?? ''} placeholder="e.g. MSP-06" /></Field>
-      <Field label="Category"><Input name="category" maxLength={80} list="stock-cats" defaultValue={i?.category ?? ''} placeholder="e.g. Plates" /></Field>
-      <Field label="Unit *"><Input name="unit" required maxLength={20} list="stock-units" defaultValue={i?.unit ?? 'Nos'} /></Field>
+      <Field label="Category"><Input name="category" maxLength={80} list={`stock-cats-${k}`} defaultValue={i?.category ?? ''} placeholder="e.g. Plates" /></Field>
+      <Field label="Unit *"><Input name="unit" required maxLength={20} list={`stock-units-${k}`} defaultValue={i?.unit ?? 'Nos'} /></Field>
       <Field label="Location"><Input name="location" maxLength={80} defaultValue={i?.location ?? ''} placeholder="e.g. Yard rack B" /></Field>
       <Field label="Reorder level" hint="“Running low” when on hand falls to this."><Input name="reorder_level" type="number" step="any" min="0" defaultValue={i ? Number(i.reorder_level) : ''} /></Field>
       <Field label="Usual reorder quantity"><Input name="reorder_qty" type="number" step="any" min="0" defaultValue={i ? Number(i.reorder_qty) : ''} /></Field>
@@ -33,8 +34,8 @@ function ItemFields({ i, units, cats, suppliers }: { i?: Item; units: string[]; 
       <Field label="Opening quantity" hint="What is on the shelf today. Leave empty to start at zero."><Input name="opening_qty" type="number" step="any" min="0" /></Field>
       <Field label="Cost per unit (AED)"><Input name="opening_cost" type="number" step="0.01" min="0" /></Field></div>}
     <Field label="Notes"><Textarea name="notes" rows={2} maxLength={1000} defaultValue={i?.notes ?? ''} /></Field>
-    <datalist id="stock-units">{units.map(u => <option key={u} value={u} />)}</datalist>
-    <datalist id="stock-cats">{cats.map(u => <option key={u} value={u} />)}</datalist>
+    <datalist id={`stock-units-${k}`}>{units.map(u => <option key={u} value={u} />)}</datalist>
+    <datalist id={`stock-cats-${k}`}>{cats.map(u => <option key={u} value={u} />)}</datalist>
   </>
 }
 

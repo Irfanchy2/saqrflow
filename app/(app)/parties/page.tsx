@@ -75,7 +75,7 @@ export default async function Parties({ searchParams }: { searchParams: Promise<
       {c.can('data.export') && <LinkButton href={`/api/export/${kind}`} variant="secondary"><Download size={14} />Export CSV</LinkButton>}
       {edit && <DialogButton wide variant="secondary" label="Import CSV" title={`Import ${isC ? 'clients' : 'suppliers'} from CSV`} icon={<Upload size={14} />}><ImportForm action={importParties.bind(null, kind)} columns="name, contact_person, phone, whatsapp, email, trn, address, notes" /></DialogButton>}
       {edit && <DialogButton wide openParam={label} label={`Add ${isC ? 'client' : 'supplier'}`} title={`Add ${isC ? 'client' : 'supplier'}`} icon={<Plus size={15} />}>
-        <ActionForm draftKey={`party:${kind}:new`} action={createParty.bind(null, kind)} resetOnSuccess><PartyFields customer={isC} create /></ActionForm></DialogButton>}</>} />
+        <ActionForm draftKey={`party:${kind}:new`} action={createParty.bind(null, kind)} resetOnSuccess><PartyFields customer={isC} create fin={fin} /></ActionForm></DialogButton>}</>} />
 
     <Metrics className="mb-5" cols={isC && fin ? 4 : 2}>
       <StatCard label={isC ? 'Total customers' : 'Total suppliers'} value={totalRes.count ?? 0} icon={Handshake} />

@@ -64,7 +64,8 @@ const money2 = (n: number) => Math.round(n * 100) / 100
 const lineSchema = z.object({ description: z.string().trim().min(1).max(300), quantity: z.number().positive().max(1e7).nullable().optional(), unit_price: z.number().min(0).max(1e10).nullable().optional(), amount: z.number().min(0).max(1e10) })
 const jsonOf = <T,>(schema: z.ZodType<T>, fallback: T) => z.string().optional().transform((s, ctx) => {
   if (!s) return fallback
-  try { const r = schema.safeParse(JSON.parse(s)); if (r.success) return r.data } catch {}
+  // a bounded size before parsing: an oversized list cannot tie up the server while it is validated
+  if (s.length <= 200_000) try { const r = schema.safeParse(JSON.parse(s)); if (r.success) return r.data } catch {}
   ctx.addIssue({ code: 'custom', message: 'The line items could not be read. Remove them and try again.' }); return z.NEVER
 })
 const expenseSchema = z.object({
@@ -215,7 +216,9 @@ export async function updateParty(kind: 'customers' | 'suppliers', id: string, _
     const blank = { contact_person: null, phone: null, whatsapp: null, email: null, trn: null, address: null, notes: null }
     const row: Record<string, unknown> = { ...blank, ...r.data }
     if (table === 'customers') Object.assign(row, { credit_days: r.data.credit_days ?? null, opening_balance: r.data.opening_balance ?? 0, opening_balance_date: r.data.opening_balance_date ?? null, updated_at: new Date().toISOString() })
-    else { delete row.credit_days; delete row.opening_balance; delete row.opening_balance_date }
+    // the opening balance is money owed: only finance users see it (the form leaves it out for others) and only they change it
+    if (table !== 'customers' || !c.can('finance.view')) { delete row.opening_balance; delete row.opening_balance_date }
+    if (table !== 'customers') delete row.credit_days
     const { error } = await c.supabase.from(table).update(row).eq('id', id)
     if (error) { if (error.code === '23505') return { error: 'Another record already uses this name.' }; throw error }
     revalidatePath('/parties'); revalidatePath(`/parties/${id}`); return { ok: true, message: 'Saved.' }
