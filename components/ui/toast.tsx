@@ -21,7 +21,8 @@ export function Toaster() {
       const { msg, tone } = (e as CustomEvent).detail as Omit<Toast, 'id'>
       const id = ++n
       setItems(x => [...x.slice(-3), { id, msg, tone }])
-      setTimeout(() => setItems(x => x.filter(t => t.id !== id)), tone === 'error' ? 7000 : 3500)
+      // an error stays until it is closed (people read and act on it at their own pace); confirmations fade after 5 s
+      if (tone !== 'error') setTimeout(() => setItems(x => x.filter(t => t.id !== id)), 5000)
     }
     window.addEventListener(EVT, on)
     return () => window.removeEventListener(EVT, on)
@@ -35,7 +36,7 @@ export function Toaster() {
       return <div key={t.id} className="toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border border-border/80 bg-surface py-3 pe-3 ps-3 text-[13.5px] shadow-pop">
         <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', t.tone === 'error' ? 'bg-danger/10 text-danger' : t.tone === 'success' ? 'bg-success/10 text-success' : 'bg-primary-soft text-primary')} aria-hidden><Icon size={16} /></span>
         <span className="flex-1 self-center font-medium leading-snug">{t.msg}</span>
-        <button aria-label="Dismiss" className="grid h-7 w-7 cursor-pointer place-items-center rounded-md text-muted transition-colors hover:bg-fg/[.05] hover:text-fg" onClick={() => setItems(x => x.filter(y => y.id !== t.id))}><X size={14} /></button>
+        <button aria-label="Dismiss" className="grid h-9 w-9 shrink-0 cursor-pointer sm:h-7 sm:w-7 place-items-center rounded-md text-muted transition-colors hover:bg-fg/[.05] hover:text-fg" onClick={() => setItems(x => x.filter(y => y.id !== t.id))}><X size={14} /></button>
       </div>
     })}
   </div>

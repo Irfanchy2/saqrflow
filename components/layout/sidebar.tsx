@@ -88,7 +88,7 @@ export function Sidebar({ items, company, rtl, user = '', role = '' }: { items: 
             className={cn('group/g flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-full ps-[14px] pe-2 text-[11px] font-semibold uppercase tracking-[0.09em] text-muted transition-[color,opacity,background-color] duration-150 hover:bg-fg/[.04] hover:text-fg', rail && 'pointer-events-none opacity-0')}>
             <span className="flex-1 truncate text-start">{g.name}</span>
             {/* a folded section says how much it holds */}
-            {isFolded && <span className="rounded-full bg-fg/[.07] px-1.5 text-[10px] font-semibold leading-4 tracking-normal tabular-nums text-muted">{g.items.length}</span>}
+            {isFolded && <span className="rounded-full bg-fg/[.07] px-1.5 text-[11px] font-semibold leading-4 tracking-normal tabular-nums text-muted">{g.items.length}</span>}
             <CaretDownIcon size={11} weight="bold" aria-hidden className={cn('opacity-40 transition-[transform,opacity] duration-200 group-hover/g:opacity-100 group-focus-visible/g:opacity-100', isFolded && '-rotate-90 rtl:rotate-90')} /></button>
           {/* in the rail a short rule marks where a section starts */}
           <span aria-hidden className={cn('absolute start-[14px] top-1/2 h-px w-3 bg-border transition-opacity duration-150', rail ? 'opacity-100' : 'opacity-0')} />

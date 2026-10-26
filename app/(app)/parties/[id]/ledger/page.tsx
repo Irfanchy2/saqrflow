@@ -12,7 +12,7 @@ import { Badge, Card, CardHeader, EmptyState, Field, Input, LinkButton, PageHead
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionForm } from '@/components/ui/action-form'
 import { recordPaymentOnAccount } from '@/app/actions/sales'
-import { formatAed } from '@/lib/time'
+import { formatAed, showDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 export const metadata = { title: 'Customer ledger' }
@@ -78,7 +78,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
     {l.invoices.length > 0 && <Card className="mt-5"><CardHeader title="Invoices" sub="Amount, paid / credited, balance and days overdue" />
       <TableWrap><thead className="bg-surface-2/50"><tr><Th>Invoice</Th><Th>Date</Th><Th>Due</Th><Th className="text-right">Amount</Th><Th className="text-right">Paid / credited</Th><Th className="text-right">Balance</Th><Th>Overdue</Th></tr></thead>
         <tbody className="divide-y divide-border">{l.invoices.map(i => <tr key={i.id} className="hover:bg-surface-2/50">
-          <Td><Link href={`/invoices/${i.id}`} className="font-mono text-[13px] text-primary hover:underline">{i.number}</Link></Td><Td className="tabular-nums">{i.issue_date}</Td><Td className="tabular-nums">{i.due_date ?? '—'}</Td>
+          <Td><Link href={`/invoices/${i.id}`} className="font-mono text-[13px] text-primary hover:underline">{i.number}</Link></Td><Td className="tabular-nums">{showDate(i.issue_date)}</Td><Td className="tabular-nums">{showDate(i.due_date, '—')}</Td>
           <Td className="text-right tabular-nums">{fmtMoney(i.total)}</Td><Td className="text-right tabular-nums">{fmtMoney(i.total - i.balance)}</Td><Td className="text-right font-medium tabular-nums">{fmtMoney(i.balance)}</Td>
           <Td>{i.daysOverdue ? <Badge tone="red">{i.daysOverdue} days</Badge> : i.balance > 0.004 ? <Badge tone="blue">Not due</Badge> : <Badge tone="green">Paid</Badge>}</Td></tr>)}</tbody></TableWrap></Card>}
   </>

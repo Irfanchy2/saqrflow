@@ -11,7 +11,7 @@ import { createReminder, toggleReminder, addRecipient, setOptIn, setRecipientAct
 import { whatsappStatus } from '@/lib/reminders/mode'
 import { parseSettings } from '@/lib/reminders/settings'
 import { nextOccurrence, nextTriggerDate } from '@/lib/reminders/schedule'
-import { formatAed, formatLongDate } from '@/lib/time'
+import { formatAed, formatLongDate, showDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 export const metadata = { title: 'Reminders' }
@@ -56,7 +56,7 @@ async function Custom({ c }: { c: C }) {
       <Field label="Remind me … days before" hint="Comma-separated. Blank = company default (90, 60, 30, 15, 7, 3, 1, 0)."><Input name="offsets" placeholder="30, 7, 1, 0" /></Field><Field label="Notes"><Textarea name="notes" /></Field></ActionForm></DialogButton>} />
     {!data?.length ? <EmptyState icon={BellRing} title="No custom reminders" body="Use these for contract renewals, machinery maintenance, project milestones or anything else with a date." /> :
       <TableWrap><thead className="border-b border-border"><tr><Th>Title</Th><Th>Due</Th><Th>Repeats</Th><Th>Days before</Th><Th /></tr></thead><tbody className="divide-y divide-border">
-        {data.map(r => <tr key={r.id} className={!r.enabled ? 'opacity-50' : ''}><Td><div className="font-medium">{r.title}</div><div className="text-xs text-muted">{r.notes}</div></Td><Td className="tabular-nums">{r.due_date}</Td><Td className="capitalize text-muted">{r.recurrence}</Td><Td className="text-muted">{r.offsets?.join(', ') ?? 'default'}</Td>
+        {data.map(r => <tr key={r.id} className={!r.enabled ? 'opacity-50' : ''}><Td><div className="font-medium">{r.title}</div><div className="text-xs text-muted">{r.notes}</div></Td><Td className="tabular-nums">{showDate(r.due_date)}</Td><Td className="capitalize text-muted">{r.recurrence}</Td><Td className="text-muted">{r.offsets?.join(', ') ?? 'default'}</Td>
           <Td><ActionButton action={toggleReminder.bind(null, r.id, !r.enabled)} variant="ghost">{r.enabled ? 'Pause' : 'Resume'}</ActionButton></Td></tr>)}</tbody></TableWrap>}</Card>
 }
 

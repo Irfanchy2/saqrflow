@@ -14,7 +14,7 @@ import { Timeline } from '@/components/timeline'
 import { SavedViews } from '@/components/saved-views'
 import { Fab } from '@/components/ui/mobile'
 
-export const metadata = { title: 'Company Documents' }
+export const metadata = { title: 'Company documents' }
 export default async function CompanyDocuments({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const c = await getCtx(); const sp = await flat(searchParams)
   const [{ rows, total, page }, { data: cats }, { data: people }] = await Promise.all([
@@ -26,7 +26,7 @@ export default async function CompanyDocuments({ searchParams }: { searchParams:
   const showTimeline = sp.view === 'timeline'
   const events = showTimeline ? await documentTimeline(c, { type: 'company' }) : []
   return <>
-    <PageHeader title="Company Documents" sub="Licences, registrations, insurance, tenancy, permits and contracts. With expiry tracking and renewal history."
+    <PageHeader title="Company documents" sub="Licences, registrations, insurance, tenancy, permits and contracts. With expiry tracking and renewal history."
       actions={<><SavedViews page="/documents" />
         <LinkButton href={showTimeline ? '/documents' : '/documents?view=timeline'} variant="secondary">{showTimeline ? 'List' : 'Timeline'}</LinkButton>
         {c.can('data.export') && <LinkButton href="/api/export/documents" variant="secondary">Export CSV</LinkButton>}

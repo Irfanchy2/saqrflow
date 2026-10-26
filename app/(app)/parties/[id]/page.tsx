@@ -17,7 +17,7 @@ import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/
 import { fmtMoney } from '@/lib/sales/money'
 import { buildLedger } from '@/lib/ledger'
 import { PROJECT_STATUS } from '@/lib/projects'
-import { formatAed, localDate } from '@/lib/time'
+import { formatAed, localDate, showDate } from '@/lib/time'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
 import { CustomFieldsCard } from '@/components/custom-fields-card'
@@ -97,7 +97,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           : <TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Type</Th><Th>Date</Th><Th className="text-right">Total</Th><Th className="text-right">Balance</Th><Th>Status</Th></tr></thead>
             <tbody className="divide-y divide-border">{(sales ?? []).map((s: any) => { const b = ledger?.invoices.find(i => i.id === s.id)
               return <tr key={s.id} className="hover:bg-surface-2/50">
-                <Td><Link href={`/invoices/${s.id}`} className="font-mono text-[13px] text-primary hover:underline">{s.number}</Link></Td><Td>{DOC_META[s.doc_type as SalesType]?.label}</Td><Td className="tabular-nums">{s.issue_date}</Td>
+                <Td><Link href={`/invoices/${s.id}`} className="font-mono text-[13px] text-primary hover:underline">{s.number}</Link></Td><Td>{DOC_META[s.doc_type as SalesType]?.label}</Td><Td className="tabular-nums">{showDate(s.issue_date)}</Td>
                 <Td className="text-right tabular-nums">{DOC_META[s.doc_type as SalesType]?.priced ? fmtMoney(s.total) : '—'}</Td>
                 <Td className={cn('text-right tabular-nums', s.payment_status === 'overdue' && 'font-medium text-danger')}>{s.doc_type === 'invoice' && s.payment_status ? fmtMoney(s.balance) : b ? fmtMoney(b.balance) : '—'}</Td>
                 <Td badge><SalesDocBadge r={s} /></Td></tr> })}</tbody></TableWrap>}
@@ -108,7 +108,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             : <div className="flex gap-3 px-4 py-2.5"><e.icon size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden /><span className="min-w-0 flex-1">{e.text}<span className="block text-xs text-muted">{when(e.at)}</span></span></div>}</li>)}</ol>}</Card>
       {fin && <Card><CardHeader title="Payments" action={<Link href={`/parties/${id}/ledger`} className="-my-2 inline-flex min-h-10 items-center text-[13px] font-medium text-primary hover:underline">Ledger</Link>} />
         {!(pays ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No payments yet.</p> :
-          <ul className="divide-y divide-border text-sm">{(pays ?? []).slice(0, 10).map((p: any) => <li key={p.id} className="flex items-center gap-3 px-4 py-2.5"><span className="tabular-nums text-xs text-muted">{p.paid_on}</span><span className="min-w-0 flex-1 truncate">{p.invoice?.number ?? 'On account'}{p.reference ? ` · ${p.reference}` : ''}</span><span className="font-medium tabular-nums text-success">{fmtMoney(p.amount)}</span></li>)}</ul>}</Card>}
+          <ul className="divide-y divide-border text-sm">{(pays ?? []).slice(0, 10).map((p: any) => <li key={p.id} className="flex items-center gap-3 px-4 py-2.5"><span className="tabular-nums text-xs text-muted">{showDate(p.paid_on)}</span><span className="min-w-0 flex-1 truncate">{p.invoice?.number ?? 'On account'}{p.reference ? ` · ${p.reference}` : ''}</span><span className="font-medium tabular-nums text-success">{fmtMoney(p.amount)}</span></li>)}</ul>}</Card>}
       <Card><CardHeader title="Projects" />
         {!(projects ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No projects.</p> :
           <ul className="divide-y divide-border">{(projects ?? []).map((p: any) => <li key={p.id}><Link href={`/projects/${p.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">
@@ -116,7 +116,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       {fin && <Card><CardHeader title="Cheques" />
         {!(cheques ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No cheques linked.</p> :
           <ul className="divide-y divide-border">{(cheques ?? []).map((q: any) => <li key={q.id}><Link href={`/cheques?open=${q.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">
-            <span className="font-mono text-xs">#{q.cheque_no}</span><span className="flex-1 text-xs text-muted">{q.cheque_date} · {q.status}</span><span className="tabular-nums">{fmtMoney(q.amount)}</span></Link></li>)}</ul>}</Card>}
+            <span className="font-mono text-xs">#{q.cheque_no}</span><span className="flex-1 text-xs text-muted">{showDate(q.cheque_date)} · {q.status}</span><span className="tabular-nums">{fmtMoney(q.amount)}</span></Link></li>)}</ul>}</Card>}
       <Card><CardHeader title="Documents" />
         {!docs.length ? <p className="px-4 py-5 text-sm text-muted">No linked documents.</p> :
           <ul className="divide-y divide-border">{docs.map((d: any) => <li key={d.id}><Link href={`/documents/${d.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">

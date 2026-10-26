@@ -52,7 +52,7 @@ async function visit(p, path, phone) {
     text: document.body.innerText.slice(0, 4000),
     links: [...document.querySelectorAll('a[href]')].map(a => a.getAttribute('href')),
     a11y: (() => {
-      const vis = el => { const r = el.getBoundingClientRect(), st = getComputedStyle(el); return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && !el.closest('[aria-hidden="true"],.sr-only,dialog:not([open])') }
+      const vis = el => { const r = el.getBoundingClientRect(), st = getComputedStyle(el); return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && !el.closest('[aria-hidden="true"],.sr-only,dialog:not([open]),details:not([open]) > :not(summary)') }
       const named = el => (el.getAttribute('aria-label') || el.getAttribute('title') || (el.getAttribute('aria-labelledby') && document.getElementById(el.getAttribute('aria-labelledby'))?.textContent) || el.innerText || [...el.querySelectorAll('img[alt],svg title')].map(x => x.getAttribute?.('alt') ?? x.textContent).join('')).trim().length > 0
       const desc = el => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.getAttribute('name') ? `[name=${el.getAttribute('name')}]` : ''}${el.getAttribute('href') ? `[href=${el.getAttribute('href').slice(0, 30)}]` : ''}.${(el.className?.baseVal ?? el.className ?? '').toString().split(' ').slice(0, 2).join('.')}`
       const html = el => el.outerHTML.replace(/\s+/g, ' ').slice(0, 220)
@@ -60,9 +60,15 @@ async function visit(p, path, phone) {
       const fields = [...document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]),select,textarea')].filter(el => vis(el) && !(el.labels?.length || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title'))).map(el => `${desc(el)} ${html(el).slice(0, 120)}`)
       const imgs = [...document.querySelectorAll('img')].filter(el => vis(el) && !el.hasAttribute('alt')).map(el => `img[src=${(el.getAttribute('src') ?? '').slice(0, 40)}]`)
       const ids = {}; for (const el of document.querySelectorAll('[id]')) ids[el.id] = (ids[el.id] ?? 0) + 1
-      return { unnamed, fields, imgs, dupIds: Object.keys(ids).filter(k => ids[k] > 1) }
+      // phones: controls under 28 × 28 px (Apple's minimum touch size); a link inside a sentence is exempt
+      const tiny = innerWidth < 640 ? [...document.querySelectorAll('button,a[href],[role=button],input[type=checkbox],input[type=radio],select')].filter(el => {
+        if (!vis(el) || el.closest('.no-print [aria-hidden]')) return false
+        if (el.tagName === 'A' && getComputedStyle(el).display === 'inline') return false
+        const r = el.getBoundingClientRect(); return Math.min(r.width, r.height) < 28
+      }).map(el => { const r = el.getBoundingClientRect(); return `${desc(el)} ${Math.round(r.width)}×${Math.round(r.height)} ${(el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 30)}` }) : []
+      return { unnamed, fields, imgs, dupIds: Object.keys(ids).filter(k => ids[k] > 1), tiny }
     })(),
-  })).catch(() => ({ over: 0, text: '', links: [], a11y: { unnamed: [], fields: [], imgs: [], dupIds: [] } }))
+  })).catch(() => ({ over: 0, text: '', links: [], a11y: { unnamed: [], fields: [], imgs: [], dupIds: [], tiny: [] } }))
   p.off('pageerror', onErr); p.off('console', onCon); p.off('response', onRes)
   const final = new URL(p.url()).pathname
   return { path, final, status, ms, over: phone ? info.over : 0, ...issues, text: info.text, links: info.links, a11y: info.a11y }

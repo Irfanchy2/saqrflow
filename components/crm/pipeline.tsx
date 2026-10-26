@@ -70,7 +70,7 @@ export function PipelineBoard({ leads, today, canEdit, hideClosed }: { leads: Bo
                   {l.next_followup && (f === 'soon' || f === 'later') && <span className="text-xs tabular-nums text-muted" title="Next follow-up">{l.next_followup}</span>}
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs text-muted">
-                  <span className="flex min-w-0 items-center gap-2">{l.salesperson ? <><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-fg" aria-hidden>{initials(l.salesperson)}</span><span className="truncate">{l.salesperson}</span></> : <span className="truncate font-mono">{l.number}</span>}</span>
+                  <span className="flex min-w-0 items-center gap-2">{l.salesperson ? <><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-fg" aria-hidden>{initials(l.salesperson)}</span><span className="truncate">{l.salesperson}</span></> : <span className="truncate font-mono">{l.number}</span>}</span>
                   <span className="flex shrink-0 items-center gap-1">
                     {l.phone && <a href={`tel:${l.phone.replace(/[^\d+]/g, '')}`} className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-primary" aria-label={`Call ${l.company_name}`}><Phone size={14} aria-hidden /></a>}
                     {canEdit && <label><span className="sr-only">Move {l.company_name} to</span>

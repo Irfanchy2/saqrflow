@@ -30,7 +30,7 @@ try {
   const cust = (await one(`insert into customers(company_id,name,phone) values ($1,'Villa 9 Owner','+971 50 222 3344') returning id`, [co])).id
   const proj = (await one(`insert into projects(company_id,name,customer_id,status) values ($1,'Villa 9 sliding gate',$2,'completed') returning id`, [co, cust])).id
   const nav = await navText(p)
-  ok(nav.includes('Service & Warranty') && nav.includes('Knowledge Base'), 'sidebar: Service & Warranty, Knowledge Base')
+  ok(nav.includes('Service & warranty') && nav.includes('Knowledge Base'), 'sidebar: Service & warranty, Knowledge Base')
 
   console.log('\n[1] Warranty → ticket')
   await p.goto(`${BASE}/tickets?tab=warranties&new=warranty`); await settle()

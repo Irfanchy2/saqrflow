@@ -13,7 +13,7 @@ import { formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
 
-export const metadata = { title: 'Work Orders' }
+export const metadata = { title: 'Work orders' }
 const ACTIVE = ['pending', 'approved', 'scheduled', 'in_fabrication', 'ready_for_site', 'installation', 'inspection', 'on_hold']
 const TABS = [['active', 'Active'], ['fabrication', 'Workshop'], ['site', 'On site'], ['completed', 'Completed'], ['all', 'All']] as const
 
@@ -46,7 +46,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
     <WorkOrderFields projects={projects.map((x: any) => ({ id: x.id, name: x.name }))} users={users.map((u: any) => ({ id: u.id, name: u.full_name }))} w={{ start_date: c.today }} /></ActionForm></DialogButton>
 
   return <>
-    <PageHeader title="Work Orders" sub="Job cards for the workshop and site crews. Create one from an accepted quotation to copy its scope." actions={<><SavedViews page="/work-orders" />{edit && add}</>} />
+    <PageHeader title="Work orders" sub="Job cards for the workshop and site crews. Create one from an accepted quotation to copy its scope." actions={<><SavedViews page="/work-orders" />{edit && add}</>} />
     <Metrics className="mb-5" cols={3}>
       <StatCard label="Active work orders" value={act.count ?? 0} href="/work-orders?tab=active" />
       <StatCard label="Past target date" value={late.count ?? 0} tone={late.count ? 'red' : 'neutral'} href="/work-orders?tab=active" />

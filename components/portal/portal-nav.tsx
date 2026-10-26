@@ -28,6 +28,6 @@ export function PortalNav({ part }: { part: 'tabs' | 'bar' }) {
         return <Link key={t.href} href={t.href} prefetch aria-current={on ? 'page' : undefined}
           className={cn('relative flex h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[18px] outline-none transition-colors', on ? 'arc text-white' : 'text-[hsl(220_10%_66%)] active:text-white')}>
           <t.icon size={22} weight={on ? 'fill' : 'regular'} aria-hidden />
-          <span className="font-tech text-[10.5px] font-semibold leading-none tracking-[0.02em]">{t.label}</span></Link> })}
+          <span className="font-tech text-[11px] font-semibold leading-none tracking-[0.02em]">{t.label}</span></Link> })}
     </nav>
 }

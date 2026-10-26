@@ -77,7 +77,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
     </div></ActionForm>
 
   return <>
-    <Link href={`/assets?tab=${a.archived_at ? 'archived' : isV ? 'vehicles' : 'assets'}`} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} className="rtl:rotate-180" />Vehicles & Assets</Link>
+    <Link href={`/assets?tab=${a.archived_at ? 'archived' : isV ? 'vehicles' : 'assets'}`} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} className="rtl:rotate-180" />Vehicles & assets</Link>
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-semibold tracking-[-0.015em]">{a.name}</h1><Badge tone={st.tone}>{st.label}</Badge>{a.archived_at && <Badge>Archived</Badge>}</div>

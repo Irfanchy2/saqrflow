@@ -153,7 +153,7 @@ try {
   await gear.hover(); await p.waitForTimeout(300)
   ok((await tip.innerText()).includes('Settings') && Number(await tip.evaluate(e => getComputedStyle(e).opacity)) > 0.9, 'dock tooltip shows the label on hover')
   const nav = await navText(p)
-  ok(nav.includes('Vehicles & Assets') && !/Vehicles & Assets\s*SOON/i.test(nav), 'Vehicles & Assets is in the navigation, not marked “Soon”')
+  ok(nav.includes('Vehicles & assets') && !/Vehicles & assets\s*SOON/i.test(nav), 'Vehicles & assets is in the navigation, not marked “Soon”')
 
   console.log('\n[P5] Vehicles & Assets')
   const emp = (await one(`insert into employees(company_id,employee_no,full_name) values ($1,'EMP-010','Imran Driver') returning id`, [co])).id

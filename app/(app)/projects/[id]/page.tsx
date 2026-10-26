@@ -1,4 +1,5 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
+import { showDate } from '@/lib/time'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, CalendarCheck, MapPin, Pencil, QrCode, Trash2 } from '@/components/icons'
@@ -42,7 +43,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           {p.code && <span className="font-mono">{p.code}</span>}
           {p.customer && <Link href={`/parties/${p.customer.id}`} className="hover:text-primary hover:underline">{p.customer.name}</Link>}
           {p.location && <span className="inline-flex items-center gap-1"><MapPin size={13} aria-hidden />{p.location}</span>}
-          {(p.start_date || p.expected_completion) && <span className="inline-flex items-center gap-1"><CalendarCheck size={13} aria-hidden />{p.start_date ?? '—'} → {p.expected_completion ?? '—'}</span>}
+          {(p.start_date || p.expected_completion) && <span className="inline-flex items-center gap-1"><CalendarCheck size={13} aria-hidden />{showDate(p.start_date, '—')} → {p.expected_completion ?? '—'}</span>}
         </div>
         {p.description && <p className="mt-2 max-w-3xl whitespace-pre-line text-sm">{p.description}</p>}
       </div>

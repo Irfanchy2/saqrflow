@@ -9,7 +9,7 @@ import { DocFields } from '@/components/documents/doc-fields'
 import { StatusBadge } from '@/components/documents/status-badge'
 import { recordRenewal, replaceFile, setDeleted, updateDocument } from '@/app/actions/documents'
 import { ACCEPT_ATTR } from '@/lib/files'
-import { formatAed, localDate } from '@/lib/time'
+import { formatAed, localDate, showDate } from '@/lib/time'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
 
@@ -77,7 +77,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="reminders_active" defaultChecked={doc.reminders_active} />Send reminders for this document</label></ActionForm></div>
             : <dl className="grid grid-cols-2 gap-3 p-4 text-sm">{[['Reference', doc.reference_no], ['Authority', doc.issuing_authority], ['Issued', doc.issue_date], ['Expires', doc.expiry_date], ['Responsible', doc.responsible?.full_name], ['Renewal fee', doc.renewal_fee != null ? formatAed(doc.renewal_fee) : null]].map(([k, v]) => <div key={k as string}><dt className="text-xs text-muted">{k}</dt><dd>{v ?? '—'}</dd></div>)}</dl>}</Card>
         <Card><CardHeader title="Renewal history" />
-          {renewals?.length ? <ul className="divide-y divide-border text-sm">{renewals.map(r => <li key={r.id} className="px-4 py-3"><div className="font-medium">{r.previous_expiry ?? '—'} → {r.new_expiry}</div>
+          {renewals?.length ? <ul className="divide-y divide-border text-sm">{renewals.map(r => <li key={r.id} className="px-4 py-3"><div className="font-medium">{showDate(r.previous_expiry, '—')} → {showDate(r.new_expiry)}</div>
             <div className="text-xs text-muted">Recorded {r.renewed_at}{r.fee != null && ` · ${formatAed(r.fee)}`}{r.notes && ` · ${r.notes}`}</div></li>)}</ul> : <EmptyState title="No renewals recorded" />}</Card>
         {c.can('audit.view') && <Card><CardHeader title="Access history" action={<History size={15} className="text-muted" />} />
           {access.data?.length ? <ul className="max-h-64 divide-y divide-border overflow-y-auto text-sm">{access.data.map((a: any) => <li key={a.id} className="flex justify-between px-4 py-2"><span><b className="capitalize">{a.action}</b> · {a.user?.full_name ?? 'System'}</span><span className="text-xs text-muted">{a.created_at.slice(0, 16).replace('T', ' ')}</span></li>)}</ul> : <EmptyState title="No access recorded" />}</Card>}

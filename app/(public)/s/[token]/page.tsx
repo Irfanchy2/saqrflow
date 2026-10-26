@@ -1,4 +1,5 @@
 import { FileText } from '@/components/icons'
+import { showDate } from '@/lib/time'
 import { Badge, Card, CardHeader, Field, Input, Select, Textarea } from '@/components/ui/primitives'
 import { LinkGone, PublicShell } from '@/components/public/shell'
 import { PublicForm } from '@/components/public/public-form'
@@ -23,7 +24,7 @@ export default async function SupplierPortal({ params }: { params: Promise<{ tok
     {r.link.message && <Card className="whitespace-pre-line p-4 text-sm">{r.link.message}</Card>}
     <Card><CardHeader title="Purchase orders" />
       {!(pos ?? []).length ? <p className="px-4 py-4 text-sm text-muted">No purchase orders yet.</p> : <ul className="divide-y divide-border">{(pos ?? []).map((p: any) => <li key={p.id} className="space-y-3 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm"><span className="min-w-0 flex-1"><span className="block font-medium">{p.number}{p.subject ? ` · ${p.subject}` : ''}</span><span className="block text-xs text-muted">{p.issue_date}</span></span>
+        <div className="flex flex-wrap items-center gap-2 text-sm"><span className="min-w-0 flex-1"><span className="block font-medium">{p.number}{p.subject ? ` · ${p.subject}` : ''}</span><span className="block text-xs text-muted">{showDate(p.issue_date)}</span></span>
           <span className="tabular-nums">{fmtMoney(p.total)}</span>
           {p.supplier_confirmed_at ? <Badge tone="green">Delivered {p.supplier_confirmation?.delivered_on ?? ''}</Badge> : <Badge tone="blue">Open</Badge>}
           <a href={`/s/${token}/doc/${p.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><FileText size={13} />PDF</a></div>

@@ -32,7 +32,7 @@ try {
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('Al Saqr ERP Test'); await p.getByLabel('Your full name').fill('Erp Owner'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`)
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email=$1`, [EMAIL])).company_id
   const nav = await navText(p); await p.goto(`${BASE}/settings`); await p.waitForLoadState('networkidle'); const sys = await sectionText(p)
-  ok(nav.includes('Expenses') && nav.includes('Products & Services') && sys.includes('Audit Log') && sys.includes('Trash'), 'navigation: Expenses, Products & Services (tabs), Audit Log, Trash (Settings section) are live')
+  ok(nav.includes('Expenses') && nav.includes('Products & services') && sys.includes('Audit log') && sys.includes('Trash'), 'navigation: Expenses, Products & services (tabs), Audit log, Trash (Settings section) are live')
 
   console.log('\n[A1] Customer with duplicate detection')
   await p.goto(`${BASE}/parties?new=customer`); await settle()

@@ -91,12 +91,12 @@ try {
     ok(own.status() !== 403, 'same-origin API request is not refused by the origin check')
   }
   const nav = await navText(p)
-  for (const l of ['Dashboard', 'Company Documents', 'Employees & Labour', 'Document Vault', 'Banking & Cheques', 'Quotations', 'Invoices', 'Payments', 'Projects', 'Customers', 'Vehicles & Assets', 'Reminders', 'Calendar', 'Reports & Analytics', 'Averiqo AI'])
+  for (const l of ['Dashboard', 'Company documents', 'Employees & labour', 'Document Vault', 'Banking & cheques', 'Quotations', 'Invoices', 'Payments', 'Projects', 'Customers', 'Vehicles & assets', 'Reminders', 'Calendar', 'Reports & analytics', 'Averiqo AI'])
     ok(nav.includes(l), `navigation has “${l}”`)
   ok(!/\b(Soon|Beta|Coming soon|Planned)\b/i.test(nav), 'every module is live: no Soon / Beta / Planned labels in navigation')
   ok(await p.locator('nav[aria-label="Quick actions"]').getByRole('link', { name: 'Settings' }).isVisible(), 'the dock links to Settings')
   await p.goto(`${BASE}/settings`); await p.waitForLoadState('networkidle')
-  for (const l of ['User Management', 'Audit Log', 'Settings']) ok((await sectionText(p)).includes(l), `Settings section has “${l}”`)
+  for (const l of ['User management', 'Audit log', 'Settings']) ok((await sectionText(p)).includes(l), `Settings section has “${l}”`)
   await p.goto(`${BASE}/`); await p.waitForLoadState('networkidle')
 
   console.log('\n[2] Company documents, versions, secure access')
@@ -271,7 +271,7 @@ try {
   const vid = (await db.query(`select id from auth.users where email='viewer@alsaqr.test'`)).rows[0].id
   await db.query(`insert into profiles(id,company_id,full_name,role) values ($1,$2,'View Only','viewer')`, [vid, A])
   await viewer.goto(`${BASE}/`); await settle(viewer); const vt = await bodyText(viewer)
-  ok(!vt.includes('Banking & Cheques') && !vt.includes('User Management') && !vt.includes('Reminders'), 'viewer: finance / users / reminders hidden from navigation')
+  ok(!vt.includes('Banking & cheques') && !vt.includes('User management') && !vt.includes('Reminders'), 'viewer: finance / users / reminders hidden from navigation')
   await viewer.goto(`${BASE}/cheques`); ok(viewer.url() === `${BASE}/`, 'viewer: /cheques redirects away (server-side check)')
   await viewer.goto(`${BASE}/users`); ok(viewer.url() === `${BASE}/`, 'viewer: /users redirects away')
   await viewer.goto(`${BASE}/employees/${empId}?tab=salary`); await settle(viewer); ok(!(await bodyText(viewer)).includes('AED 2,500') && !(await bodyText(viewer)).includes('Monthly salary'), 'viewer: salary not shown even via URL')

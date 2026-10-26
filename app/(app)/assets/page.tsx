@@ -13,7 +13,7 @@ import { addDays, daysBetween, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
 
-export const metadata = { title: 'Vehicles & Assets' }
+export const metadata = { title: 'Vehicles & assets' }
 const TABS = [['vehicles', 'Vehicles', CarFront], ['assets', 'Equipment & assets', Wrench], ['archived', 'Archived', Archive]] as const
 
 /** A date cell that turns amber within 30 days and red once passed. */
@@ -60,7 +60,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   const addAsset = <DialogButton wide label="Add asset" title="Add asset or equipment" icon={<Plus size={15} />} variant={isV ? 'secondary' : 'primary'} openParam="asset"><ActionForm action={createAsset} submit="Save asset" idempotent><AssetFields kind="asset" employees={emps ?? []} suppliers={(sups ?? []).map(s => s.name)} /></ActionForm></DialogButton>
 
   return <>
-    <PageHeader title="Vehicles & Assets" sub="Company vehicles and equipment with registration, insurance, maintenance and assignment history."
+    <PageHeader title="Vehicles & assets" sub="Company vehicles and equipment with registration, insurance, maintenance and assignment history."
       actions={<><SavedViews page="/assets" />{tab !== 'archived' && <LinkButton variant="ghost" href={`/print/qr?type=asset&kind=${isV ? 'vehicle' : 'equipment'}`}>QR labels</LinkButton>}{c.can('data.export') && tab !== 'archived' && <><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}`}><Download size={15} />CSV</LinkButton><LinkButton variant="ghost" href={`/api/export/${isV ? 'vehicles' : 'assets'}?format=xlsx`}><Download size={15} />Excel</LinkButton></>}
         {edit && tab !== 'archived' && <>{addVehicle}{addAsset}</>}</>} />
     <Metrics className="mb-5" cols={5}>

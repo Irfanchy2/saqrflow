@@ -4,7 +4,7 @@ import { Card, EmptyState, Pagination, SortTh, Td, Th, TableWrap } from '@/compo
 import { StatusBadge } from './status-badge'
 import { PAGE_SIZE, type SP } from '@/lib/queries'
 import { FilterBar, FilterTabs, MList, MRow, Tile, TINTS } from '@/components/ui/mobile'
-import { formatShortDate } from '@/lib/time'
+import { formatShortDate, showDate } from '@/lib/time'
 
 export function DocsTable({ rows, total, page, today, base, sp, showOwner, empty }: {
   rows: any[]; total: number; page: number; today: string; base: string; sp: SP; showOwner?: boolean; empty: React.ReactNode
@@ -25,7 +25,7 @@ export function DocsTable({ rows, total, page, today, base, sp, showOwner, empty
       <Td className="text-muted">{r.category?.name ?? '—'}</Td>
       {showOwner && <Td className="text-muted">{ownerLabel[r.owner_type] ?? r.owner_type}{r.folder ? ` · ${r.folder}` : ''}</Td>}
       <Td className="font-mono text-xs text-muted">{r.reference_no ?? '—'}</Td>
-      <Td className="tabular-nums">{r.expiry_date ?? '—'}</Td><Td><StatusBadge doc={r} today={today} /></Td>
+      <Td className="tabular-nums">{showDate(r.expiry_date, '—')}</Td><Td><StatusBadge doc={r} today={today} /></Td>
       <Td className="text-muted">{r.responsible?.full_name ?? '—'}</Td></tr>)}</tbody></TableWrap></div>
     <Pagination page={page} pageSize={PAGE_SIZE} total={total} params={sp} base={base} /></Card>
 }

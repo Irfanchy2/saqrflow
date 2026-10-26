@@ -49,7 +49,7 @@ export function TopTabs({ items, counts }: { items: TopItem[]; counts: Partial<R
           {on && <m.span layoutId="top-pill" transition={SPRING} aria-hidden className="absolute inset-0 rounded-full bg-ink shadow-[0_6px_16px_-8px_hsl(var(--shadow)/.6)]" />}
           {!on && <span aria-hidden className="absolute inset-0 rounded-full bg-fg/[.05] opacity-0 transition-opacity duration-150 [div:hover>a>&]:opacity-100" />}
           <span className="relative">{t.label}</span>
-          {n > 0 && <span className="relative grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[hsl(14_85%_52%)] px-1 text-[10.5px] font-semibold tabular-nums leading-none text-white" aria-label={`${n} need attention`}>{n > 99 ? '99+' : n}</span>}
+          {n > 0 && <span className="relative grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[hsl(14_85%_52%)] px-1 text-[11px] font-semibold tabular-nums leading-none text-white" aria-label={`${n} need attention`}>{n > 99 ? '99+' : n}</span>}
         </Link>
         {peek === t.key && group.length > 1 && <div className="absolute start-1/2 top-[calc(100%+10px)] z-pop w-60 -translate-x-1/2 rtl:translate-x-1/2" onMouseEnter={() => open(t.key, 0)}>
           <div ref={menu} role="menu" aria-label={t.label} className="rounded-2xl border border-border/80 bg-surface p-1.5 shadow-pop">

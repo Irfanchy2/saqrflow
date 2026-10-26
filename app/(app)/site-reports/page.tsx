@@ -11,7 +11,7 @@ import { createSiteReport } from '@/app/actions/operations'
 import { addDays, formatShortDate } from '@/lib/time'
 import { SavedViews } from '@/components/saved-views'
 
-export const metadata = { title: 'Daily Site Reports' }
+export const metadata = { title: 'Daily site reports' }
 
 export default async function SiteReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const c = await getCtx(); if (!c.can('documents.view')) redirect('/')
@@ -42,7 +42,7 @@ export default async function SiteReportsPage({ searchParams }: { searchParams: 
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
 
   return <>
-    <PageHeader title="Daily Site Reports" sub="What happened on site each day: work done, manpower, issues, safety and photos." actions={<><SavedViews page="/site-reports" />{edit && add}</>} />
+    <PageHeader title="Daily site reports" sub="What happened on site each day: work done, manpower, issues, safety and photos." actions={<><SavedViews page="/site-reports" />{edit && add}</>} />
     <Metrics className="mb-5" cols={3}>
       <StatCard label="Reports today" value={today.count ?? 0} />
       <StatCard label="Last 7 days" value={week.count ?? 0} />

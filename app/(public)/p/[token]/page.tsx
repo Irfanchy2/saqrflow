@@ -1,4 +1,5 @@
 import { PayStatusBadge } from '@/components/sales/status-badges'
+import { showDate } from '@/lib/time'
 import { payState } from '@/lib/sales/status'
 import { FileText } from '@/components/icons'
 import { Badge, Card, CardHeader, Field, Input, Metrics, Select, StatCard, Textarea } from '@/components/ui/primitives'
@@ -52,7 +53,7 @@ export default async function CustomerPortal({ params }: { params: Promise<{ tok
     <Card><CardHeader title="Quotations" sub="Open quotations can be accepted or declined here" />
       {!quotes.length ? <p className="px-4 py-4 text-sm text-muted">No quotations yet.</p> : <ul className="divide-y divide-border">{quotes.map((q: any) => <li key={q.id} className="space-y-3 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2 text-sm"><span className="min-w-0 flex-1"><span className="block font-medium">{q.number}{q.subject ? ` · ${q.subject}` : ''}</span>
-          <span className="block text-xs text-muted">{q.issue_date}{q.valid_until ? ` · valid until ${q.valid_until}` : ''}</span></span>
+          <span className="block text-xs text-muted">{showDate(q.issue_date)}{q.valid_until ? ` · valid until ${q.valid_until}` : ''}</span></span>
           <span className="tabular-nums">{fmtMoney(q.total)}</span><Badge tone={STATUS_TONE[q.status]}>{statusLabel('quotation' as SalesType, q.status)}</Badge><Pdf id={q.id} /></div>
         {(q.status === 'accepted' || q.status === 'converted') && <p className="text-xs text-success">Accepted. Thank you, our team will contact you to schedule the work.</p>}
         {openQ(q) && <details className="rounded-md border border-border"><summary className="cursor-pointer px-3 py-2 text-sm font-medium text-primary">Accept or decline {q.number}</summary>
@@ -67,12 +68,12 @@ export default async function CustomerPortal({ params }: { params: Promise<{ tok
     <Card><CardHeader title="Invoices" sub="Balance after payments and credit notes" action={<a href={`/p/${token}/statement`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"><FileText size={14} />Statement of account</a>} />
       {!invoices.length ? <p className="px-4 py-4 text-sm text-muted">No invoices yet.</p> : <ul className="divide-y divide-border">{invoices.map((i: any) => { const b: any = bal.get(i.id)
         return <li key={i.id} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm"><span className="min-w-0 flex-1"><span className="block font-medium">{i.number}{i.subject ? ` · ${i.subject}` : ''}</span>
-          <span className={b?.daysOverdue > 0 ? 'block text-xs text-danger' : 'block text-xs text-muted'}>{i.issue_date}{i.due_date ? ` · due ${i.due_date}` : ''}{b?.daysOverdue > 0 ? ` · ${b.daysOverdue} days overdue` : ''}</span></span>
+          <span className={b?.daysOverdue > 0 ? 'block text-xs text-danger' : 'block text-xs text-muted'}>{showDate(i.issue_date)}{i.due_date ? ` · due ${i.due_date}` : ''}{b?.daysOverdue > 0 ? ` · ${b.daysOverdue} days overdue` : ''}</span></span>
           <span className="text-end tabular-nums"><span className="block">{fmtMoney(i.total)}</span>{b && b.balance > 0.004 && <span className="block text-xs text-muted">balance {fmtMoney(b.balance)}</span>}</span>
           {payOf(i) ? <PayStatusBadge state={payOf(i)!} daysLate={b?.daysOverdue} /> : null}<Pdf id={i.id} /></li> })}</ul>}</Card>
 
     {others.length > 0 && <Card><CardHeader title="Delivery notes & credit notes" />
-      <ul className="divide-y divide-border">{others.map((o: any) => <li key={o.id} className="flex items-center gap-2 px-4 py-3 text-sm"><span className="min-w-0 flex-1 font-medium">{DOC_META[o.doc_type as SalesType].label} {o.number}</span><span className="text-xs text-muted">{o.issue_date}</span><Pdf id={o.id} /></li>)}</ul></Card>}
+      <ul className="divide-y divide-border">{others.map((o: any) => <li key={o.id} className="flex items-center gap-2 px-4 py-3 text-sm"><span className="min-w-0 flex-1 font-medium">{DOC_META[o.doc_type as SalesType].label} {o.number}</span><span className="text-xs text-muted">{showDate(o.issue_date)}</span><Pdf id={o.id} /></li>)}</ul></Card>}
 
     <Card><CardHeader title="Service requests" sub="Report a problem with completed work; we reply within one working day" />
       {(tickets ?? []).length > 0 && <ul className="divide-y divide-border border-b border-border">{(tickets ?? []).map((t: any) => <li key={t.id} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">

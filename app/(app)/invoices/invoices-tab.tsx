@@ -9,7 +9,7 @@ import { DocStatusBadge, InvoiceStatus, PayStatusBadge } from '@/components/sale
 import { InvoiceRowActions } from '@/components/sales/invoice-actions'
 import { daysOverdue, type DocState, type PayState } from '@/lib/sales/status'
 import { fmtMoney } from '@/lib/sales/money'
-import { formatShortDate } from '@/lib/time'
+import { formatShortDate, showDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 // Tax invoices: document status and payment status side by side, the money in its own columns, actions on every row.
@@ -81,10 +81,10 @@ export async function InvoicesTab({ sp, edit }: { sp: Record<string, string | un
           <Th className="text-right">Total (AED)</Th><Th className="text-right">Paid</Th><Th className="text-right">Balance</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
           <tbody className="divide-y divide-border">{rows.map(r => { const late = daysOverdue(r.due_date, c.today), bal = Number(r.balance), issued = !['draft', 'cancelled'].includes(r.status)
             return <tr key={r.id} className="hover:bg-surface-2/50" data-invoice-row={r.number}>
-              <Td><Link href={`/invoices/${r.id}`} className="whitespace-nowrap font-mono text-[13px] font-medium text-primary hover:underline">{r.number}</Link><div className="whitespace-nowrap text-xs tabular-nums text-muted">{r.issue_date}</div></Td>
+              <Td><Link href={`/invoices/${r.id}`} className="whitespace-nowrap font-mono text-[13px] font-medium text-primary hover:underline">{r.number}</Link><div className="whitespace-nowrap text-xs tabular-nums text-muted">{showDate(r.issue_date)}</div></Td>
               <Td className="max-w-[220px]"><div className="truncate" title={r.customer_name ?? undefined}>{r.customer_name ?? <span className="text-muted">—</span>}</div>
                 {(r.subject || projName.get(r.project_id) || r.site) && <div className="truncate text-xs text-muted" title={r.subject ?? projName.get(r.project_id) ?? r.site}>{r.subject ?? projName.get(r.project_id) ?? r.site}</div>}</Td>
-              <Td className={cn('whitespace-nowrap tabular-nums', r.payment_status === 'overdue' && 'font-medium text-danger')}>{r.due_date ?? '—'}{late > 0 && r.payment_status === 'overdue' && <div className="text-[11px] font-normal">{late} day{late === 1 ? '' : 's'} late</div>}</Td>
+              <Td className={cn('whitespace-nowrap tabular-nums', r.payment_status === 'overdue' && 'font-medium text-danger')}>{showDate(r.due_date, '—')}{late > 0 && r.payment_status === 'overdue' && <div className="text-[11px] font-normal">{late} day{late === 1 ? '' : 's'} late</div>}</Td>
               <Td badge><DocStatusBadge state={r.doc_status} /></Td>
               <Td badge>{r.payment_status ? <PayStatusBadge state={r.payment_status} daysLate={late} /> : <span className="text-muted">—</span>}</Td>
               <Td className="text-right tabular-nums">{fmtMoney(r.total)}</Td>

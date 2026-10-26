@@ -13,7 +13,7 @@ export function PrivateValue({ children, className }: { children: ReactNode; cla
   }, [])
   const toggle = () => { try { sessionStorage.setItem(KEY, shown ? '0' : '1') } catch {} setShown(!shown); dispatchEvent(new Event('portal-pay')) }
   return <button type="button" onClick={toggle} aria-pressed={shown} data-private={shown ? 'shown' : 'hidden'}
-    title={shown ? 'Tap to hide' : 'Tap to show'} className={cn('cursor-pointer rounded-md text-start outline-none focus-visible:ring-2 focus-visible:ring-primary/40', className)}>
+    title={shown ? 'Tap to hide' : 'Tap to show'} className={cn('-my-1.5 inline-flex min-h-8 cursor-pointer items-center rounded-md py-1.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-primary/40', className)}>
     <span className={cn('transition-[filter] duration-200', !shown && 'select-none blur-[7px]')} aria-hidden={!shown}>{children}</span>
     {!shown && <span className="sr-only">Hidden. Tap to show.</span>}
   </button>
