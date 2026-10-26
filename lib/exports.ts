@@ -3,7 +3,7 @@ import type { createClient } from '@/lib/supabase/server'
 
 // List exports (Settings → Data & backup, every list's export button, and the full backup workbook).
 type Sb = Awaited<ReturnType<typeof createClient>>
-export type Def = { title: string; perm?: 'finance.view' | 'employees.view' | 'documents.view'; run: (sb: Sb, today: string) => Promise<[string[], unknown[][]]> }
+export type Def = { title: string; perm?: 'finance.view' | 'employees.view' | 'documents.view'; run: (sb: Sb, today: string, opt?: { fin: boolean }) => Promise<[string[], unknown[][]]> }
 const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v))
 const sales = (t: string): Def['run'] => async sb => {
   const { data } = await sb.from('invoices').select('number,status,issue_date,due_date,valid_until,customer_name,customer_trn,subject,site,lpo_ref,subtotal,discount,vat_amount,total,project:projects(name)').eq('doc_type', t).order('issue_date', { ascending: false }).limit(20000)
@@ -19,8 +19,10 @@ export const DEFS: Record<string, Def> = {
     return [['Employee ID', 'Name', 'Nationality', 'Department', 'Designation', 'Phone', 'Joined', 'Status', 'Location'], (data ?? []).map(e => [e.employee_no, e.full_name, e.nationality, e.department, e.designation, e.phone, e.joining_date, e.status, e.work_location])] } },
   cheques: { title: 'Cheques', perm: 'finance.view', run: async sb => { const { data } = await sb.from('cheques').select('cheque_no,direction,kind,party_name,bank_name,amount,issue_date,cheque_date,deposit_date,status,purpose,invoice:invoices(number)').order('cheque_date').limit(20000)
     return [['Cheque no.', 'Direction', 'Type', 'Party', 'Bank', 'Amount (AED)', 'Issue date', 'Cheque date', 'Deposit date', 'Status', 'Purpose', 'Invoice'], (data ?? []).map((x: any) => [x.cheque_no, x.direction, x.kind, x.party_name, x.bank_name, num(x.amount), x.issue_date, x.cheque_date, x.deposit_date, x.status, x.purpose, x.invoice?.number])] } },
-  customers: { title: 'Customers', run: async sb => { const { data } = await sb.from('customers').select('name,contact_person,phone,whatsapp,email,trn,address,credit_days,opening_balance,notes').order('name').limit(20000)
-    return [['name', 'contact_person', 'phone', 'whatsapp', 'email', 'trn', 'address', 'credit_days', 'opening_balance', 'notes'], (data ?? []).map((r: any) => [r.name, r.contact_person, r.phone, r.whatsapp, r.email, r.trn, r.address, r.credit_days, num(r.opening_balance), r.notes])] } },
+  customers: { title: 'Customers', run: async (sb, _today, opt) => { const { data } = await sb.from('customers').select('name,contact_person,phone,whatsapp,email,trn,address,credit_days,opening_balance,notes').order('name').limit(20000)
+    // the opening balance (money owed) only for finance users
+    const fin = opt?.fin ?? false
+    return [['name', 'contact_person', 'phone', 'whatsapp', 'email', 'trn', 'address', 'credit_days', ...(fin ? ['opening_balance'] : []), 'notes'], (data ?? []).map((r: any) => [r.name, r.contact_person, r.phone, r.whatsapp, r.email, r.trn, r.address, r.credit_days, ...(fin ? [num(r.opening_balance)] : []), r.notes])] } },
   suppliers: { title: 'Suppliers', run: async sb => { const { data } = await sb.from('suppliers').select('name,contact_person,phone,whatsapp,email,trn,address,notes').order('name').limit(20000)
     return [['name', 'contact_person', 'phone', 'whatsapp', 'email', 'trn', 'address', 'notes'], (data ?? []).map((r: any) => [r.name, r.contact_person, r.phone, r.whatsapp, r.email, r.trn, r.address, r.notes])] } },
   quotations: { title: 'Quotations', perm: 'finance.view', run: sales('quotation') },

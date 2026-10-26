@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AccountSelect } from '@/components/banking/account-select'
 import { AlertTriangle, Camera, CheckCircle2, Loader2, Plus, ScanText, Trash2, Upload } from '@/components/icons'
 import { Field, Input, Select, Textarea } from '@/components/ui/primitives'
@@ -52,6 +52,7 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
   const [vat, setVat] = useState<string>(e?.vat_amount != null ? String(e.vat_amount) : '')
   const [status, setStatus] = useState<'paid' | 'unpaid'>(e?.payment_status ?? 'paid')
   const [paidWith, setPaidWith] = useState<string>(e?.paid_with ?? 'cash')
+  const supList = `exp-suppliers-${useId().replace(/:/g, '')}`   // several expense forms can be on one page
   const [lines, setLines] = useState<Line[]>(() => (Array.isArray(e?.items) ? e!.items : []).map((l: ReceiptLine) => ({ description: l.description, quantity: l.quantity == null ? '' : String(l.quantity), unit_price: l.unit_price == null ? '' : String(l.unit_price), amount: String(l.amount) })))
   const [showLines, setShowLines] = useState(lines.length > 0)
   const known = sups.find(s => s.name.toLowerCase() === supplier.trim().toLowerCase())
@@ -167,9 +168,9 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
 
     {/* supplier */}
     <Field label="Supplier" hint={claim ? 'The shop or company on the receipt' : known ? (known.trn ? `Saved supplier · TRN ${known.trn}` : 'Saved supplier') : supplier.trim() ? 'New: added to your suppliers when you save' : 'Pick a saved supplier or type a new name'}>
-      <Input name="supplier_name" maxLength={200} list="exp-suppliers" value={supplier} className={tint('supplier')}
+      <Input name="supplier_name" maxLength={200} list={supList} value={supplier} className={tint('supplier')}
         onChange={ev => { setSupplier(ev.target.value); const k = sups.find(s => s.name.toLowerCase() === ev.target.value.trim().toLowerCase()); if (k?.trn && !trn) setTrn(k.trn) }} />
-      <datalist id="exp-suppliers">{sups.map(s => <option key={s.id || s.name} value={s.name} />)}</datalist></Field>
+      <datalist id={supList}>{sups.map(s => <option key={s.id || s.name} value={s.name} />)}</datalist></Field>
     {!claim && known?.id && <input type="hidden" name="supplier_id" value={known.id} />}
     <Field label="Supplier TRN" hint="15 digits, on their tax invoice"><Input name="supplier_trn" inputMode="numeric" maxLength={20} value={trn} onChange={ev => setTrn(ev.target.value)} placeholder="100xxxxxxxxxxxx" className={tint('trn')} /></Field>
 

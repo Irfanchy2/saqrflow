@@ -20,7 +20,8 @@ export default async function Employees({ searchParams }: { searchParams: Promis
   if (!c.can('employees.view')) {            // "employee" role: straight to their own profile
     const { data } = await c.supabase.from('employees').select('id').eq('user_id', c.userId).maybeSingle()
     if (data) redirect(`/employees/${data.id}`)
-    return <><PageHeader title="Employees" /><Card><EmptyState icon={Users} title="No employee record is linked to your account" body="Ask HR to link your login to your employee profile." /></Card></>
+    // staff whose role does not include the employee list (e.g. an accountant) and who have no employee record of their own
+    return <><PageHeader title="Employees" /><Card><EmptyState icon={Users} title="Your role does not include the employee list" body="Ask an administrator if you need it. If you are also an employee here, HR can link your login to your employee record so your own profile opens." /></Card></>
   }
   const page = pageOf(sp.page), term = sanitizeQ(sp.q), view = sp.view === 'table' ? 'table' : 'cards', size = view === 'cards' ? 24 : PAGE_SIZE
   const canDocs = c.can('employees.view_sensitive'), canUpload = canDocs && c.can('documents.upload')
@@ -64,9 +65,9 @@ export default async function Employees({ searchParams }: { searchParams: Promis
       actions={<><SavedViews page="/employees" />{c.can('data.export') && c.can('employees.view_sensitive') && <LinkButton href="/api/export/employees" variant="secondary">Export CSV</LinkButton>}
         {c.can('records.edit') && c.can('employees.view_sensitive') && <DialogButton wide openParam="employee" label="Add employee" title="Add employee" icon={<Plus size={15} />}>
           <ActionForm action={createEmployee} submit="Create employee"><EmployeeFields withSalary={c.can('salary.view')} /></ActionForm></DialogButton>}</>} />
-    <form className="mb-4 flex flex-wrap gap-2"><input name="q" defaultValue={sp.q} placeholder="Search name, ID, designation…" className={`${cls} min-w-52 flex-1`} />
-      <select name="status" defaultValue={sp.status ?? ''} className={cls}><option value="">Current staff</option>{EMP_STATUS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select>
-      <select name="department" defaultValue={sp.department ?? ''} className={cls}><option value="">All departments</option>{deptList.map(d => <option key={d}>{d}</option>)}</select>
+    <form className="mb-4 flex flex-wrap gap-2"><input name="q" type="search" aria-label="Search employees" defaultValue={sp.q} placeholder="Search name, ID, designation…" className={`${cls} min-w-52 flex-1`} />
+      <select name="status" aria-label="Employee status" defaultValue={sp.status ?? ''} className={cls}><option value="">Current staff</option>{EMP_STATUS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select>
+      <select name="department" aria-label="Department" defaultValue={sp.department ?? ''} className={cls}><option value="">All departments</option>{deptList.map(d => <option key={d}>{d}</option>)}</select>
       {view === 'table' && <input type="hidden" name="view" value="table" />}
       <button className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-fg">Filter</button>
       <nav aria-label="Layout" className="ms-auto inline-flex rounded-full bg-surface-2 p-1 ring-1 ring-border/70">{([['cards', 'Cards', LayoutGrid], ['table', 'Table', List]] as const).map(([k, l, I]) =>

@@ -35,7 +35,7 @@ export async function saveNotificationRule(id: string | null, _: ActionState, fd
     const c = await getCtx(); need(c, 'settings.manage')
     const event = str(fd, 'event') ?? ''
     if (!isEvent(event)) return { error: 'Choose what should trigger the alert.', fieldErrors: { event: 'Required' } }
-    const channels = z.array(z.enum(CHANNELS)).min(1, 'Choose at least one channel').parse(all(fd, 'channels'))
+    const channels = z.array(z.enum(CHANNELS)).min(1, 'Choose at least one channel').max(CHANNELS.length).parse(all(fd, 'channels'))
     const recipient_ids = await validRecipients(c, all(fd, 'recipients'))
     if (!recipient_ids.length) return { error: 'Choose at least one recipient (add people under Reminders → Recipients).' }
     const min = str(fd, 'min_amount'), min_amount = min ? z.coerce.number().min(0).max(1e12).parse(min) : null
@@ -152,7 +152,7 @@ export async function saveReportSchedule(id: string | null, _: ActionState, fd: 
     const month_day = frequency === 'monthly' ? z.coerce.number().int().min(1).max(28).parse(str(fd, 'month_day') ?? '1') : null
     const sections = [...new Set(all(fd, 'sections'))].filter(s => s in SECTIONS)
     if (!sections.length) return { error: 'Choose at least one section for the report.' }
-    const channels = z.array(z.enum(CHANNELS)).min(1, 'Choose at least one channel').parse(all(fd, 'channels'))
+    const channels = z.array(z.enum(CHANNELS)).min(1, 'Choose at least one channel').max(CHANNELS.length).parse(all(fd, 'channels'))
     const recipient_ids = await validRecipients(c, all(fd, 'recipients'))
     if (!recipient_ids.length) return { error: 'Choose at least one recipient (add people under Reminders → Recipients).' }
     const row = { name: z.string().trim().min(1, 'Name the report').max(120).parse(str(fd, 'name') ?? ''), frequency, weekday, month_day, sections, channels, recipient_ids,

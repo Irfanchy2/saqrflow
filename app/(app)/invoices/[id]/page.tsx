@@ -63,6 +63,8 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const delivery = Object.fromEntries((deliv ?? []).map((x: any) => [x.item_id, { ordered: Number(x.ordered), delivered: Number(x.delivered) }]))
   const deliveryNotes = d.related.filter((r: any) => r.doc_type === 'delivery_note' && r.quotation_id === id)
   const creditNotes = d.related.filter((r: any) => r.doc_type === 'credit_note' && r.source_invoice_id === id)
+  // a delivery note already billed by an invoice that still stands: no second invoice from it
+  const invoicedAs = d.doc.doc_type === 'delivery_note' && d.doc.source_invoice_id ? (d.related.find((r: any) => r.id === d.doc.source_invoice_id && r.doc_type === 'invoice' && r.status !== 'cancelled')?.number ?? null) : null
   const { data: payDocs } = isInv && d.payments.some((p: any) => p.document_id) ? await c.supabase.from('documents').select('id,name').in('id', d.payments.map((p: any) => p.document_id).filter(Boolean)) : { data: [] as any[] }
   const docName = new Map((payDocs ?? []).map((x: any) => [x.id, x.name]))
   // project advances received on account and not yet applied to an invoice
@@ -76,7 +78,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
     <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} customers={[...new Map([...(customers ?? []), ...(projects ?? []).map((x: any) => x.customer).filter(Boolean)].map((x: any) => [x.id, x])).values()] as any} projects={(projects ?? []).map(({ customer: _c, ...x }: any) => x) as any}
       catalog={(catalog ?? []).map((x: any) => ({ ...x, rate: Number(x.rate) }))} templates={(templates ?? []) as any} salespeople={people ?? []} delivery={delivery}
       editable={edit && !locked} lockedReason={!edit ? 'You can view this document but not change it.' : locked} requireApproval={settings.requireApproval}
-      canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber}
+      canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber} invoicedAs={invoicedAs}
       statusView={isInv ? { doc: docSt, pay, daysLate: late } : undefined} />
 
     <div className="no-print mt-2 grid gap-5 px-0 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">

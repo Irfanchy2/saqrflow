@@ -30,8 +30,8 @@ export async function AiAutomation({ c, wa }: { c: Ctx; wa: WaStatus | null }) {
     return <div className="space-y-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-medium">{SECRETS[name].label}</span>
         <span className="flex items-center gap-2 text-muted">{v ? <><KeyRound size={12} aria-hidden /><code>{name === 'google_service_account' ? (sa?.client_email ?? 'set') : mask(v)}</code>{src === 'env' ? <Badge>env: {SECRETS[name].env}</Badge> : <ActionButton variant="ghost" action={clearAiSecret.bind(null, name)} confirm={`Remove the stored ${SECRETS[name].label}?`}>Remove</ActionButton>}</> : 'not set'}</span></div>
-      {src !== 'env' && (multiline ? <Textarea name={name} rows={2} placeholder={v ? 'Paste to replace (leave blank to keep)' : hint} autoComplete="off" spellCheck={false} className="font-mono text-xs" />
-        : <Input name={name} type="password" placeholder={v ? 'Enter a new key to replace (leave blank to keep)' : hint} autoComplete="off" />)}
+      {src !== 'env' && (multiline ? <Textarea name={name} aria-label={SECRETS[name].label} rows={2} placeholder={v ? 'Paste to replace (leave blank to keep)' : hint} autoComplete="off" spellCheck={false} className="font-mono text-xs" />
+        : <Input name={name} aria-label={SECRETS[name].label} type="password" placeholder={v ? 'Enter a new key to replace (leave blank to keep)' : hint} autoComplete="off" />)}
     </div>
   }
 

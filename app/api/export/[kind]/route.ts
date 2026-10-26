@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   if (!me || !can(me.role as Role, 'data.export') || (def.perm && !can(me.role as Role, def.perm))) return new NextResponse('You do not have permission to export this list.', { status: 403 })
   const tz = (me.company as any)?.timezone ?? 'Asia/Dubai'
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
-  const [headers, rows] = await def.run(sb, today)
+  const [headers, rows] = await def.run(sb, today, { fin: can(me.role as Role, 'finance.view') })
   try { await createAdminClient().from('audit_logs').insert({ company_id: me.company_id, user_id: user.id, action: 'EXPORT', table_name: kind, changes: { rows: rows.length } }) } catch {}
   const xlsx = req.nextUrl.searchParams.get('format') === 'xlsx', name = `averiqo-${kind}-${today}.${xlsx ? 'xlsx' : 'csv'}`
   const body = xlsx ? writeXlsx(def.title, headers, rows) : toCsv(headers, rows)
