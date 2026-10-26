@@ -10,7 +10,7 @@ import { deleteBankTxn, recordBankTxn, saveBankAccount, setBankAccountActive, tr
 import { fmtMoney } from '@/lib/sales/money'
 import { cn } from '@/lib/utils'
 
-export const metadata = { title: 'Bank Accounts' }
+export const metadata = { title: 'Bank accounts' }
 const TYPES: Record<string, string> = { current: 'Current account', savings: 'Savings', cash: 'Cash', card: 'Card', other: 'Other' }
 const KIND: Record<string, [string, Tone]> = {
   payment_in: ['Payment received', 'green'], expense_out: ['Expense', 'neutral'], cheque_out: ['Cheque cleared', 'neutral'], deposit: ['Deposit', 'green'], withdrawal: ['Withdrawal', 'neutral'],
@@ -56,7 +56,7 @@ export default async function Banking({ searchParams }: { searchParams: Promise<
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
 
   return <>
-    <PageHeader title="Bank Accounts" sub="Balances of your bank accounts and cash. Payments, expenses and cleared cheques post here when you choose the account."
+    <PageHeader title="Bank accounts" sub="Balances of your bank accounts and cash. Payments, expenses and cleared cheques post here when you choose the account."
       actions={manage && <>
         {open.length > 1 && <DialogButton wide variant="secondary" label="Transfer" title="Move money between accounts" icon={<ArrowRightLeft size={14} />}><ActionForm idempotent action={transferBetweenAccounts} submit="Transfer">
           <div className="grid gap-4 sm:grid-cols-2"><Field label="From *"><Select name="from" required defaultValue="">{[<option key="" value="" disabled>Choose…</option>, ...opts]}</Select></Field>

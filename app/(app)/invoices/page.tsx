@@ -11,13 +11,13 @@ import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/
 import { fmtMoney } from '@/lib/sales/money'
 import { AGE_BUCKETS, receivablesAgeing, type InvRow } from '@/lib/sales/summary'
 import { loadSalesKpis } from '@/lib/sales/kpis'
-import { formatAed, formatShortDate } from '@/lib/time'
+import { formatAed, formatShortDate, showDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
 import { TabStrip } from '@/components/ui/tab-strip'
 import { InvoicesTab } from './invoices-tab'
 
-export const metadata = { title: 'Sales & Invoices' }
+export const metadata = { title: 'Sales & invoices' }
 const TABS = [
   { k: 'quotation', label: 'Quotations', icon: ScrollText }, { k: 'invoice', label: 'Tax invoices', icon: Receipt }, { k: 'delivery_note', label: 'Delivery notes', icon: Truck },
   { k: 'credit_note', label: 'Credit notes', icon: FileMinus }, { k: 'followups', label: 'Follow-ups', icon: BellRing },
@@ -43,7 +43,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const base = '/invoices'
   const tabHref = (t: string) => `${base}?tab=${t}`
   return <>
-    <PageHeader title="Sales & Invoices" sub="Quotations, tax invoices, delivery notes and the payments against them."
+    <PageHeader title="Sales & invoices" sub="Quotations, tax invoices, delivery notes and the payments against them."
       actions={<><SavedViews page="/invoices" />{edit && <NewSalesButtons />}</>} />
 
     <Metrics className="mb-5" cols={4}>
@@ -111,7 +111,7 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
             <Td><Link href={`/invoices/${r.id}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{r.number}</Link></Td>
             <Td className="max-w-[220px] truncate" title={r.customer_name ?? undefined}>{r.customer_name ?? <span className="text-muted">—</span>}</Td>
             <Td className="max-w-[260px] truncate text-muted" title={r.subject ?? r.project?.name ?? r.site ?? undefined}>{r.subject ?? r.project?.name ?? r.site ?? '—'}</Td>
-            <Td className="whitespace-nowrap tabular-nums">{r.issue_date}</Td>
+            <Td className="whitespace-nowrap tabular-nums">{showDate(r.issue_date)}</Td>
             {t !== 'delivery_note' && <Td className={cn('whitespace-nowrap tabular-nums', isInv && r.status === 'overdue' && 'font-medium text-danger')}>{(isInv ? r.due_date : r.valid_until) ?? '—'}</Td>}
             {meta.priced && <Td className="text-right tabular-nums">{fmtMoney(r.total)}</Td>}
             {isInv && <Td className={cn('text-right tabular-nums', bal > 0 && !['draft', 'cancelled'].includes(r.status) ? 'font-medium' : 'text-muted')}>{['draft', 'cancelled'].includes(r.status) ? '—' : fmtMoney(bal)}</Td>}
@@ -129,7 +129,7 @@ async function FollowupsTab() {
   return <Card>{!rows.length ? <EmptyState icon={BellRing} title="No follow-ups open" body="When a quotation is marked as sent, follow-up reminders are created automatically (Settings → Document branding → Quotation workflow)." />
     : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Due</Th><Th>Quotation</Th><Th>Customer</Th><Th>Note</Th><Th className="text-right">Value (AED)</Th></tr></thead>
       <tbody className="divide-y divide-border">{rows.map((f: any) => <tr key={f.id} className="hover:bg-surface-2/50">
-        <Td className={cn('whitespace-nowrap tabular-nums', f.due_date <= c.today && 'font-medium text-warning')}>{f.due_date}{f.due_date < c.today ? ' · late' : f.due_date === c.today ? ' · today' : ''}</Td>
+        <Td className={cn('whitespace-nowrap tabular-nums', f.due_date <= c.today && 'font-medium text-warning')}>{showDate(f.due_date)}{f.due_date < c.today ? ' · late' : f.due_date === c.today ? ' · today' : ''}</Td>
         <Td><Link href={`/invoices/${f.invoice.id}`} className="font-mono text-[13px] text-primary hover:underline">{f.invoice.number}</Link></Td>
         <Td className="max-w-[220px] truncate">{f.invoice.customer_name ?? '—'}</Td><Td className="text-muted">{f.note ?? '—'}</Td><Td className="text-right tabular-nums">{fmtMoney(f.invoice.total)}</Td></tr>)}</tbody></TableWrap>}</Card>
 }
@@ -141,7 +141,7 @@ async function PaymentsTab({ sp }: { sp: Record<string, string | undefined> }) {
   return <Card>{!data?.length ? <EmptyState icon={Banknote} title="No payments yet" body="Open an issued tax invoice and use “Record payment”. Partial payments update the balance and status automatically." />
     : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Invoice</Th><Th>Customer</Th><Th>Method</Th><Th>Reference</Th><Th className="text-right">Amount (AED)</Th>{edit && <Th><span className="sr-only">Send receipt</span></Th>}</tr></thead>
       <tbody className="divide-y divide-border">{data.map((p: any) => <tr key={p.id} className="hover:bg-surface-2/50">
-        <Td className="tabular-nums">{p.paid_on}</Td>
+        <Td className="tabular-nums">{showDate(p.paid_on)}</Td>
         <Td>{p.invoice ? <Link href={`/invoices/${p.invoice.id}`} className="font-mono text-[13px] text-primary hover:underline">{p.invoice.number}</Link>
           : <span className="text-xs text-muted">{p.project ? <>Project advance · <Link href={`/projects/${p.project.id}?tab=finance`} className="text-primary hover:underline">{p.project.name}</Link></> : 'On account (not applied)'}</span>}</Td>
         <Td className="max-w-[220px] truncate">{p.invoice?.customer_name ?? (p.customer ? <Link href={`/parties/${p.customer.id}`} className="hover:text-primary hover:underline">{p.customer.name}</Link> : '—')}</Td><Td>{METHOD[p.method] ?? p.method ?? '—'}</Td><Td className="text-muted">{p.reference ?? '—'}</Td>

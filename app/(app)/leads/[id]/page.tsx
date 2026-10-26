@@ -81,7 +81,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     {!['lost', 'on_hold'].includes(l.stage) && <ol aria-label="Pipeline progress" className="mb-5 flex overflow-x-auto rounded-lg border border-border bg-surface text-xs">
       {steps.map((s, i) => <li key={s.key} aria-current={s.key === l.stage ? 'step' : undefined} className={cn('flex min-w-[110px] flex-1 items-center gap-1.5 border-e border-border px-3 py-2 last:border-e-0',
         i < at || l.stage === 'won' ? 'text-success' : s.key === l.stage ? 'bg-primary-soft font-medium text-primary' : 'text-muted')}>
-        <span className={cn('grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[9px] tabular-nums', i < at || l.stage === 'won' ? 'border-success bg-success/10' : s.key === l.stage ? 'border-primary' : 'border-border')}>{i + 1}</span><span className="truncate">{s.label}</span></li>)}
+        <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] tabular-nums', i < at || l.stage === 'won' ? 'border-success bg-success/10' : s.key === l.stage ? 'border-primary' : 'border-border')}>{i + 1}</span><span className="truncate">{s.label}</span></li>)}
     </ol>}
 
     <div className="grid gap-5 xl:grid-cols-3 [&>*]:min-w-0">

@@ -17,7 +17,7 @@ import { deletePayment, recordProjectPayment } from '@/app/actions/sales'
 import { EXPENSE_CATS, PHOTO_CATS } from '@/lib/projects'
 import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
 import { fmtMoney } from '@/lib/sales/money'
-import { formatAed, formatShortDate, localDate } from '@/lib/time'
+import { formatAed, formatShortDate, localDate, showDate } from '@/lib/time'
 import { ACCEPT_ATTR } from '@/lib/files'
 import { cn } from '@/lib/utils'
 import { RecordActivity } from '@/components/record-activity'
@@ -87,7 +87,7 @@ export async function OverviewTab({ c, p }: { c: Ctx; p: any }) {
               {edit ? <ActionButton variant="ghost" action={toggleMilestone.bind(null, m.id, !m.done)}>{m.done ? <CheckCircle2 size={17} className="text-success" /> : <Circle size={17} />}<span className="sr-only">{m.done ? 'Mark not done' : 'Mark done'}</span></ActionButton>
                 : m.done ? <CheckCircle2 size={17} className="text-success" /> : <Circle size={17} className="text-muted" />}
               <span className={cn('flex-1', m.done && 'text-muted line-through')}>{m.title}</span>
-              <span className={cn('tabular-nums text-xs', late ? 'font-medium text-danger' : 'text-muted')}>{m.due_date}{late ? ' · overdue' : ''}</span>
+              <span className={cn('tabular-nums text-xs', late ? 'font-medium text-danger' : 'text-muted')}>{showDate(m.due_date)}{late ? ' · overdue' : ''}</span>
               {del && <ActionButton variant="ghost" action={deleteMilestone.bind(null, m.id)} confirm="Delete this milestone?"><Trash2 size={13} /><span className="sr-only">Delete</span></ActionButton>}
             </li> })}</ul>}
       </Card>
@@ -125,7 +125,7 @@ export async function FinanceTab({ c, p }: { c: Ctx; p: any }) {
         {!(sales ?? []).length ? <EmptyState icon={Receipt} title="No sales documents yet" body="Create a quotation for this project. Customer and site are filled in for you." action={edit ? <NewSalesButtons projectId={id} customerId={p.customer_id ?? undefined} only={['quotation']} /> : undefined} />
           : <TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Type</Th><Th>Date</Th><Th className="text-right">Total</Th><Th className="text-right">Paid</Th><Th>Status</Th></tr></thead>
             <tbody className="divide-y divide-border">{(sales ?? []).map((s: any) => <tr key={s.id} className="hover:bg-surface-2/50">
-              <Td><Link href={`/invoices/${s.id}`} className="font-mono text-[13px] text-primary hover:underline">{s.number}</Link></Td><Td>{DOC_META[s.doc_type as SalesType]?.label}</Td><Td className="tabular-nums">{s.issue_date}</Td>
+              <Td><Link href={`/invoices/${s.id}`} className="font-mono text-[13px] text-primary hover:underline">{s.number}</Link></Td><Td>{DOC_META[s.doc_type as SalesType]?.label}</Td><Td className="tabular-nums">{showDate(s.issue_date)}</Td>
               <Td className="text-right tabular-nums">{DOC_META[s.doc_type as SalesType]?.priced ? fmtMoney(s.total) : '—'}</Td><Td className="text-right tabular-nums">{s.doc_type === 'invoice' ? fmtMoney(paid.get(s.id) ?? 0) : '—'}</Td>
               <Td badge><SalesDocBadge r={s} /></Td></tr>)}</tbody></TableWrap>}
       </Card>}
@@ -186,7 +186,7 @@ export async function FinanceTab({ c, p }: { c: Ctx; p: any }) {
         {!(exps ?? []).length ? <p className="px-4 py-6 text-sm text-muted">No costs recorded.</p> :
           <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Description</Th><Th>Category</Th><Th className="text-right">Amount</Th><Th /></tr></thead>
             <tbody className="divide-y divide-border">{(exps ?? []).slice(0, 50).map((e: any) => <tr key={e.id}>
-              <Td className="whitespace-nowrap tabular-nums text-xs">{e.spent_on}</Td>
+              <Td className="whitespace-nowrap tabular-nums text-xs">{showDate(e.spent_on)}</Td>
               <Td><div className="max-w-[300px] truncate">{e.description}</div><div className="text-xs text-muted">{[e.supplier_name, e.reference, e.employee?.full_name].filter(Boolean).join(' · ')}{e.receipt_document_id && <Link href={`/documents/${e.receipt_document_id}`} className="ms-1 text-primary hover:underline">receipt</Link>}</div></Td>
               <Td className="text-muted">{EXPENSE_CATS[e.category] ?? e.category}</Td><Td className="text-right font-medium tabular-nums">{fmtMoney(e.amount)}</Td>
               <Td className="text-right">{del && <ActionButton variant="ghost" action={deleteExpense.bind(null, e.id)} confirm="Delete this cost?"><Trash2 size={13} /><span className="sr-only">Delete</span></ActionButton>}</Td></tr>)}</tbody></TableWrap>}

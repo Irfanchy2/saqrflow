@@ -10,11 +10,11 @@ import { ActionForm } from '@/components/ui/action-form'
 import { MonthGrid } from '@/components/ui/month-grid'
 import { changeChequeStatus, createCheque } from '@/app/actions/cheques'
 import { nextStatuses, summarizeCheques, type ChequeStatus, type Direction } from '@/lib/cheques'
-import { formatAed } from '@/lib/time'
+import { formatAed, showDate } from '@/lib/time'
 import { ACCEPT_ATTR } from '@/lib/files'
 import { SavedViews } from '@/components/saved-views'
 
-export const metadata = { title: 'Banking & Cheques' }
+export const metadata = { title: 'Banking & cheques' }
 const STATUS_TONE: Record<string, Tone> = { received: 'blue', issued: 'blue', scheduled: 'blue', deposited: 'amber', presented: 'amber', cleared: 'green', returned: 'red', cancelled: 'neutral' }
 const ALL = ['received', 'issued', 'scheduled', 'deposited', 'presented', 'cleared', 'returned', 'cancelled']
 
@@ -42,7 +42,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
 
   return <>
-    <PageHeader title="Banking & Cheques" sub="A tracker for incoming, outgoing and post-dated cheques."
+    <PageHeader title="Banking & cheques" sub="A tracker for incoming, outgoing and post-dated cheques."
       actions={<><SavedViews page="/cheques" />{c.can('data.export') && <LinkButton href="/api/export/cheques" variant="secondary">Export CSV</LinkButton>}
         {manage && <DialogButton wide label="Add cheque" title="Add cheque" icon={<Plus size={15} />}>
           <ActionForm action={createCheque} submit="Save cheque">
@@ -88,7 +88,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
         <Card className="overflow-hidden">{!rows?.length ? <EmptyState icon={Landmark} title={Object.keys(sp).length ? 'No cheques match your filters' : 'No cheques recorded'} body="Add incoming, outgoing and post-dated cheques to see due dates, totals and get reminders before each cheque date." /> : <>
           <TableWrap><thead className="border-b border-border bg-surface-2/60"><tr><SortTh label="Cheque date" col="cheque_date" params={sp} base="/cheques" /><Th>No.</Th><SortTh label="Party" col="party_name" params={sp} base="/cheques" /><Th>Bank</Th><SortTh label="Amount" col="amount" params={sp} base="/cheques" /><Th>Type</Th><SortTh label="Status" col="status" params={sp} base="/cheques" />{manage && <Th />}</tr></thead>
             <tbody className="divide-y divide-border">{rows.map(r => { const next = nextStatuses(r.direction as Direction, r.status as ChequeStatus); const late = ['received', 'issued', 'scheduled'].includes(r.status) && r.cheque_date < c.today
-              return <tr key={r.id} className="hover:bg-surface-2/50"><Td className="tabular-nums">{r.cheque_date}{late && <Badge tone="red" className="ms-2">overdue</Badge>}</Td><Td className="font-mono text-xs">{r.cheque_no}</Td>
+              return <tr key={r.id} className="hover:bg-surface-2/50"><Td className="tabular-nums">{showDate(r.cheque_date)}{late && <Badge tone="red" className="ms-2">overdue</Badge>}</Td><Td className="font-mono text-xs">{r.cheque_no}</Td>
                 <Td><div className="font-medium">{r.party_name}</div><div className="text-xs text-muted">{r.purpose}</div>{r.invoice_id && <Link href={`/invoices/${r.invoice_id}`} className="text-xs text-primary hover:underline">Invoice {invNo.get(r.invoice_id) ?? ''}</Link>}</Td><Td className="text-muted">{r.bank_name}{r.account_display_name && <div className="text-xs">{r.account_display_name}</div>}</Td>
                 <Td className={`tabular-nums font-medium ${r.direction === 'incoming' ? 'text-success' : ''}`}>{r.direction === 'incoming' ? '+' : '−'}{formatAed(r.amount)}</Td>
                 <Td><span className="capitalize text-muted">{r.direction} · {r.kind === 'pdc' ? 'PDC' : r.kind}</span></Td><Td><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>{r.approval_status && r.approval_status !== 'approved' && <Badge tone={r.approval_status === 'pending' ? 'amber' : 'red'} className="ms-1">{r.approval_status === 'pending' ? 'Awaiting approval' : r.approval_status === 'rejected' ? 'Rejected' : 'Changes requested'}</Badge>}{r.returned_reason && <div className="mt-1 text-xs text-danger">{r.returned_reason}</div>}</Td>

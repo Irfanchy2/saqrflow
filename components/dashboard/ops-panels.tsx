@@ -82,7 +82,7 @@ function CashCard({ cash }: { cash: { total: number; accounts: CashAccount[] } |
 export function SalesFunnel({ steps }: { steps: FunnelStep[] }) {
   const empty = !steps[0]?.count
   return <Card className="h-full"><CardHeader title="Sales funnel" sub="Leads by how far they got" action={<CardLink href="/leads">Pipeline</CardLink>} />
-    {empty ? <EmptyState compact icon={Users} title="No leads yet" body="Enquiries you add under CRM & Leads move through this funnel as they reach a site visit, a quotation and a decision." /> :
+    {empty ? <EmptyState compact icon={Users} title="No leads yet" body="Enquiries you add under CRM & leads move through this funnel as they reach a site visit, a quotation and a decision." /> :
       <ol className="space-y-2 px-5 pb-5">{steps.map((s, i) => { const prev = i ? steps[i - 1].count : 0
         return <li key={s.key}><Link href="/leads?view=list" className="group/f block">
           <div className="flex items-baseline justify-between gap-2 text-[12.5px]"><span className="font-medium">{s.label}</span>

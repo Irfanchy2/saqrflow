@@ -34,7 +34,7 @@ try {
   const welder = (await one(`insert into employees(company_id,employee_no,full_name,designation) values ($1,'E-101','Anil Thomas','Welder') returning id`, [co])).id
   const fitter = (await one(`insert into employees(company_id,employee_no,full_name,designation) values ($1,'E-102','Rashid Khan','Fitter') returning id`, [co])).id
   const nav = await navText(p)
-  for (const l of ['CRM & Leads', 'Site Visits', 'Work Orders', 'Daily Site Reports', 'Tasks']) ok(nav.includes(l), `sidebar: ${l}`)
+  for (const l of ['CRM & leads', 'Site visits', 'Work orders', 'Daily site reports', 'Tasks']) ok(nav.includes(l), `sidebar: ${l}`)
   ok(/SALES/.test(nav) && /OPERATIONS/.test(nav), 'sidebar grouped: Sales, Operations')
   ok(/\nSTOCK\n/.test(nav), 'stock has its own tab (materials, not mixed into Operations)')
 

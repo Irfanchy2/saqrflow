@@ -67,7 +67,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     rightSub={ago(l.created_at)} />
 
   return <>
-    <PageHeader crumbs={[{ label: 'Sales' }, { label: 'CRM & Leads' }]} title="CRM & Leads" sub="Every enquiry from first call to won job. Follow-ups remind you automatically." actions={<><SavedViews page="/leads" />{edit && add}</>} />
+    <PageHeader crumbs={[{ label: 'Sales' }, { label: 'CRM & leads' }]} title="CRM & leads" sub="Every enquiry from first call to won job. Follow-ups remind you automatically." actions={<><SavedViews page="/leads" />{edit && add}</>} />
     <Metrics className="mb-5" cols={5}>
       <StatCard label="Open leads" value={sum.open} hint={sum.unvalued ? `${sum.unvalued} without an estimated value` : undefined} />
       <StatCard label="Pipeline value" value={formatAed(sum.value)} hint="Open leads, excl. VAT" />

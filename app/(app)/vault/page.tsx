@@ -37,5 +37,5 @@ export default async function Vault({ searchParams }: { searchParams: Promise<Re
       {!!emps?.length && <select name="employee" aria-label="Employee" defaultValue={sp.employee ?? ''} className={cls}><option value="">Any employee</option>{emps.map((e: any) => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>}
       {bin && <input type="hidden" name="bin" value="1" />}</>} />
     <DocsTable showOwner rows={rows} total={total} page={page} today={c.today} base="/vault" sp={sp}
-      empty={<EmptyState icon={VaultIcon} title={bin ? 'Recycle bin is empty' : 'No files found'} body={bin ? 'Deleted documents can be restored from here.' : 'Upload files or add documents from the Company Documents and Employees pages.'} />} /></>
+      empty={<EmptyState icon={VaultIcon} title={bin ? 'Recycle bin is empty' : 'No files found'} body={bin ? 'Deleted documents can be restored from here.' : 'Upload files or add documents from the Company documents and Employees pages.'} />} /></>
 }

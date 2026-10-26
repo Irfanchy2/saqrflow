@@ -16,7 +16,7 @@ import { saveSupplierLedger } from '@/app/actions/expenses'
 import { EXPENSE_CATS, PAYMENT_METHODS } from '@/lib/projects'
 import { loadExportRows, loadTallySettings, readFilters } from '@/lib/expenses/export-data'
 import { fmtMoney } from '@/lib/sales/money'
-import { formatAed, formatShortDate } from '@/lib/time'
+import { formatAed, formatShortDate, showDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
 import { Fab, FilterBar, FilterTabs, MList, MRow, Tile, TINTS, type TintKey } from '@/components/ui/mobile'
@@ -155,7 +155,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
             right={<Money value={Number(e.amount) + Number(e.vat_amount)} className="text-[15px] font-semibold tracking-[-0.01em]" />} rightSub={formatShortDate(e.spent_on)} /> })}</MList>
         <div className="hidden sm:block"><TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Supplier / description</Th><Th>Invoice no.</Th><Th>Category</Th><Th>Payment</Th><Th className="text-right">Excl. VAT</Th><Th className="text-right">VAT</Th><Th className="text-right">Total</Th>{edit && <Th />}</tr></thead>
           <tbody className="divide-y divide-border">{data.map((e: any) => <tr key={e.id} className="hover:bg-surface-2/50" data-expense={e.reference ?? e.id}>
-            <Td className="whitespace-nowrap tabular-nums">{e.spent_on}</Td>
+            <Td className="whitespace-nowrap tabular-nums">{showDate(e.spent_on)}</Td>
             <Td><div className="max-w-[340px] truncate font-medium">{e.supplier_name ?? e.description}{badges(e)}</div><div className="max-w-[340px] truncate text-xs text-muted">{[e.supplier_name ? e.description : null, e.project?.name ?? 'General', e.employee?.full_name].filter(Boolean).join(' · ')}
               {e.receipt_document_id && <Link href={`/documents/${e.receipt_document_id}`} className="ms-2 inline-flex items-center gap-0.5 text-primary hover:underline"><Paperclip size={11} />receipt</Link>}
               {e.source === 'scan' && <span className="ms-2 inline-flex items-center gap-0.5" title="Entered from a scanned receipt"><ScanText size={11} aria-hidden />scanned</span>}</div></Td>

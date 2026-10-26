@@ -22,6 +22,11 @@ export function formatLongDate(iso: string): string {
 export function formatShortDate(iso: string): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(toUtcMs(iso)))
 }
+/** A stored date shown to people ("18 Oct 2026"), or `empty` when there is none: one date format on every screen. */
+export function showDate(iso: string | null | undefined, empty = ''): string {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso ? String(iso) : empty
+  return formatShortDate(iso.slice(0, 10))
+}
 const AED = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 /** "AED 1,250.00": one money format everywhere (rounded half away from zero on the cent, never "1,250.1") */
 export function formatAed(n: number | string): string {

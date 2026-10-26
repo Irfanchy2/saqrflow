@@ -14,7 +14,7 @@ const SHORT: Record<string, string> = { leads: 'CRM', parties: 'Customers', site
  * (CRM, Customers, Expenses…) it takes the second slot, so the place you are is always visible. Hidden from lg up.
  *
  * A graphite capsule; the open tab is lit by the blue "arc" that GSAP glides across (it moves the moment you tap, before
- * the page arrives). Only the open tab shows its name; the others are icons with their names for screen readers.
+ * the page arrives). Every tab shows its name under the icon, so the bar reads without guessing what an icon means.
  * The four tab pages are prefetched while the bar is on screen, so they open without waiting.
  */
 export function BottomNav({ items }: { items: NavItem[] }) {
@@ -61,8 +61,8 @@ export function BottomNav({ items }: { items: NavItem[] }) {
       return <Link key={i.key} href={i.href} prefetch data-tab={i.key} aria-current={on(i.href) ? 'page' : undefined} onClick={() => setWant(i.key)}
         className={cn(cell, lit ? 'text-white' : 'text-[hsl(220_10%_66%)] active:text-white')}>
         {icon(i.key, lit)}
-        <span data-name className={lit ? 'font-tech text-[10.5px] font-semibold leading-none tracking-[0.02em]' : 'sr-only'}>{SHORT[i.key] ?? i.label}</span></Link> })}
+        <span data-name className="max-w-full truncate px-1 font-tech text-[11px] font-semibold leading-none tracking-[0.02em]">{SHORT[i.key] ?? i.label}</span></Link> })}
     <button type="button" onClick={() => dispatchEvent(new Event('averiqo:menu'))} className={cn(cell, 'text-[hsl(220_10%_66%)] active:text-white')}>
-      <TabIcon name="more" className="relative transition-transform duration-150 active:scale-90" /><span className="sr-only">More</span></button>
+      <TabIcon name="more" className="relative transition-transform duration-150 active:scale-90" /><span className="font-tech text-[11px] font-semibold leading-none tracking-[0.02em]">More</span></button>
   </nav>
 }

@@ -7,7 +7,7 @@ import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { changeRole, inviteUser, setUserActive } from '@/app/actions/admin'
 import { PERMISSIONS, ROLES, ROLE_LABELS, ROLE_PERMISSIONS } from '@/lib/permissions'
 
-export const metadata = { title: 'User Management' }
+export const metadata = { title: 'User management' }
 export default async function Users() {
   const c = await getCtx(); if (!c.can('users.manage')) redirect('/')
   const canLink = c.can('employees.view_sensitive')
@@ -22,7 +22,7 @@ export default async function Users() {
     {(emps ?? []).map(e => { const other = !!e.user_id && e.user_id !== userId
       return <option key={e.id} value={e.id} disabled={other}>{e.full_name} ({e.employee_no}){other ? ` · linked to ${nameOf.get(e.user_id!) ?? 'another login'}` : ''}</option> })}
   </Select>
-  return <><PageHeader title="User Management" sub="Roles are enforced by the database, not just the interface."
+  return <><PageHeader title="User management" sub="Roles are enforced by the database, not just the interface."
     actions={<><LinkButton href="/users/activity" variant="secondary"><ShieldCheck size={15} aria-hidden />Sign-in activity</LinkButton><DialogButton label="Invite user" title="Invite a user" icon={<UserPlus size={15} />}><ActionForm action={inviteUser} submit="Send invitation">
       <Field label="Full name"><Input name="name" required /></Field><Field label="Email"><Input name="email" type="email" required /></Field>
       <Field label="Role"><Select name="role" defaultValue="viewer">{ROLES.filter(r => r !== 'super_admin' || c.profile.role === 'super_admin').map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</Select></Field>

@@ -129,7 +129,7 @@ try {
   await p.goto(`${BASE}/employees/${mo}?tab=history`); await settle()
   ok((await body()).includes('Document timeline') && (await body()).includes('Emirates ID – Mohammed Ayub uploaded'), 'employee timeline lists uploaded documents')
   await p.goto(`${BASE}/documents?view=timeline`); await settle()
-  ok((await body()).includes('renewed') && (await body()).includes('2027-05-12 → 2028-05-12'), 'company timeline shows the renewal')
+  ok((await body()).includes('renewed') && (await body()).includes('12 May 2027 → 12 May 2028'), 'company timeline shows the renewal')
   await p.goto(`${BASE}/`); await settle(); await shot('23-dashboard-smart-center')
   ok(/Uploaded today\s*14/.test((await body()).replace(/\n+/g, ' ')), 'dashboard widget counts today’s uploads (14)')
   const anon = await browser.newContext(); const r1 = await anon.request.get(`${BASE}/api/inbox/${imgId}/file`); ok(r1.url().includes('/login') && !(await r1.body()).toString().startsWith('%PDF') && !(await r1.body()).subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])), 'logged-out request gets the login page, never the file')

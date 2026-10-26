@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { addFollowup, applyProjectAdvance, completeFollowup, decideApproval, deletePayment, unapplyProjectAdvance } from '@/app/actions/sales'
-import { formatLongDate } from '@/lib/time'
+import { formatLongDate, showDate } from '@/lib/time'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
 import { ShareLinks } from '@/components/share-links'
@@ -113,7 +113,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
           : d.payments.length === 0 ? <p className="px-4 pb-5 pt-1 text-sm text-muted">No payments recorded yet.</p>
           : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Payment date</Th><Th className="text-right">Amount</Th><Th>Method</Th><Th>Reference</Th><Th>Cheque / bank</Th><Th>Recorded by</Th><Th><span className="sr-only">Actions</span></Th></tr></thead><tbody className="divide-y divide-border" data-payment-history>
             {d.payments.map((p: any) => { const q = p.cheque_id ? chequeOf.get(p.cheque_id) : null
-              return <tr key={p.id}><Td className="whitespace-nowrap tabular-nums">{p.paid_on}</Td>
+              return <tr key={p.id}><Td className="whitespace-nowrap tabular-nums">{showDate(p.paid_on)}</Td>
                 <Td className="text-right font-medium tabular-nums text-success">{fmtMoney(p.amount)}</Td>
                 <Td>{METHOD[p.method] ?? p.method ?? '—'}{p.project_id && <div className="text-xs text-muted">Project advance</div>}</Td>
                 <Td className="text-muted">{p.reference ?? '—'}{p.notes && <div className="text-xs">{p.notes}</div>}{p.document_id && <Link href={`/documents/${p.document_id}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"><Paperclip size={11} />{docName.get(p.document_id) ?? 'Attachment'}</Link>}</Td>
@@ -131,7 +131,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
           <tbody className="divide-y divide-border">{d.items.map((it: any, i: number) => { const x = delivery[it.id] ?? { ordered: Number(it.quantity), delivered: 0 }
             return <tr key={it.id}><Td className="max-w-[14rem]"><span className="line-clamp-1">{i + 1}. {it.description}</span></Td><Td className="text-right tabular-nums">{x.ordered} {it.unit}</Td><Td className="text-right tabular-nums">{x.delivered}</Td>
               <Td className="text-right tabular-nums">{x.ordered - x.delivered > 0 ? <b>{+(x.ordered - x.delivered).toFixed(3)}</b> : <Badge tone="green">Complete</Badge>}</Td></tr> })}</tbody></TableWrap>}
-        {deliveryNotes.length > 0 && <ul className="divide-y divide-border border-t border-border text-sm">{deliveryNotes.map((r: any) => <li key={r.id}><Link href={`/invoices/${r.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/60"><Truck size={14} className="text-muted" aria-hidden /><span className="flex-1 font-mono text-[13px]">{r.number}</span><span className="text-xs text-muted">{r.issue_date}</span><Badge tone={STATUS_TONE[r.status]}>{statusLabel('delivery_note', r.status)}</Badge></Link></li>)}</ul>}
+        {deliveryNotes.length > 0 && <ul className="divide-y divide-border border-t border-border text-sm">{deliveryNotes.map((r: any) => <li key={r.id}><Link href={`/invoices/${r.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/60"><Truck size={14} className="text-muted" aria-hidden /><span className="flex-1 font-mono text-[13px]">{r.number}</span><span className="text-xs text-muted">{showDate(r.issue_date)}</span><Badge tone={STATUS_TONE[r.status]}>{statusLabel('delivery_note', r.status)}</Badge></Link></li>)}</ul>}
       </Card>}
 
       {isQtn && <Card><CardHeader title="Follow-ups" sub="Created automatically when the quotation is sent" action={edit ? <DialogButton size="sm" variant="secondary" label="Add" title="Schedule follow-up" icon={<Plus size={14} />}><ActionForm action={addFollowup.bind(null, id)} submit="Schedule">

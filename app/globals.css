@@ -7,10 +7,11 @@
 :root {
   --bg: 60 5% 93%; --surface: 0 0% 100%; --surface-2: 50 8% 96%; --border: 40 9% 89%; --border-strong: 40 6% 80%;
   --fg: 30 8% 10%; --muted: 30 4% 41%;
-  --primary: 214 78% 48%; --primary-fg: 0 0% 100%; --primary-soft: 214 90% 96%;
+  /* text-bearing colours keep 4.5:1 or more on white, the page background, grey surfaces and their own 10% tints */
+  --primary: 214 78% 45%; --primary-fg: 0 0% 100%; --primary-soft: 214 90% 96%;
   --ink: 30 8% 11%; --ink-fg: 45 30% 97%;
   --mesh-1: 214 90% 84%; --mesh-2: 24 95% 86%; --mesh-3: 160 55% 85%;
-  --success: 152 60% 32%; --warning: 28 90% 40%; --danger: 354 70% 48%;
+  --success: 152 60% 29%; --warning: 28 90% 34%; --danger: 354 70% 47%;
   --nav: 220 33% 97.5%;
   --sb: 223 60% 12%; --sb-2: 223 45% 18%; --sb-line: 223 38% 19%; --sb-fg: 220 30% 95%; --sb-muted: 221 22% 70%; --sb-accent: 217 85% 56%; --sb-accent-soft: 214 100% 80%;
   --shadow: 30 20% 20%; --hi: 0 0% 100% / 0;
@@ -364,4 +365,9 @@ main :where(p, dd, li, h1, h2, h3, label) { overflow-wrap: break-word; }
   .th { @apply h-10 whitespace-nowrap border-b border-border bg-surface-2/50 px-3 text-start text-[12.5px] font-medium tracking-[0.005em] text-muted first:ps-5 last:pe-5; }
   .td { @apply px-3 py-3 align-middle first:ps-5 last:pe-5; }
   .cal-day { @apply relative mx-auto grid h-9 w-9 place-items-center rounded-lg tabular-nums transition-colors; }   /* mini calendar day */
+}
+/* Phones: form fields at 16px. Below that, iPhone Safari zooms the whole page in when a field is tapped (and leaves it zoomed).
+   One rule here covers the shared Input / Select / Textarea and the hand-written filter fields alike. */
+@media (max-width: 639px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]), select, textarea { font-size: 16px; }
 }

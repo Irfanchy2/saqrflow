@@ -34,7 +34,7 @@ try {
   // a bank name taken from a customer's cheque before accounts existed: must not turn into an account
   await one(`insert into banks(company_id,name,account_display_name) values ($1,'ADCB','') returning id`, [co])
   const nav = await navText(p)
-  ok(/STOCK[\s\S]*Stock Movements/.test(nav) && nav.includes('Bank Accounts'), 'navigation: Stock tab (items, movements) and Bank Accounts under Finance')
+  ok(/STOCK[\s\S]*Stock movements/.test(nav) && nav.includes('Bank accounts'), 'navigation: Stock tab (items, movements) and Bank accounts under Finance')
 
   console.log('\n[1] Stock items and movements')
   await p.goto(`${BASE}/stock`); await settle()
@@ -83,7 +83,7 @@ try {
   await p.goto(`${BASE}/stock?tab=movements&item=${item.id}`); await settle()
   const mv = await main()
   ok(['Opening', 'Received', 'Issued', 'Adjusted', 'Villa 12 staircase', 'EST-5541'].every(s => mv.includes(s)), 'movements list every step, with the job and the supplier reference')
-  ok(await p.locator('nav[aria-label="Section"] a[aria-current="page"]').innerText() === 'Stock Movements', 'section tab: Stock Movements is current')
+  ok(await p.locator('nav[aria-label="Section"] a[aria-current="page"]').innerText() === 'Stock movements', 'section tab: Stock movements is current')
   await p.screenshot({ path: `${OUT}/movements.png`, fullPage: true })
 
   console.log('\n[2] Bank accounts')

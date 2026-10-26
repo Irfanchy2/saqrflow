@@ -14,7 +14,7 @@ import { EmployeeCard, type EmpCardExtra } from '@/components/employees/employee
 import { EmployeeDropCard } from '@/components/employees/drop-card'
 import { cn } from '@/lib/utils'
 
-export const metadata = { title: 'Employees & Labour' }
+export const metadata = { title: 'Employees & labour' }
 export default async function Employees({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const c = await getCtx(); const sp = await flat(searchParams)
   if (!c.can('employees.view')) {            // "employee" role: straight to their own profile
@@ -61,7 +61,7 @@ export default async function Employees({ searchParams }: { searchParams: Promis
   const qs = (v: string) => { const u = new URLSearchParams(Object.entries(sp).filter(([k, x]) => x && k !== 'page' && k !== 'view') as [string, string][]); if (v === 'table') u.set('view', 'table'); const s = u.toString(); return `/employees${s ? `?${s}` : ''}` }
 
   return <>
-    <PageHeader title="Employees & Labour" sub={`${activeCount ?? 0} active employee${activeCount === 1 ? '' : 's'}`}
+    <PageHeader title="Employees & labour" sub={`${activeCount ?? 0} active employee${activeCount === 1 ? '' : 's'}`}
       actions={<><SavedViews page="/employees" />{c.can('data.export') && c.can('employees.view_sensitive') && <LinkButton href="/api/export/employees" variant="secondary">Export CSV</LinkButton>}
         {c.can('records.edit') && c.can('employees.view_sensitive') && <DialogButton wide openParam="employee" label="Add employee" title="Add employee" icon={<Plus size={15} />}>
           <ActionForm action={createEmployee} submit="Create employee"><EmployeeFields withSalary={c.can('salary.view')} /></ActionForm></DialogButton>}</>} />

@@ -13,7 +13,7 @@ import { SECTIONS, conversionRate, projectProfit, sectionTables, type SectionKey
 import { formatAed, formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
-export const metadata = { title: 'Reports & Analytics' }
+export const metadata = { title: 'Reports & analytics' }
 const monthLabel = (ym: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'short' }).format(new Date(ym + '-01T00:00:00Z'))
 
 export default async function Reports({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -47,7 +47,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
       <div className="text-sm">{title} report · {period.label}</div>
       <div className="text-xs text-muted">Generated {generated} · Averiqo Reports</div>
     </div>
-    <PageHeader title="Reports & Analytics" sub={`${period.label}. Figures come from your records; nothing is estimated unless marked.`}
+    <PageHeader title="Reports & analytics" sub={`${period.label}. Figures come from your records; nothing is estimated unless marked.`}
       actions={<div className="no-print flex flex-wrap gap-2">{c.can('data.export') && section !== 'overview' && <>
         <LinkButton variant="ghost" href={`/api/reports/${section}?${exportQs}&format=csv`}><Download size={15} />CSV</LinkButton>
         <LinkButton variant="ghost" href={`/api/reports/${section}?${exportQs}&format=xlsx`}><Download size={15} />Excel</LinkButton>

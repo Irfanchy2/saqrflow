@@ -258,7 +258,7 @@ export default async function Dashboard() {
     mytasks: myTasks ? <Card><CardHeader title="My tasks" sub="Open, by due date" action={<CardLink href="/tasks?view=mine" />} />
       {!myTasks.length ? <EmptyState compact icon={CheckCircle2} title="No open tasks" /> : <ul className="px-2 pb-2 text-sm">{myTasks.map((t: any) => <li key={t.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">
         <TaskCheck id={t.id} title={t.title} />
-        <Link href={`/tasks?view=mine&open=${t.id}`} className="min-w-0 flex-1"><span className="block truncate font-medium">{t.title}</span>{t.project?.name && <span className="block truncate text-xs text-muted">{t.project.name}</span>}</Link>
+        <Link href={`/tasks?view=mine&open=${t.id}`} className="-my-2 min-w-0 flex-1 py-2"><span className="block truncate font-medium">{t.title}</span>{t.project?.name && <span className="block truncate text-xs text-muted">{t.project.name}</span>}</Link>
         {t.due_date && <span className={cn('shrink-0 text-xs tabular-nums', t.due_date < c.today ? 'font-semibold text-danger' : t.due_date === c.today ? 'font-semibold text-warning' : 'text-muted')}>{t.due_date === c.today ? 'Today' : formatShortDate(t.due_date)}</span>}</li>)}</ul>}</Card> : null,
     approvals: pendingApprovals ? <Card><CardHeader title="Waiting for approval" action={<CardLink href="/approvals" />} />
       {!pendingApprovals.length ? <EmptyState compact icon={CheckCircle2} title="Nothing to approve" /> : <ul className="px-2 pb-2 text-sm">{pendingApprovals.map((a: any) => <li key={a.id}><Link href={`/approvals?open=${a.id}`} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2/70">

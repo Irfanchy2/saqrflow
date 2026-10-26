@@ -131,7 +131,7 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
   useEffect(() => { if (initialFile) attach(initialFile) }, [initialFile])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const c = scan.result?.read.confidence ?? {}
-  const sure = (k: keyof ReceiptRead['confidence']) => scanned && c[k] ? <span className={cn('ms-1.5 rounded-full px-1.5 py-px text-[10.5px] font-semibold', c[k] === 'high' ? 'bg-success/10 text-success' : c[k] === 'medium' ? 'bg-warning/10 text-warning' : 'bg-danger/10 text-danger')}>{c[k] === 'high' ? 'read' : c[k] === 'medium' ? 'check' : 'unsure'}</span> : null
+  const sure = (k: keyof ReceiptRead['confidence']) => scanned && c[k] ? <span className={cn('ms-1.5 rounded-full px-1.5 py-px text-[11px] font-semibold', c[k] === 'high' ? 'bg-success/10 text-success' : c[k] === 'medium' ? 'bg-warning/10 text-warning' : 'bg-danger/10 text-danger')}>{c[k] === 'high' ? 'read' : c[k] === 'medium' ? 'check' : 'unsure'}</span> : null
   const pick = 'flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 text-[14px] font-semibold transition-colors focus-within:ring-2 focus-within:ring-primary/40'
   const tint = (k: keyof ReceiptRead['confidence']) => scanned && c[k] ? 'bg-warning/10' : undefined
 
