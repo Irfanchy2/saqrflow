@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCtx } from '@/lib/auth'
 import { getMe } from '@/lib/me'
-import { movements, salaryAccount } from '@/lib/salary'
+import { movements, salaryAccount, statementRange } from '@/lib/salary'
 import { statement } from '@/lib/salary-math'
 import { brandingBytes, brandingFor } from '@/lib/sales/data'
 import { renderSimplePdf } from '@/lib/sales/simple-pdf'
@@ -23,8 +23,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!a) return new NextResponse('Not found', { status: 404 })
   const q = new URL(req.url).searchParams
   const moves = movements(a)
-  const dates = moves.map(m => m.date).sort(), first = dates[0] ?? c.today, last = dates[dates.length - 1] ?? c.today
-  const from = isDay(q.get('from')) ? q.get('from')! : first, to = isDay(q.get('to')) ? q.get('to')! : last > c.today ? last : c.today
+  const def = statementRange(moves, c.today)   // same default period the WhatsApp share sheet names the file with
+  const from = isDay(q.get('from')) ? q.get('from')! : def.from, to = isDay(q.get('to')) ? q.get('to')! : def.to
   const st = statement(moves, from, to)
   const [b, images] = await Promise.all([brandingFor(c), brandingBytes(c)])
   const bytes = await renderSimplePdf({

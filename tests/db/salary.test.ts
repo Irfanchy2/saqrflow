@@ -277,3 +277,24 @@ describe('0035: WhatsApp sharing of salary documents', () => {
     expect(await outstanding(ali)).toBe(7649.75)
   })
 })
+
+describe('0036: free sharing of more documents', () => {
+  const ins = (kind: string, party = 'employee') => `insert into document_shares(company_id,doc_kind,record_id,party_type,method) values ($1,'${kind}',$2,'${party}','native_share')`
+  it('the new document types are logged only with the access their data needs', async () => {
+    const rec = uuid()
+    await as(U.acc, ins('salary_statement'), [A, rec])                                  // salary access
+    await as(U.acc, ins('customer_receipt', 'customer'), [A, rec])                      // finance access
+    await as(U.acc, ins('customer_statement', 'customer'), [A, rec])
+    await as(U.hr, ins('employee_document'), [A, rec])                                  // document access + sensitive employee data
+    await fails(as(U.acc, ins('employee_document'), [A, rec]), /row-level security/i)  // accountant: no sensitive employee data
+    await fails(as(U.hr, ins('customer_receipt', 'customer'), [A, rec]), /row-level security/i)  // HR: no finance access
+    await fails(as(U.pm, ins('salary_statement'), [A, rec]), /row-level security/i)
+    await fails(as(U.ownerB, ins('customer_statement', 'customer'), [A, rec]), /row-level security/i)  // another company
+    await fails(as(U.owner, ins('bank_password', 'customer'), [A, rec]), /check constraint/i)       // unknown types are still refused
+    expect((await as(U.acc, `select doc_kind from document_shares where record_id=$1 order by doc_kind`, [rec])).rows.map(r => r.doc_kind)).toEqual(['customer_receipt', 'customer_statement', 'salary_statement'])
+    expect((await as(U.hr, `select doc_kind from document_shares where record_id=$1 order by doc_kind`, [rec])).rows.map(r => r.doc_kind)).toEqual(['employee_document', 'salary_statement'])
+  })
+  it('shares logged before 0036 are kept', async () => {
+    expect((await as(U.hr, `select count(*)::int n from document_shares where doc_kind='salary_receipt'`)).rows[0].n).toBe(1)
+  })
+})

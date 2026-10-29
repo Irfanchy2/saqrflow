@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ShareSheet } from '@/components/whatsapp/share-sheet'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowRightLeft, BellRing, CheckCircle2, Clock, FileMinus, FolderOpen, History, Link2, Paperclip, Plus, ShieldCheck, Trash2, Truck, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
@@ -121,7 +122,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
                 <Td className="text-muted">{p.reference ?? '—'}{p.notes && <div className="text-xs">{p.notes}</div>}{p.document_id && <Link href={`/documents/${p.document_id}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"><Paperclip size={11} />{docName.get(p.document_id) ?? 'Attachment'}</Link>}</Td>
                 <Td className="text-muted">{q ? <Link href={`/cheques?open=${q.id}`} className="text-primary hover:underline">#{q.cheque_no}</Link> : null}{q ? ` · ${q.bank_name}` : p.bank_name ?? '—'}</Td>
                 <Td className="text-muted">{names.get(p.created_by) ?? '—'}</Td>
-                <Td className="text-right">{edit && p.project_id && <ActionButton variant="ghost" action={unapplyProjectAdvance.bind(null, p.id)} confirm="Move this advance back to the project? The invoice balance goes up; the money stays recorded on the project.">Move back</ActionButton>}{c.can('records.delete') && !p.project_id && <ActionButton variant="ghost" action={deletePayment.bind(null, p.id)} confirm="Delete this payment? The invoice balance will be recalculated. (To keep the money as customer credit instead, use “Mark as unpaid”.)"><Trash2 size={14} /><span className="sr-only">Delete payment</span></ActionButton>}</Td></tr> })}
+                <Td className="text-right"><ShareSheet kind="customer_receipt" recordId={p.id} variant="ghost" iconOnly label={`Share the ${showDate(p.paid_on)} payment receipt via WhatsApp`} />{edit && p.project_id && <ActionButton variant="ghost" action={unapplyProjectAdvance.bind(null, p.id)} confirm="Move this advance back to the project? The invoice balance goes up; the money stays recorded on the project.">Move back</ActionButton>}{c.can('records.delete') && !p.project_id && <ActionButton variant="ghost" action={deletePayment.bind(null, p.id)} confirm="Delete this payment? The invoice balance will be recalculated. (To keep the money as customer credit instead, use “Mark as unpaid”.)"><Trash2 size={14} /><span className="sr-only">Delete payment</span></ActionButton>}</Td></tr> })}
           </tbody></TableWrap>}
       </Card>}
 

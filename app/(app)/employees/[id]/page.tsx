@@ -48,6 +48,9 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     c.supabase.from('document_categories').select('id,name,scope').eq('scope', 'employee').order('name'),
     c.supabase.from('profiles').select('id,full_name').eq('is_active', true).order('full_name'),
   ])
+  // PDFs in the employee's file can be shared with the employee (free WhatsApp sharing); other file types are downloaded instead
+  const verIds = canSens && c.can('documents.view') && tab === 'documents' ? (docs ?? []).map((d: any) => d.current_version_id).filter(Boolean) : []
+  const pdfDocs = new Set(verIds.length ? ((await c.supabase.from('document_versions').select('document_id,mime_type').in('id', verIds)).data ?? []).filter(v => v.mime_type === 'application/pdf').map(v => v.document_id as string) : [])
   const checklist = employeeChecklist((docs ?? []).map((d: any) => ({ category_name: d.category?.name, expiry_date: d.expiry_date, status: d.status })), c.today)
   const stateTone: Record<string, Tone> = { valid: 'green', expiring_soon: 'amber', expired: 'red', missing: 'red', no_expiry: 'green', renewal_in_progress: 'blue', cancelled: 'neutral' }
 
@@ -79,9 +82,9 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         <ActionForm action={createDocument} submit="Save document"><input type="hidden" name="owner_type" value="employee" /><input type="hidden" name="owner_id" value={id} />
           <DocFields categories={cats ?? []} people={people ?? []} fileRequired /></ActionForm></DialogButton> : undefined} />
         {!docs?.length ? <EmptyState title="No documents on file" body="Add the passport, Emirates ID, residence visa, work permit, labour contract and medical insurance." /> :
-          <TableWrap><thead className="border-b border-border"><tr><Th>Document</Th><Th>Number</Th><Th>Expiry</Th><Th>Status</Th>{canEdit && <Th><span className="sr-only">Remind</span></Th>}</tr></thead>
+          <TableWrap><thead className="border-b border-border"><tr><Th>Document</Th><Th>Number</Th><Th>Expiry</Th><Th>Status</Th>{(canEdit || pdfDocs.size > 0) && <Th><span className="sr-only">Share or remind</span></Th>}</tr></thead>
             <tbody className="divide-y divide-border">{docs.map((d: any) => <tr key={d.id} className="hover:bg-surface-2/50"><Td><Link className="font-medium hover:text-primary" href={`/documents/${d.id}`}>{d.category?.name ?? d.name}</Link><div className="text-xs text-muted">{d.name}</div></Td>
-              <Td className="font-mono text-xs text-muted">{d.reference_no ?? '—'}</Td><Td className="tabular-nums">{showDate(d.expiry_date, '—')}</Td><Td><StatusBadge doc={d} today={c.today} /></Td>{canEdit && <Td className="text-right">{d.expiry_date && <WhatsAppSend kind="document_expiry" recordId={d.id} label="Remind" ariaLabel={`Send ${d.category?.name ?? d.name} expiry reminder via WhatsApp`} variant="ghost" />}</Td>}</tr>)}</tbody></TableWrap>}</Card>
+              <Td className="font-mono text-xs text-muted">{d.reference_no ?? '—'}</Td><Td className="tabular-nums">{showDate(d.expiry_date, '—')}</Td><Td><StatusBadge doc={d} today={c.today} /></Td>{(canEdit || pdfDocs.size > 0) && <Td className="text-right"><div className="flex justify-end gap-1">{pdfDocs.has(d.id) && <ShareSheet kind="employee_document" recordId={d.id} variant="ghost" iconOnly label={`Share ${d.category?.name ?? d.name} with ${e.full_name} via WhatsApp`} />}{canEdit && d.expiry_date && <WhatsAppSend kind="document_expiry" recordId={d.id} label="Remind" ariaLabel={`Send ${d.category?.name ?? d.name} expiry reminder via WhatsApp`} variant="ghost" />}</div></Td>}</tr>)}</tbody></TableWrap>}</Card>
       <Card><CardHeader title="Compliance checklist" sub={`${checklist.score}% complete`} />
         <ul className="divide-y divide-border">{checklist.items.map(i => <li key={i.name} className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm">
           <span className="flex items-center gap-2">{i.state === 'missing' || i.state === 'expired' ? <AlertTriangle size={15} className="text-danger" /> : i.state === 'expiring_soon' ? <CircleDashed size={15} className="text-warning" /> : <CheckCircle2 size={15} className="text-success" />}{i.name}</span>
