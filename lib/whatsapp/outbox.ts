@@ -12,6 +12,7 @@ import { safePart } from '../sales/filename'
 import { buildLedger } from '../ledger'
 import { toE164 } from '../phone'
 import { formatAed, formatShortDate } from '../time'
+import { methodLabel, periodLabel, sum } from '../salary-math'
 import { loadWhatsAppConfig } from '../reminders/engine'
 import { parseSettings } from '../reminders/settings'
 import { isConfigured, type SendResult } from './client'
@@ -30,8 +31,6 @@ export class SendError extends Error {}
 const fail = (m: string): never => { throw new SendError(m) }
 const need = (c: Ctx, p: Parameters<Ctx['can']>[0]) => { if (!c.can(p)) fail('You do not have permission to send this.') }
 const phoneOf = (...xs: (string | null | undefined)[]) => { for (const x of xs) { const e = x ? toE164(x) : null; if (e) return e } return null }
-/** first day of the period's month (+n months), as YYYY-MM-DD; `-31` is not a valid date in short months */
-const monthStart = (iso: string, n = 0) => { const d = new Date(`${iso.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 10) }
 const monthLabel = (iso: string) => new Date(`${iso.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 /** What a message type says and attaches, read with the user's own session (RLS) after the permission check. */
@@ -82,26 +81,36 @@ export async function resolveMessage(c: Ctx, kind: string, recordId: string, opt
     }
   }
   if (kind === 'payslip') {
+    // salary payment receipt (kind kept as "payslip": WhatsApp templates and history already use it)
     if (!opts?.ownEmployeeId) need(c, 'salary.view')
-    const { data: s } = await sb.from('salary_payments').select('id,period,amount,paid_on,method,employee:employees(id,full_name,employee_no,designation,phone)').eq('id', recordId).maybeSingle()
+    const { data: s } = await sb.from('salary_payments').select('id,period,amount,paid_on,method,reference,notes,status,reversal_reason,created_at,employee:employees(id,full_name,employee_no,designation,phone)').eq('id', recordId).maybeSingle()
     if (!s) fail('Salary payment not found.')
     const e: any = (s as any).employee
     if (opts?.ownEmployeeId && e?.id !== opts.ownEmployeeId) fail('Salary payment not found.')
-    const { data: adv } = await sb.from('employee_advances').select('kind,amount,given_on').eq('employee_id', e.id).gte('given_on', monthStart(s!.period)).lt('given_on', monthStart(s!.period, 1))
-    const ded = (adv ?? []).filter((a: any) => a.kind === 'deduction')
     return {
-      kind, recordType: 'salary_payment', recordId, link: `/employees/${e.id}?tab=salary`,
+      kind, recordType: 'salary_payment', recordId, link: `/salary/${e.id}`,
       party: { type: 'employee', id: e.id, name: e.full_name }, phone: phoneOf(e.phone),
-      values: { employee: e.full_name, period: monthLabel(s!.period), company },   // no amounts in the message text
+      values: { employee: e.full_name, period: monthLabel(s!.paid_on ?? s!.period), company },   // no amounts in the message text
       pdf: async () => {
-        const [b, images] = await Promise.all([brandingFor(c), brandingBytes(c)])
-        const rows = [[`Salary for ${monthLabel(s!.period)}`, fmtMoney(s!.amount)], ...ded.map((d: any) => [`Deduction (${formatShortDate(d.given_on)})`, `- ${fmtMoney(d.amount)}`])]
-        const net = Number(s!.amount) - ded.reduce((a: number, d: any) => a + Number(d.amount), 0)
-        const bytes = await renderSimplePdf({ title: 'Salary payslip', companyName: company, images, showHeaderFooter: b.showHeaderFooter, companyAddress: b.companyAddress, companyPhone: b.companyPhone, companyEmail: b.companyEmail,
+        const [b, images, { data: al }, { data: led }, { data: pays }] = await Promise.all([brandingFor(c), brandingBytes(c),
+          sb.from('salary_allocations').select('amount,obligation:salary_ledger!salary_allocations_obligation_id_fkey(kind,period,entry_date,reason)').eq('payment_id', s!.id),
+          sb.from('salary_ledger').select('kind,amount,created_at').eq('employee_id', e.id).eq('status', 'posted'),
+          sb.from('salary_payments').select('amount,created_at').eq('employee_id', e.id).eq('status', 'posted')])
+        // what was still owed right after this payment: everything posted up to it, less everything settled up to it
+        const upTo = (x: { created_at: string }) => x.created_at <= s!.created_at
+        const owedAfter = sum([...(led ?? []).filter(upTo).map(l => (l.kind === 'deduction' || l.kind === 'advance_offset' ? -1 : 1) * Number(l.amount)), ...(pays ?? []).filter(upTo).map(p => -Number(p.amount))])
+        const lines = (al ?? []).map((a: any) => [`Salary: ${periodLabel(a.obligation)}`, fmtMoney(a.amount)])
+        const credit = Number(s!.amount) - sum((al ?? []).map((a: any) => a.amount))
+        if (credit > 0.004) lines.push(['Paid in advance (credit)', fmtMoney(credit)])
+        const reversed = s!.status === 'reversed'
+        const bytes = await renderSimplePdf({ title: reversed ? 'Salary payment receipt (reversed)' : 'Salary payment receipt', companyName: company, images, showHeaderFooter: b.showHeaderFooter, companyAddress: b.companyAddress, companyPhone: b.companyPhone, companyEmail: b.companyEmail,
           left: [['Employee:', e.full_name], ['Employee ID:', e.employee_no], ...(e.designation ? [['Designation:', e.designation] as [string, string]] : [])],
-          right: [['Period:', monthLabel(s!.period)], ['Paid on:', s!.paid_on ? formatShortDate(s!.paid_on) : '-'], ['Paid by:', String(s!.method ?? '-').replace('_', ' ').toUpperCase()]],
-          table: { cols: [{ h: 'Description', w: 4 }, { h: 'Amount (AED)', w: 1.4, right: true }], rows, total: ['Net paid', fmtMoney(net)] }, signLine: 'Authorised signature' })
-        return { bytes, filename: `Payslip_${safePart(e.full_name)}_${s!.period.slice(0, 7)}.pdf` }
+          right: [['Receipt:', `SR-${s!.id.slice(0, 8).toUpperCase()}`], ['Paid on:', s!.paid_on ? formatShortDate(s!.paid_on) : formatShortDate(s!.period)], ['Paid by:', methodLabel(s!.method)], ...(s!.reference ? [['Reference:', s!.reference] as [string, string]] : [])],
+          table: { cols: [{ h: 'Salary period settled', w: 4 }, { h: 'Amount (AED)', w: 1.4, right: true }], rows: lines.length ? lines : [['Salary payment', fmtMoney(s!.amount)]], total: ['Amount paid', fmtMoney(s!.amount)] },
+          words: amountInWords(Number(s!.amount)),
+          note: [reversed ? `This payment was reversed${s!.reversal_reason ? `: ${s!.reversal_reason}` : ''}. It no longer counts towards the salary paid.` : `Salary still owed after this payment: AED ${fmtMoney(owedAfter)}.`, s!.notes ? `Notes: ${s!.notes}` : ''].filter(Boolean).join('\n'),
+          signLine: 'Authorised signature' })
+        return { bytes, filename: `Salary_receipt_${safePart(e.full_name)}_${(s!.paid_on ?? s!.period).slice(0, 10)}.pdf` }
       },
     }
   }

@@ -50,8 +50,10 @@ export async function myProjects(c: Ctx): Promise<{ id: string; name: string }[]
 }
 
 /** Advances not yet settled, and how much more may be asked for (a share of the monthly salary set by the company). */
-export function advanceBalance(salary: number | null, advances: { kind: string; amount: number | string; settled: boolean }[], limitPct: number) {
-  const outstanding = Math.round(advances.filter(a => a.kind === 'advance' && !a.settled).reduce((s, a) => s + Number(a.amount), 0) * 100) / 100
+export function advanceBalance(salary: number | null, advances: { kind: string; amount: number | string; settled: boolean; remaining?: number | string | null }[], limitPct: number) {
+  // `remaining` (employee_advance_balances) counts what was already recovered from salary; without it an open advance counts in full
+  const left = (a: (typeof advances)[number]) => a.remaining !== undefined && a.remaining !== null ? Number(a.remaining) : a.settled ? 0 : Number(a.amount)
+  const outstanding = Math.round(advances.filter(a => a.kind === 'advance').reduce((s, a) => s + left(a), 0) * 100) / 100
   const limit = salary && limitPct > 0 ? Math.round(salary * limitPct) / 100 : 0
   return { outstanding, limit, available: limitPct > 0 ? Math.max(0, Math.round((limit - outstanding) * 100) / 100) : null }
 }

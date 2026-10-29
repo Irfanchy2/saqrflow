@@ -2,7 +2,7 @@ import 'server-only'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage } from 'pdf-lib'
 import type { BrandKind } from './data'
 
-// One-page A4 documents with the company letterhead: payment receipt and salary payslip (same look as statements).
+// A4 documents with the company letterhead: payment receipt, salary receipt and salary statement (long tables run onto more pages).
 export interface SimplePdf {
   title: string; companyName: string; images: Partial<Record<BrandKind, { bytes: Uint8Array; png: boolean }>>; showHeaderFooter: boolean
   companyTrn?: string | null; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null
@@ -18,7 +18,7 @@ export async function renderSimplePdf(o: SimplePdf): Promise<Uint8Array> {
   const img: Partial<Record<BrandKind, PDFImage>> = {}
   for (const [k, v] of Object.entries(o.images)) { try { img[k as BrandKind] = v!.png ? await pdf.embedPng(v!.bytes) : await pdf.embedJpg(v!.bytes) } catch { /* skip */ } }
   const W = 595.28, H = 841.89, M = 28, CW = W - 2 * M, black = rgb(0, 0, 0), boxBg = rgb(0.953, 0.941, 0.918), grey = rgb(0.4, 0.4, 0.4)
-  const page = pdf.addPage([W, H]); let y = H - M
+  let page = pdf.addPage([W, H]); let y = H - M
   const safe = (f: PDFFont, s: string) => [...(s ?? '')].map(ch => { try { f.encodeText(ch); return ch } catch { return '?' } }).join('')
   const text = (s: string, x: number, yy: number, size = 9.5, f: PDFFont = font, color = black) => page.drawText(safe(f, s), { x, y: yy, size, font: f, color })
   const right = (s: string, xr: number, yy: number, size = 9.5, f: PDFFont = font) => text(s, xr - f.widthOfTextAtSize(safe(f, s), size), yy, size, f)
@@ -48,13 +48,17 @@ export async function renderSimplePdf(o: SimplePdf): Promise<Uint8Array> {
 
   if (o.table) {
     const t = o.table, scale = CW / t.cols.reduce((a, c) => a + c.w, 0), cols = t.cols.map(c => ({ ...c, w: c.w * scale }))
-    let x = M; for (const c of cols) { rect(x, y - 20, c.w, 20); center(c.h, x + c.w / 2, y - 13.5, 9, bold); x += c.w } y -= 20
-    for (const r of t.rows) { x = M; cols.forEach((c, i) => { rect(x, y - 20, c.w, 20); c.right ? right(r[i] ?? '', x + c.w - 6, y - 13.5) : text(r[i] ?? '', x + 6, y - 13.5); x += c.w }); y -= 20 }
+    const head = () => { let hx = M; for (const c of cols) { rect(hx, y - 20, c.w, 20); center(c.h, hx + c.w / 2, y - 13.5, 9, bold); hx += c.w } y -= 20 }
+    let x = M; head()
+    // long tables (statements) continue on a new page with the column headings repeated
+    for (const r of t.rows) { if (y - 20 < 96) { page = pdf.addPage([W, H]); y = H - M; head() } x = M; cols.forEach((c, i) => { rect(x, y - 20, c.w, 20); c.right ? right(r[i] ?? '', x + c.w - 6, y - 13.5) : text(r[i] ?? '', x + 6, y - 13.5); x += c.w }); y -= 20 }
+    if (t.total && y - 22 < 96) { page = pdf.addPage([W, H]); y = H - M }
     if (t.total) { const lw2 = cols.slice(0, -1).reduce((a, c) => a + c.w, 0); rect(M, y - 22, lw2, 22); right(t.total[0], M + lw2 - 6, y - 14.5, 10, bold); rect(M + lw2, y - 22, cols[cols.length - 1].w, 22); right(t.total[1], M + CW - 6, y - 14.5, 10, bold); y -= 22 }
     y -= 12
   }
   if (o.words) { for (const l of wrap(o.words, bold, 10, CW)) { text(l, M, y - 10, 10, bold); y -= 14 } y -= 6 }
   if (o.note) { for (const l of wrap(o.note, font, 9.5, CW)) { text(l, M, y - 9, 9.5); y -= 13 } y -= 6 }
+  if (o.signLine && y < 150) { page = pdf.addPage([W, H]); y = H - M }
   if (o.signLine) { y -= 40; page.drawLine({ start: { x: W - M - 180, y }, end: { x: W - M, y }, thickness: 0.7, color: black }); center(o.signLine, W - M - 90, y - 12, 9) }
   text('This is a computer-generated document.', M, 40, 8, font, grey)
   if (o.showHeaderFooter && img.footer) image(img.footer, M, 72, CW, 52)

@@ -57,6 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { key: 'expenses', group: 'Finance', top: 'finance', href: '/expenses', show: c.can('finance.view') },
     { key: 'cheques', group: 'Finance', top: 'finance', href: '/cheques', show: c.can('finance.view') },
     { key: 'employees', group: 'People & documents', top: 'people', href: '/employees', show: true },
+    { key: 'salary', group: 'People & documents', top: 'people', href: '/salary', show: c.can('salary.view') },
     { key: 'documents', group: 'People & documents', top: 'people', href: '/documents', show: c.can('documents.view') },
     { key: 'vault', group: 'People & documents', top: 'people', href: '/vault', show: c.can('documents.view') },
     { key: 'reminders', group: 'People & documents', top: 'people', href: '/reminders', show: c.can('reminders.create') },
