@@ -20,6 +20,7 @@ import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
 import { ShareLinks } from '@/components/share-links'
 import { PoSupplierCard } from '@/components/po-supplier-card'
+import { companyWhatsApp } from '@/lib/whatsapp/outbox'
 
 export const metadata = { title: 'Sales document' }
 const METHOD: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank transfer', cheque: 'Cheque', pdc: 'PDC cheque', card: 'Card', other: 'Other' }
@@ -31,6 +32,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const c = await getCtx(); if (!c.can('finance.view')) redirect('/')
   const d = await loadSalesDoc(c, id); if (!d) notFound()
   const t = d.doc.doc_type as SalesType, isInv = t === 'invoice', isQtn = t === 'quotation'
+  const waP = companyWhatsApp(c.company.id).then(w => w.live, () => false)   // WhatsApp Business connected? (else the phone capsule uses free sharing)
   const [branding, settings, { data: customers }, { data: projects }, { data: catalog }, { data: templates }, { data: people }, { data: deliv }, { data: revisions }, { data: events }, { data: followups }, { data: cheques }] = await Promise.all([
     brandingFor(c), salesSettings(c),
     // only the document's own customer: the picker searches the rest on demand (/api/customers/search) instead of shipping every customer
@@ -78,7 +80,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
     <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} customers={[...new Map([...(customers ?? []), ...(projects ?? []).map((x: any) => x.customer).filter(Boolean)].map((x: any) => [x.id, x])).values()] as any} projects={(projects ?? []).map(({ customer: _c, ...x }: any) => x) as any}
       catalog={(catalog ?? []).map((x: any) => ({ ...x, rate: Number(x.rate) }))} templates={(templates ?? []) as any} salespeople={people ?? []} delivery={delivery}
       editable={edit && !locked} lockedReason={!edit ? 'You can view this document but not change it.' : locked} requireApproval={settings.requireApproval}
-      canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber} invoicedAs={invoicedAs}
+      canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber} invoicedAs={invoicedAs} cloudLive={await waP}
       statusView={isInv ? { doc: docSt, pay, daysLate: late } : undefined} />
 
     <div className="no-print mt-2 grid gap-5 px-0 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">

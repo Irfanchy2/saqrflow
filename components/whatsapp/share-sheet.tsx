@@ -4,20 +4,35 @@ import { checkShareNumber, logShare, prepareShare, saveShareNumber, type SharePr
 import { logSalesEvent } from '@/app/actions/sales'
 import { Modal } from '@/components/ui/dialog'
 import { Alert, Button, Field, Input, Textarea } from '@/components/ui/primitives'
-import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, Loader2, MessageCircle, Pencil, Share2, ShieldCheck } from '@/components/icons'
+import { AlertTriangle, Check, CheckCircle2, Copy, Download, ExternalLink, FileText, Info, Loader2, MessageCircle, Paperclip, Pencil, RefreshCw, Share2, ShieldCheck } from '@/components/icons'
 import { prettyPhone, waChatLink } from '@/lib/whatsapp/share'
 import { cn } from '@/lib/utils'
 
-/** Can this device hand a PDF file to its share sheet (Android / iPhone)? Desktop browsers use the WhatsApp chat link. */
-function nativeFileShare() {
-  if (typeof navigator === 'undefined' || typeof navigator.canShare !== 'function' || typeof matchMedia === 'undefined') return false
-  try { return matchMedia('(pointer: coarse)').matches && navigator.canShare({ files: [new File(['%PDF'], 'check.pdf', { type: 'application/pdf' })] }) } catch { return false }
+/** Can this browser hand files to the device's share menu (Android Chrome and the installed app, iPhone Safari, some desktops)?
+ *  A wa.me chat link can only carry text, so without this the PDF has to be attached by hand. */
+function canShareFiles(f?: File) {
+  if (typeof navigator === 'undefined' || typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') return false
+  try { return navigator.canShare({ files: [f ?? new File(['%PDF-'], 'check.pdf', { type: 'application/pdf' })] }) } catch { return false }
+}
+const touchDevice = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
+const withParam = (url: string, q: string) => `${url}${url.includes('?') ? '&' : '?'}${q}`
+
+/** The document's own PDF (same endpoint as Download), as a file for the share menu. Refuses anything that is not a real PDF,
+ *  such as a sign-in page after the session ended, so a broken file is never handed to WhatsApp. */
+async function loadPdf(url: string, filename: string): Promise<File> {
+  const res = await fetch(withParam(url, 'share=1'), { credentials: 'same-origin', cache: 'no-store' })
+  if (!res.ok) throw new Error(res.status === 403 || res.status === 404 ? 'You do not have access to this document.' : 'The PDF could not be generated.')
+  const blob = await res.blob()
+  const head = new TextDecoder().decode(await blob.slice(0, 5).arrayBuffer())
+  if (!/application\/pdf/i.test(res.headers.get('content-type') ?? '') || head !== '%PDF-') throw new Error('The server did not return a PDF. You may have been signed out.')
+  return new File([blob], /\.pdf$/i.test(filename) ? filename : `${filename}.pdf`, { type: 'application/pdf', lastModified: Date.now() })
 }
 
 /**
  * "Share via WhatsApp" (free, no WhatsApp Business API): shows who it goes to (name, ID and number from their profile), the
- * document and the message, then hands over to the user's own WhatsApp. Phones: the PDF goes to the phone's share sheet;
- * computers: the PDF downloads and the employee's chat opens with the message. Nothing is sent by Averiqo and nothing is
+ * document and the message, then hands over to the user's own WhatsApp. Phones: the PDF file itself goes to the phone's share
+ * menu (Web Share API); computers that cannot share files: the PDF downloads, the chat opens with the message and the sheet
+ * says plainly that the PDF must be attached by hand. Nothing is sent by Averiqo and nothing is
  * marked as sent: the person sharing checks the chat and presses send.
  */
 export function ShareSheet({ kind, recordId, label = 'Share via WhatsApp', variant = 'secondary', size = 'sm', trigger, iconOnly }: {
@@ -42,19 +57,32 @@ function Sheet({ kind, recordId }: { kind: string; recordId: string }) {
   const [prep, setPrep] = useState<SharePrep | null>(null), [err, setErr] = useState<string | null>(null)
   const [phone, setPhone] = useState<string | null>(null), [editing, setEditing] = useState(false), [typed, setTyped] = useState('')
   const [numErr, setNumErr] = useState<string | null>(null), [numNote, setNumNote] = useState<string | null>(null), [also, setAlso] = useState<string[]>([])
-  const [text, setText] = useState(''), [busy, setBusy] = useState<string | null>(null), [done, setDone] = useState<null | 'native' | 'link' | 'download'>(null)
-  const [native, setNative] = useState(false), file = useRef<File | null>(null), [fileReady, setFileReady] = useState(false)
+  const [text, setText] = useState(''), [busy, setBusy] = useState<string | null>(null), [done, setDone] = useState<null | 'native' | 'link' | 'text' | 'download'>(null)
+  // the PDF file for the share menu: 'checking' while it is fetched, 'ready' to share, 'unsupported' (this browser cannot share
+  // files: manual attach), 'failed' (could not load a real PDF: retry or manual attach)
+  const [fileState, setFileState] = useState<'checking' | 'ready' | 'unsupported' | 'failed'>('checking'), [fileErr, setFileErr] = useState<string | null>(null)
+  const [touch, setTouch] = useState(false), [shareErr, setShareErr] = useState<string | null>(null), [copied, setCopied] = useState<null | 'ok' | 'manual'>(null)
+  const file = useRef<File | null>(null), alive = useRef(true), msgRef = useRef<HTMLTextAreaElement>(null)
+
+  const fetchFile = (p: SharePrep) => {
+    setFileState('checking'); setFileErr(null); file.current = null
+    // fetched now, so the share menu opens straight from the tap (browsers allow it only right after a tap)
+    loadPdf(p.pdfUrl, p.filename).then(f => {
+      if (!alive.current) return
+      if (!canShareFiles(f)) { setFileState('unsupported'); return }
+      file.current = f; setFileState('ready')
+    }).catch((e: Error) => { if (alive.current) { setFileState('failed'); setFileErr(e.message) } })
+  }
   useEffect(() => {
-    let live = true
+    alive.current = true
     prepareShare(kind, recordId).then(r => {
-      if (!live) return
+      if (!alive.current) return
       if (r?.error || !r?.data) { setErr(r?.error ?? 'Could not prepare this document.'); return }
       const p = r.data as SharePrep; setPrep(p); setPhone(p.phone); setText(p.message); setAlso(p.sameNumberAs); setEditing(!p.phone); setTyped(p.storedInvalid ?? '')
-      const n = nativeFileShare(); setNative(n)
-      // phones: fetch the PDF now, so the share sheet opens straight from the tap (browsers allow it only right after a tap)
-      if (n) fetch(p.pdfUrl, { credentials: 'same-origin' }).then(res => (res.ok ? res.blob() : Promise.reject())).then(b => { if (live) { file.current = new File([b], p.filename, { type: 'application/pdf' }); setFileReady(true) } }).catch(() => live && setNative(false))
-    }).catch(() => live && setErr('Could not prepare this document.'))
-    return () => { live = false }
+      setTouch(touchDevice())
+      if (canShareFiles()) fetchFile(p); else setFileState('unsupported')
+    }).catch(() => alive.current && setErr('Could not prepare this document.'))
+    return () => { alive.current = false }
   }, [kind, recordId])
 
   if (err) return <Alert tone="red">{err}</Alert>
@@ -72,26 +100,41 @@ function Sheet({ kind, recordId }: { kind: string; recordId: string }) {
     setPhone(r!.data!.phone); setEditing(false); setAlso(r!.data!.sameNumberAs ?? [])
     setNumNote(save ? `Saved to ${prep.party.name}'s profile.` : `Using this number for this share only. ${prep.party.name}'s profile is unchanged.`)
   }
+  /** Copies the message. Where the clipboard is blocked, selects it so it can be copied by hand. */
+  const copyMessage = (quiet = false) => {
+    const manual = () => { if (!quiet) { msgRef.current?.focus(); msgRef.current?.select(); setCopied('manual') } }
+    try { const w = navigator.clipboard?.writeText(text); if (!w) { manual(); return } w.then(() => alive.current && setCopied('ok'), manual) } catch { manual() }
+  }
   const shareNative = async () => {
-    if (!file.current) return
+    const f = file.current; if (!f) return
+    setShareErr(null); setBusy('native')
+    copyMessage(true)                                         // not awaited: waiting here can use up the tap and the browser then refuses to share
     try {
-      setBusy('native')
-      try { await navigator.clipboard?.writeText(text) } catch { /* some apps drop the caption: the message is also on the clipboard */ }
-      await navigator.share({ files: [file.current], text, title: prep.docLabel })
+      // the PDF only: with text as well, WhatsApp on some phones (iPhone, some Android versions) sends the text and drops the
+      // file. The message is on the clipboard to paste as the caption, and "Open chat" can send it as text.
+      await navigator.share({ files: [f] })
       log('native_share'); setDone('native')
-    } catch (e) { if ((e as Error)?.name !== 'AbortError') setErr('This phone could not share the file. Use "Download PDF" and attach it in WhatsApp.') }
-    finally { setBusy(null) }
+    } catch (e) {
+      const n = (e as Error)?.name
+      if (n === 'AbortError') { /* share menu closed without choosing an app */ }
+      else if (n === 'NotAllowedError') setShareErr('The browser blocked the share menu. Tap "Share PDF" again.')
+      else setShareErr('This device could not share the PDF file. Use "Download PDF" and attach it in WhatsApp with the paperclip.')
+    } finally { setBusy(null) }
   }
   const download = () => { const a = document.createElement('a'); a.href = prep.pdfUrl; a.download = prep.filename; document.body.appendChild(a); a.click(); a.remove() }
+  const canNative = fileState === 'checking' || fileState === 'ready'
+  const phoneFlow = canNative && touch                       // phones and tablets: the PDF goes through the share menu
+  /** Phones: opens the chat with the message only (the PDF goes through "Share PDF"). Computers: downloads the PDF to attach by hand, then opens the chat. */
   const openChat = () => {
     if (!phone) return
-    download()                                               // the PDF to attach
+    if (!phoneFlow) download()
     window.open(waChatLink(phone, text), '_blank', 'noopener,noreferrer')
-    log('whatsapp_link'); setDone('link')
+    log('whatsapp_link'); setDone(phoneFlow ? (done === 'native' ? 'native' : 'text') : 'link')
   }
   const first = prep.party.name.split(' ')[0]
+  const who = <b className="font-medium text-fg">{prep.party.name}</b>
 
-  return <div className="flex flex-col gap-4" data-share-sheet data-share-kind={prep.kind}>
+  return <div className="flex flex-col gap-4" data-share-sheet data-share-kind={prep.kind} data-share-mode={phoneFlow ? 'phone' : 'manual'} data-share-file={fileState}>
     {/* who */}
     <section className="rounded-xl bg-surface-2/70 p-4 ring-1 ring-inset ring-border/70" data-share-recipient>
       <div className="flex items-start gap-3">
@@ -125,18 +168,38 @@ function Sheet({ kind, recordId }: { kind: string; recordId: string }) {
     <section className="flex items-center gap-3 rounded-xl border border-border/80 p-3.5" data-share-doc>
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-danger/[.08] text-danger" aria-hidden><FileText size={19} /></span>
       <div className="min-w-0 flex-1"><div className="truncate text-[14px] font-semibold">{prep.docLabel}</div><div className="truncate text-[12.5px] text-muted">{prep.docDetail} · {prep.filename}</div></div>
-      <a href={`${prep.pdfUrl}?view=1`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-primary hover:bg-primary-soft">Preview<ExternalLink size={13} aria-hidden /></a>
+      <a href={withParam(prep.pdfUrl, 'view=1')} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-primary hover:bg-primary-soft">Preview<ExternalLink size={13} aria-hidden /></a>
     </section>
-    <iframe src={`${prep.pdfUrl}?view=1`} title={`Preview: ${prep.docLabel}`} className="hidden h-72 w-full rounded-lg border border-border bg-white sm:block" data-share-preview />
+    <iframe src={withParam(prep.pdfUrl, 'view=1')} title={`Preview: ${prep.docLabel}`} className="hidden h-72 w-full rounded-lg border border-border bg-white sm:block" data-share-preview />
 
     {/* message */}
-    <Field label="Message"><Textarea value={text} onChange={e => setText(e.target.value)} rows={7} maxLength={1000} className="text-[14px] leading-relaxed" data-share-message /></Field>
+    <div className="flex flex-col gap-1.5">
+      <Field label="Message"><Textarea ref={msgRef} value={text} onChange={e => { setText(e.target.value); setCopied(null) }} rows={7} maxLength={1000} className="text-[14px] leading-relaxed" data-share-message /></Field>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="ghost" onClick={() => copyMessage()} data-share-copy>{copied === 'ok' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}{copied === 'ok' ? 'Message copied' : 'Copy message'}</Button>
+        {copied === 'manual' && <span className="text-[12px] text-muted" role="status">Copying is blocked here: the message is selected, copy it with your keyboard or long-press.</span>}
+      </div>
+    </div>
+
+    {/* how the PDF reaches WhatsApp on this device (said before anything is tapped, never claimed when it cannot happen) */}
+    {!done && <div className="flex items-start gap-2.5 rounded-xl bg-surface-2/70 px-3.5 py-3 text-[13px] leading-relaxed ring-1 ring-inset ring-border/70" data-share-how>
+      {phoneFlow ? <><Share2 size={16} className="mt-0.5 shrink-0 text-[#128c46] dark:text-[#5fd68f]" aria-hidden />
+        <span><b className="font-semibold">The PDF goes into WhatsApp as a file.</b> Tap &quot;Share PDF to WhatsApp&quot;, choose WhatsApp, then {who}&apos;s chat. The message is copied for you: paste it as the caption, because some phones do not carry text along with a file.</span></>
+        : <><Paperclip size={16} className="mt-0.5 shrink-0 text-muted" aria-hidden />
+        <span><b className="font-semibold">This browser cannot attach the PDF to WhatsApp automatically.</b> &quot;Download PDF &amp; open chat&quot; saves {prep.filename} and opens {who}&apos;s chat with the message. In WhatsApp, click the paperclip, choose Document, pick the downloaded PDF, then send.
+          {fileState === 'ready' ? ' Or use "Share PDF…" to send the file through an app on this computer.' : ''}</span></>}
+    </div>}
+    {fileState === 'failed' && <div className="flex flex-wrap items-center gap-2 rounded-xl bg-warning/[.08] px-3.5 py-2.5 text-[12.5px] text-warning ring-1 ring-inset ring-warning/20" data-share-file-error role="alert">
+      <AlertTriangle size={14} className="shrink-0" aria-hidden /><span className="min-w-0 flex-1">The PDF could not be prepared for the share menu: {fileErr} Download it and attach it by hand, or try again.</span>
+      <Button type="button" size="sm" variant="secondary" onClick={() => fetchFile(prep)} data-share-retry><RefreshCw size={13} aria-hidden />Try again</Button></div>}
+    {shareErr && <Alert tone="amber">{shareErr}</Alert>}
 
     {done ? <div className="flex items-start gap-2.5 rounded-xl bg-success/[.07] px-3.5 py-3 text-[13.5px] ring-1 ring-inset ring-success/20" data-share-done role="status">
       <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success" aria-hidden />
-      <div>{done === 'link' ? <><b className="font-semibold">WhatsApp opened for {prep.party.name}.</b> The PDF ({prep.filename}) was downloaded: attach it in the chat with the paperclip, check the message, then send.</>
-        : done === 'native' ? <><b className="font-semibold">Handed to WhatsApp.</b> Make sure you picked {prep.party.name}&apos;s chat before sending.</>
-        : <>PDF downloaded.</>}
+      <div>{done === 'native' ? <><b className="font-semibold">The PDF was passed to the share menu.</b> If you chose WhatsApp, the file is in the chat you picked: make sure it is {prep.party.name}&apos;s, paste the message as the caption (it is copied), then press send.</>
+        : done === 'link' ? <><b className="font-semibold">WhatsApp opened for {prep.party.name} with the message.</b> The PDF is not attached yet: {prep.filename} was downloaded. Attach it in the chat with the paperclip (Document), check the message, then send.</>
+        : done === 'text' ? <><b className="font-semibold">WhatsApp opened for {prep.party.name} with the message only.</b> The PDF is not attached: tap &quot;Share PDF to WhatsApp&quot; to send the file.</>
+        : <>PDF downloaded ({prep.filename}).</>}
         <span className="mt-1 block text-[12px] text-muted">Averiqo does not know whether the message was sent. Nothing is marked as sent or paid.</span></div></div>
       : <p className="flex items-start gap-2 text-[12.5px] leading-relaxed text-muted" data-share-verify><ShieldCheck size={15} className="mt-px shrink-0" aria-hidden />
         <span>WhatsApp opens on this device and nothing is sent until you press send there. Check the chat is <b className="font-medium text-fg">{prep.party.name}</b>{phone ? <> ({prettyPhone(phone)})</> : null}.
@@ -146,10 +209,12 @@ function Sheet({ kind, recordId }: { kind: string; recordId: string }) {
 
     <div className="form-actions flex flex-col-reverse gap-2 border-t border-border/80 pt-3 sm:flex-row sm:justify-end">
       <Button type="button" variant="ghost" onClick={() => { download(); log('download'); if (!done) setDone('download') }} data-share-download><Download size={15} aria-hidden />Download PDF</Button>
-      {native ? <Button type="button" onClick={shareNative} disabled={!fileReady || !!busy || editing} className="h-11 bg-[#1fae57] text-white hover:bg-[#189a4c] sm:h-10" data-share-native>
-        {busy === 'native' || !fileReady ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={16} aria-hidden />}{fileReady ? 'Share PDF to WhatsApp' : 'Preparing PDF…'}</Button> : null}
-      <Button type="button" variant={native ? 'secondary' : 'primary'} onClick={openChat} disabled={!phone || editing} className={cn('h-11 sm:h-10', !native && 'bg-[#1fae57] text-white hover:bg-[#189a4c]')} data-share-open>
-        <MessageCircle size={16} aria-hidden />{native ? 'Open chat with message' : 'Download PDF & open chat'}</Button>
+      {canNative && <Button type="button" variant={phoneFlow ? 'primary' : 'secondary'} onClick={shareNative} disabled={fileState !== 'ready' || !!busy || editing}
+        className={cn('h-11 sm:h-10', phoneFlow && 'bg-[#1fae57] text-white hover:bg-[#189a4c]')} data-share-native>
+        {busy === 'native' || fileState === 'checking' ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={16} aria-hidden />}{fileState === 'checking' ? 'Preparing PDF…' : phoneFlow ? 'Share PDF to WhatsApp' : 'Share PDF…'}</Button>}
+      <Button type="button" variant={phoneFlow ? 'secondary' : 'primary'} onClick={openChat} disabled={!phone || editing} className={cn('h-11 sm:h-10', !phoneFlow && 'bg-[#1fae57] text-white hover:bg-[#189a4c]')} data-share-open>
+        <MessageCircle size={16} aria-hidden />{phoneFlow ? 'Open chat with message (text only)' : 'Download PDF & open chat'}</Button>
     </div>
+    {phoneFlow && <p className="-mt-2 flex items-start gap-1.5 text-[12px] text-muted"><Info size={13} className="mt-px shrink-0" aria-hidden />A chat link can only carry text. To send the message as its own text after the PDF, use &quot;Open chat with message&quot;.</p>}
   </div>
 }
