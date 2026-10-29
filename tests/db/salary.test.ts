@@ -246,3 +246,34 @@ describe('who may see and change salary accounts', () => {
     for (const r of rows) expect(r.changes).toEqual({ redacted: true })
   })
 })
+
+describe('0035: WhatsApp sharing of salary documents', () => {
+  it('an accountant (salary access) can read employee names for the salary pages, a project manager cannot see salary', async () => {
+    const names = (await as(U.acc, `select full_name from employees where company_id=$1 order by employee_no`, [A])).rows.map(r => r.full_name)
+    expect(names).toContain('Ali Hassan')
+    expect((await as(U.acc, `select count(*)::int n from salary_accounts where employee_id=$1`, [ali])).rows[0].n).toBe(1)
+    expect((await as(U.ownerB, `select count(*)::int n from employees where id=$1`, [ali])).rows[0].n).toBe(0)
+  })
+  it('the employee WhatsApp number must be international, and only HR / owner can change it', async () => {
+    await fails(as(U.hr, `update employees set whatsapp='0501234567' where id=$1`, [ali]), /employees_whatsapp_e164/)
+    await as(U.hr, `update employees set whatsapp='+971501234567' where id=$1`, [ali])
+    await as(U.acc, `update employees set whatsapp='+971559999999' where id=$1`, [ali])          // no employee edit right: no effect
+    expect((await as(U.hr, `select whatsapp from employees where id=$1`, [ali])).rows[0].whatsapp).toBe('+971501234567')
+  })
+  it('shares are logged per document, readable only with the matching access, never edited', async () => {
+    const pay = (await as(U.hr, `select id from salary_payments where employee_id=$1 limit 1`, [ali])).rows[0].id
+    await as(U.acc, `insert into document_shares(company_id,doc_kind,record_id,party_type,party_id,method,phone_last4) values ($1,'salary_receipt',$2,'employee',$3,'whatsapp_link','4567')`, [A, pay, ali])
+    await fails(as(U.pm, `insert into document_shares(company_id,doc_kind,record_id,party_type,party_id,method) values ($1,'salary_receipt',$2,'employee',$3,'native_share')`, [A, pay, ali]), /row-level security/i)
+    await fails(as(U.acc, `insert into document_shares(company_id,doc_kind,record_id,party_type,party_id,method,user_id) values ($1,'payslip',$2,'employee',$3,'download',$4)`, [A, pay, ali, U.hr]), /row-level security/i)
+    await fails(as(U.ownerB, `insert into document_shares(company_id,doc_kind,record_id,party_type,party_id,method) values ($1,'payslip',$2,'employee',$3,'download')`, [A, pay, ali]), /row-level security/i)
+    await fails(as(U.acc, `insert into document_shares(company_id,doc_kind,record_id,party_type,method,phone_last4) values ($1,'payslip',$2,'employee','download','971501234567')`, [A, pay]), /check constraint/i)
+    expect((await as(U.hr, `select count(*)::int n from document_shares where record_id=$1`, [pay])).rows[0].n).toBe(1)
+    for (const u of [U.pm, U.viewer, U.emp, U.ownerB]) expect((await as(u, `select count(*)::int n from document_shares`)).rows[0].n).toBe(0)
+    await fails(as(U.owner, `delete from document_shares where record_id=$1`, [pay]), /permission denied/i)
+    await fails(as(U.owner, `update document_shares set method='download' where record_id=$1`, [pay]), /permission denied/i)
+    expect((await as(U.hr, `select method from document_shares where record_id=$1`, [pay])).rows).toEqual([{ method: 'whatsapp_link' }])
+  })
+  it('sharing changes no salary balance', async () => {
+    expect(await outstanding(ali)).toBe(7649.75)
+  })
+})

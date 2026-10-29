@@ -57,7 +57,8 @@ export default async function MySalary() {
         <div className="min-w-0 flex-1"><div className="text-[15px] font-semibold">{periodLabel(o)}</div>
           <div className="text-[13px] text-muted">Salary <PrivateValue><Money value={o.amount} /></PrivateValue>{Number(o.allocated) > 0 && <> · paid <PrivateValue><Money value={o.allocated} /></PrivateValue></>}</div></div>
         <div className="flex flex-col items-end gap-1"><Badge tone={STATUS[o.status as keyof typeof STATUS].tone}>{STATUS[o.status as keyof typeof STATUS].label}</Badge>
-          {Number(o.remaining) > 0 && <span className="text-[12.5px] text-muted"><PrivateValue><Money value={o.remaining} /></PrivateValue> left</span>}</div></li>)}</ul>
+          {Number(o.remaining) > 0 && <span className="text-[12.5px] text-muted"><PrivateValue><Money value={o.remaining} /></PrivateValue> left</span>}</div>
+        {o.kind === 'accrual' && <a href={`/api/salary-payslips/${o.id}`} aria-label={`Download the payslip for ${periodLabel(o)}`} title="Payslip (PDF)" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border bg-surface text-primary shadow-key hover:bg-surface-2" data-payslip-link><FileText size={17} /></a>}</li>)}</ul>
     </PortalCard>}
 
     <PortalCard title="Payments & receipts">

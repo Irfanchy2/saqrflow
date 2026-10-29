@@ -23,6 +23,7 @@ import { ScheduledReports } from '@/components/settings/scheduled-reports'
 import { Integrations } from '@/components/settings/integrations'
 import { MySessions } from '@/components/settings/sessions'
 import { WhatsAppTemplates } from '@/components/settings/whatsapp-templates'
+import { ShareMessages } from '@/components/settings/share-messages'
 import { testWhatsAppConnection } from '@/app/actions/whatsapp'
 import Link from 'next/link'
 
@@ -34,7 +35,7 @@ export default async function Settings() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
   // order follows how a business sets Averiqo up: who we are → how documents look → how they are numbered → who gets told → integrations → data
   const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['builder', 'Template builder', admin], ['templates', 'Terms templates', admin], ['numbering', 'Numbering', admin], ['approvals', 'Approvals', admin], ['custom', 'Custom fields & statuses', admin], ['forms', 'Public forms', admin],
-    ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['wa-templates', 'WhatsApp templates', admin && !!wa], ['ai', 'AI & OCR', admin],
+    ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['wa-templates', 'WhatsApp templates', admin && !!wa], ['wa-share', 'WhatsApp sharing messages', admin], ['ai', 'AI & OCR', admin],
     ['integrations', 'API & webhooks', admin], ['account', 'Account & security', true], ['data', 'Data & backup', true]]
   return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
     <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -99,6 +100,7 @@ export default async function Settings() {
             {(Object.keys(TEMPLATE_META) as (keyof typeof TEMPLATE_META)[]).map(k => <details key={k} className="rounded-md border border-border p-2"><summary className="cursor-pointer font-mono text-xs">{TEMPLATE_META[k].metaName} <span className="text-muted">({TEMPLATE_META[k].language}, utility)</span></summary><pre className="mt-2 whitespace-pre-wrap text-xs text-muted">{templateBody(k)}</pre></details>)}</div></div></Card>}
 
       {admin && wa && <WhatsAppTemplates c={c} live={wa.mode === 'live'} />}
+      {admin && <ShareMessages c={c} />}
       {admin && <AiAutomation c={c} wa={wa} />}
       {admin && <Integrations c={c} />}
 

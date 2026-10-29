@@ -11,6 +11,7 @@ export function EmployeeFields({ d = {}, withSalary }: { d?: Record<string, any>
     <Field label="Job designation"><Input name="designation" defaultValue={d.designation} /></Field>
     <Field label="Status"><Select name="status" defaultValue={d.status ?? 'active'}>{EMP_STATUS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</Select></Field>
     <Field label="Contact number"><Input name="phone" defaultValue={d.phone} inputMode="tel" placeholder="050 123 4567" /></Field>
+    <Field label="WhatsApp number" hint="For payslips and receipts. Empty: the contact number is used."><Input name="whatsapp" defaultValue={d.whatsapp} inputMode="tel" placeholder="+971 50 123 4567" /></Field>
     <Field label="Joining date"><Input type="date" name="joining_date" defaultValue={d.joining_date} /></Field>
     <Field label="Emergency contact name"><Input name="emergency_contact_name" defaultValue={d.emergency_contact_name} /></Field>
     <Field label="Emergency contact number"><Input name="emergency_contact_phone" defaultValue={d.emergency_contact_phone} inputMode="tel" /></Field>

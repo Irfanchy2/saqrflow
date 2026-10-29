@@ -5,7 +5,7 @@ import { cents, fromCents, salaryStatus, splitOwed, sum, type Movement, type Sal
 export type Obligation = { id: string; employee_id: string; kind: string; period: string | null; entry_date: string; amount: number; allocated: number; remaining: number; status: 'paid' | 'partial' | 'unpaid'; reason: string | null; created_at: string }
 export type BoardRow = {
   id: string; name: string; no: string; status: string; monthly: number | null
-  previous: number; current: number | null; currentDue: number; outstanding: number; paidThisMonth: number; payStatus: SalaryStatus
+  previous: number; current: number | null; currentId: string | null; currentDue: number; outstanding: number; paidThisMonth: number; payStatus: SalaryStatus
   open: Pick<Obligation, 'id' | 'kind' | 'period' | 'entry_date' | 'remaining' | 'reason'>[]
 }
 const INACTIVE = new Set(['resigned', 'terminated', 'archived'])
@@ -37,7 +37,7 @@ export async function salaryBoard(c: Ctx, month: string) {
     const open = list.filter(o => o.remaining > 0).sort((a, b) => (a.kind === 'opening' ? -1 : b.kind === 'opening' ? 1 : (a.period ?? a.entry_date).localeCompare(b.period ?? b.entry_date)))
     rows.push({
       id: e.id, name: e.full_name, no: e.employee_no, status: e.status, monthly: salary.get(e.id) ?? null,
-      previous, current: acc ? acc.amount : null, currentDue: current, outstanding, paidThisMonth: p,
+      previous, current: acc ? acc.amount : null, currentId: acc?.id ?? null, currentDue: current, outstanding, paidThisMonth: p,
       payStatus: salaryStatus(outstanding, p, list.some(o => o.status === 'partial')),
       open: open.map(({ id, kind, period, entry_date, remaining, reason }) => ({ id, kind, period, entry_date, remaining, reason })),
     })
