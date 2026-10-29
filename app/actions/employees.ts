@@ -52,17 +52,6 @@ export async function setSalary(id: string, _: ActionState, fd: FormData): Promi
     revalidatePath(`/employees/${id}`); return { ok: true, message: 'Salary updated.' }
   })
 }
-export async function addSalaryPayment(id: string, _: ActionState, fd: FormData): Promise<ActionState> {
-  return safe(async () => {
-    const c = await getCtx(); need(c, 'salary.view')
-    const v = z.object({ period: z.string().regex(/^\d{4}-\d{2}$/, 'Choose the month'), amount: z.coerce.number().min(0), paid_on: date, method: z.enum(['wps', 'bank_transfer', 'cash', 'cheque']).optional(), notes: z.string().max(500).optional() })
-      .parse({ period: str(fd, 'period'), amount: str(fd, 'amount'), paid_on: str(fd, 'paid_on'), method: str(fd, 'method'), notes: str(fd, 'notes') })
-    const { error } = await c.supabase.from('salary_payments').insert({ ...v, period: v.period + '-01', employee_id: id, company_id: c.company.id })
-    if (error?.code === '23505') return { error: `Salary for ${v.period} is already recorded for this employee. Open that payment instead of adding it again.`, fieldErrors: { period: 'Already recorded' } }
-    if (error) throw error
-    revalidatePath(`/employees/${id}`); return { ok: true, message: 'Payment recorded.' }
-  })
-}
 export async function addAdvance(id: string, _: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'salary.view')
@@ -72,7 +61,7 @@ export async function addAdvance(id: string, _: ActionState, fd: FormData): Prom
     const { error } = await c.supabase.from('employee_advances').insert({ ...v, idempotency_key: v.idempotency_key ?? null, given_on: v.given_on ?? c.today, employee_id: id, company_id: c.company.id })
     if (error?.code === '23505' && v.idempotency_key) return { ok: true, message: 'Already saved.' }
     if (error) throw error
-    revalidatePath(`/employees/${id}`); return { ok: true, message: 'Saved.' }
+    revalidatePath(`/employees/${id}`); revalidatePath(`/salary/${id}`); revalidatePath('/me/salary'); return { ok: true, message: 'Saved.' }
   })
 }
 export async function addLeave(id: string, _: ActionState, fd: FormData): Promise<ActionState> {

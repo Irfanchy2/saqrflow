@@ -153,7 +153,7 @@ try {
     ['payment_reminder', `/invoices/${inv}`, 'Send reminder via WhatsApp', ['INV-W1 has AED 8,000.00 outstanding'], true],
     ['receipt', '/invoices?tab=payments', 'Send payment receipt via WhatsApp', ['payment of AED 2,500.00', 'INV-W1'], true],
     ['statement', `/parties/${cust}`, 'Send statement', ['statement of account', 'Balance: AED 8,000.00'], true],
-    ['payslip', `/employees/${emp}?tab=salary`, /payslip via WhatsApp/, ['Anil Thomas', 'payslip for'], true],
+    ['payslip', `/employees/${emp}?tab=salary`, /salary receipt via WhatsApp/, ['Anil Thomas', 'payslip for'], true],
     ['document_expiry', `/employees/${emp}?tab=documents`, /expiry reminder via WhatsApp/, ['Residence visa expires on'], false],
     ['cheque_reminder', '/cheques', 'Send cheque 004417 reminder via WhatsApp', ['cheque ending 4417', 'AED 18,450.00'], false],
     ['project_update', `/projects/${proj}`, 'Send update', ['Falcon canopy', '60% / 20%'], false],
@@ -182,12 +182,12 @@ try {
   const feb = (await one(`insert into salary_payments(company_id,employee_id,period,amount,paid_on,method) values ($1,$2,'2026-02-01',3000,'2026-02-28','wps') returning id`, [co, emp])).id
   await one(`insert into employee_advances(company_id,employee_id,kind,amount,given_on) values ($1,$2,'deduction',300,'2026-02-15') returning id`, [co, emp])
   await p.goto(`${BASE}/employees/${emp}?tab=salary`); await settle()
-  const [dl] = await Promise.all([p.waitForEvent('download'), p.getByRole('link', { name: 'PDF payslip 2026-02' }).click()])
-  ok(dl.suggestedFilename() === 'Payslip_Anil-Thomas_2026-02.pdf', `payslip downloads with a clear file name (${dl.suggestedFilename()})`)
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.getByRole('link', { name: 'Receipt 28 Feb 2026' }).click()])
+  ok(dl.suggestedFilename() === 'Salary_receipt_Anil-Thomas_2026-02-28.pdf', `salary receipt downloads with a clear file name (${dl.suggestedFilename()})`)
   await dl.saveAs(`${OUT}/payslip-feb.pdf`)
   const ps = execFileSync('pdftotext', ['-layout', `${OUT}/payslip-feb.pdf`, '-']).toString()
-  ok(/salary payslip/i.test(ps) && ps.includes('Anil Thomas') && ps.includes('E-77') && ps.includes('February 2026'), 'payslip PDF: employee, ID and period')
-  ok(ps.includes('3,000.00') && ps.includes('300.00') && /Net paid\s+2,700\.00/.test(ps), 'payslip PDF: deductions in a 28-day month are included and net is correct')
+  ok(/salary payment receipt/i.test(ps) && ps.includes('Anil Thomas') && ps.includes('E-77') && ps.includes('28 Feb 2026'), 'salary receipt PDF: employee, ID and payment date')
+  ok(/Amount paid\s+3,000\.00/.test(ps) && /Salary still owed after this payment/.test(ps) && /three thousand/i.test(ps), 'salary receipt PDF: amount paid (in words too) and the balance after it')
   const anon = await browser.newContext(); const ar = await anon.request.get(`${BASE}/api/payslips/${feb}`, { maxRedirects: 0 })
   ok(!(ar.headers()['content-type'] ?? '').includes('pdf'), `signed-out request gets no PDF (${ar.status()})`); await anon.close()
   ok((await ctx.request.get(`${BASE}/api/payslips/${crypto.randomUUID()}`)).status() === 404, 'unknown payslip: 404')

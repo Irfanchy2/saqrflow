@@ -19,7 +19,7 @@ export default async function MyHome() {
   if (!emp) return null
   const month = startOfMonth(c.today), monthEnd = endOfMonth(c.today), sb = c.supabase
   const settingsP = portalSettings(c)
-  const [cards, projects, sups, settings, todayRec, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }] = await Promise.all([
+  const [cards, projects, sups, settings, todayRec, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }, { data: acct }] = await Promise.all([
     companyCards(c),
     myProjects(c),
     claimSuppliers(c, emp.id),
@@ -29,8 +29,9 @@ export default async function MyHome() {
     sb.from('expense_claims').select(CLAIM_COLS).eq('employee_id', emp.id).order('created_at', { ascending: false }).limit(5),
     sb.from('attendance_records').select('work_date,status,overtime_hours,check_in_at,check_out_at').eq('employee_id', emp.id).gte('work_date', month).lte('work_date', monthEnd),
     sb.from('employee_compensation').select('monthly_salary').eq('employee_id', emp.id).maybeSingle(),
-    sb.from('salary_payments').select('id,period,amount,paid_on').eq('employee_id', emp.id).order('period', { ascending: false }).limit(2),
-    sb.from('employee_advances').select('kind,amount,settled,given_on').eq('employee_id', emp.id),
+    sb.from('salary_payments').select('id,period,amount,paid_on').eq('employee_id', emp.id).eq('status', 'posted').order('paid_on', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(2),
+    sb.from('employee_advance_balances').select('kind,amount,settled,given_on,remaining').eq('employee_id', emp.id),
+    sb.from('salary_accounts').select('outstanding').eq('employee_id', emp.id).maybeSingle(),
   ])
   const claims = all ?? [], total = (r: { amount: unknown; vat_amount: unknown }) => Number(r.amount) + Number(r.vat_amount)
   const thisMonth = claims.filter(r => r.spent_on >= month && r.spent_on <= monthEnd && r.status !== 'withdrawn')
@@ -41,7 +42,7 @@ export default async function MyHome() {
   const salary = comp ? Number(comp.monthly_salary) : null
   const bal = advanceBalance(salary, adv ?? [], settings.advanceLimitPct)
   const lastAdv = (adv ?? []).filter(a => a.kind === 'advance').sort((a, b) => b.given_on.localeCompare(a.given_on))[0]
-  const paidNow = (pays ?? []).find(p => p.period.slice(0, 7) === month.slice(0, 7) && p.paid_on), last = (pays ?? []).find(p => p.paid_on)
+  const last = (pays ?? [])[0], owed = Number(acct?.outstanding ?? 0)
   const hour = Number(localHm(new Date(), c.company.timezone).slice(0, 2))
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const tz = c.company.timezone
@@ -75,8 +76,8 @@ export default async function MyHome() {
     <PortalCard title="Salary" sub="Only you can see this. Tap an amount to show it." action={<Link href="/me/salary" className="text-[13px] font-medium text-primary">Details</Link>}>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-4 px-4 pb-5 pt-1 sm:px-5" data-salary>
         <div><dt className="text-[12.5px] text-muted">Monthly salary</dt><dd className="mt-1 text-[19px] font-semibold tabular-nums">{salary !== null ? <PrivateValue><Money value={salary} /></PrivateValue> : <span className="text-[14px] font-normal text-muted">Not set</span>}</dd></div>
-        <div><dt className="text-[12.5px] text-muted">{monthName(month)}</dt><dd className="mt-1.5">{paidNow ? <Badge tone="green">Paid {formatShortDate(paidNow.paid_on!)}</Badge> : <Badge tone="amber">Not paid yet</Badge>}</dd></div>
-        <div><dt className="text-[12.5px] text-muted">Last payment</dt><dd className="mt-1 text-[14px] font-medium">{last ? <><span className="block">{monthName(last.period)}</span><PrivateValue><Money value={last.amount} /></PrivateValue></> : <span className="font-normal text-muted">None yet</span>}</dd></div>
+        <div><dt className="text-[12.5px] text-muted">Salary owed to you</dt><dd className="mt-1 text-[19px] font-semibold tabular-nums" data-owed>{owed > 0 ? <PrivateValue><Money value={owed} /></PrivateValue> : <Badge tone="green">All paid</Badge>}</dd></div>
+        <div><dt className="text-[12.5px] text-muted">Last payment</dt><dd className="mt-1 text-[14px] font-medium">{last ? <><span className="block">{formatShortDate(last.paid_on ?? last.period)}</span><PrivateValue><Money value={last.amount} /></PrivateValue></> : <span className="font-normal text-muted">None yet</span>}</dd></div>
         {lastAdv && <div className="col-span-2 flex items-center justify-between gap-3 rounded-xl border border-border/80 px-3.5 py-2.5" data-last-advance><dt className="text-[13px] text-muted">Last advance received</dt>
           <dd className="text-end text-[13.5px] font-medium">{formatShortDate(lastAdv.given_on)} · <PrivateValue><Money value={lastAdv.amount} /></PrivateValue></dd></div>}
         <div><dt className="text-[12.5px] text-muted">Advances to repay</dt><dd className="mt-1 text-[14px] font-medium"><PrivateValue><Money value={bal.outstanding} /></PrivateValue></dd></div>

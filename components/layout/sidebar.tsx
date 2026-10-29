@@ -6,7 +6,7 @@ import { AnimatePresence, m } from 'framer-motion'
 import {
   SquaresFourIcon, SunHorizonIcon, TrayIcon, CalendarDotsIcon, FunnelIcon, BuildingsIcon, MapPinAreaIcon, ScrollIcon, ReceiptIcon, TruckIcon,
   HandCoinsIcon, PackageIcon, HardHatIcon, ClipboardTextIcon, NotebookIcon, CheckSquareOffsetIcon, VanIcon, WrenchIcon, WalletIcon, BankIcon,
-  IdentificationBadgeIcon, FilesIcon, VaultIcon, BellRingingIcon, BookOpenTextIcon, ChartLineUpIcon, SealCheckIcon, SparkleIcon, UserGearIcon,
+  IdentificationBadgeIcon, MoneyWavyIcon, FilesIcon, VaultIcon, BellRingingIcon, BookOpenTextIcon, ChartLineUpIcon, SealCheckIcon, SparkleIcon, UserGearIcon,
   ClockCounterClockwiseIcon, TrashIcon, GearSixIcon, CubeIcon, ArrowsLeftRightIcon, CardholderIcon, MagnifyingGlassIcon, CaretDownIcon, XIcon,
 } from '@phosphor-icons/react/dist/ssr'
 import type { Icon } from '@phosphor-icons/react'
@@ -22,7 +22,7 @@ export const ICONS: Record<string, Icon> = {
   projects: HardHatIcon, work_orders: ClipboardTextIcon, site_reports: NotebookIcon, tasks: CheckSquareOffsetIcon, assets: VanIcon, tickets: WrenchIcon,
   stock: CubeIcon, stock_moves: ArrowsLeftRightIcon,
   bank_accounts: CardholderIcon, expenses: WalletIcon, cheques: BankIcon,
-  employees: IdentificationBadgeIcon, documents: FilesIcon, vault: VaultIcon, reminders: BellRingingIcon, kb: BookOpenTextIcon,
+  employees: IdentificationBadgeIcon, salary: MoneyWavyIcon, documents: FilesIcon, vault: VaultIcon, reminders: BellRingingIcon, kb: BookOpenTextIcon,
   reports: ChartLineUpIcon, approvals: SealCheckIcon, assistant: SparkleIcon,
   users: UserGearIcon, audit: ClockCounterClockwiseIcon, trash: TrashIcon, settings: GearSixIcon,
 }
