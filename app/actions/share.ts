@@ -6,7 +6,8 @@ import { safe, str } from '@/lib/action'
 import { toE164 } from '@/lib/phone'
 import { formatAed, formatShortDate } from '@/lib/time'
 import { loadPayslip } from '@/lib/salary-docs'
-import { safePart } from '@/lib/sales/filename'
+import { safePart, salesPdfName } from '@/lib/sales/filename'
+import type { SalesType } from '@/lib/sales/docs'
 import { SHARE, fillShare, isShareKind, shareBodyProblems, shareSettingKey, type ShareKind } from '@/lib/whatsapp/share'
 import type { Ctx } from '@/lib/auth'
 import type { ActionState } from '@/lib/utils'
@@ -64,13 +65,14 @@ export async function prepareShare(kind: string, recordId: string): Promise<Acti
         storedInvalid: !first(e.whatsapp, e.phone) && (e.whatsapp || e.phone) ? (e.whatsapp || e.phone) : null, canSaveNumber: c.can('records.edit') && c.can('employees.view_sensitive'), portalLink: !!e.user_id }
       values = { employee: e.full_name, amount: formatAed(Number(s.amount)), date: formatShortDate(day), reference: s.reference ?? '-', company }
     } else {
-      const { data: d } = await sb.from('invoices').select('id,doc_type,number,status,customer_id,customer_name,customer_phone,total,due_date,valid_until').eq('id', recordId).maybeSingle()
+      const { data: d } = await sb.from('invoices').select('id,doc_type,number,revision,status,customer_id,customer_name,customer_phone,total,due_date,valid_until,project:projects(name)').eq('id', recordId).maybeSingle()
       if (!d || d.doc_type !== SALES[kind]) return { error: 'Document not found.' }
       const { data: cu } = d.customer_id ? await sb.from('customers').select('id,name,phone,whatsapp').eq('id', d.customer_id).maybeSingle() : { data: null }
       const { data: bal } = kind === 'payment_reminder' ? await sb.from('invoice_balances').select('balance').eq('id', d.id).maybeSingle() : { data: null }
       const label = SHARE[kind].label
       prep = { kind, recordId, docLabel: `${kind === 'payment_reminder' ? 'Tax invoice' : label} ${d.number}`, docDetail: kind === 'payment_reminder' ? 'Payment reminder' : label, pdfUrl: `/api/sales/${d.id}/pdf`,
-        filename: `${(kind === 'payment_reminder' ? 'Invoice' : label).replace(/\s+/g, '_')}_${String(d.number).replace(/[^\w-]+/g, '-')}.pdf`,
+        // the same name the PDF downloads with, so "attach <file>" points at the file that is really in Downloads
+        filename: salesPdfName({ doc_type: d.doc_type as SalesType, number: d.number, revision: d.revision, customer_name: d.customer_name, project_name: (d.project as unknown as { name?: string } | null)?.name ?? null }),
         party: { type: 'customer', id: cu?.id ?? d.customer_id ?? d.id, name: cu?.name ?? d.customer_name ?? 'Customer', code: null },
         phone: first(cu?.whatsapp, cu?.phone, d.customer_phone), phoneSource: first(cu?.whatsapp) ? 'whatsapp' : first(cu?.phone, d.customer_phone) ? 'phone' : null,
         storedInvalid: null, canSaveNumber: !!cu && c.can('records.edit'), portalLink: false }

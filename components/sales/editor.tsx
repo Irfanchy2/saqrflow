@@ -49,10 +49,12 @@ function ago(ts: number | null, now: number) {
   return s < 10 ? 'Saved just now' : s < 60 ? `Saved ${Math.floor(s / 5) * 5} seconds ago` : s < 3600 ? `Saved ${Math.floor(s / 60)} min ago` : 'Saved'
 }
 
-export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false, statusView, invoicedAs = null }: {
+export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false, statusView, invoicedAs = null, cloudLive = false }: {
   doc: Record<string, any>; items: (PaperItem & { id?: string })[]; branding: Branding; paid: number; customers: CustomerOpt[]; projects: ProjectOpt[]
   catalog: CatalogOpt[]; templates: TemplateOpt[]; salespeople: { id: string; full_name: string }[]; delivery: Record<string, { ordered: number; delivered: number }>
   editable: boolean; lockedReason?: string | null; canStatus: boolean; canDelete: boolean; canVault: boolean; requireApproval: boolean; canRenumber?: boolean
+  /** WhatsApp Business (paid Cloud API) is connected: the phone capsule sends through it; otherwise it opens the free share sheet */
+  cloudLive?: boolean
   /** invoices: document status and payment status, shown side by side ("Sent | Unpaid") instead of one combined status */
   statusView?: { doc: DocState; pay: PayState | null; daysLate: number }
   /** delivery notes: the invoice that already bills it (no second invoice is offered) */
@@ -263,7 +265,9 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
     {/* phones: what people do with a finished document, as a small lit capsule within thumb reach (names are on the
         buttons for screen readers and as tooltips) */}
     <div className="dock capsule no-print fixed bottom-[calc(86px+env(safe-area-inset-bottom))] end-3 z-nav flex gap-1.5 rounded-[22px] p-1.5 lg:hidden">
-      {waMain && <WhatsAppSend kind={waMain[0]} recordId={doc.id} label={waMain[1]}
+      {!cloudLive && shareKinds[0] ? <button type="button" title="Share via WhatsApp" aria-label={`Share ${meta.label.toLowerCase()} PDF via WhatsApp`} onClick={() => (dirty ? save(() => setShare(shareKinds[0][0])) : setShare(shareKinds[0][0]))} data-share-capsule
+        className="capsule-btn h-12 w-12 cursor-pointer bg-[#1fae57] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.3),0_8px_20px_-8px_rgba(31,174,87,.8)]"><WhatsApp size={24} weight="fill" aria-hidden /></button>
+      : waMain && <WhatsAppSend kind={waMain[0]} recordId={doc.id} label={waMain[1]}
         trigger={open => <button type="button" title="Send via WhatsApp" aria-label={`Send ${waMain[1] === 'WhatsApp' ? meta.label.toLowerCase() : waMain[1].toLowerCase()} via WhatsApp`} onClick={() => (dirty ? save(open) : open())} className="capsule-btn h-12 w-12 cursor-pointer bg-[#1fae57] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.3),0_8px_20px_-8px_rgba(31,174,87,.8)]"><WhatsApp size={24} weight="fill" aria-hidden /></button>} />}
       <button type="button" title="Download PDF" aria-label="Download PDF" onClick={() => (dirty ? save(download) : download())} className="capsule-btn h-12 w-12 cursor-pointer bg-white/[.07] text-white ring-1 ring-inset ring-white/10"><Download size={22} weight="bold" aria-hidden /></button>
       {payJump && <a href="#payment" title="Record payment" aria-label="Payment" className="capsule-btn arc h-12 w-12" data-pay-jump><Banknote size={22} weight="fill" aria-hidden /></a>}
