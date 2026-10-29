@@ -15,11 +15,11 @@ const phone = z.string().optional().transform((v, ctx) => { if (!v) return undef
 const empSchema = z.object({
   employee_no: z.string().min(1, 'Employee ID is required').max(30), full_name: z.string().min(2, 'Full name is required').max(200),
   nationality: z.string().max(80).optional(), department: z.string().max(80).optional(), designation: z.string().max(120).optional(),
-  phone, emergency_contact_name: z.string().max(120).optional(), emergency_contact_phone: phone,
+  phone, whatsapp: phone, emergency_contact_name: z.string().max(120).optional(), emergency_contact_phone: phone,
   joining_date: date, status: z.enum(['active', 'on_leave', 'probation', 'resigned', 'terminated', 'archived']).default('active'),
   work_location: z.string().max(200).optional(), accommodation: z.string().max(200).optional(), notes: z.string().max(4000).optional(),
 })
-const FIELDS = ['employee_no', 'full_name', 'nationality', 'department', 'designation', 'phone', 'emergency_contact_name', 'emergency_contact_phone', 'joining_date', 'status', 'work_location', 'accommodation', 'notes']
+const FIELDS = ['employee_no', 'full_name', 'nationality', 'department', 'designation', 'phone', 'whatsapp', 'emergency_contact_name', 'emergency_contact_phone', 'joining_date', 'status', 'work_location', 'accommodation', 'notes']
 const parseEmp = (fd: FormData) => empSchema.parse(Object.fromEntries(FIELDS.map(k => [k, str(fd, k)])))
 
 export async function createEmployee(_: ActionState, fd: FormData): Promise<ActionState> {

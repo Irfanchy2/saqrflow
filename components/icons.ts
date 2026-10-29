@@ -120,6 +120,7 @@ export {
   MagnifyingGlassIcon as Search,
   MagnifyingGlassMinusIcon as SearchX,
   PaperPlaneTiltIcon as Send,
+  ShareFatIcon as Share2,
   GearSixIcon as Settings,
   ShieldCheckIcon as ShieldCheck,
   ShieldSlashIcon as ShieldOff,

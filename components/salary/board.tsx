@@ -7,8 +7,9 @@ import { EmptyState } from '@/components/ui/primitives'
 import { Search, Users, Wallet } from '@/components/icons'
 import { STATUS, type SalaryStatus } from '@/lib/salary-math'
 import { PayModal, type PayTarget } from './quick-pay'
+import { ShareSheet } from '@/components/whatsapp/share-sheet'
 
-export type BoardRow = PayTarget & { status: string; paidThisMonth: number; payStatus: SalaryStatus }
+export type BoardRow = PayTarget & { status: string; paidThisMonth: number; payStatus: SalaryStatus; currentId: string | null }
 const FILTERS: [string, string][] = [['all', 'All'], ['unpaid', 'Unpaid'], ['partial', 'Partially paid'], ['paid', 'Paid']]
 
 /** The employee salary table: search, status filter, sort, Quick Pay. Phones get one card per person. */
@@ -22,6 +23,8 @@ export function SalaryBoard({ rows, today, monthLabel }: { rows: BoardRow[]; tod
   const list = useMemo(() => rows
     .filter(r => (f === 'all' || r.payStatus === f) && (!dq || r.name.toLowerCase().includes(dq) || r.no.toLowerCase().includes(dq)))
     .sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'paid' ? b.paidThisMonth - a.paidThisMonth || a.name.localeCompare(b.name) : b.outstanding - a.outstanding || a.name.localeCompare(b.name)), [rows, f, dq, sort])
+  // the chosen month's payslip, once that month is posted (sharing never posts or pays anything)
+  const share = (r: BoardRow) => r.currentId ? <ShareSheet kind="payslip" recordId={r.currentId} variant="ghost" iconOnly label={`Share ${r.name}'s ${monthLabel} payslip via WhatsApp`} /> : null
   const pay = (r: BoardRow) => <Button size="sm" variant={r.outstanding > 0 ? 'primary' : 'secondary'} data-row-stop onClick={() => setPaying(r)} data-quick-pay={r.id}>
     <Wallet size={14} aria-hidden />Pay<span className="sr-only"> {r.name}</span></Button>
   return <>
@@ -46,7 +49,7 @@ export function SalaryBoard({ rows, today, monthLabel }: { rows: BoardRow[]; tod
           <div className="mt-2.5 flex items-end justify-between gap-3">
             <div><div className="text-[12px] text-muted">Total owed</div><div className="text-[19px] font-semibold tracking-[-0.02em]"><Money value={r.outstanding} /></div>
               <div className="mt-0.5 text-[12px] text-muted">Earlier <Money value={r.previous} /> · {monthLabel} {r.current === null ? 'not posted' : <Money value={r.currentDue} />}</div></div>
-            {pay(r)}</div></li>)}</ul>
+            <div className="flex items-center gap-1">{share(r)}{pay(r)}</div></div></li>)}</ul>
         <div className="hidden sm:block"><TableWrap cards={false}><thead className="border-b border-border"><tr>
           <Th>Employee</Th><Th className="text-end">Monthly salary</Th><Th className="text-end">Earlier months</Th><Th className="text-end">{monthLabel}</Th>
           <Th className="text-end">Total owed</Th><Th className="text-end">Paid this month</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
@@ -58,7 +61,7 @@ export function SalaryBoard({ rows, today, monthLabel }: { rows: BoardRow[]; tod
             <Td className="text-end font-semibold"><Money value={r.outstanding} className={r.outstanding < 0 ? 'text-success' : ''} />{r.outstanding < 0 && <div className="text-xs font-normal text-success">credit</div>}</Td>
             <Td className="text-end"><Money value={r.paidThisMonth} className={r.paidThisMonth > 0 ? '' : 'text-muted'} /></Td>
             <Td><Badge tone={STATUS[r.payStatus].tone}>{STATUS[r.payStatus].label}</Badge></Td>
-            <Td className="text-end"><div className="flex justify-end gap-1">{pay(r)}<Link href={`/salary/${r.id}#statement`} data-row-stop className="inline-flex h-8 items-center rounded-full px-3 text-[13px] font-medium text-muted hover:bg-fg/[.05] hover:text-fg">Statement<span className="sr-only"> for {r.name}</span></Link></div></Td>
+            <Td className="text-end"><div className="flex justify-end gap-1">{pay(r)}{share(r)}<Link href={`/salary/${r.id}#statement`} data-row-stop className="inline-flex h-8 items-center rounded-full px-3 text-[13px] font-medium text-muted hover:bg-fg/[.05] hover:text-fg">Statement<span className="sr-only"> for {r.name}</span></Link></div></Td>
           </tr>)}</tbody></TableWrap></div>
       </>}
     {payRow && <PayModal emp={payRow} today={today} onClose={() => setPaying(null)} />}

@@ -14,6 +14,8 @@ import { monthLong, movements, salaryAccount } from '@/lib/salary'
 import { KIND_LABEL, METHODS, STATUS, methodLabel, periodLabel, splitOwed, statement, sum } from '@/lib/salary-math'
 import { formatAed, formatShortDate, showDate } from '@/lib/time'
 import { QuickPay } from '@/components/salary/quick-pay'
+import { ShareSheet } from '@/components/whatsapp/share-sheet'
+import { companyWhatsApp } from '@/lib/whatsapp/outbox'
 
 export const metadata = { title: 'Salary account' }
 const isDay = (s?: string) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s)
@@ -32,7 +34,8 @@ export default async function SalaryAccountPage({ params, searchParams }: { para
   const c = await getCtx(); if (!c.can('salary.view')) redirect('/')
   const { id } = await params; if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
   const sp = await flat(searchParams)
-  const a = await salaryAccount(c, id); if (!a) notFound()
+  const [a, wa] = await Promise.all([salaryAccount(c, id), companyWhatsApp(c.company.id)]); if (!a) notFound()
+  const cloud = wa.live && c.can('records.edit')   // WhatsApp Business (paid API) only when the company has connected it
   const month = c.today.slice(0, 7), split = splitOwed(a.obligations, month)
   const cur = a.obligations.find(o => o.kind === 'accrual' && o.period === `${month}-01`)
   const open = a.obligations.filter(o => o.remaining > 0)
@@ -82,7 +85,10 @@ export default async function SalaryAccountPage({ params, searchParams }: { para
             <Td className="text-end"><Money value={o.amount} /></Td><Td className="text-end"><Money value={o.allocated} className={o.allocated ? '' : 'text-muted'} /></Td>
             <Td className="text-end font-semibold"><Money value={o.remaining} className={o.remaining ? '' : 'text-muted'} /></Td>
             <Td><Badge tone={STATUS[o.status].tone}>{STATUS[o.status].label}</Badge></Td>
-            <Td className="text-end">{o.kind !== 'opening' && <Reverse id={o.id} type="entry" emp={id} what={periodLabel(o)} />}</Td></tr>)}</tbody></TableWrap>}
+            <Td className="text-end"><div className="flex flex-wrap justify-end gap-1">
+              {o.kind === 'accrual' && <><LinkButton href={`/api/salary-payslips/${o.id}?view=1`} target="_blank" variant="ghost" size="sm"><FileText size={14} aria-hidden />Payslip<span className="sr-only"> {periodLabel(o)}</span></LinkButton>
+                <ShareSheet kind="payslip" recordId={o.id} variant="ghost" iconOnly label={`Share the ${periodLabel(o)} payslip via WhatsApp`} /></>}
+              {o.kind !== 'opening' && <Reverse id={o.id} type="entry" emp={id} what={periodLabel(o)} />}</div></Td></tr>)}</tbody></TableWrap>}
       </Card>
 
       <Card className="lg:col-span-2" data-opening><CardHeader title="Opening balance" sub="Salary already owed before your records in Averiqo start. Entered once; it is never repeated." />
@@ -121,7 +127,8 @@ export default async function SalaryAccountPage({ params, searchParams }: { para
             <Td className="text-end"><div className="flex flex-wrap justify-end gap-1">
               <LinkButton href={`/api/payslips/${p.id}?view=1`} target="_blank" variant="ghost" size="sm"><Printer size={14} aria-hidden />Receipt<span className="sr-only"> {showDate(p.paid_on ?? p.period)}</span></LinkButton>
               <LinkButton href={`/api/payslips/${p.id}`} variant="ghost" size="sm"><Download size={14} aria-hidden /><span className="sr-only">Download receipt {showDate(p.paid_on ?? p.period)}</span></LinkButton>
-              {!off && c.can('records.edit') && <WhatsAppSend kind="payslip" recordId={p.id} label="Receipt" ariaLabel={`Send the ${showDate(p.paid_on ?? p.period)} salary receipt via WhatsApp`} variant="ghost" />}
+              {!off && <ShareSheet kind="salary_receipt" recordId={p.id} variant="ghost" iconOnly label={`Share the ${showDate(p.paid_on ?? p.period)} salary receipt via WhatsApp`} />}
+              {!off && cloud && <WhatsAppSend kind="payslip" recordId={p.id} label="Business" ariaLabel={`Send the ${showDate(p.paid_on ?? p.period)} salary receipt with WhatsApp Business`} variant="ghost" />}
               {!off && <DialogButton size="sm" variant="ghost" label={<><Pencil size={14} aria-hidden /><span className="sr-only">Edit payment {showDate(p.paid_on ?? p.period)}</span></>} title="Edit payment details">
                 <ActionForm action={editPayment} resetOnSuccess={false}>
                   <input type="hidden" name="id" value={p.id} /><input type="hidden" name="employee_id" value={id} />

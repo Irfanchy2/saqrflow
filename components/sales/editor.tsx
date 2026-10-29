@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { WhatsAppSend } from '@/components/whatsapp/send'
+import { ShareModal } from '@/components/whatsapp/share-sheet'
 import { clearDraft, draftAge, readDraft, writeDraft } from '@/lib/drafts'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -229,8 +230,10 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const amountTxt = meta.priced ? ` for AED ${fmtMoney(tot.total)}` : ''
   const mail = `mailto:${encodeURIComponent(head.customer_email || customer?.email || '')}?subject=${encodeURIComponent(`${meta.label} ${doc.number}${head.subject ? ': ' + head.subject : ''}`)}&body=${encodeURIComponent(
     `Dear ${head.attention || 'Sir/Madam'},\n\nPlease find attached our ${meta.label.toLowerCase()} ${doc.number}${amountTxt}.\n\nKind regards,\n${branding.companyName}`)}`
-  const waPhone = (head.customer_phone || customer?.phone || '').replace(/[^\d]/g, '').replace(/^00/, '').replace(/^0(5\d{8})$/, '971$1').replace(/^(5\d{8})$/, '971$1')
-  const wa = `https://wa.me/${waPhone}?text=${encodeURIComponent(`Dear ${head.attention || 'Sir/Madam'}, please find our ${meta.label.toLowerCase()} ${doc.number}${amountTxt}. The PDF follows in this chat.\n\n${branding.companyName}`)}`
+  // free "Share via WhatsApp": the PDF and the message go through the user's own WhatsApp (the sheet checks the number)
+  const [share, setShare] = useState<string | null>(null)
+  const shareKinds: [string, string][] = t === 'quotation' || t === 'invoice' || t === 'delivery_note'
+    ? [[t, 'Share on WhatsApp…'], ...(t === 'invoice' && ['sent', 'partially_paid', 'overdue'].includes(doc.status) ? [['payment_reminder', 'Share payment reminder on WhatsApp…'] as [string, string]] : [])] : []
   const Icon = ICON[t] ?? FileText
   const statuses = canStatus ? manualStatuses(t, doc.status) : []
   const err = (k: string) => fieldErr[k] ? <span role="alert" className="text-[11px] text-danger">{fieldErr[k]}</span> : null
@@ -256,6 +259,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
   const waMain = waKinds[0]
   const payJump = !!statusView && !['draft', 'cancelled'].includes(doc.status)
   return <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
+    {share && <ShareModal kind={share} recordId={doc.id} onClose={() => setShare(null)} />}
     {/* phones: what people do with a finished document, as a small lit capsule within thumb reach (names are on the
         buttons for screen readers and as tooltips) */}
     <div className="dock capsule no-print fixed bottom-[calc(86px+env(safe-area-inset-bottom))] end-3 z-nav flex gap-1.5 rounded-[22px] p-1.5 lg:hidden">
@@ -287,7 +291,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
         <Menu label={<><MoreHorizontal size={15} /><span className="sr-only">More actions</span></>} busy={busy}>
           {canVault && <MenuItem icon={FolderArchive} onClick={() => run(() => archivePdfToVault(doc.id), { saveFirst: true })}>Save PDF to Document Vault</MenuItem>}
           <MenuItem icon={Mail} href={mail} onClick={() => void logSalesEvent(doc.id, 'emailed')}>Email to customer…</MenuItem>
-          {waPhone.length >= 9 && <MenuItem icon={MessageCircle} href={wa} external onClick={() => void logSalesEvent(doc.id, 'whatsapp')}>Share on WhatsApp…</MenuItem>}
+          {shareKinds.map(([k, l]) => <MenuItem key={k} icon={MessageCircle} onClick={() => (dirty ? save(() => setShare(k)) : setShare(k))}>{l}</MenuItem>)}
           {isQtn && requireApproval && canStatus && (!approval || approval === 'changes_requested' || approval === 'rejected') && <MenuItem icon={Send} onClick={() => run(() => requestApproval(doc.id), { saveFirst: true })}>Request approval</MenuItem>}
           {canDeliver && <MenuItem icon={Truck} onClick={() => (dirty ? save(() => setShowDelivery(true)) : setShowDelivery(true))}>Create delivery note (choose quantities)…</MenuItem>}
           {canStatus && (CONVERSIONS[t] ?? []).filter(to => !(isQtn && to === 'delivery_note')).filter(to => to !== 'credit_note' || !draft).filter(to => !(to === 'invoice' && invoicedAs)).map(to => <MenuItem key={to} icon={to === 'credit_note' ? FileMinus : Repeat}

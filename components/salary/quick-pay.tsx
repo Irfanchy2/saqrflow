@@ -6,6 +6,7 @@ import { Modal, useDialog } from '@/components/ui/dialog'
 import { CheckCircle2, Download, Loader2, Printer, Wallet } from '@/components/icons'
 import { cents, fromCents, METHODS, periodLabel, suggestedPay } from '@/lib/salary-math'
 import { cn } from '@/lib/utils'
+import { ShareSheet } from '@/components/whatsapp/share-sheet'
 
 export type PayTarget = {
   id: string; name: string; no: string; monthly: number | null; outstanding: number; previous: number; currentDue: number; current: number | null
@@ -52,7 +53,8 @@ function PayForm({ emp, today, again }: { emp: PayTarget; today: string; again: 
         <p className="mt-1 text-[13.5px] text-muted">{left > 0 ? <>Still owed to {emp.name.split(' ')[0]}: <Money value={left} /></> : left < 0 ? <>Paid <Money value={-left} /> more than was owed (kept as credit).</> : 'Nothing is owed now.'}</p></div>
       {id && <div className="flex flex-wrap justify-center gap-2">
         <LinkButton href={`/api/payslips/${id}?view=1`} target="_blank" variant="secondary"><Printer size={15} aria-hidden />Print receipt</LinkButton>
-        <LinkButton href={`/api/payslips/${id}`} variant="secondary"><Download size={15} aria-hidden />Download receipt</LinkButton></div>}
+        <LinkButton href={`/api/payslips/${id}`} variant="secondary"><Download size={15} aria-hidden />Download receipt</LinkButton>
+        <ShareSheet kind="salary_receipt" recordId={id} size="md" /></div>}
       <div className="flex w-full gap-2 border-t border-border/80 pt-4 sm:justify-end"><Button variant="ghost" onClick={again}>Record another</Button><Button className="flex-1 sm:flex-none" onClick={close}>Done</Button></div>
     </div>
   }

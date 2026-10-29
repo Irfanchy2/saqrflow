@@ -153,7 +153,7 @@ try {
     ['payment_reminder', `/invoices/${inv}`, 'Send reminder via WhatsApp', ['INV-W1 has AED 8,000.00 outstanding'], true],
     ['receipt', '/invoices?tab=payments', 'Send payment receipt via WhatsApp', ['payment of AED 2,500.00', 'INV-W1'], true],
     ['statement', `/parties/${cust}`, 'Send statement', ['statement of account', 'Balance: AED 8,000.00'], true],
-    ['payslip', `/employees/${emp}?tab=salary`, /salary receipt via WhatsApp/, ['Anil Thomas', 'payslip for'], true],
+    ['payslip', `/employees/${emp}?tab=salary`, /salary receipt with WhatsApp Business/, ['Anil Thomas', 'payslip for'], true],
     ['document_expiry', `/employees/${emp}?tab=documents`, /expiry reminder via WhatsApp/, ['Residence visa expires on'], false],
     ['cheque_reminder', '/cheques', 'Send cheque 004417 reminder via WhatsApp', ['cheque ending 4417', 'AED 18,450.00'], false],
     ['project_update', `/projects/${proj}`, 'Send update', ['Falcon canopy', '60% / 20%'], false],

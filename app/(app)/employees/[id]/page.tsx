@@ -8,7 +8,9 @@ import { flat } from '@/lib/queries'
 import { trashRecord } from '@/app/actions/trash'
 import { Badge, Card, CardHeader, CardLink, EmptyState, Field, Input, LinkButton, Money, PageHeader, Select, Td, Th, TableWrap, Textarea, type Tone } from '@/components/ui/primitives'
 import { QuickPay } from '@/components/salary/quick-pay'
+import { ShareSheet } from '@/components/whatsapp/share-sheet'
 import { salaryAccount } from '@/lib/salary'
+import { companyWhatsApp } from '@/lib/whatsapp/outbox'
 import { methodLabel, splitOwed, sum } from '@/lib/salary-math'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
@@ -97,8 +99,9 @@ export default async function EmployeePage({ params, searchParams }: { params: P
 }
 
 async function SalaryTab({ id, c }: { id: string; c: Awaited<ReturnType<typeof getCtx>> }) {
-  const a = await salaryAccount(c, id)
+  const [a, wa] = await Promise.all([salaryAccount(c, id), companyWhatsApp(c.company.id)])
   if (!a) return null
+  const cloud = wa.live && c.can('records.edit')   // WhatsApp Business (paid API) only when connected
   const month = c.today.slice(0, 7), split = splitOwed(a.obligations, month)
   const cur = a.obligations.find(o => o.kind === 'accrual' && o.period === `${month}-01`)
   const target = { id, name: a.emp.full_name, no: a.emp.employee_no, monthly: a.monthly, outstanding: a.account.outstanding, previous: split.previous, currentDue: split.current, current: cur ? cur.amount : null,
@@ -118,7 +121,7 @@ async function SalaryTab({ id, c }: { id: string; c: Awaited<ReturnType<typeof g
     <Card className="lg:col-span-3"><CardHeader title="Recent payments" action={<CardLink href={`/salary/${id}`} />} />
       {!a.payments.length ? <EmptyState compact title="No payments recorded" /> : <TableWrap><thead className="border-b border-border"><tr><Th>Paid on</Th><Th>Amount</Th><Th>Method</Th><Th>Status</Th><Th><span className="sr-only">Receipt</span></Th></tr></thead><tbody className="divide-y divide-border">
         {a.payments.slice(0, 6).map(p => <tr key={p.id}><Td>{showDate(p.paid_on ?? p.period)}</Td><Td className="tabular-nums">{formatAed(p.amount)}</Td><Td className="text-muted">{methodLabel(p.method)}</Td><Td><Badge tone={p.status === 'posted' ? 'green' : 'neutral'}>{p.status === 'posted' ? 'Posted' : 'Reversed'}</Badge></Td>
-          <Td className="text-right"><div className="flex justify-end gap-1"><LinkButton href={`/api/payslips/${p.id}`} variant="ghost" size="sm"><Download size={14} aria-hidden />Receipt<span className="sr-only"> {showDate(p.paid_on ?? p.period)}</span></LinkButton>{c.can('records.edit') && p.status === 'posted' && <WhatsAppSend kind="payslip" recordId={p.id} label="Receipt" ariaLabel={`Send the ${showDate(p.paid_on ?? p.period)} salary receipt via WhatsApp`} variant="ghost" />}</div></Td></tr>)}</tbody></TableWrap>}</Card>
+          <Td className="text-right"><div className="flex justify-end gap-1"><LinkButton href={`/api/payslips/${p.id}`} variant="ghost" size="sm"><Download size={14} aria-hidden />Receipt<span className="sr-only"> {showDate(p.paid_on ?? p.period)}</span></LinkButton>{p.status === 'posted' && <ShareSheet kind="salary_receipt" recordId={p.id} variant="ghost" iconOnly label={`Share the ${showDate(p.paid_on ?? p.period)} salary receipt via WhatsApp`} />}{p.status === 'posted' && cloud && <WhatsAppSend kind="payslip" recordId={p.id} label="Business" ariaLabel={`Send the ${showDate(p.paid_on ?? p.period)} salary receipt with WhatsApp Business`} variant="ghost" />}</div></Td></tr>)}</tbody></TableWrap>}</Card>
   </div>
 }
 
