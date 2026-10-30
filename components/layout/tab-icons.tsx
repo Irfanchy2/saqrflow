@@ -1,6 +1,7 @@
 // Phone tab bar icons, drawn for Averiqo on one 24 px grid: 1.6 stroke, round joins, and a tinted inner fill that
-// lights up on the open tab. Projects is a steel I-beam. Pages without their own drawing use the regular icon set.
+// lights up on the open tab. Projects is a project document with a gear (components/project-icon.tsx). Pages without their own drawing use the regular icon set.
 import type { ReactNode } from 'react'
+import { PROJECT_LINES, PROJECT_PAGE } from '@/components/project-icon'
 
 const shapes: Record<string, { fill: ReactNode; line: ReactNode }> = {
   overview: {
@@ -11,10 +12,7 @@ const shapes: Record<string, { fill: ReactNode; line: ReactNode }> = {
     fill: <path d="M7.5 3.5h6.4c.5 0 1 .2 1.4.6l3.6 3.6c.4.4.6.9.6 1.4V18a2.5 2.5 0 0 1-2.5 2.5h-9.5A2.5 2.5 0 0 1 5 18V6a2.5 2.5 0 0 1 2.5-2.5Z" />,
     line: <><path d="M7.5 3.5h6.4c.5 0 1 .2 1.4.6l3.6 3.6c.4.4.6.9.6 1.4V18a2.5 2.5 0 0 1-2.5 2.5h-9.5A2.5 2.5 0 0 1 5 18V6a2.5 2.5 0 0 1 2.5-2.5Z" /><path d="M14 3.8V7a1.5 1.5 0 0 0 1.5 1.5h3.2M8.5 12.5h7M8.5 16h4.5" /></>,
   },
-  projects: {
-    fill: <path d="M4.5 3.5h15a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H14v9h5.5a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1H10v-9H4.5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" />,
-    line: <path d="M4.5 3.5h15a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H14v9h5.5a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1H10v-9H4.5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" />,
-  },
+  projects: { fill: <path d={PROJECT_PAGE} />, line: PROJECT_LINES },
   tasks: {
     fill: <rect x="3.5" y="3.5" width="17" height="17" rx="5" />,
     line: <><rect x="3.5" y="3.5" width="17" height="17" rx="5" /><path d="m8.4 12.2 2.5 2.5 4.9-5.1" /></>,

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BadgeCheck, CheckCircle2, FileWarning, HardHat, Landmark, ListTodo, Receipt, Target, Wrench } from '@/components/icons'
+import { BadgeCheck, CheckCircle2, FileWarning, Landmark, ListTodo, Receipt, Target, Wrench, ProjectDoc } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { loadBrief } from '@/lib/brief'
 import { Badge, Card, CardHeader, Metrics, PageHeader, StatCard } from '@/components/ui/primitives'
@@ -45,7 +45,7 @@ export default async function BriefPage() {
         {!b.tasks.mine.length ? <p className="flex items-center gap-2 px-4 py-4 text-sm text-muted"><CheckCircle2 size={15} className="text-success" />You are up to date.</p>
           : <ul className="divide-y divide-border">{b.tasks.mine.map(t => <Row key={t.id} href={`/tasks?view=mine&open=${t.id}`} title={t.title} sub={t.due_date < c.today ? `Overdue since ${formatShortDate(t.due_date)}` : 'Due today'} bad={t.due_date < c.today} />)}</ul>}</Card>
 
-      {b.projects && <Card><CardHeader title="Project alerts" sub="Past the planned completion, or costs above the contract value" action={<HardHat size={15} className="text-muted" aria-hidden />} />
+      {b.projects && <Card><CardHeader title="Project alerts" sub="Past the planned completion, or costs above the contract value" action={<ProjectDoc size={15} className="text-muted" aria-hidden />} />
         {!b.projects.length ? none : <ul className="divide-y divide-border">{b.projects.slice(0, 15).map((p, i) => <Row key={p.id + i} href={`/projects/${p.id}`} title={p.name} sub={p.reason} bad />)}</ul>}</Card>}
 
       {b.approvals && <Card><CardHeader title="Waiting for my approval" action={<BadgeCheck size={15} className="text-muted" aria-hidden />} />

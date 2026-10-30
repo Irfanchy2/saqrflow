@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useTransition } from 'react'
-import { FilePlus2, HardHat, Loader2, PackageCheck, Receipt, ScrollText, Target, Upload, UserPlus, Users, Wallet, ListPlus } from '@/components/icons'
+import { FilePlus2, Loader2, PackageCheck, Receipt, ScrollText, Target, Upload, UserPlus, Users, Wallet, ListPlus, ProjectDoc } from '@/components/icons'
 import { newSalesDoc } from '@/app/actions/sales'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -17,7 +17,7 @@ export function QuickGrid({ can }: { can: Can }) {
   const items: { label: string; icon: typeof Receipt; run?: () => void; href?: string; show: boolean }[] = [
     { label: 'New quotation', icon: ScrollText, run: () => make('quotation'), show: can.sales },
     { label: 'New invoice', icon: Receipt, run: () => make('invoice'), show: can.sales },
-    { label: 'New project', icon: HardHat, href: '/projects?new=project', show: can.projects },
+    { label: 'New project', icon: ProjectDoc, href: '/projects?new=project', show: can.projects },
     { label: 'New lead', icon: Target, href: '/leads?new=lead', show: can.crm },
     { label: 'Add expense', icon: Wallet, href: '/expenses?new=expense', show: can.sales },
     { label: 'Add customer', icon: UserPlus, href: '/parties?new=customer', show: can.people },

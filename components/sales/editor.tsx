@@ -7,8 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowDown, ArrowLeft, ArrowUp, Banknote, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle, WhatsApp,
-  MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, HardHat, Wallet,
-} from '@/components/icons'
+  MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, Wallet, ProjectDoc } from '@/components/icons'
 import { SalesPaper, docDiscount, vatOn, type Branding, type PaperItem } from './paper'
 import { FitPaper } from './preview'
 import { RichTextField } from './rich-field'
@@ -304,7 +303,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
             onClick={() => run(() => convertSalesDoc(doc.id, to, tok(`convert-${to}`)), { saveFirst: true })}>{isQtn && to === 'invoice' ? 'Convert to invoice' : `Create ${DOC_META[to].label.toLowerCase()}`}</MenuItem>)}
           {isQtn && canStatus && ['accepted', 'converted'].includes(doc.status) && <>
             <MenuItem icon={ClipboardList} onClick={() => run(() => createWorkOrderFromQuotation(doc.id, tok('work-order')), { saveFirst: true })}>Create work order (and project)</MenuItem>
-            {!doc.project_id && <MenuItem icon={HardHat} onClick={() => run(() => createProjectFromQuotation(doc.id), { saveFirst: true })}>Create project</MenuItem>}</>}
+            {!doc.project_id && <MenuItem icon={ProjectDoc} onClick={() => run(() => createProjectFromQuotation(doc.id), { saveFirst: true })}>Create project</MenuItem>}</>}
           {canStatus && !isCn && <MenuItem icon={Copy} onClick={() => run(() => duplicateSalesDoc(doc.id, tok('duplicate')), { saveFirst: true })}>Duplicate</MenuItem>}
           {payJump && <MenuItem icon={Banknote} href="#payment">Payments: record, mark paid / unpaid…</MenuItem>}
           {payJump && canStatus && !doc.viewed_at && <MenuItem icon={Eye} onClick={() => run(() => markInvoiceViewed(doc.id))}>Mark as viewed (customer confirmed)</MenuItem>}
