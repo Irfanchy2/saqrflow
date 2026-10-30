@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { SalesDocBadge } from '@/components/sales/status-badges'
 import { cn } from '@/lib/utils'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, BookOpen, Clock, FileText, HardHat, Landmark, Mail, MapPin, MessageCircle, Pencil, Phone, Receipt, Target, Trash2, Wallet } from '@/components/icons'
+import { ArrowLeft, BookOpen, Clock, FileText, Landmark, Mail, MapPin, MessageCircle, Pencil, Phone, Receipt, Target, Trash2, Wallet, ProjectDoc } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, EmptyState, LinkButton, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
@@ -55,7 +55,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     ...(sales ?? []).map((s: any) => ({ at: s.created_at, icon: s.doc_type === 'invoice' ? Receipt : FileText, text: `${DOC_META[s.doc_type as SalesType]?.label ?? s.doc_type} ${s.number}: ${statusLabel(s.doc_type, s.status).toLowerCase()}`, href: `/invoices/${s.id}` })),
     ...(pays ?? []).map((p: any) => ({ at: p.created_at, icon: Wallet, text: `Payment received AED ${fmtMoney(p.amount)}${p.invoice ? ` for ${p.invoice.number}` : ' on account'}`, href: p.invoice ? `/invoices/${p.invoice.id}` : undefined })),
     ...(cheques ?? []).map((q: any) => ({ at: q.created_at, icon: Landmark, text: `Cheque #${q.cheque_no} AED ${fmtMoney(q.amount)}: ${q.status}`, href: `/cheques?open=${q.id}` })),
-    ...(projects ?? []).map((p: any) => ({ at: p.created_at, icon: HardHat, text: `Project “${p.name}” created`, href: `/projects/${p.id}` })),
+    ...(projects ?? []).map((p: any) => ({ at: p.created_at, icon: ProjectDoc, text: `Project “${p.name}” created`, href: `/projects/${p.id}` })),
     ...docs.map((d: any) => ({ at: d.created_at, icon: FileText, text: `Document uploaded: ${d.name}`, href: `/documents/${d.id}` })),
   ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 25)
   const when = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { timeZone: c.company.timezone, day: '2-digit', month: 'short', year: 'numeric' })
@@ -114,7 +114,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <Card><CardHeader title="Projects" />
         {!(projects ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No projects.</p> :
           <ul className="divide-y divide-border">{(projects ?? []).map((p: any) => <li key={p.id}><Link href={`/projects/${p.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">
-            <HardHat size={15} className="text-muted" aria-hidden /><span className="min-w-0 flex-1 truncate">{p.name}</span><Badge tone={PROJECT_STATUS[p.status].tone}>{PROJECT_STATUS[p.status].label}</Badge></Link></li>)}</ul>}</Card>
+            <ProjectDoc size={15} className="text-muted" aria-hidden /><span className="min-w-0 flex-1 truncate">{p.name}</span><Badge tone={PROJECT_STATUS[p.status].tone}>{PROJECT_STATUS[p.status].label}</Badge></Link></li>)}</ul>}</Card>
       {fin && <Card><CardHeader title="Cheques" />
         {!(cheques ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No cheques linked.</p> :
           <ul className="divide-y divide-border">{(cheques ?? []).map((q: any) => <li key={q.id}><Link href={`/cheques?open=${q.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">

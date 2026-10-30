@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, CalendarClock, CheckSquare, HardHat, MapPin, Pencil, Phone, Plus, Printer, Trash2, User } from '@/components/icons'
+import { ArrowLeft, CalendarClock, CheckSquare, MapPin, Pencil, Phone, Plus, Printer, Trash2, User, ProjectDoc } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, LinkButton } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
@@ -62,7 +62,7 @@ export default async function SiteVisitPage({ params }: { params: Promise<{ id: 
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit site visit" icon={<Pencil size={14} />}><ActionForm action={updateSiteVisit.bind(null, id)} resetOnSuccess={false}>{visitForm()}</ActionForm></DialogButton>}
         <LinkButton variant="secondary" href={`/print/report/site_visit/${id}`} target="_blank"><Printer size={14} />Visit report</LinkButton>
         {edit && fin && <NewSalesButtons siteVisitId={id} customerId={v.customer_id ?? undefined} projectId={v.project_id ?? undefined} only={['quotation']} variant="secondary" />}
-        {edit && !v.project_id && <ActionButton size="md" action={createProjectFromVisit.bind(null, id)}><HardHat size={14} />Create project</ActionButton>}
+        {edit && !v.project_id && <ActionButton size="md" action={createProjectFromVisit.bind(null, id)}><ProjectDoc size={14} />Create project</ActionButton>}
         {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'site_visit', id)} confirm="Move this site visit to the trash?"><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
       </div>
     </div>

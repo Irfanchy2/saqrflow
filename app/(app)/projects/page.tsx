@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertTriangle, Briefcase, HardHat, MapPin, Plus, Wallet } from '@/components/icons'
+import { AlertTriangle, Briefcase, MapPin, Plus, Wallet, ProjectDoc } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { flat, sanitizeQ } from '@/lib/queries'
 import { Badge, Card, EmptyState, PageHeader, Metrics, StatCard } from '@/components/ui/primitives'
@@ -45,16 +45,16 @@ export default async function Projects({ searchParams }: { searchParams: Promise
     <PageHeader title="Projects" sub="Fabrication & site progress, milestones, costs and billing for every job."
       actions={<><SavedViews page="/projects" />{c.can('records.edit') ? <DialogButton wide openParam="project" label="New project" title="New project" icon={<Plus size={15} />}><ActionForm action={createProject} submit="Create project"><ProjectFields /></ActionForm></DialogButton> : null}</>} />
     <Metrics className="mb-5" cols={4}>
-      <StatCard label="Active projects" value={active.length} hint={`${rows.length} shown`} icon={HardHat} tone="blue" />
+      <StatCard label="Active projects" value={active.length} hint={`${rows.length} shown`} icon={ProjectDoc} tone="blue" />
       {fin && <StatCard label="Active contract value" value={formatAed(active.reduce((s, r) => s + Number(r.contract_value ?? 0), 0))} icon={Briefcase} />}
       {fin && <StatCard label="Outstanding on projects" value={formatAed(rows.reduce((s, r) => s + r.f.outstanding, 0))} icon={Wallet} tone="amber" href="/invoices?tab=receivables" />}
       <StatCard label="Overdue milestones" value={overdueMs} icon={AlertTriangle} tone={overdueMs ? 'red' : 'neutral'} href="/reminders" />
     </Metrics>
     <FilterTabs label="Project status" className="mb-3" tabs={[['open', 'In progress'], ['active', 'Active'], ['on_hold', 'On hold'], ['completed', 'Completed'], ['all', 'All']].map(([k, l]) => ({ href: `/projects?status=${k}${sp.q ? `&q=${encodeURIComponent(sp.q)}` : ''}`, label: l, active: (status ?? 'all') === k }))} />
     <form className="mb-4"><input type="hidden" name="status" value={sp.status ?? 'open'} /><FilterBar search={<input name="q" type="search" defaultValue={sp.q} aria-label="Search projects" placeholder="Search name, code, location…" className={`${cls} h-11 min-w-0 flex-1 sm:h-10`} />} /></form>
-    {!rows.length ? <Card><EmptyState icon={HardHat} title={term ? 'No projects match' : 'No projects yet'} body="Create a project to track its progress, milestones, expenses, drawings, quotations and invoices in one place." /></Card>
+    {!rows.length ? <Card><EmptyState icon={ProjectDoc} title={term ? 'No projects match' : 'No projects yet'} body="Create a project to track its progress, milestones, expenses, drawings, quotations and invoices in one place." /></Card>
       : <><Card className="overflow-hidden sm:hidden"><MList>{rows.map(p => { const pct = Math.round(((p.fabrication_progress ?? 0) + (p.site_progress ?? 0)) / 2), st = PROJECT_STATUS[p.status]
-          return <MRow key={p.id} href={`/projects/${p.id}`} lead={<span className="grid h-14 w-14 place-items-center rounded-xl bg-[linear-gradient(135deg,hsl(var(--sb))_0%,hsl(217_70%_35%)_100%)] text-white" aria-hidden><HardHat size={22} /></span>}
+          return <MRow key={p.id} href={`/projects/${p.id}`} lead={<span className="grid h-14 w-14 place-items-center rounded-xl bg-[linear-gradient(135deg,hsl(var(--sb))_0%,hsl(217_70%_35%)_100%)] text-white" aria-hidden><ProjectDoc size={22} /></span>}
             title={p.name} sub={p.customer?.name ?? p.location ?? p.code ?? 'No customer'}
             line={<span className="flex w-full items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><span className={cn('block h-full rounded-full', pct >= 75 ? 'bg-success' : pct >= 40 ? 'bg-primary' : 'bg-warning')} style={{ width: `${pct}%` }} /></span><span className="w-9 text-end text-xs font-semibold tabular-nums">{pct}%</span></span>}
             right={<Badge tone={st.tone}>{st.label}</Badge>} /> })}</MList></Card>

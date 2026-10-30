@@ -163,3 +163,5 @@ export {
   FloppyDiskIcon as Save,
 } from '@phosphor-icons/react/dist/ssr'
 export type { Icon as LucideIcon, IconWeight } from '@phosphor-icons/react'
+// drawn for Averiqo (not Phosphor): the Projects icon
+export { ProjectIcon as ProjectDoc } from './project-icon'

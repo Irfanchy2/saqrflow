@@ -6,7 +6,7 @@ import { formatAed } from '@/lib/time'
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { LucideIcon } from '@/components/icons'
 import { EmptyArt } from './empty-art'
-import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, CalendarClock, Users, FileText, Truck, Landmark, TrendingUp, BarChart3, Receipt, Clock, CheckCircle2, ShieldCheck, Package, Wrench, MapPinned, ArrowUp, ArrowDown } from '@/components/icons'
+import { Inbox, AlertTriangle, Wallet, Banknote, Target, HardHat, ListTodo, CalendarClock, Users, FileText, Truck, Landmark, TrendingUp, BarChart3, Receipt, Clock, CheckCircle2, ShieldCheck, Package, Wrench, MapPinned, ArrowUp, ArrowDown, ProjectDoc } from '@/components/icons'
 
 /*
  * Averiqo design system primitives.
@@ -95,7 +95,7 @@ const BARS = ['bg-blue-500', 'bg-orange-400', 'bg-emerald-500', 'bg-violet-500',
 const RED_TILE = 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300'
 // a sensible icon from the label when the caller passes none
 const ICON_RULES: [RegExp, LucideIcon][] = [[/overdue|late|expired|risk|blocked/i, AlertTriangle], [/expir|renewal|due/i, CalendarClock], [/collect|paid|payment|received/i, Banknote],
-  [/receivable|outstanding|balance|owed|cost|spend|expense|budget/i, Wallet], [/invoice|sales|revenue|billed|quot/i, Receipt], [/lead|pipeline|opportunit/i, Target], [/project|job/i, HardHat],
+  [/receivable|outstanding|balance|owed|cost|spend|expense|budget/i, Wallet], [/invoice|sales|revenue|billed|quot/i, Receipt], [/lead|pipeline|opportunit/i, Target], [/project/i, ProjectDoc], [/job/i, HardHat],
   [/task|to.?do/i, ListTodo], [/employee|staff|people|user|team|member/i, Users], [/document|file|record|page/i, FileText], [/vehicle|asset|fleet|equipment/i, Truck],
   [/cheque|bank/i, Landmark], [/rate|%|margin|growth|conversion|win/i, TrendingUp], [/hour|time|day|week/i, Clock], [/done|complete|closed|approved|resolved|won/i, CheckCircle2],
   [/compliance|permit|licen|warranty/i, ShieldCheck], [/item|catalog|stock|product/i, Package], [/ticket|service|repair|maint/i, Wrench], [/visit|site|location/i, MapPinned]]
