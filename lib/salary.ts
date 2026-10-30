@@ -124,4 +124,9 @@ export function movements(a: Pick<SalaryAccount, 'ledger' | 'payments'>): Moveme
   }
   return out
 }
+/** The salary statement's default period: from the first movement to the later of the last movement and today. */
+export function statementRange(moves: Movement[], today: string) {
+  const dates = moves.map(m => m.date).sort(), last = dates[dates.length - 1] ?? today
+  return { from: dates[0] ?? today, to: last > today ? last : today }
+}
 export const monthLong = (d: string) => new Date(`${d.slice(0, 7)}-01T00:00:00Z`).toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })

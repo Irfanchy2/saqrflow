@@ -6,27 +6,8 @@ import { Modal } from '@/components/ui/dialog'
 import { Alert, Button, Field, Input, Textarea } from '@/components/ui/primitives'
 import { AlertTriangle, Check, CheckCircle2, Copy, Download, ExternalLink, FileText, Info, Loader2, MessageCircle, Paperclip, Pencil, RefreshCw, Share2, ShieldCheck } from '@/components/icons'
 import { prettyPhone, waChatLink } from '@/lib/whatsapp/share'
+import { canShareFiles, copyText, loadPdf, shareDocumentViaWhatsApp, touchDevice, withParam } from '@/lib/whatsapp/native-share'
 import { cn } from '@/lib/utils'
-
-/** Can this browser hand files to the device's share menu (Android Chrome and the installed app, iPhone Safari, some desktops)?
- *  A wa.me chat link can only carry text, so without this the PDF has to be attached by hand. */
-function canShareFiles(f?: File) {
-  if (typeof navigator === 'undefined' || typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') return false
-  try { return navigator.canShare({ files: [f ?? new File(['%PDF-'], 'check.pdf', { type: 'application/pdf' })] }) } catch { return false }
-}
-const touchDevice = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
-const withParam = (url: string, q: string) => `${url}${url.includes('?') ? '&' : '?'}${q}`
-
-/** The document's own PDF (same endpoint as Download), as a file for the share menu. Refuses anything that is not a real PDF,
- *  such as a sign-in page after the session ended, so a broken file is never handed to WhatsApp. */
-async function loadPdf(url: string, filename: string): Promise<File> {
-  const res = await fetch(withParam(url, 'share=1'), { credentials: 'same-origin', cache: 'no-store' })
-  if (!res.ok) throw new Error(res.status === 403 || res.status === 404 ? 'You do not have access to this document.' : 'The PDF could not be generated.')
-  const blob = await res.blob()
-  const head = new TextDecoder().decode(await blob.slice(0, 5).arrayBuffer())
-  if (!/application\/pdf/i.test(res.headers.get('content-type') ?? '') || head !== '%PDF-') throw new Error('The server did not return a PDF. You may have been signed out.')
-  return new File([blob], /\.pdf$/i.test(filename) ? filename : `${filename}.pdf`, { type: 'application/pdf', lastModified: Date.now() })
-}
 
 /**
  * "Share via WhatsApp" (free, no WhatsApp Business API): shows who it goes to (name, ID and number from their profile), the
@@ -101,25 +82,17 @@ function Sheet({ kind, recordId }: { kind: string; recordId: string }) {
     setNumNote(save ? `Saved to ${prep.party.name}'s profile.` : `Using this number for this share only. ${prep.party.name}'s profile is unchanged.`)
   }
   /** Copies the message. Where the clipboard is blocked, selects it so it can be copied by hand. */
-  const copyMessage = (quiet = false) => {
-    const manual = () => { if (!quiet) { msgRef.current?.focus(); msgRef.current?.select(); setCopied('manual') } }
-    try { const w = navigator.clipboard?.writeText(text); if (!w) { manual(); return } w.then(() => alive.current && setCopied('ok'), manual) } catch { manual() }
+  const copyMessage = () => {
+    copyText(text).then(() => alive.current && setCopied('ok'), () => { msgRef.current?.focus(); msgRef.current?.select(); setCopied('manual') })
   }
   const shareNative = async () => {
     const f = file.current; if (!f) return
     setShareErr(null); setBusy('native')
-    copyMessage(true)                                         // not awaited: waiting here can use up the tap and the browser then refuses to share
-    try {
-      // the PDF only: with text as well, WhatsApp on some phones (iPhone, some Android versions) sends the text and drops the
-      // file. The message is on the clipboard to paste as the caption, and "Open chat" can send it as text.
-      await navigator.share({ files: [f] })
-      log('native_share'); setDone('native')
-    } catch (e) {
-      const n = (e as Error)?.name
-      if (n === 'AbortError') { /* share menu closed without choosing an app */ }
-      else if (n === 'NotAllowedError') setShareErr('The browser blocked the share menu. Tap "Share PDF" again.')
-      else setShareErr('This device could not share the PDF file. Use "Download PDF" and attach it in WhatsApp with the paperclip.')
-    } finally { setBusy(null) }
+    const r = await shareDocumentViaWhatsApp({ file: f, message: text })   // the PDF only; the message goes on the clipboard
+    setBusy(null)
+    if (r === 'shared') { log('native_share'); setDone('native') }
+    else if (r === 'blocked') setShareErr('The browser blocked the share menu. Tap "Share PDF" again.')
+    else if (r === 'failed') setShareErr('This device could not share the PDF file. Use "Download PDF" and attach it in WhatsApp with the paperclip.')
   }
   const download = () => { const a = document.createElement('a'); a.href = prep.pdfUrl; a.download = prep.filename; document.body.appendChild(a); a.click(); a.remove() }
   const canNative = fileState === 'checking' || fileState === 'ready'
@@ -176,7 +149,7 @@ function Sheet({ kind, recordId }: { kind: string; recordId: string }) {
     <div className="flex flex-col gap-1.5">
       <Field label="Message"><Textarea ref={msgRef} value={text} onChange={e => { setText(e.target.value); setCopied(null) }} rows={7} maxLength={1000} className="text-[14px] leading-relaxed" data-share-message /></Field>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" variant="ghost" onClick={() => copyMessage()} data-share-copy>{copied === 'ok' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}{copied === 'ok' ? 'Message copied' : 'Copy message'}</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={copyMessage} data-share-copy>{copied === 'ok' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}{copied === 'ok' ? 'Message copied' : 'Copy message'}</Button>
         {copied === 'manual' && <span className="text-[12px] text-muted" role="status">Copying is blocked here: the message is selected, copy it with your keyboard or long-press.</span>}
       </div>
     </div>

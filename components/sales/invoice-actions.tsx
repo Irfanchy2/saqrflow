@@ -9,6 +9,7 @@ import { ActionForm } from '@/components/ui/action-form'
 import { Modal, useDialog } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/toast'
 import { WhatsAppSend } from '@/components/whatsapp/send'
+import { ShareModal, ShareSheet } from '@/components/whatsapp/share-sheet'
 import { markInvoiceUnpaid, markInvoiceViewed, recordPayment, setSalesStatus } from '@/app/actions/sales'
 import { balanceOf, paymentActions } from '@/lib/sales/status'
 import { fmtMoney } from '@/lib/sales/money'
@@ -117,7 +118,7 @@ export function InvoicePaymentActions({ inv, today, cheques, canEdit, canDelete,
  */
 export function InvoiceRowActions({ inv, today, canEdit, canDelete, inline }: { inv: InvoiceMoney; today: string; canEdit: boolean; canDelete?: boolean; inline?: boolean }) {
   const [mode, setMode] = useState<Mode | null>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false), [share, setShare] = useState<null | 'invoice' | 'payment_reminder'>(null)
   const wa = useRef<() => void>(() => {})
   const ref = useRef<HTMLDivElement>(null)
   const a = paymentActions(inv), issued = inv.status !== 'draft' && inv.status !== 'cancelled'
@@ -135,6 +136,7 @@ export function InvoiceRowActions({ inv, today, canEdit, canDelete, inline }: { 
       : <button role="menuitem" type="button" className={cn(item, danger && 'text-danger')} onClick={onClick}><Icon size={15} aria-hidden />{children}</button>
   return <div ref={ref} className="relative inline-flex items-center gap-1" data-row-stop data-row-actions>
     {inline && canEdit && a.record && <Button size="sm" variant="secondary" onClick={() => setMode('record')} aria-label={`Record payment for ${inv.number}`} title="Record payment"><Banknote size={14} /><span className="hidden 2xl:inline">Record payment</span></Button>}
+    {inline && inv.status !== 'cancelled' && <ShareSheet kind="invoice" recordId={inv.id} variant="ghost" iconOnly label={`Share tax invoice ${inv.number} via WhatsApp`} />}
     <button type="button" aria-label={`Actions for ${inv.number}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}
       className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg active:scale-95 sm:h-8 sm:w-8"><MoreHorizontal size={18} /></button>
     {open && <div role="menu" aria-label={`Actions for ${inv.number}`} className="toast-in absolute end-0 top-full z-30 mt-1 max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-surface p-1 text-fg shadow-pop">
@@ -143,7 +145,9 @@ export function InvoiceRowActions({ inv, today, canEdit, canDelete, inline }: { 
       {canEdit && a.markPaid && <Item icon={CheckCircle2} onClick={() => pick('full')}>Mark as paid</Item>}
       {canEdit && ['draft', 'sent', 'overdue'].includes(inv.status) && inv.paid === 0 && <Item icon={PenLine} href={`/invoices/${inv.id}`}>Edit</Item>}
       <Item icon={Download} href={`/api/sales/${inv.id}/pdf`} external>Download PDF</Item>
-      {canEdit && <Item icon={MessageCircle} onClick={() => { setOpen(false); wa.current() }}>Send via WhatsApp</Item>}
+      {inv.status !== 'cancelled' && <Item icon={MessageCircle} onClick={() => { setOpen(false); setShare('invoice') }}>Share via WhatsApp</Item>}
+      {issued && balanceOf(inv) > 0.005 && <Item icon={MessageCircle} onClick={() => { setOpen(false); setShare('payment_reminder') }}>Share payment reminder</Item>}
+      {canEdit && <Item icon={MessageCircle} onClick={() => { setOpen(false); wa.current() }}>Send with WhatsApp Business</Item>}
       <div className="my-1 border-t border-border" role="separator" />
       <div className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">More actions</div>
       <Item icon={Printer} onClick={() => { setOpen(false); window.open(`/print/sales/${inv.id}?auto=1`, '_blank') }}>Print</Item>
@@ -153,6 +157,7 @@ export function InvoiceRowActions({ inv, today, canEdit, canDelete, inline }: { 
       {canEdit && a.cancel && <Item icon={Ban} danger onClick={() => pick('cancel')}>Cancel invoice</Item>}
     </div>}
     {canEdit && <WhatsAppSend kind="invoice" recordId={inv.id} trigger={o => { wa.current = o; return null }} />}
+    {share && <ShareModal kind={share} recordId={inv.id} onClose={() => setShare(null)} />}
     {mode && <InvoiceDialog inv={inv} mode={mode} onClose={() => setMode(null)} today={today} canDelete={canDelete} />}
   </div>
 }

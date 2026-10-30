@@ -1,4 +1,5 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
+import { ShareSheet } from '@/components/whatsapp/share-sheet'
 import { WhatsAppHistory } from '@/components/whatsapp/history'
 import Link from 'next/link'
 import { SalesDocBadge } from '@/components/sales/status-badges'
@@ -77,7 +78,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           {cu.notes && <p className="mt-2 max-w-3xl whitespace-pre-line text-sm text-muted">{cu.notes}</p>}</div></div>
       <div className="flex flex-wrap gap-2">
         {fin && <LinkButton href={`/parties/${id}/ledger`} variant="secondary"><BookOpen size={14} />Ledger & statement</LinkButton>}
-        {fin && edit && <WhatsAppSend kind="statement" recordId={id} label="Send statement" size="md" />}
+        {fin && <ShareSheet kind="customer_statement" recordId={id} label="Share statement" size="md" />}
+        {fin && edit && <WhatsAppSend kind="statement" recordId={id} label="Business" ariaLabel="Send statement with WhatsApp Business" size="md" />}
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit client" icon={<Pencil size={14} />}><ActionForm action={updateParty.bind(null, 'customers', id)} resetOnSuccess={false}><PartyFields p={cu} fin={fin} /></ActionForm></DialogButton>}
         {edit && fin && <NewSalesButtons customerId={id} only={['quotation', 'invoice']} />}
         {c.can('records.delete') && <ActionButton variant="ghost" size="md" action={trashRecord.bind(null, 'customer', id)} confirm={`Move “${cu.name}” to the trash? Their documents and invoices are kept; an admin can restore the customer from Settings → Trash.`}><Trash2 size={14} /><span className="max-sm:sr-only">Delete</span></ActionButton>}
@@ -108,7 +110,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             : <div className="flex gap-3 px-4 py-2.5"><e.icon size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden /><span className="min-w-0 flex-1">{e.text}<span className="block text-xs text-muted">{when(e.at)}</span></span></div>}</li>)}</ol>}</Card>
       {fin && <Card><CardHeader title="Payments" action={<Link href={`/parties/${id}/ledger`} className="-my-2 inline-flex min-h-10 items-center text-[13px] font-medium text-primary hover:underline">Ledger</Link>} />
         {!(pays ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No payments yet.</p> :
-          <ul className="divide-y divide-border text-sm">{(pays ?? []).slice(0, 10).map((p: any) => <li key={p.id} className="flex items-center gap-3 px-4 py-2.5"><span className="tabular-nums text-xs text-muted">{showDate(p.paid_on)}</span><span className="min-w-0 flex-1 truncate">{p.invoice?.number ?? 'On account'}{p.reference ? ` · ${p.reference}` : ''}</span><span className="font-medium tabular-nums text-success">{fmtMoney(p.amount)}</span></li>)}</ul>}</Card>}
+          <ul className="divide-y divide-border text-sm">{(pays ?? []).slice(0, 10).map((p: any) => <li key={p.id} className="flex items-center gap-3 px-4 py-2.5"><span className="tabular-nums text-xs text-muted">{showDate(p.paid_on)}</span><span className="min-w-0 flex-1 truncate">{p.invoice?.number ?? 'On account'}{p.reference ? ` · ${p.reference}` : ''}</span><span className="font-medium tabular-nums text-success">{fmtMoney(p.amount)}</span><ShareSheet kind="customer_receipt" recordId={p.id} variant="ghost" iconOnly label={`Share the ${showDate(p.paid_on)} payment receipt via WhatsApp`} /></li>)}</ul>}</Card>}
       <Card><CardHeader title="Projects" />
         {!(projects ?? []).length ? <p className="px-4 py-5 text-sm text-muted">No projects.</p> :
           <ul className="divide-y divide-border">{(projects ?? []).map((p: any) => <li key={p.id}><Link href={`/projects/${p.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">

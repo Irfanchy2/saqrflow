@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { SHARE, SHARE_KINDS, fillShare, prettyPhone, shareBodyProblems, waChatLink } from '@/lib/whatsapp/share'
+import { SHARE, SHARE_KINDS, fillShare, prettyPhone, shareBodyProblems, sharePerms, waChatLink } from '@/lib/whatsapp/share'
 import { employeeMayUse } from '@/lib/portal-paths'
 import { toE164 } from '@/lib/phone'
 
 describe('free WhatsApp sharing messages', () => {
   it('has a default message for every document type, using only its own placeholders', () => {
-    expect(SHARE_KINDS).toEqual(['payslip', 'salary_receipt', 'quotation', 'invoice', 'delivery_note', 'payment_reminder'])
+    expect(SHARE_KINDS).toEqual(['payslip', 'salary_receipt', 'salary_statement', 'quotation', 'invoice', 'delivery_note', 'payment_reminder', 'customer_receipt', 'customer_statement', 'employee_document'])
     for (const k of SHARE_KINDS) expect(shareBodyProblems(k, SHARE[k].body)).toEqual([])
   })
   it('fills the payslip message without any salary amount', () => {
@@ -22,6 +22,17 @@ describe('free WhatsApp sharing messages', () => {
     expect(shareBodyProblems('payslip', 'Dear {employee}, you are owed {balance}. {company}')[0]).toMatch(/\{balance\} is not available/)
     expect(shareBodyProblems('payslip', 'Hi')).toContain('The message is too short.')
     expect(shareBodyProblems('invoice', 'x'.repeat(1001))).toContain('Keep the message under 1,000 characters.')
+  })
+  it('each document type is shared only with the access its data needs', () => {
+    expect(sharePerms('payslip')).toEqual(['salary.view']); expect(sharePerms('salary_statement')).toEqual(['salary.view'])
+    expect(sharePerms('customer_receipt')).toEqual(['finance.view']); expect(sharePerms('customer_statement')).toEqual(['finance.view'])
+    expect(sharePerms('employee_document')).toEqual(['documents.view', 'employees.view_sensitive'])
+    for (const k of SHARE_KINDS) expect(SHARE[k].party).toBe(['payslip', 'salary_receipt', 'salary_statement', 'employee_document'].includes(k) ? 'employee' : 'customer')
+  })
+  it('the salary statement and employee document messages carry no salary amounts', () => {
+    const st = fillShare('salary_statement', SHARE.salary_statement.body, { employee: 'Ali Hassan', from: '1 Oct 2026', to: '29 Oct 2026', company: 'Al Saqr' })
+    expect(st).toContain('salary statement from 1 Oct 2026 to 29 Oct 2026'); expect(st).not.toMatch(/AED|\d[\d,]*\.\d{2}/)
+    expect(fillShare('customer_receipt', SHARE.customer_receipt.body, { customer: 'Gulf Horizon', amount: 'AED 2,500.00', date: '29 Oct 2026', reference: 'INV-1', company: 'Al Saqr' })).toContain('payment of AED 2,500.00 received on 29 Oct 2026 (INV-1)')
   })
   it('masks long digit runs in values (IDs, account numbers)', () => {
     expect(fillShare('payslip', 'Dear {employee} {company}', { employee: 'Ref 784199012345678', company: 'X' })).toContain('•••••••••••5678')

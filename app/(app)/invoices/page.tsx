@@ -1,4 +1,5 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
+import { ShareSheet } from '@/components/whatsapp/share-sheet'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, ScrollText, Target, Truck, Wallet } from '@/components/icons'
@@ -87,6 +88,7 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
   const paidOf = new Map((bals ?? []).map(b => [b.id, Number(b.paid) + Number(b.credited ?? 0)]))
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   const isInv = t === 'invoice'
+  const share = t === 'quotation' || t === 'invoice' || t === 'delivery_note'   // free "Share via WhatsApp" with the PDF
   return <Card>
     <FilterTabs label="Status" className="px-2 sm:hidden" tabs={[{ href: `/invoices?tab=${t}`, label: 'All', active: !sp.status }, ...meta.statuses.filter(x => x !== 'cancelled').slice(0, 4).map(x => ({ href: `/invoices?tab=${t}&status=${x}`, label: statusLabel(t, x), active: sp.status === x }))]} />
     <form className="border-b border-border p-3"><input type="hidden" name="tab" value={t} />
@@ -104,7 +106,7 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
             title={r.number} sub={r.customer_name ?? r.subject ?? '—'}
             line={meta.priced ? <><Money value={r.total} className="text-[15px] font-semibold tracking-[-0.01em]" />{isInv && bal > 0.005 && !['draft', 'cancelled', 'paid'].includes(r.status) && <span className="whitespace-nowrap text-[12.5px] font-medium tabular-nums text-warning">{fmtMoney(bal)} due</span>}</> : undefined}
             right={<Badge tone={tone}>{statusLabel(t, r.status)}</Badge>} rightSub={formatShortDate(r.issue_date)} /> })}</MList>
-        <div className="hidden sm:block"><TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Customer</Th><Th>Subject / project</Th><Th>Date</Th>{t !== 'delivery_note' && <Th>{isInv ? 'Due' : 'Valid until'}</Th>}{meta.priced && <Th className="text-right">Total (AED)</Th>}{isInv && <Th className="text-right">Balance</Th>}<Th>Status</Th></tr></thead>
+        <div className="hidden sm:block"><TableWrap><thead className="bg-surface-2/50"><tr><Th>No.</Th><Th>Customer</Th><Th>Subject / project</Th><Th>Date</Th>{t !== 'delivery_note' && <Th>{isInv ? 'Due' : 'Valid until'}</Th>}{meta.priced && <Th className="text-right">Total (AED)</Th>}{isInv && <Th className="text-right">Balance</Th>}<Th>Status</Th>{share && <Th><span className="sr-only">Share</span></Th>}</tr></thead>
         <tbody className="divide-y divide-border">{data.map((r: any) => {
           const bal = Number(r.total) - (paidOf.get(r.id) ?? 0)
           return <tr key={r.id} className="hover:bg-surface-2/50">
@@ -115,7 +117,8 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
             {t !== 'delivery_note' && <Td className={cn('whitespace-nowrap tabular-nums', isInv && r.status === 'overdue' && 'font-medium text-danger')}>{(isInv ? r.due_date : r.valid_until) ?? '—'}</Td>}
             {meta.priced && <Td className="text-right tabular-nums">{fmtMoney(r.total)}</Td>}
             {isInv && <Td className={cn('text-right tabular-nums', bal > 0 && !['draft', 'cancelled'].includes(r.status) ? 'font-medium' : 'text-muted')}>{['draft', 'cancelled'].includes(r.status) ? '—' : fmtMoney(bal)}</Td>}
-            <Td badge><Badge tone={STATUS_TONE[r.status]}>{statusLabel(t, r.status)}</Badge></Td></tr>
+            <Td badge><Badge tone={STATUS_TONE[r.status]}>{statusLabel(t, r.status)}</Badge></Td>
+            {share && <Td className="w-px text-right">{r.status !== 'cancelled' && <ShareSheet kind={t} recordId={r.id} variant="ghost" iconOnly label={`Share ${meta.label.toLowerCase()} ${r.number} via WhatsApp`} />}</Td>}</tr>
         })}</tbody></TableWrap></div></>}
     {edit && t !== 'credit_note' && <NewDocFab type={t} label={`Quick create: ${meta.label.toLowerCase()}`} />}
     <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/invoices" />
@@ -139,14 +142,14 @@ async function PaymentsTab({ sp }: { sp: Record<string, string | undefined> }) {
   const page = pageOf(sp.page), edit = c.can('records.edit')
   const { data, count } = await c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name),customer:customers(id,name),project:projects(id,name)', { count: 'exact' }).order('paid_on', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
   return <Card>{!data?.length ? <EmptyState icon={Banknote} title="No payments yet" body="Open an issued tax invoice and use “Record payment”. Partial payments update the balance and status automatically." />
-    : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Invoice</Th><Th>Customer</Th><Th>Method</Th><Th>Reference</Th><Th className="text-right">Amount (AED)</Th>{edit && <Th><span className="sr-only">Send receipt</span></Th>}</tr></thead>
+    : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Invoice</Th><Th>Customer</Th><Th>Method</Th><Th>Reference</Th><Th className="text-right">Amount (AED)</Th><Th><span className="sr-only">Share receipt</span></Th></tr></thead>
       <tbody className="divide-y divide-border">{data.map((p: any) => <tr key={p.id} className="hover:bg-surface-2/50">
         <Td className="tabular-nums">{showDate(p.paid_on)}</Td>
         <Td>{p.invoice ? <Link href={`/invoices/${p.invoice.id}`} className="font-mono text-[13px] text-primary hover:underline">{p.invoice.number}</Link>
           : <span className="text-xs text-muted">{p.project ? <>Project advance · <Link href={`/projects/${p.project.id}?tab=finance`} className="text-primary hover:underline">{p.project.name}</Link></> : 'On account (not applied)'}</span>}</Td>
         <Td className="max-w-[220px] truncate">{p.invoice?.customer_name ?? (p.customer ? <Link href={`/parties/${p.customer.id}`} className="hover:text-primary hover:underline">{p.customer.name}</Link> : '—')}</Td><Td>{METHOD[p.method] ?? p.method ?? '—'}</Td><Td className="text-muted">{p.reference ?? '—'}</Td>
         <Td className="text-right font-medium tabular-nums text-success">{fmtMoney(p.amount)}</Td>
-        {edit && <Td className="text-right"><WhatsAppSend kind="receipt" recordId={p.id} label="Receipt" ariaLabel="Send payment receipt via WhatsApp" variant="ghost" /></Td>}</tr>)}</tbody></TableWrap>}
+        <Td className="whitespace-nowrap text-right"><ShareSheet kind="customer_receipt" recordId={p.id} variant="ghost" iconOnly label={`Share the ${showDate(p.paid_on)} payment receipt via WhatsApp`} />{edit && <WhatsAppSend kind="receipt" recordId={p.id} label="Business" ariaLabel="Send payment receipt via WhatsApp" variant="ghost" />}</Td></tr>)}</tbody></TableWrap>}
     <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/invoices" /></Card>
 }
 

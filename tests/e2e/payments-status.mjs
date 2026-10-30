@@ -128,7 +128,7 @@ try {
   await p.goto(`${BASE}/invoices?tab=invoice`); await settle()
   await p.getByRole('button', { name: /^Actions for / }).first().click()
   const items = await p.getByRole('menuitem').allInnerTexts()
-  ok(['Open', 'Record payment', 'Mark as paid', 'Download PDF', 'Send via WhatsApp', 'Print', 'Mark as partially paid'].every(x => items.includes(x)), `quick actions: ${items.join(' · ')}`)
+  ok(['Open', 'Record payment', 'Mark as paid', 'Download PDF', 'Share via WhatsApp', 'Send with WhatsApp Business', 'Print', 'Mark as partially paid'].every(x => items.includes(x)), `quick actions: ${items.join(' · ')}`)
   await p.getByRole('menuitem', { name: 'Record payment' }).click()
   await dlg().getByLabel('Amount (AED) *').fill('1000'); await dlg().getByLabel('Payment method *').selectOption('cash'); await dlg().getByRole('button', { name: 'Save payment' }).click(); await settle(1200)
   ok(await p.locator('tr[data-invoice-row]').first().locator('[data-pay-status="overdue"]').count() === 1 && (await p.locator('tr[data-invoice-row]').first().innerText()).includes('1,000.00'), 'payment recorded from the list; still overdue (balance left)')

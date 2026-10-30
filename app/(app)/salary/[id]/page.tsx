@@ -176,7 +176,8 @@ export default async function SalaryAccountPage({ params, searchParams }: { para
 
     <Card className="mt-5" id="statement" data-statement><CardHeader title="Statement" sub="Opening balance, salary, payments, adjustments and deductions, with the balance after each." action={<div className="flex gap-1">
       <LinkButton size="sm" variant="ghost" target="_blank" href={`/api/salary-statements/${id}?from=${from}&to=${to}&view=1`}><Printer size={14} aria-hidden />Print</LinkButton>
-      <LinkButton size="sm" variant="secondary" href={`/api/salary-statements/${id}?from=${from}&to=${to}`}><Download size={14} aria-hidden />PDF</LinkButton></div>} />
+      <LinkButton size="sm" variant="secondary" href={`/api/salary-statements/${id}?from=${from}&to=${to}`}><Download size={14} aria-hidden />PDF</LinkButton>
+      <ShareSheet kind="salary_statement" recordId={id} variant="ghost" label="Share" /></div>} />
       <form className="flex flex-wrap items-end gap-2 px-5 pb-3" action={`/salary/${id}#statement`}>
         <Field label="From"><Input name="from" type="date" defaultValue={from} /></Field><Field label="To"><Input name="to" type="date" defaultValue={to} /></Field>
         <button className="h-10 cursor-pointer rounded-full border border-border bg-surface px-4 text-[13px] font-medium shadow-key hover:bg-surface-2">Show</button></form>

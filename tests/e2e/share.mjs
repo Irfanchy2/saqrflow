@@ -142,9 +142,9 @@ try {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.__copied = t } } })
   }
   const phoneCtx = async files => { const c = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: ANDROID, acceptDownloads: true, storageState: await ctx.storageState() }); await c.addInitScript(spyOpen); await c.addInitScript(mockShare, { files }); return c }
-  const mctx = await phoneCtx(true), m = watch(await mctx.newPage())
+  const mctx = await phoneCtx(true), m = watch(await mctx.newPage()), mPage = m
   const fileReady = page => page.waitForFunction(() => document.querySelector('dialog[open] [data-share-sheet]')?.getAttribute('data-share-file') === 'ready', null, { timeout: 20000 })
-  const phoneShare = async (open, what) => {
+  const phoneShare = async (open, what, m = mPage) => {
     await m.evaluate(() => { window.__shared = null; window.__copied = null })
     await open(); await sheet(m).waitFor(); await fileReady(m)
     const how = await sheet(m).locator('[data-share-how]').innerText(), msg = await sheet(m).locator('[data-share-message]').inputValue(), to = await sheet(m).locator('[data-share-phone]').innerText()
@@ -152,7 +152,7 @@ try {
     const sh = await m.evaluate(() => window.__shared), done = await sheet(m).locator('[data-share-done]').innerText(), copied = await m.evaluate(() => window.__copied)
     const text = sh.b64 ? pdfToText(Buffer.from(sh.b64, 'base64')) : ''
     ok(how.includes('The PDF goes into WhatsApp as a file') && sheet(m).locator('[data-share-native]') && (await sheet(m).locator('[data-share-native]').innerText()).includes('Share PDF to WhatsApp'), `${what}: "Share PDF to WhatsApp" is the main action, with how it works`)
-    ok(sh.count === 1 && sh.type === 'application/pdf' && sh.head === '%PDF-' && sh.size > 1000, `${what}: one real PDF file handed to the share menu (${sh.name}, ${sh.size} bytes, ${sh.type})`)
+    ok(sh.count === 1 && sh.type === 'application/pdf' && sh.head === '%PDF-' && sh.size > 150, `${what}: one real PDF file handed to the share menu (${sh.name}, ${sh.size} bytes, ${sh.type})`)
     ok(sh.keys.join() === 'files', `${what}: only the file is shared (no text that makes WhatsApp drop the PDF)`)
     ok(copied === msg && done.includes('The PDF was passed to the share menu') && done.includes('paste the message'), `${what}: the message is copied to paste as the caption, and the sheet says so`)
     return { sh, text, to, msg }
@@ -199,6 +199,71 @@ try {
   await sheet(f).locator('[data-share-retry]').click(); await fileReady(f)
   ok(await sheet(f).locator('[data-share-native]').isEnabled(), '"Try again" fetches the real PDF and the share button is ready')
   await fctx.close()
+
+  console.log('\n[8b] More documents: salary statement, customer receipt, customer statement, employee PDF; list and toolbar entry points')
+  const pay1 = (await one(`insert into payments(company_id,invoice_id,customer_id,amount,paid_on,method,reference) values ($1,$2,$3,2500,$4,'bank_transfer','TT-77') returning id`, [co, inv, cust, today])).id
+  // desktop: open the sheet, check it, download what it names, return the file's text
+  const deskShare = async (open, what, { name, fname, msgHas, docHas }) => {
+    await open(); await sheet().waitFor(); await settle(p, 500)
+    const st = await sheet().innerText(), mg = await sheet().locator('[data-share-message]').inputValue(), to = await sheet().locator('[data-share-phone]').innerText().catch(() => '')
+    ok(st.includes(name) && (typeof fname === 'string' ? st.includes(fname) : fname.test(st)) && mg.includes(msgHas) && (await sheet().locator('[data-share-how]').innerText()).includes('cannot attach the PDF to WhatsApp automatically'), `${what}: recipient ${name} (${to}), its file name and message, manual-attach instruction`)
+    const [d] = await Promise.all([p.waitForEvent('download'), sheet().locator('[data-share-open]').click()])
+    const buf = fs.readFileSync(await d.path()), txt = buf.subarray(0, 5).toString() === '%PDF-' ? `${(() => { try { return pdfToText(buf) } catch { return '' } })()}\n${buf.toString('latin1')}` : ''
+    ok((typeof fname === 'string' ? d.suggestedFilename() === fname : fname.test(d.suggestedFilename())) && st.includes(d.suggestedFilename()) && docHas.every(x => txt.toLowerCase().includes(x.toLowerCase())) && (await p.evaluate(() => window.__opened.at(-1))).startsWith('https://wa.me/'), `${what}: ${d.suggestedFilename()} downloaded (the right document) and the chat opened`)
+    await p.keyboard.press('Escape'); await p.waitForTimeout(300)
+  }
+  await p.goto(`${BASE}/salary/${ali}`); await settle()
+  await deskShare(() => p.locator('[data-statement]').getByRole('button', { name: 'Share' }).click(), 'salary statement',
+    { name: 'Ali Hassan', fname: /Salary_statement_Ali-Hassan_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.pdf/, msgHas: 'Please find attached your salary statement from', docHas: ['Salary statement', 'Ali Hassan', 'W-01'] })
+  await p.goto(`${BASE}/invoices?tab=payments`); await settle()
+  await deskShare(() => p.locator('[data-share=customer_receipt]').first().click(), 'customer payment receipt (payments list)',
+    { name: 'Gulf Horizon Interiors', fname: `Receipt_Gulf-Horizon-Interiors_${today}.pdf`, msgHas: 'Thank you for your payment of AED 2,500.00', docHas: ['2,500.00', 'Gulf Horizon Interiors', 'INV-SH1/2026'] })
+  ok(await p.getByRole('button', { name: 'Send payment receipt via WhatsApp' }).first().isVisible(), 'payments list: WhatsApp Business receipt button kept, labelled separately')
+  await p.goto(`${BASE}/invoices/${inv}`); await settle(p, 900)
+  ok(await p.locator('[data-payment-panel] [data-share=customer_receipt]').count() === 1, 'invoice page: each recorded payment can share its receipt')
+  ok(await p.locator('[data-share-toolbar]').isVisible() && (await p.getByRole('button', { name: 'Send tax invoice via WhatsApp' }).first().innerText()).includes('Business'), 'editor toolbar: "Share" (free, with PDF) and the WhatsApp Business button labelled "Business"')
+  await p.locator('[data-share-toolbar]').click(); await sheet().waitFor()
+  ok((await sheet().innerText()).includes('Tax invoice INV-SH1/2026'), 'toolbar "Share" opens the sheet for this invoice'); await p.keyboard.press('Escape')
+  await p.goto(`${BASE}/parties/${cust}`); await settle()
+  await deskShare(() => p.getByRole('button', { name: 'Share statement' }).click(), 'customer statement',
+    { name: 'Gulf Horizon Interiors', fname: `Statement_Gulf-Horizon-Interiors_${today}.pdf`, msgHas: 'statement of account as of', docHas: ['Gulf Horizon Interiors', 'INV-SH1/2026'] })
+  ok(await p.getByRole('button', { name: 'Send statement with WhatsApp Business' }).isVisible(), 'customer page: WhatsApp Business statement kept, labelled "Business"')
+  for (const [tab, num] of [['quotation', 'AS-SH1/2026'], ['invoice', 'INV-SH1/2026'], ['delivery_note', 'DN-SH1/2026']]) {
+    await p.goto(`${BASE}/invoices?tab=${tab}`); await settle()
+    await p.getByRole('button', { name: new RegExp(`Share .* ${num.replace('/', '\\/')} via WhatsApp`) }).click(); await sheet().waitFor()
+    ok((await sheet().innerText()).includes(num) && (await sheet().locator('[data-share-phone]').innerText()) === '+971 50 999 8877', `${tab} list: the row's share button opens ${num} for the customer`); await p.keyboard.press('Escape'); await p.waitForTimeout(300)
+  }
+  // employee file: a PDF can be shared with the employee; an image cannot (it is downloaded instead)
+  const mini = t => Buffer.from(`%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 100]>>endobj\ntrailer<</Root 1 0 R>>\n%% ${t}\n%%EOF`)
+  const addDoc = async (name, file) => {
+    await p.goto(`${BASE}/employees/${ali}?tab=documents`); await settle()
+    await p.getByRole('button', { name: 'Add' }).first().click(); const dg = p.locator('dialog[open]')
+    await dg.getByLabel('Document name *').fill(name); await dg.getByLabel('Category *').selectOption({ index: 1 }); await dg.locator('input[type=file]').setInputFiles(file)
+    await dg.getByRole('button', { name: 'Save document' }).click(); await settle(p, 1500)
+  }
+  await addDoc('Labour contract Ali', { name: 'labour-contract-ali.pdf', mimeType: 'application/pdf', buffer: mini('contract-ali') })
+  await addDoc('Photo Ali', { name: 'photo-ali.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64') })
+  const docPdf = (await one(`select id from documents where name='Labour contract Ali'`)).id
+  ok(await p.locator('[data-share=employee_document]').count() === 1, "employee file: only the PDF has a share button (the image does not)")
+  await deskShare(() => p.locator('[data-share=employee_document]').click(), 'employee document', { name: 'Ali Hassan', fname: 'labour-contract-ali.pdf', msgHas: 'Please find attached your document', docHas: ['contract-ali'] })
+  ok((await one(`select count(*)::int n from document_shares where doc_kind='employee_document' and record_id=$1`, [docPdf])).n === 1, 'employee document share logged')
+  // phone: the same four documents go to the share menu as real PDF files
+  const m2ctx = await phoneCtx(true), m2 = watch(await m2ctx.newPage())
+  await m2.goto(`${BASE}/salary/${ali}`); await settle(m2)
+  let r = await phoneShare(() => m2.locator('[data-statement]').getByRole('button', { name: 'Share' }).click(), 'phone: salary statement', m2)
+  ok(/^Salary_statement_Ali-Hassan_/.test(r.sh.name) && /salary statement/i.test(r.text) && r.text.includes('Ali Hassan'), `phone: the salary statement PDF itself (${r.sh.name})`); await m2.keyboard.press('Escape')
+  await m2.goto(`${BASE}/parties/${cust}`); await settle(m2)
+  r = await phoneShare(() => m2.locator('[data-share=customer_receipt]').first().click(), 'phone: customer receipt', m2)
+  ok(r.sh.name === `Receipt_Gulf-Horizon-Interiors_${today}.pdf` && r.text.includes('2,500.00') && r.to === '+971 50 999 8877', `phone: the payment receipt PDF for Gulf Horizon Interiors (${r.sh.name})`); await m2.keyboard.press('Escape'); await m2.waitForTimeout(300)
+  r = await phoneShare(() => m2.getByRole('button', { name: 'Share statement' }).click(), 'phone: customer statement', m2)
+  ok(r.sh.name === `Statement_Gulf-Horizon-Interiors_${today}.pdf` && r.text.includes('INV-SH1/2026'), `phone: the statement of account PDF (${r.sh.name})`); await m2.keyboard.press('Escape')
+  await m2.goto(`${BASE}/employees/${ali}?tab=documents`); await settle(m2)
+  r = await phoneShare(() => m2.locator('[data-share=employee_document]').click(), 'phone: employee document', m2)
+  ok(r.sh.name === 'labour-contract-ali.pdf' && Buffer.from(r.sh.b64, 'base64').toString('latin1').includes('contract-ali') && r.to === '+971 50 111 2222', 'phone: the employee\'s own PDF file, for Ali'); await m2.keyboard.press('Escape')
+  await m2ctx.close()
+  const anon2 = await browser.newContext()
+  const ar2 = await anon2.request.get(`${BASE}/api/payment-receipts/${pay1}`, { maxRedirects: 0 })
+  ok(ar2.status() !== 200 && !(ar2.headers()['content-type'] ?? '').includes('pdf'), `not signed in: no payment receipt (${ar2.status()})`); await anon2.close()
 
   console.log('\n[9] Balances unchanged by sharing')
   ok(await owed(ali) === before.owed && (await one(`select count(*)::int n from salary_payments where company_id=$1`, [co])).n === before.pays && (await one(`select count(*)::int n from salary_ledger where company_id=$1`, [co])).n === before.acc, 'nothing posted, paid or changed by sharing')
