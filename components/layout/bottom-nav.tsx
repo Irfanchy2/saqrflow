@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { ICONS, type NavItem } from '@/components/layout/sidebar'
+import { ICONS, NavDot, type NavItem } from '@/components/layout/sidebar'
 import { TabIcon, hasTabIcon } from '@/components/layout/tab-icons'
 import { gsapNow, preloadGsap } from '@/lib/gsap-pop'
 
@@ -27,6 +27,7 @@ export function BottomNav({ items }: { items: NavItem[] }) {
   const here = items.find(i => !i.tab && i.key !== 'overview' && on(i.href))
   const list = here && !base.some(b => on(b.href)) ? [base[0], here, ...base.slice(1)].slice(0, 4) : base.slice(0, 4)
   const active = want ?? list.find(i => on(i.href))?.key ?? null
+  const hidden = items.filter(i => i.alert && !list.some(l => l.key === i.key)).reduce((s, i) => s + (i.alert ?? 0), 0)   // waiting behind "More"
 
   const bar = useRef<HTMLElement>(null), lamp = useRef<HTMLSpanElement>(null), first = useRef(true)
   useLayoutEffect(() => {
@@ -60,9 +61,9 @@ export function BottomNav({ items }: { items: NavItem[] }) {
     {list.map(i => { const lit = active === i.key
       return <Link key={i.key} href={i.href} prefetch data-tab={i.key} aria-current={on(i.href) ? 'page' : undefined} onClick={() => setWant(i.key)}
         className={cn(cell, lit ? 'text-white' : 'text-[hsl(220_10%_66%)] active:text-white')}>
-        {icon(i.key, lit)}
+        <span className="relative">{icon(i.key, lit)}<NavDot n={i.alert} className="absolute -end-1 -top-0.5" /></span>
         <span data-name className="max-w-full truncate px-1 font-tech text-[11px] font-semibold leading-none tracking-[0.02em]">{SHORT[i.key] ?? i.label}</span></Link> })}
     <button type="button" onClick={() => dispatchEvent(new Event('averiqo:menu'))} className={cn(cell, 'text-[hsl(220_10%_66%)] active:text-white')}>
-      <TabIcon name="more" className="relative transition-transform duration-150 active:scale-90" /><span className="font-tech text-[11px] font-semibold leading-none tracking-[0.02em]">More</span></button>
+      <span className="relative"><TabIcon name="more" className="relative transition-transform duration-150 active:scale-90" /><NavDot n={hidden} className="absolute -end-1 -top-0.5" /></span><span className="font-tech text-[11px] font-semibold leading-none tracking-[0.02em]">More</span></button>
   </nav>
 }

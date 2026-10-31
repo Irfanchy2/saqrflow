@@ -41,3 +41,36 @@ export async function decideClaim(id: string, _: ActionState, fd: FormData): Pro
     return { ok: true, message: v.decision === 'approved' ? 'Approved and added to expenses.' : v.decision === 'rejected' ? 'Rejected. The employee was told why.' : 'Sent back to the employee for a correction.' }
   })
 }
+
+const bulk = z.object({ ids: z.array(uuid).min(1, 'Choose at least one claim').max(100, 'Approve at most 100 claims at a time'), bank: uuid.nullish() })
+
+/**
+ * Approve several waiting claims at once (Expenses → Employee claims → select → Approve). Each claim goes through the same
+ * database function as a single approval (permission, own-claim refusal, added to expenses exactly once), with the
+ * employee's own category and project. A claim that cannot be approved is skipped and named; the others still go through.
+ */
+export async function approveClaims(ids: string[], bank?: string | null): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx()
+    if (!c.can('expenses.approve') && !c.can('approvals.decide')) throw new ForbiddenError('expenses.approve')
+    const r = bulk.safeParse({ ids: [...new Set(ids)], bank: bank || null })
+    if (!r.success) return { error: r.error.issues[0].message }
+    const { data: claims } = await c.supabase.from('expense_claims').select('id,status,supplier_name,supplier_trn,amount,vat_amount,reference,employee:employees(full_name)').in('id', r.data.ids)
+    let approved = 0, total = 0
+    const skipped: string[] = []
+    for (const id of r.data.ids) {
+      const claim: any = (claims ?? []).find(x => x.id === id)
+      const name = claim ? `${claim.employee?.full_name ?? 'Employee'} · ${claim.supplier_name ?? claim.reference ?? 'claim'}` : 'A claim'
+      if (!claim) { skipped.push(`${name}: not found`); continue }
+      if (claim.status !== 'pending') { skipped.push(`${name}: already ${String(claim.status).replace('_', ' ')}`); continue }
+      const supplier = claim.supplier_name || claim.supplier_trn ? await resolveSupplier(c, { name: claim.supplier_name, trn: claim.supplier_trn }).catch(() => null) : null
+      const { error } = await c.supabase.rpc('decide_expense_claim', { p_claim: id, p_decision: 'approved', p_note: null, p_category: null, p_project: null, p_supplier: supplier?.id ?? null, p_bank: r.data.bank ?? null })
+      if (error) { skipped.push(`${name}: ${error.message.length < 120 ? error.message : 'could not be approved'}`); continue }
+      approved++; total += Number(claim.amount) + Number(claim.vat_amount)
+    }
+    revalidatePath('/expenses'); revalidatePath('/approvals'); revalidatePath('/')
+    const aed = `AED ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    if (!approved) return { error: `Nothing was approved. ${skipped.join('. ')}.` }
+    return { ok: true, message: `Approved ${approved} claim${approved === 1 ? '' : 's'} (${aed}) and added ${approved === 1 ? 'it' : 'them'} to expenses.${skipped.length ? ` Skipped ${skipped.length}: ${skipped.join('; ')}.` : ''}`, data: { approved, skipped } }
+  })
+}

@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { m } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { popIn, warmGsap } from '@/lib/gsap-pop'
-import { ICONS, type NavItem } from '@/components/layout/sidebar'
+import { ICONS, NavDot, type NavItem } from '@/components/layout/sidebar'
 
 /** The top-level groups shown as tabs (desktop). "system" pages (users, audit, trash, settings) have no tab of their own. */
 export const TOPS = [
@@ -55,7 +55,7 @@ export function TopTabs({ items, counts }: { items: TopItem[]; counts: Partial<R
           <div ref={menu} role="menu" aria-label={t.label} className="rounded-2xl border border-border/80 bg-surface p-1.5 shadow-pop">
           {group.map(i => { const I = ICONS[i.key]
             return <Link key={i.key} role="menuitem" href={i.href} onClick={() => setPeek(null)} className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] text-fg/85 transition-colors hover:bg-surface-2 hover:text-fg">
-              {I && <I size={17} className="shrink-0 text-muted" aria-hidden />}<span className="truncate">{i.label}</span></Link> })}
+              {I && <I size={17} className="shrink-0 text-muted" aria-hidden />}<span className="min-w-0 flex-1 truncate">{i.label}</span><NavDot n={i.alert} /></Link> })}
         </div></div>}
       </div>
     })}
@@ -72,6 +72,6 @@ export function SubTabs({ items }: { items: TopItem[] }) {
       return <Link key={i.key} href={i.href} aria-current={on ? 'page' : undefined}
         className={cn('relative flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-medium transition-colors duration-200', on ? 'text-fg' : 'text-muted hover:text-fg')}>
         {on && <m.span layoutId="sub-pill" transition={SPRING} aria-hidden className="absolute inset-0 rounded-full border border-white/80 bg-surface shadow-card dark:border-white/[.06]" />}
-        <span className="relative whitespace-nowrap">{i.label}</span></Link> })}
+        <span className="relative whitespace-nowrap">{i.label}</span><NavDot n={i.alert} className="relative ms-1.5" /></Link> })}
   </nav>
 }
