@@ -82,9 +82,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     c.can('finance.view') ? c.supabase.from('cheques').select('id', head).in('status', ['received', 'issued', 'scheduled']).lte('cheque_date', addDays(c.today, 7)) : none,
     c.can('documents.view') ? c.supabase.from('documents').select('id', head).is('deleted_at', null).eq('status', 'active').lte('expiry_date', addDays(c.today, 30)) : none,
     c.can('documents.view') ? c.supabase.from('stock_items').select('id', head).eq('is_low', true) : none,
+    // employee expense claims waiting for this person's approval: a red dot beside Expenses
+    c.can('finance.view') && (c.can('expenses.approve') || c.can('approvals.decide')) ? c.supabase.from('expense_claims').select('id', head).eq('status', 'pending') : none,
+    // …less the approver's own claims (someone else decides those), so the dot clears once their work is done
+    c.can('finance.view') && (c.can('expenses.approve') || c.can('approvals.decide')) ? c.supabase.from('expense_claims').select('id, employee:employees!inner(user_id)', head).eq('status', 'pending').eq('employee.user_id', c.userId) : none,
   ])
-  const counts: Partial<Record<TopKey, number>> = { sales: tops[0].count ?? 0, ops: tops[1].count ?? 0, finance: tops[2].count ?? 0, people: tops[3].count ?? 0, stock: tops[4].count ?? 0 }
-  const visible = items.filter(i => i.show)
+  const claims = Math.max(0, (tops[5].count ?? 0) - (tops[6].count ?? 0))
+  const counts: Partial<Record<TopKey, number>> = { sales: tops[0].count ?? 0, ops: tops[1].count ?? 0, finance: (tops[2].count ?? 0) + claims, people: tops[3].count ?? 0, stock: tops[4].count ?? 0 }
+  const visible = items.filter(i => i.show).map(i => (i.key === 'expenses' && claims ? { ...i, alert: claims } : i))
   return <MotionRoot><div className="flex min-h-screen"><div className="mesh" aria-hidden><i className="mesh__a" /><i className="mesh__b" /><i className="mesh__c" /></div>
     <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
     {/* the shell (sidebar, progress bar, tap skeleton) renders in the first HTML chunk, with no Suspense boundary: a boundary

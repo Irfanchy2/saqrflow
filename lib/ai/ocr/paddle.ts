@@ -90,7 +90,11 @@ function batchRecognition(svc: unknown, batchSize = 6, minWidth = 160) {
 /** Loads the models now (e.g. while the person is still taking the photo), so the scan itself starts at once. */
 export async function warmPaddle(): Promise<boolean> {
   if (!paddleEnabled()) return false
-  try { await Promise.all([loadService('small'), ...(tinyAvailable() ? [loadService('tiny')] : [])]); return true } catch { return false }
+  // the tiny models first (they read first, ~1 s to load); the small ones follow in the background, not competing for the CPU
+  try {
+    if (tinyAvailable()) { await loadService('tiny'); void loadService('small').catch(() => {}) } else await loadService('small')
+    return true
+  } catch { return false }
 }
 
 // One image at a time per server instance: keeps memory flat when several people scan at once.
