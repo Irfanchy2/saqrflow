@@ -10,6 +10,7 @@ import { PrivateValue } from '@/components/portal/private-value'
 import { Today, loadToday } from '@/components/portal/today'
 import { claimSuppliers } from '@/lib/expenses/claim-suppliers'
 import { companyCards } from '@/lib/cards'
+import { WalletCard, myWallet } from '@/components/petty/portal'
 
 export const metadata = { title: 'My portal' }
 
@@ -19,7 +20,7 @@ export default async function MyHome() {
   if (!emp) return null
   const month = startOfMonth(c.today), monthEnd = endOfMonth(c.today), sb = c.supabase
   const settingsP = portalSettings(c)
-  const [cards, projects, sups, settings, todayRec, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }, { data: acct }] = await Promise.all([
+  const [cards, projects, sups, settings, todayRec, { data: all }, { data: recent }, { data: att }, { data: comp }, { data: pays }, { data: adv }, { data: acct }, wallet] = await Promise.all([
     companyCards(c),
     myProjects(c),
     claimSuppliers(c, emp.id),
@@ -32,6 +33,7 @@ export default async function MyHome() {
     sb.from('salary_payments').select('id,period,amount,paid_on').eq('employee_id', emp.id).eq('status', 'posted').order('paid_on', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(2),
     sb.from('employee_advance_balances').select('kind,amount,settled,given_on,remaining').eq('employee_id', emp.id),
     sb.from('salary_accounts').select('outstanding').eq('employee_id', emp.id).maybeSingle(),
+    myWallet(c, emp.id),
   ])
   const claims = all ?? [], total = (r: { amount: unknown; vat_amount: unknown }) => Number(r.amount) + Number(r.vat_amount)
   const thisMonth = claims.filter(r => r.spent_on >= month && r.spent_on <= monthEnd && r.status !== 'withdrawn')
@@ -57,8 +59,10 @@ export default async function MyHome() {
       <AlertTriangle size={18} aria-hidden className="shrink-0" />{attention === 1 ? 'One expense needs a correction from you.' : `${attention} expenses need a correction from you.`}<span className="ms-auto shrink-0 underline-offset-2">Fix now</span></Link>}
 
     <PortalCard title="Add an expense" sub="Photograph the receipt: the details fill in for you to check.">
-      <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} cards={cards} projects={projects} /></div>
+      <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} cards={cards} projects={projects} pettyBalance={wallet.available} /></div>
     </PortalCard>
+
+    <WalletCard w={wallet} />
 
     {settings.checkin && <Today c={c} rec={todayRec} settings={settings} />}
 

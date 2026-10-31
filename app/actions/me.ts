@@ -36,12 +36,14 @@ const claimSchema = z.object({
   quantity: z.coerce.number().positive('Quantity must be more than zero').max(1e7).optional(),
   paid_with: z.enum(['cash', 'card', 'bank_transfer', 'other']).default('cash'), card_id: z.string().uuid('Choose the card').optional(), project_id: z.string().uuid('Choose a project from the list').optional(),
   notes: z.string().max(2000).optional(), idempotency_key: z.string().uuid().optional(),
+  // whose money paid: company petty cash the employee holds, their own money (paid back), or the company directly
+  funded_by: z.enum(['petty_cash', 'personal', 'company'], { message: 'Choose where the money came from' }).optional(),
   items: jsonOf(z.array(line).max(200), []), source: z.enum(['manual', 'scan']).default('manual'),
   ocr_suggested: jsonOf(z.record(z.string(), z.unknown()).refine(o => JSON.stringify(o).length <= 20000, 'Scan data too large'), null as Record<string, unknown> | null),
   verified: z.string().optional(),
 }).refine(v => v.vat_amount <= v.amount, { message: 'VAT looks larger than the amount. Enter the amount before VAT', path: ['vat_amount'] })
   .refine(v => v.source !== 'scan' || v.verified === 'on', { message: 'Tick “I checked these details against the receipt” before sending a scanned receipt', path: ['verified'] })
-const KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_name', 'supplier_trn', 'quantity', 'paid_with', 'card_id', 'project_id', 'notes', 'idempotency_key', 'items', 'source', 'ocr_suggested', 'verified']
+const KEYS = ['spent_on', 'category', 'description', 'amount', 'vat_amount', 'reference', 'supplier_name', 'supplier_trn', 'quantity', 'paid_with', 'card_id', 'project_id', 'notes', 'idempotency_key', 'funded_by', 'items', 'source', 'ocr_suggested', 'verified']
 type Claim = z.infer<typeof claimSchema>
 
 const touch = () => { revalidatePath('/me'); revalidatePath('/me/expenses'); revalidatePath('/expenses') }
@@ -51,6 +53,8 @@ const fields = (v: Claim) => ({
   spent_on: v.spent_on, category: v.category, description: v.description, amount: v.amount, vat_amount: v.vat_amount,
   reference: v.reference ?? null, supplier_name: v.supplier_name ?? null, supplier_trn: v.supplier_trn ?? null, quantity: v.quantity ?? null,
   paid_with: v.paid_with, card_id: v.paid_with === 'card' ? v.card_id ?? null : null, project_id: v.project_id ?? null, notes: v.notes ?? null, items: v.items,
+  // a company card is company money (the database enforces it too)
+  funded_by: v.paid_with === 'card' && v.card_id ? 'company' : v.funded_by ?? null,
 })
 /** Paid by card: which company card is required once the company has listed its cards (the database checks it again). */
 async function cardProblem(c: Ctx, v: Claim): Promise<ActionState | null> {

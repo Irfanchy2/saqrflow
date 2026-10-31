@@ -5,9 +5,9 @@ import { safeValue } from './messages'
 import type { Permission } from '../permissions'
 
 export type ShareKind = 'payslip' | 'salary_receipt' | 'salary_statement' | 'quotation' | 'invoice' | 'delivery_note' | 'payment_reminder'
-  | 'customer_receipt' | 'customer_statement' | 'employee_document'
+  | 'customer_receipt' | 'customer_statement' | 'employee_document' | 'petty_cash_statement'
 /** perm: who may share it (checked on the server and, for the share log, in the database: share_kind_allowed). */
-export interface ShareDef { label: string; party: 'employee' | 'customer'; perm: 'salary' | 'finance' | 'employee_files'; vars: string[]; body: string }
+export interface ShareDef { label: string; party: 'employee' | 'customer'; perm: 'salary' | 'finance' | 'employee_files' | 'petty'; vars: string[]; body: string }
 
 export const SHARE: Record<ShareKind, ShareDef> = {
   payslip: { label: 'Employee payslip', party: 'employee', perm: 'salary', vars: ['employee', 'period', 'company'],
@@ -30,6 +30,8 @@ export const SHARE: Record<ShareKind, ShareDef> = {
     body: 'Dear {customer},\n\nPlease find attached your statement of account as of {date}. Balance: {balance}.\n\nKindly review it and contact us with any questions.\n\n{company}' },
   employee_document: { label: 'Employee document', party: 'employee', perm: 'employee_files', vars: ['employee', 'document', 'expiry', 'company'],
     body: 'Dear {employee},\n\nPlease find attached your document: {document}.\n\nThank you,\n{company}' },
+  petty_cash_statement: { label: 'Petty cash statement', party: 'employee', perm: 'petty', vars: ['employee', 'from', 'to', 'balance', 'company'],
+    body: 'Dear {employee},\n\nPlease find attached your petty cash statement from {from} to {to}. Available petty cash: {balance}.\n\nKindly review the attached document.\n\nThank you,\n{company}' },
 }
 export const SHARE_KINDS = Object.keys(SHARE) as ShareKind[]
 export const isShareKind = (k: string): k is ShareKind => k in SHARE
@@ -64,4 +66,5 @@ export function prettyPhone(e164: string | null | undefined): string {
 
 /** The permissions a document type needs to be shared (the same rule as share_kind_allowed() in the database). */
 export const sharePerms = (k: ShareKind): Permission[] =>
-  SHARE[k].perm === 'salary' ? ['salary.view'] : SHARE[k].perm === 'finance' ? ['finance.view'] : ['documents.view', 'employees.view_sensitive']
+  SHARE[k].perm === 'salary' ? ['salary.view'] : SHARE[k].perm === 'finance' ? ['finance.view'] : SHARE[k].perm === 'petty' ? ['expenses.approve']
+    : ['documents.view', 'employees.view_sensitive']

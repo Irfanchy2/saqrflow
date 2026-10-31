@@ -26,7 +26,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   else q = q.neq('status', 'pending')
   if (type) q = q.eq('entity_type', type)
   if (term) q = q.ilike('title', `%${term}%`)
-  const [{ data: rows, count }, pending, mine, approved30, people, focusRes, claims] = await Promise.all([
+  const [{ data: rows, count }, pending, mine, approved30, people, focusRes, claims, petty] = await Promise.all([
     q.order('requested_at', { ascending: tab === 'pending' }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     c.supabase.from('approval_requests').select('id', head).eq('status', 'pending'),
     c.supabase.from('approval_requests').select('id', head).eq('status', 'pending').eq('requested_by', c.userId),
@@ -34,6 +34,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     c.supabase.from('profiles').select('id,full_name'),
     sp.open && /^[0-9a-f-]{36}$/.test(sp.open) ? c.supabase.from('approval_requests').select('*').eq('id', sp.open).maybeSingle() : Promise.resolve({ data: null }),
     c.can('expenses.approve') || c.can('approvals.decide') ? c.supabase.from('expense_claims').select('id', head).eq('status', 'pending') : Promise.resolve({ count: 0 }),
+    c.can('expenses.approve') || c.can('approvals.decide') ? c.supabase.from('petty_cash_requests').select('id', head).eq('status', 'pending') : Promise.resolve({ count: 0 }),
   ])
   const who = new Map((people.data ?? []).map(p => [p.id, p.full_name as string]))
   const focus: any = focusRes.data
@@ -60,6 +61,9 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     {!!claims.count && <Link href="/expenses?tab=claims" data-claims-banner className="mb-5 flex items-center gap-3 rounded-xl border border-warning/25 bg-warning/[.06] px-4 py-3 text-sm font-medium">
       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-warning/15 text-warning tabular-nums">{claims.count}</span>
       {claims.count === 1 ? 'An employee expense is' : `${claims.count} employee expenses are`} waiting for approval<span className="ms-auto shrink-0 text-primary">Open queue →</span></Link>}
+    {!!petty.count && <Link href="/expenses?tab=petty&view=requests" data-petty-banner className="mb-5 flex items-center gap-3 rounded-xl border border-warning/25 bg-warning/[.06] px-4 py-3 text-sm font-medium">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-warning/15 text-warning tabular-nums">{petty.count}</span>
+      {petty.count === 1 ? 'An employee petty cash report is' : `${petty.count} employee petty cash reports are`} waiting for confirmation<span className="ms-auto shrink-0 text-primary">Open queue →</span></Link>}
     <Metrics className="mb-5" cols={3}>
       <StatCard label="Waiting for a decision" value={pending.count ?? 0} tone={pending.count ? 'amber' : 'neutral'} href="/approvals?tab=pending" />
       <StatCard label="My open requests" value={mine.count ?? 0} href="/approvals?tab=mine" />

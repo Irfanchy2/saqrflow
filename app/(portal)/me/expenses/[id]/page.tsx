@@ -13,6 +13,7 @@ import { PortalCard } from '@/components/portal/stat'
 import { updateClaim, withdrawClaim } from '@/app/actions/me'
 import { claimSuppliers } from '@/lib/expenses/claim-suppliers'
 import { cardName, companyCards } from '@/lib/cards'
+import { FUNDED } from '@/lib/petty-math'
 
 export const metadata = { title: 'Expense' }
 const PAID: Record<string, string> = { cash: 'Cash', card: 'Card', bank_transfer: 'Bank transfer', other: 'Other' }
@@ -26,12 +27,13 @@ export default async function MyExpense({ params }: { params: Promise<{ id: stri
   if (!emp) return null
   const { data: e } = await c.supabase.from('expense_claims').select('*').eq('id', id).eq('employee_id', emp.id).maybeSingle()
   if (!e) notFound()
-  const [cards, projects, sups, { data: events }, { data: doc }] = await Promise.all([
+  const [cards, projects, sups, { data: events }, { data: doc }, { data: pettyBal }] = await Promise.all([
     companyCards(c, true),
     myProjects(c),
     claimSuppliers(c, emp.id),
     c.supabase.from('expense_claim_events').select('id,kind,note,actor_name,created_at').eq('claim_id', id).order('created_at', { ascending: true }),
     e.receipt_document_id ? c.supabase.from('documents').select('id,current_version_id,version:document_versions!documents_current_version_fk(mime_type,file_name)').eq('id', e.receipt_document_id).maybeSingle() : Promise.resolve({ data: null }),
+    c.supabase.rpc('petty_wallet_balance', { p_employee: emp.id }),
   ])
   const s = CLAIM_STATUS[e.status] ?? CLAIM_STATUS.pending
   const open = e.status === 'pending' || e.status === 'correction_requested'
@@ -39,7 +41,7 @@ export default async function MyExpense({ params }: { params: Promise<{ id: stri
   const tz = c.company.timezone
   const rows: [string, React.ReactNode][] = [
     ['Date', formatShortDate(e.spent_on)], ['Category', EXPENSE_CATS[e.category] ?? e.category], ['Supplier', e.supplier_name || '—'], ...(e.supplier_trn ? [['Supplier TRN', e.supplier_trn] as [string, string]] : []),
-    ['Receipt no.', e.reference || '—'], ['Paid with', `${PAID[e.paid_with] ?? e.paid_with}${e.card_id && cards.find(k => k.id === e.card_id) ? ` · ${cardName(cards.find(k => k.id === e.card_id)!)}` : ''}`], ['Amount excl. VAT', <Money key="a" value={e.amount} />], ['VAT', <Money key="v" value={e.vat_amount} />],
+    ['Receipt no.', e.reference || '—'], ['Paid with', `${PAID[e.paid_with] ?? e.paid_with}${e.card_id && cards.find(k => k.id === e.card_id) ? ` · ${cardName(cards.find(k => k.id === e.card_id)!)}` : ''}`], ['Paid from', FUNDED.find(([k]) => k === e.funded_by)?.[1] ?? '—'], ['Amount excl. VAT', <Money key="a" value={e.amount} />], ['VAT', <Money key="v" value={e.vat_amount} />],
     ...(e.project_id ? [['Project', projects.find(p => p.id === e.project_id)?.name ?? '—'] as [string, string]] : []),
     ...(e.quantity ? [['Quantity', String(Number(e.quantity))] as [string, string]] : []),
   ]
@@ -59,7 +61,7 @@ export default async function MyExpense({ params }: { params: Promise<{ id: stri
       {open && <div className="mt-5 flex flex-wrap gap-2">
         <DialogButton wide label={<><Pencil size={15} aria-hidden />{e.status === 'correction_requested' ? 'Correct and send again' : 'Edit'}</>} title={e.status === 'correction_requested' ? 'Correct and send again' : 'Edit expense'} variant={e.status === 'correction_requested' ? 'primary' : 'secondary'}>
           <ActionForm action={updateClaim.bind(null, id)} submit={e.status === 'correction_requested' ? 'Send for approval' : 'Save changes'} resetOnSuccess={false}>
-            <ExpenseFields claim e={e} today={c.today} employees={[]} suppliers={sups} cards={cards.filter(k => k.active)} projects={projects} />
+            <ExpenseFields claim e={e} today={c.today} employees={[]} suppliers={sups} cards={cards.filter(k => k.active)} projects={projects} pettyBalance={Number(pettyBal ?? 0)} />
           </ActionForm>
         </DialogButton>
         <ActionButton action={withdrawClaim.bind(null, id)} size="md" variant="ghost" confirm="Withdraw this expense? It will not be sent for approval. You can add it again later."><Undo2 size={15} aria-hidden />Withdraw</ActionButton>

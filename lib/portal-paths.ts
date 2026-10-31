@@ -7,6 +7,7 @@ const EMPLOYEE_PATHS: RegExp[] = [
   /^\/api\/payslips\/[0-9a-f-]{36}$/,                   // own salary receipts (RLS decides)
   /^\/api\/salary-payslips\/[0-9a-f-]{36}$/,            // own monthly payslips (RLS decides)
   /^\/api\/salary-statements\/[0-9a-f-]{36}$/,          // own salary statement (route checks it is their own; RLS decides)
+  /^\/api\/petty-cash\/[0-9a-f-]{36}\/statement$/,     // own petty cash statement (route checks it is their own; RLS decides)
   /^\/api\/notifications\/[0-9a-f-]{36}\/open$/,        // opening own notifications
   /^\/api\/employees\/[0-9a-f-]{36}\/photo$/,           // own photo (RLS decides)
   /^\/auth(\/.*)?$/, /^\/offline$/,

@@ -86,8 +86,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     c.can('finance.view') && (c.can('expenses.approve') || c.can('approvals.decide')) ? c.supabase.from('expense_claims').select('id', head).eq('status', 'pending') : none,
     // …less the approver's own claims (someone else decides those), so the dot clears once their work is done
     c.can('finance.view') && (c.can('expenses.approve') || c.can('approvals.decide')) ? c.supabase.from('expense_claims').select('id, employee:employees!inner(user_id)', head).eq('status', 'pending').eq('employee.user_id', c.userId) : none,
+    // employee petty cash reports (money received, returns) waiting for confirmation, less the approver's own
+    c.can('finance.view') && (c.can('expenses.approve') || c.can('approvals.decide')) ? c.supabase.from('petty_cash_requests').select('id', head).eq('status', 'pending') : none,
+    c.can('finance.view') && (c.can('expenses.approve') || c.can('approvals.decide')) ? c.supabase.from('petty_cash_requests').select('id, employee:employees!inner(user_id)', head).eq('status', 'pending').eq('employee.user_id', c.userId) : none,
   ])
-  const claims = Math.max(0, (tops[5].count ?? 0) - (tops[6].count ?? 0))
+  const claims = Math.max(0, (tops[5].count ?? 0) - (tops[6].count ?? 0)) + Math.max(0, (tops[7].count ?? 0) - (tops[8].count ?? 0))
   const counts: Partial<Record<TopKey, number>> = { sales: tops[0].count ?? 0, ops: tops[1].count ?? 0, finance: (tops[2].count ?? 0) + claims, people: tops[3].count ?? 0, stock: tops[4].count ?? 0 }
   const visible = items.filter(i => i.show).map(i => (i.key === 'expenses' && claims ? { ...i, alert: claims } : i))
   return <MotionRoot><div className="flex min-h-screen"><div className="mesh" aria-hidden><i className="mesh__a" /><i className="mesh__b" /><i className="mesh__c" /></div>

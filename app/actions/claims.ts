@@ -17,6 +17,8 @@ const schema = z.object({
   note: z.string().trim().max(2000, 'The note is too long').optional(),
   category: z.enum(['material', 'labour', 'transport', 'fuel', 'equipment', 'subcontract', 'accommodation', 'food', 'maintenance', 'other']).optional(),
   project_id: uuid.optional(), paid_from_bank_id: uuid.optional(),
+  // petty cash claims: how much is settled from petty cash, and how much the employee confirmed paying themselves
+  petty: z.coerce.number().min(0, 'Amounts cannot be negative').max(10_000_000).optional(), personal: z.coerce.number().min(0, 'Amounts cannot be negative').max(10_000_000).optional(),
 }).refine(v => v.decision === 'approved' || !!v.note, { message: 'Give a reason so the employee knows what to fix', path: ['note'] })
 
 export async function decideClaim(id: string, _: ActionState, fd: FormData): Promise<ActionState> {
@@ -24,7 +26,7 @@ export async function decideClaim(id: string, _: ActionState, fd: FormData): Pro
     const c = await getCtx()
     if (!c.can('expenses.approve') && !c.can('approvals.decide')) throw new ForbiddenError('expenses.approve')
     if (!uuid.safeParse(id).success) return { error: 'Expense claim not found.' }
-    const r = schema.safeParse(Object.fromEntries(['decision', 'note', 'category', 'project_id', 'paid_from_bank_id'].map(k => [k, str(fd, k)])))
+    const r = schema.safeParse(Object.fromEntries(['decision', 'note', 'category', 'project_id', 'paid_from_bank_id', 'petty', 'personal'].map(k => [k, str(fd, k)])))
     if (!r.success) return { error: r.error.issues[0].message, fieldErrors: Object.fromEntries(r.error.issues.map(i => [i.path.join('.'), i.message])) }
     const v = r.data
     const { data: claim } = await c.supabase.from('expense_claims').select('id,status,supplier_name,supplier_trn').eq('id', id).maybeSingle()
@@ -35,6 +37,7 @@ export async function decideClaim(id: string, _: ActionState, fd: FormData): Pro
     const { error } = await c.supabase.rpc('decide_expense_claim', {
       p_claim: id, p_decision: v.decision, p_note: v.note ?? null, p_category: v.category ?? null,
       p_project: v.project_id ?? null, p_supplier: supplier?.id ?? null, p_bank: v.paid_from_bank_id ?? null,
+      p_petty: v.decision === 'approved' ? v.petty ?? null : null, p_personal: v.decision === 'approved' ? v.personal ?? null : null,
     })
     if (error) return { error: error.message.length < 200 ? error.message : 'The decision could not be saved. Please try again.' }
     revalidatePath('/expenses'); revalidatePath('/approvals'); revalidatePath('/')
@@ -64,7 +67,7 @@ export async function approveClaims(ids: string[], bank?: string | null): Promis
       if (!claim) { skipped.push(`${name}: not found`); continue }
       if (claim.status !== 'pending') { skipped.push(`${name}: already ${String(claim.status).replace('_', ' ')}`); continue }
       const supplier = claim.supplier_name || claim.supplier_trn ? await resolveSupplier(c, { name: claim.supplier_name, trn: claim.supplier_trn }).catch(() => null) : null
-      const { error } = await c.supabase.rpc('decide_expense_claim', { p_claim: id, p_decision: 'approved', p_note: null, p_category: null, p_project: null, p_supplier: supplier?.id ?? null, p_bank: r.data.bank ?? null })
+      const { error } = await c.supabase.rpc('decide_expense_claim', { p_claim: id, p_decision: 'approved', p_note: null, p_category: null, p_project: null, p_supplier: supplier?.id ?? null, p_bank: r.data.bank ?? null, p_petty: null, p_personal: null })
       if (error) { skipped.push(`${name}: ${error.message.length < 120 ? error.message : 'could not be approved'}`); continue }
       approved++; total += Number(claim.amount) + Number(claim.vat_amount)
     }

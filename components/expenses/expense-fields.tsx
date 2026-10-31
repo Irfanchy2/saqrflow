@@ -30,7 +30,7 @@ const RATES: [string, string][] = [['5', '5% standard'], ['0', '0% / exempt'], [
  * with the expense. Field names match the save action (and the older form) so every page using it keeps working.
  */
 export type CardOpt = { id: string; label: string; last4: string }
-export function ExpenseFields({ e, today, projects, assets, employees, suppliers, fixedProject, initialFile, claim, cards = [] }: {
+export function ExpenseFields({ e, today, projects, assets, employees, suppliers, fixedProject, initialFile, claim, cards = [], pettyBalance = 0 }: {
   e?: Record<string, any>; today: string; projects?: Opt[]; assets?: Opt[]; employees: Opt[]; suppliers: (string | SupplierOpt)[]; fixedProject?: boolean
   /** a receipt picked before the form opened (the "Scan receipt" button): read immediately */
   initialFile?: File | null
@@ -39,6 +39,8 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
   claim?: boolean
   /** the company's cards (claim mode): which one was used is asked when the employee paid by card */
   cards?: CardOpt[]
+  /** claim mode: the company petty cash the employee holds (picks "Company petty cash" as the payment source when > 0) */
+  pettyBalance?: number
 }) {
   const box = useRef<HTMLDivElement>(null), fileRef = useRef<HTMLInputElement>(null)
   const sups = useMemo(() => suppliers.map(s => typeof s === 'string' ? { id: '', name: s, trn: null as string | null } : { ...s, trn: s.trn ?? null }), [suppliers])
@@ -52,6 +54,8 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
   const [vat, setVat] = useState<string>(e?.vat_amount != null ? String(e.vat_amount) : '')
   const [status, setStatus] = useState<'paid' | 'unpaid'>(e?.payment_status ?? 'paid')
   const [paidWith, setPaidWith] = useState<string>(e?.paid_with ?? 'cash')
+  const [funded, setFunded] = useState<string>(e?.funded_by ?? (pettyBalance > 0 ? 'petty_cash' : 'personal'))
+  const companyCard = paidWith === 'card' && cards.length > 0   // a company card is company money: never petty cash or own money
   const supList = `exp-suppliers-${useId().replace(/:/g, '')}`   // several expense forms can be on one page
   const [lines, setLines] = useState<Line[]>(() => (Array.isArray(e?.items) ? e!.items : []).map((l: ReceiptLine) => ({ description: l.description, quantity: l.quantity == null ? '' : String(l.quantity), unit_price: l.unit_price == null ? '' : String(l.unit_price), amount: String(l.amount) })))
   const [showLines, setShowLines] = useState(lines.length > 0)
@@ -198,6 +202,10 @@ export function ExpenseFields({ e, today, projects, assets, employees, suppliers
         <Select name="card_id" required defaultValue={cards.some(k => k.id === e?.card_id) ? e!.card_id : cards.length === 1 ? cards[0].id : ''} data-card-select>
           {cards.length > 1 && <option value="">Choose the card…</option>}
           {cards.map(k => <option key={k.id} value={k.id}>{k.label} ••{k.last4}</option>)}</Select></Field>}
+      {companyCard ? <input type="hidden" name="funded_by" value="company" />
+        : <Field label="Paid from *" hint={funded === 'petty_cash' ? `Company petty cash you hold: AED ${pettyBalance.toFixed(2)}` : funded === 'personal' ? 'The company pays you back once approved' : 'The company paid the supplier directly'}>
+          <Select name="funded_by" value={funded} onChange={ev => setFunded(ev.target.value)} data-claim-funded>
+            {[['petty_cash', 'Company petty cash'], ['personal', 'My own money'], ['company', 'Company paid directly']].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>}
       {projects && projects.length > 0 && <Field label="Project" hint="Optional: the job this was for"><Select name="project_id" defaultValue={projects.some(p => p.id === e?.project_id) ? e!.project_id : ''} data-claim-project>
         <option value="">No project</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}</>
     : <><fieldset className="sm:col-span-2"><legend className="mb-1.5 text-[13px] font-medium">Payment</legend>
