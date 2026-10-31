@@ -29,6 +29,7 @@ export interface ScanEvents {
 type Cached = Omit<ScanBody, 'supplier' | 'duplicate' | 'cached' | 'bytes'>
 const cache = new Map<string, { at: number; v: Cached }>()
 const TTL = 30 * 60_000, MAX = 300
+const AI_TIMEOUT_MS = Number(process.env.SAQRFLOW_AI_TIMEOUT_MS) || 15_000
 function remember(k: string, v: Cached) {
   cache.delete(k); cache.set(k, { at: Date.now(), v })
   while (cache.size > MAX) cache.delete(cache.keys().next().value!)
@@ -74,21 +75,34 @@ export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: strin
   // the company's paid readers are looked up while the free reading runs, so a hand-over to them does not wait for it
   const ocrList = ocrProviders(c.company.id), aiList = aiProviders(c.company.id)
   ocrList.catch(() => {}); aiList.catch(() => {})       // awaited (and their errors seen) only when they are needed
-  // 1. free: the PDF's text layer, or PaddleOCR on this server
+  // 2 (prepared). cloud OCR, only when the free reading is missing or not good enough and the company has not chosen local
+  //    only. In turbo it starts as soon as the first on-server reading is unsure, alongside the second one, instead of after.
+  let cloud: Promise<{ text: string; provider: string } | null> | null = null
+  const startCloud = () => {
+    if (cloud || s.ocr === 'tesseract') return
+    cloud = (async () => {
+      const providers = providerOrder(s.ocr, await ocrList, mime).filter(p => p.id !== 'tesseract')
+      if (!providers.length) return null
+      const { result, attempts } = await runOcr({ bytes: buf, mime, name: file.name }, providers)
+      if (result?.text.trim()) return { text: result.text, provider: result.provider }
+      errors.push(...attempts.map(a => a.error ?? '').filter(Boolean)); return null
+    })().catch(e => { errors.push((e as Error).message); return null })
+  }
+  // 1. free: the PDF's text layer, or PaddleOCR on this server (turbo: about 3–6 s)
   on.stage?.('local')
   if (mime === 'application/pdf') { const layer = await extractText(buf, mime).catch(() => ''); if (layer.replace(/\s/g, '').length >= 30) take(layer, 'text_layer') }
   else {
-    const local = await localReceiptOcr(buf, mime, c.today, 30_000, s.turbo)
+    const local = await localReceiptOcr(buf, mime, c.today, s.turbo ? 14_000 : 30_000, s.turbo, s.turbo ? startCloud : undefined)
     if (local) { localEngine = local.engine; take(local.text, local.engine.startsWith('paddle') ? 'paddleocr' : 'tesseract', local.read) }
   }
-  // 2. paid OCR, only when the free reading is missing or not good enough (and the company has not chosen local only)
-  if (!settled() && s.ocr !== 'tesseract' && (mime === 'application/pdf' ? !best : true)) {
-    const providers = providerOrder(s.ocr, await ocrList, mime).filter(p => p.id !== 'tesseract')
-    if (providers.length) {
+  // 2. cloud OCR's reading, when the free one is still not good enough
+  if (!settled() && (mime === 'application/pdf' ? !best : true)) {
+    startCloud()
+    const pending = cloud as Promise<{ text: string; provider: string } | null> | null   // set by startCloud (TS cannot see that)
+    if (pending) {
       await partial(); on.stage?.('cloud')
-      const { result, attempts } = await runOcr({ bytes: buf, mime, name: file.name }, providers)
-      if (result?.text.trim()) take(result.text, result.provider)
-      else errors.push(...attempts.map(a => a.error ?? '').filter(Boolean))
+      const r = await pending
+      if (r) take(r.text, r.provider)
     }
   }
   // 3. Gemini, only when the reading still is not good enough. It sees the photo unless ID / card / bank numbers must stay
@@ -104,9 +118,11 @@ export async function scanReceipt(c: Ctx, file: { bytes: Uint8Array; mime: strin
       await partial(); on.stage?.('ai')
       try {
         const sent = s.redact ? red.text : cur?.text ?? ''
-        const ai = await gemini.generateStructuredOutput<Partial<ReceiptRead>>(RECEIPT_PROMPT,
+        // at most 15 s: the free reading is already on the screen, so a slow AI answer must not keep the person waiting
+        const ai = await Promise.race([gemini.generateStructuredOutput<Partial<ReceiptRead>>(RECEIPT_PROMPT,
           `Receipt OCR text:\n"""\n${sent.slice(0, 20_000) || '(no text could be read; use the photo)'}\n"""\n${withImage ? 'The photo of the receipt is attached. ' : ''}Return the JSON.`,
-          RECEIPT_SCHEMA, raw => (raw && typeof raw === 'object' ? raw as Partial<ReceiptRead> : {}), withImage ? { image: { bytes: buf, mime } } : undefined)
+          RECEIPT_SCHEMA, raw => (raw && typeof raw === 'object' ? raw as Partial<ReceiptRead> : {}), withImage ? { image: { bytes: buf, mime } } : undefined),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('it took longer than 15 seconds')), AI_TIMEOUT_MS))])
         const base = cur?.read ?? readReceipt('', c.today)
         best = { text: cur?.text ?? '', read: mergeAi(base, ai, cur?.text ?? '', { image: withImage, today: c.today }), provider: cur?.provider ?? 'gemini' }
         engine = 'rules+gemini'; aiSaw = withImage ? 'photo' : 'text'

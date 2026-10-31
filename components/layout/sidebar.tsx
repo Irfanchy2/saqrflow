@@ -28,7 +28,15 @@ export const ICONS: Record<string, Icon> = {
   users: UserGearIcon, audit: ClockCounterClockwiseIcon, trash: TrashIcon, settings: GearSixIcon,
 }
 /** `tab`: the item opens one tab of a page (/invoices?tab=…) and is active only there. `fallback`: also active on that page when no tab is chosen. */
-export interface NavItem { key: string; href: string; label: string; group: string; tab?: string; fallback?: boolean }
+export interface NavItem { key: string; href: string; label: string; group: string; tab?: string; fallback?: boolean
+  /** how many things wait here for this person (e.g. expense claims to approve): a red dot beside the page */
+  alert?: number }
+
+/** The red dot beside a page that has something waiting (screen readers hear the count). */
+export function NavDot({ n, className }: { n?: number; className?: string }) {
+  if (!n) return null
+  return <span data-nav-dot className={cn('pointer-events-none h-2.5 w-2.5 shrink-0 rounded-full bg-[hsl(4_86%_55%)] shadow-[0_0_0_2px_hsl(var(--surface)),0_0_10px_hsl(4_86%_55%/.6)]', className)} role="status" aria-label={`${n} waiting`} />
+}
 
 const FOLD_KEY = 'averiqo:nav-folded'
 const fade = { duration: 0.14, ease: EASE }
@@ -78,6 +86,7 @@ export function Sidebar({ items, company, rtl, user = '', role = '' }: { items: 
       <I size={19} weight={on ? 'fill' : 'regular'} aria-hidden
         className={cn('nav-ico', on && 'is-on')} />
       <m.span initial={false} animate={{ opacity: rail ? 0 : 1 }} transition={rail ? fade : { ...fade, delay: 0.06 }} className="relative min-w-0 flex-1 truncate">{i.label}</m.span>
+      <NavDot n={i.alert} className={rail ? 'absolute start-[26px] top-1.5' : 'relative me-1'} />
     </Link>
   }
   const nav = (rail: boolean, where: string) => <nav className="sb-scroll flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-3 pb-3 pt-1" aria-label="Main">

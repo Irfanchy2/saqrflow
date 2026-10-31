@@ -4,13 +4,13 @@ import { Badge, EmptyState, Field, Money, Select, Textarea } from '@/components/
 import { ActionForm } from '@/components/ui/action-form'
 import { FilterTabs } from '@/components/ui/mobile'
 import { AccountSelect } from '@/components/banking/account-select'
-import { AlertTriangle, CheckCircle2, FileText, History, Receipt, ScanText, X } from '@/components/icons'
+import { AlertTriangle, CheckCircle2, FileText, History, Receipt, X } from '@/components/icons'
 import { decideClaim } from '@/app/actions/claims'
 import { CLAIM_STATUS } from '@/lib/me'
 import { EXPENSE_CATS } from '@/lib/projects'
-import { findDuplicate, normRef } from '@/lib/expenses/suppliers'
+import { findDuplicate, normName, normRef } from '@/lib/expenses/suppliers'
+import { ClaimsQueue, type QueueRow } from './claims-queue'
 import { formatShortDate } from '@/lib/time'
-import { cn } from '@/lib/utils'
 
 const FILTERS = [['pending', 'Waiting'], ['correction_requested', 'Sent back'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['withdrawn', 'Withdrawn'], ['all', 'All']] as const
 const PAID: Record<string, string> = { cash: 'Cash', card: 'Card', bank_transfer: 'Bank transfer', other: 'Other' }
@@ -44,6 +44,22 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
   const own = f?.employee?.user_id === c.userId
   const base = (x: Record<string, string>) => `/expenses?${new URLSearchParams({ tab: 'claims', ...(status !== 'pending' ? { status } : {}), ...x })}`
   const tz = c.company.timezone
+  // Waiting tab: possible duplicates (same supplier and receipt number as a saved expense or another live claim), worked out
+  // for the whole list in two queries; they are flagged and left out of "Select all"
+  const waiting = status === 'pending' && canDecide && (rows ?? []).length > 0
+  const key = (name: string | null, ref: string | null) => (ref && normRef(ref) ? `${normName(name ?? '')}|${normRef(ref)}` : '')
+  const [expKeys, claimKeys] = waiting ? await Promise.all([
+    c.supabase.from('project_expenses').select('supplier_name,reference').not('reference', 'is', null).limit(5000).then(r => new Set((r.data ?? []).map(x => key(x.supplier_name, x.reference)).filter(Boolean))),
+    c.supabase.from('expense_claims').select('id,supplier_name,reference').not('reference', 'is', null).not('status', 'in', '(withdrawn,rejected)').limit(5000).then(r => (r.data ?? []).map(x => ({ id: x.id, k: key(x.supplier_name, x.reference) })).filter(x => x.k)),
+  ]) : [new Set<string>(), [] as { id: string; k: string }[]]
+  const queue: QueueRow[] = (rows ?? []).map((r: any) => {
+    const k = key(r.supplier_name, r.reference)
+    return { id: r.id, href: base({ open: r.id }), title: `${r.employee?.full_name ?? 'Employee'} · ${r.supplier_name ?? r.description}`,
+      sub: `${formatShortDate(r.spent_on)} · ${EXPENSE_CATS[r.category] ?? r.category}${r.reference ? ` · ${r.reference}` : ''}${r.source === 'scan' ? ' · scanned' : ''}${r.receipt_document_id ? '' : ' · no receipt'}`,
+      total: Number(r.amount) + Number(r.vat_amount), scanned: r.source === 'scan', active: sp.open === r.id,
+      status: { label: CLAIM_STATUS[r.status]?.label ?? r.status, tone: CLAIM_STATUS[r.status]?.tone }, own: r.employee?.user_id === c.userId,
+      dup: !!k && r.status === 'pending' && (expKeys.has(k) || claimKeys.some(x => x.k === k && x.id !== r.id)) }
+  })
 
   return <>
     {f && <section className="border-b border-border bg-surface-2/30 p-4 sm:p-5" data-claim-detail={f.id}>
@@ -96,12 +112,6 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
 
     <FilterTabs label="Claim status" className="px-3" tabs={FILTERS.map(([k, l]) => ({ href: `/expenses?tab=claims${k === 'pending' ? '' : `&status=${k}`}`, label: l, active: status === k, count: n(k) }))} />
     {!rows?.length ? <EmptyState icon={Receipt} title={status === 'pending' ? 'No employee expenses waiting' : 'Nothing here'} body={status === 'pending' ? 'Employees send expenses from their portal (Scan receipt). They appear here for approval, and only enter your expenses once approved.' : undefined} />
-      : <ul className="divide-y divide-border" data-claims-queue>{rows.map((r: any) => <li key={r.id}>
-        <Link href={base({ open: r.id })} scroll={false} data-claim-row={r.reference ?? r.id} className={cn('flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-surface-2/50', sp.open === r.id && 'bg-primary-soft/40')}>
-          <span className="min-w-0 flex-1"><span className="block truncate font-medium">{r.employee?.full_name ?? 'Employee'} · {r.supplier_name ?? r.description}</span>
-            <span className="block truncate text-xs text-muted">{formatShortDate(r.spent_on)} · {EXPENSE_CATS[r.category] ?? r.category}{r.reference ? ` · ${r.reference}` : ''}{r.source === 'scan' ? ' · scanned' : ''}{r.receipt_document_id ? '' : ' · no receipt'}</span></span>
-          {r.source === 'scan' && <ScanText size={14} className="hidden shrink-0 text-muted sm:block" aria-hidden />}
-          <Money value={Number(r.amount) + Number(r.vat_amount)} className="shrink-0 font-semibold" />
-          <Badge tone={CLAIM_STATUS[r.status]?.tone} className="hidden shrink-0 sm:inline-flex">{CLAIM_STATUS[r.status]?.label}</Badge></Link></li>)}</ul>}
+      : <ClaimsQueue rows={queue} selectable={waiting} />}
   </>
 }

@@ -118,6 +118,16 @@ describe('turbo OCR', () => {
     console.log(`very poor photo: ${fuzzy?.passes} pass(es), read by ${fuzzy?.engine}`)
     expect(fuzzy?.passes).toBeGreaterThan(1); expect(fuzzy?.engine).toBe('paddleocr-ppocrv6-small')   // tiny was not enough → small tried
   }, 60_000)
+  it.skipIf(!tinyAvailable())('an unsure receipt (no date on it) stops after two quick passes and asks for cloud OCR after the first', async () => {
+    // before turbo v2 this case also ran the small models and the full-size, contrast-evened copy: ~35 s on one CPU
+    const img = await receiptImage(RECEIPT.filter(l => !/^Date/.test(l)), { tilt: 1.5, blur: 0.9, jpeg: 70, width: 520 })
+    let unsureAfter = -1, t0 = Date.now()
+    const r = await localReceiptOcr(img, 'image/jpeg', TODAY, 14_000, true, () => { unsureAfter = Date.now() - t0 })
+    expect(r?.passes).toBeLessThanOrEqual(2)
+    expect(r?.engine).toBe('paddleocr-ppocrv6-tiny')
+    expect(unsureAfter).toBeGreaterThan(0)
+    expect(r!.ms).toBeLessThan(14_000)
+  }, 60_000)
   it('reads long thin receipts at a larger size so their lines stay readable', async () => {
     const { readSize } = await import('@/lib/ai/ocr/paddle')
     expect(readSize(3024, 4032, true)).toBe(1280)                    // ordinary phone photo

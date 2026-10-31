@@ -51,11 +51,15 @@ export async function prepareReceiptImage(bytes: Uint8Array): Promise<{ gray: Bu
 }
 
 /**
- * Reads a receipt photo on this server. PaddleOCR reads the photo as taken (turbo: a smaller copy with the tiny models, ~1 s,
- * then the small models), then — only if that reading is not good enough — a contrast-evened, detailed copy; Tesseract runs only when PaddleOCR cannot (and tries
- * the photo in three ways). The reading that makes the most sense as a receipt wins; it stops as soon as one is good enough.
+ * Reads a receipt photo on this server. Turbo (the default): the tiny PaddleOCR models on a small copy of the photo (~2–3 s
+ * on one CPU), then the same with the contrast evened out (faded thermal paper, shadows); the small models only when the
+ * tiny ones found almost no text. Measured on one CPU: tiny 2.6 s, small 8 s, the detailed full-size pass 20 s — and on
+ * real receipts the slow passes rarely read more, so turbo leaves the detailed pass out (cloud OCR, started in parallel
+ * through `onUnsure`, covers the hard photos instead). Detailed mode (turbo off): small models, then the full-size,
+ * contrast-evened copy. Tesseract runs only when PaddleOCR cannot. The reading that makes the most sense as a receipt wins;
+ * it stops as soon as one is good enough.
  */
-export async function localReceiptOcr(bytes: Uint8Array, mime: string, today: string, budgetMs = 40_000, turbo = true): Promise<{ text: string; read: ReceiptRead; passes: number; ms: number; engine: string } | null> {
+export async function localReceiptOcr(bytes: Uint8Array, mime: string, today: string, budgetMs = 40_000, turbo = true, onUnsure?: () => void): Promise<{ text: string; read: ReceiptRead; passes: number; ms: number; engine: string } | null> {
   if (!IMAGES.has(mime) || process.env.SAQRFLOW_DISABLE_OCR === '1') return null
   const t0 = Date.now()
   let best: { text: string; read: ReceiptRead; score: number; engine: string } | null = null, passes = 0
@@ -66,18 +70,21 @@ export async function localReceiptOcr(bytes: Uint8Array, mime: string, today: st
   }
   const done = () => { const b = best as { text: string; read: ReceiptRead; engine: string } | null; return b && b.text.trim() ? { text: b.text, read: b.read, passes, ms: Date.now() - t0, engine: b.engine } : null }
 
-  // turbo: tiny models on a small copy (~1 s) → small models on the small copy → small models, contrast-evened, full size
-  const plan: { model: PaddleModel; enhance: boolean; turbo: boolean }[] = [
-    ...(turbo && tinyAvailable() ? [{ model: 'tiny' as const, enhance: false, turbo: true }] : []),
-    { model: 'small', enhance: false, turbo }, { model: 'small', enhance: true, turbo: false },
-  ]
-  let paddleRan = false
+  // turbo: tiny → tiny, contrast-evened → (almost no text read) small; detailed: small → small, contrast-evened, full size
+  const tiny = turbo && tinyAvailable()
+  const plan: { model: PaddleModel; enhance: boolean; turbo: boolean; ifLittle?: boolean }[] = tiny
+    ? [{ model: 'tiny', enhance: false, turbo: true }, { model: 'tiny', enhance: true, turbo: true }, { model: 'small', enhance: false, turbo: true, ifLittle: true }]
+    : [{ model: 'small', enhance: false, turbo }, { model: 'small', enhance: true, turbo: false }]
+  let paddleRan = false, told = false
   for (const step of plan) {
+    const b = best as { text: string } | null
+    if (step.ifLittle && b && b.text.split('\n').filter(l => l.trim()).length >= 8) continue   // the tiny models read the receipt: the small ones would not add to it
     const left = budgetMs - (Date.now() - t0); if (left < 4000) break
     const r = await paddleOcr(bytes, mime, { ...step, timeoutMs: left })
     if (!r) { if (step.model === 'tiny') continue; break }       // tiny could not run: the small models still can
     paddleRan = true; passes++
     if (r.text.trim() && consider(r.text, r.engine)) return done()
+    if (!told) { told = true; onUnsure?.() }                    // not sure after the first reading: the caller may start cloud OCR alongside
   }
   if (paddleRan) return done()                     // PaddleOCR ran: Tesseract would not read more than it did
   return (await tesseractPasses(bytes, t0, budgetMs, (t) => { passes++; return consider(t, 'tesseract-5-eng') })) ?? done()
