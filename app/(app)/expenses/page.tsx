@@ -11,6 +11,7 @@ import { ExpenseFields } from '@/components/expenses/expense-fields'
 import { ScanReceiptButton } from '@/components/expenses/scan-button'
 import { TallyPanel } from '@/components/expenses/tally-panel'
 import { ClaimsPanel } from '@/components/expenses/claims-panel'
+import { PettyPanel } from '@/components/petty/petty-panel'
 import { deleteExpense, saveExpense } from '@/app/actions/projects'
 import { saveSupplierLedger } from '@/app/actions/expenses'
 import { EXPENSE_CATS, PAYMENT_METHODS } from '@/lib/projects'
@@ -29,23 +30,25 @@ const UUID = /^[0-9a-f-]{36}$/
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const c = await getCtx(); if (!c.can('finance.view')) redirect('/')
   const sp = await flat(searchParams), edit = c.can('records.edit'), exp = c.can('data.export')
-  const tab = sp.tab === 'suppliers' ? 'suppliers' : sp.tab === 'tally' && exp ? 'tally' : sp.tab === 'claims' ? 'claims' : 'list'
-  const [{ data: projects }, { data: employees }, { data: suppliers }, { data: assetRows }, { count: waiting }] = await Promise.all([
+  const tab = sp.tab === 'suppliers' ? 'suppliers' : sp.tab === 'tally' && exp ? 'tally' : sp.tab === 'claims' ? 'claims' : sp.tab === 'petty' ? 'petty' : 'list'
+  const [{ data: projects }, { data: employees }, { data: suppliers }, { data: assetRows }, { count: waiting }, { count: pettyWaiting }] = await Promise.all([
     c.supabase.from('projects').select('id,name').order('name').limit(500),
     edit ? c.supabase.from('employees').select('id,full_name').neq('status', 'archived').order('full_name').limit(1000) : Promise.resolve({ data: [] as any[] }),
     c.supabase.from('suppliers').select('id,name,trn,tally_ledger,phone').is('deleted_at', null).order('name').limit(2000),
     edit ? c.supabase.from('assets').select('id,name,plate_or_serial').is('archived_at', null).order('name').limit(1000) : Promise.resolve({ data: [] as any[] }),
     c.supabase.from('expense_claims').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    c.supabase.from('petty_cash_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
   ])
   const emps = (employees ?? []).map((e: any) => ({ id: e.id, name: e.full_name })), projs = (projects ?? []) as { id: string; name: string }[]
   const sups = (suppliers ?? []).map((s: any) => ({ id: s.id as string, name: s.name as string, trn: s.trn as string | null }))
   const assetOpts = (assetRows ?? []).map((a: any) => ({ id: a.id, name: a.plate_or_serial ? `${a.name} (${a.plate_or_serial})` : a.name }))
   const form = (e?: any) => <ExpenseFields e={e} today={c.today} projects={projs} assets={assetOpts} employees={emps} suppliers={sups} />
 
-  const tabs = <TabStrip label="Expenses sections" className="px-3">{[['list', 'Expenses'], ['claims', 'Employee claims'], ['suppliers', 'Suppliers'], ...(exp ? [['tally', 'Tally export']] : [])].map(([k, l]) =>
+  const tabs = <TabStrip label="Expenses sections" className="px-3">{[['list', 'Expenses'], ['claims', 'Employee claims'], ['petty', 'Petty cash'], ['suppliers', 'Suppliers'], ...(exp ? [['tally', 'Tally export']] : [])].map(([k, l]) =>
     <Link key={k} href={k === 'list' ? '/expenses' : `/expenses?tab=${k}`} aria-current={tab === k ? 'page' : undefined}
       className={cn('-mb-px inline-flex items-center whitespace-nowrap border-b-2 px-3 py-3 text-sm transition-colors', tab === k ? 'border-primary font-semibold text-primary' : 'border-transparent text-muted hover:text-fg')}>{l}
-      {k === 'claims' && !!waiting && <span data-claims-waiting className="ms-1.5 min-w-[20px] rounded-full bg-warning px-1.5 text-center text-[11px] font-semibold leading-[18px] text-white tabular-nums">{waiting}</span>}</Link>)}</TabStrip>
+      {k === 'claims' && !!waiting && <span data-claims-waiting className="ms-1.5 min-w-[20px] rounded-full bg-warning px-1.5 text-center text-[11px] font-semibold leading-[18px] text-white tabular-nums">{waiting}</span>}
+      {k === 'petty' && !!pettyWaiting && <span data-petty-waiting className="ms-1.5 min-w-[20px] rounded-full bg-warning px-1.5 text-center text-[11px] font-semibold leading-[18px] text-white tabular-nums">{pettyWaiting}</span>}</Link>)}</TabStrip>
 
   const header = <PageHeader title="Expenses" sub="Supplier purchases and running costs. Scan a receipt or enter it by hand; scanned details are only suggestions until you check them. Export verified expenses to Tally."
     actions={<><SavedViews page="/expenses" />{exp && <LinkButton href="/api/export/expenses?format=xlsx" variant="secondary"><Download size={14} />Excel</LinkButton>}
@@ -62,6 +65,8 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
     return <>{header}<Card className="mb-5">{tabs}</Card>
       <TallyPanel rows={rows} settings={settings} batches={(batches ?? []) as any} banks={(banks ?? []).map(b => ({ id: b.id, label: [b.name, b.account_display_name].filter(Boolean).join(' ') }))} suppliers={sups} filters={f} canEdit={exp && edit} /></>
   }
+
+  if (tab === 'petty') return <>{header}<Card>{tabs}<PettyPanel c={c} sp={sp} projects={projs} /></Card></>
 
   if (tab === 'claims') return <>{header}<Card>{tabs}<ClaimsPanel c={c} sp={sp} projects={projs} /></Card></>
 

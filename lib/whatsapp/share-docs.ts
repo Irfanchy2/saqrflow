@@ -4,6 +4,8 @@ import { toE164 } from '../phone'
 import { formatAed, formatShortDate } from '../time'
 import { loadPayslip } from '../salary-docs'
 import { movements, salaryAccount, statementRange } from '../salary'
+import { walletOf } from '../petty'
+import { statementRange as pettyRange } from '../petty-math'
 import { safePart, salesPdfName } from '../sales/filename'
 import type { SalesType } from '../sales/docs'
 import { SendError, resolveMessage } from './outbox'
@@ -73,6 +75,15 @@ const RESOLVE: Record<ShareKind, (c: Ctx, id: string) => Promise<ShareDoc>> = {
     return { docLabel: 'Salary statement', docDetail: `${e.employee_no} · ${formatShortDate(r.from)} to ${formatShortDate(r.to)}`, pdfUrl: `/api/salary-statements/${id}`,
       filename: `Salary_statement_${safePart(e.full_name)}_${r.from}_${r.to}.pdf`, ...employeeTo(c, e),
       values: { employee: e.full_name, from: formatShortDate(r.from), to: formatShortDate(r.to) } }
+  },
+  async petty_cash_statement(c, id) {
+    // id = the employee; the default period (first petty cash entry to today), the same one Download gives
+    const a = await walletOf(c, id)
+    if (!a) throw new ShareDocError('Employee not found.')
+    const r = pettyRange(a.entries, c.today)
+    return { docLabel: 'Petty cash statement', docDetail: `${a.emp.employee_no} · ${formatShortDate(r.from)} to ${formatShortDate(r.to)}`, pdfUrl: `/api/petty-cash/${id}/statement`,
+      filename: `Petty_cash_statement_${safePart(a.emp.full_name)}_${r.from}_${r.to}.pdf`, ...employeeTo(c, a.emp),
+      values: { employee: a.emp.full_name, from: formatShortDate(r.from), to: formatShortDate(r.to), balance: formatAed(a.wallet.available) } }
   },
   quotation: (c, id) => salesDoc(c, 'quotation', id),
   invoice: (c, id) => salesDoc(c, 'invoice', id),

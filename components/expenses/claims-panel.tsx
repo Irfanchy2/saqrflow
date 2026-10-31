@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { Ctx } from '@/lib/auth'
-import { Badge, EmptyState, Field, Money, Select, Textarea } from '@/components/ui/primitives'
+import { Badge, EmptyState, Field, Input, Money, Select, Textarea } from '@/components/ui/primitives'
 import { ActionForm } from '@/components/ui/action-form'
 import { FilterTabs } from '@/components/ui/mobile'
 import { AccountSelect } from '@/components/banking/account-select'
@@ -11,6 +11,7 @@ import { EXPENSE_CATS } from '@/lib/projects'
 import { findDuplicate, normName, normRef } from '@/lib/expenses/suppliers'
 import { ClaimsQueue, type QueueRow } from './claims-queue'
 import { formatShortDate } from '@/lib/time'
+import { FUNDED_ADMIN, defaultSettlement } from '@/lib/petty-math'
 
 const FILTERS = [['pending', 'Waiting'], ['correction_requested', 'Sent back'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['withdrawn', 'Withdrawn'], ['all', 'All']] as const
 const PAID: Record<string, string> = { cash: 'Cash', card: 'Card', bank_transfer: 'Bank transfer', other: 'Other' }
@@ -24,7 +25,7 @@ const UUID = /^[0-9a-f-]{36}$/i
 export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<string, string | undefined>; projects: { id: string; name: string }[] }) {
   const canDecide = c.can('expenses.approve') || c.can('approvals.decide')
   const status = FILTERS.some(([k]) => k === sp.status) ? sp.status! : 'pending'
-  const cols = 'id,employee_id,spent_on,category,supplier_name,supplier_trn,reference,description,amount,vat_amount,paid_with,card:company_cards(label,last4),project_id,project:projects(name),quantity,items,notes,status,source,receipt_document_id,decision_note,decided_at,expense_id,created_at,employee:employees(full_name,employee_no,user_id)'
+  const cols = 'id,employee_id,spent_on,category,supplier_name,supplier_trn,reference,description,amount,vat_amount,paid_with,card:company_cards(label,last4),project_id,project:projects(name),quantity,items,notes,status,source,funded_by,receipt_document_id,decision_note,decided_at,expense_id,created_at,employee:employees(full_name,employee_no,user_id)'
   let q = c.supabase.from('expense_claims').select(cols)
   if (status !== 'all') q = q.eq('status', status)
   const [{ data: rows }, { data: counts }, focusRes] = await Promise.all([
@@ -42,6 +43,14 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
       .then(r => (r.data ?? []).filter(x => normRef(x.reference ?? '') === normRef(f.reference)).slice(0, 5)) : [],
   ]) : [[], null, null, []]
   const own = f?.employee?.user_id === c.userId
+  // petty cash / own money: the employee's petty cash balance and, once approved, how much of the claim is settled
+  const funded = f && (f.funded_by === 'petty_cash' || f.funded_by === 'personal')
+  const [pettyBal, settle] = funded ? await Promise.all([
+    c.supabase.rpc('petty_wallet_balance', { p_employee: f.employee_id }).then(r => Number(r.data ?? 0)),
+    f.status === 'approved' ? c.supabase.from('expense_claim_settlement').select('from_petty_cash,to_reimburse,unsettled').eq('claim_id', f.id).maybeSingle().then(r => r.data) : null,
+  ]) : [0, null]
+  const fTotal = f ? Number(f.amount) + Number(f.vat_amount) : 0
+  const plan = f ? defaultSettlement(f.funded_by, fTotal, pettyBal) : null
   const base = (x: Record<string, string>) => `/expenses?${new URLSearchParams({ tab: 'claims', ...(status !== 'pending' ? { status } : {}), ...x })}`
   const tz = c.company.timezone
   // Waiting tab: possible duplicates (same supplier and receipt number as a saved expense or another live claim), worked out
@@ -55,7 +64,7 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
   const queue: QueueRow[] = (rows ?? []).map((r: any) => {
     const k = key(r.supplier_name, r.reference)
     return { id: r.id, href: base({ open: r.id }), title: `${r.employee?.full_name ?? 'Employee'} · ${r.supplier_name ?? r.description}`,
-      sub: `${formatShortDate(r.spent_on)} · ${EXPENSE_CATS[r.category] ?? r.category}${r.reference ? ` · ${r.reference}` : ''}${r.source === 'scan' ? ' · scanned' : ''}${r.receipt_document_id ? '' : ' · no receipt'}`,
+      sub: `${formatShortDate(r.spent_on)} · ${EXPENSE_CATS[r.category] ?? r.category}${r.reference ? ` · ${r.reference}` : ''}${r.source === 'scan' ? ' · scanned' : ''}${r.receipt_document_id ? '' : ' · no receipt'}${r.funded_by === 'petty_cash' ? ' · petty cash' : r.funded_by === 'personal' ? ' · own money' : ''}`,
       total: Number(r.amount) + Number(r.vat_amount), scanned: r.source === 'scan', active: sp.open === r.id,
       status: { label: CLAIM_STATUS[r.status]?.label ?? r.status, tone: CLAIM_STATUS[r.status]?.tone }, own: r.employee?.user_id === c.userId,
       dup: !!k && r.status === 'pending' && (expKeys.has(k) || claimKeys.some(x => x.k === k && x.id !== r.id)) }
@@ -74,6 +83,7 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[14px] sm:grid-cols-3">
             {([['Total', <Money key="t" value={Number(f.amount) + Number(f.vat_amount)} className="font-semibold" />], ['Excl. VAT', <Money key="a" value={f.amount} />], ['VAT', <Money key="v" value={f.vat_amount} />],
               ['Date', formatShortDate(f.spent_on)], ['Category', EXPENSE_CATS[f.category] ?? f.category], ['Paid with', `${PAID[f.paid_with] ?? f.paid_with}${f.card ? ` · ${f.card.label} ••${f.card.last4}` : ''}`],
+              ['Paid from', f.funded_by ? FUNDED_ADMIN[f.funded_by] : 'Not stated (earlier claim)'], ...(funded ? [['Petty cash held', <Money key="p" value={pettyBal} />] as [string, React.ReactNode]] : []),
               ['Project', f.project?.name ?? '—'], ['Receipt no.', f.reference ?? '—'], ['Supplier TRN', f.supplier_trn ?? '—'], ['Entered', f.source === 'scan' ? 'Scanned receipt' : 'By hand']] as [string, React.ReactNode][]).map(([k, v]) =>
               <div key={k} className="min-w-0"><dt className="text-[12px] text-muted">{k}</dt><dd className="mt-0.5 font-medium [overflow-wrap:anywhere]">{v}</dd></div>)}
           </dl>
@@ -88,6 +98,7 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
             <a href={`/api/documents/${f.receipt_document_id}/download?mode=preview`} target="_blank" rel="noopener noreferrer" data-claim-receipt className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-[13.5px] font-medium shadow-key hover:bg-surface-2"><FileText size={15} aria-hidden />Open receipt</a></div>
             : <p className="text-[13.5px] text-warning">No receipt attached.</p>}
           {f.decision_note && f.status !== 'pending' && <p className="text-[13.5px]"><b className="font-semibold">Decision note:</b> {f.decision_note}</p>}
+          {settle && <p className="text-[13.5px]" data-claim-settlement>Settled: <Money value={settle.from_petty_cash} /> from petty cash{Number(settle.to_reimburse) > 0 && <>, <Money value={settle.to_reimburse} /> owed back to the employee</>}{Number(settle.unsettled) > 0 && <span className="text-warning">; <Money value={settle.unsettled} /> still to settle (<Link href={`/expenses/petty-cash/${f.employee_id}`} className="underline-offset-2 hover:underline">wallet</Link>)</span>}.</p>}
           {f.expense_id && <p className="flex items-center gap-1.5 text-[13.5px] text-success"><CheckCircle2 size={15} aria-hidden />In expenses since {f.decided_at ? formatShortDate(f.decided_at.slice(0, 10)) : '—'}. <Link href={`/expenses?q=${encodeURIComponent(f.reference ?? f.description)}`} className="font-medium underline-offset-2 hover:underline">Find it</Link></p>}
           <ol className="space-y-2 border-t border-border pt-3 text-[13px]" aria-label="History">{(events as any[]).map(ev => <li key={ev.id} className="flex gap-2"><History size={14} className="mt-0.5 shrink-0 text-muted" aria-hidden />
             <span><span className="font-medium">{EVENT[ev.kind] ?? ev.kind}</span><span className="text-muted"> · {ev.actor_name ?? 'System'} · {new Date(ev.created_at).toLocaleString('en-GB', { timeZone: tz, dateStyle: 'medium', timeStyle: 'short' })}</span>{ev.note && <span className="block [overflow-wrap:anywhere]">{ev.note}</span>}</span></li>)}</ol>
@@ -103,7 +114,16 @@ export async function ClaimsPanel({ c, sp, projects }: { c: Ctx; sp: Record<stri
               <Field label="Note to the employee" hint="Required when sending back or rejecting"><Textarea name="note" rows={2} maxLength={2000} /></Field>
               <Field label="Category"><Select name="category" defaultValue={f.category}>{Object.entries(EXPENSE_CATS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
               <Field label="Project" hint={f.project_id ? 'The employee chose this project; change it if needed' : 'When approving'}><Select name="project_id" defaultValue={f.project_id ?? ''}><option value="">— General / no project —</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
-              <AccountSelect name="paid_from_bank_id" label="Paid back from" />
+              {f.funded_by === 'petty_cash' && plan ? <div className="grid gap-3 rounded-xl bg-surface-2/60 p-3" data-claim-settle>
+                <p className="text-[13px]">Paid from company petty cash. The employee holds <b className="font-semibold">AED {pettyBal.toFixed(2)}</b>. No company account moves again: the cash left when the petty cash was issued.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="From petty cash (AED)"><Input name="petty" type="number" step="0.01" min="0" max={Math.min(fTotal, pettyBal)} defaultValue={plan.petty.toFixed(2)} /></Field>
+                  <Field label="Employee paid (AED)" hint="Only if confirmed"><Input name="personal" type="number" step="0.01" min="0" max={fTotal} placeholder="0.00" /></Field></div>
+                {plan.awaiting > 0 && <p className="text-[12.5px] text-warning">AED {plan.awaiting.toFixed(2)} more than the employee holds: it waits for settlement unless you confirm the employee paid it with their own money.</p>}</div>
+                : f.funded_by === 'personal' ? <div className="grid gap-2 rounded-xl bg-surface-2/60 p-3" data-claim-settle>
+                  <p className="text-[13px]">Paid with the employee&apos;s own money: approving records AED {fTotal.toFixed(2)} owed back to them (not from their petty cash).</p>
+                  <AccountSelect name="paid_from_bank_id" label="Pay back now from (optional)" value={null} /></div>
+                : <AccountSelect name="paid_from_bank_id" label={f.funded_by === 'company' ? 'Paid from' : 'Paid back from'} />}
             </div>
           </ActionForm></div>}
         {f.status === 'pending' && own && <p className="text-[13.5px] text-muted">This is your own expense: another approver decides it.</p>}

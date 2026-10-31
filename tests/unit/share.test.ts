@@ -5,7 +5,7 @@ import { toE164 } from '@/lib/phone'
 
 describe('free WhatsApp sharing messages', () => {
   it('has a default message for every document type, using only its own placeholders', () => {
-    expect(SHARE_KINDS).toEqual(['payslip', 'salary_receipt', 'salary_statement', 'quotation', 'invoice', 'delivery_note', 'payment_reminder', 'customer_receipt', 'customer_statement', 'employee_document'])
+    expect(SHARE_KINDS).toEqual(['payslip', 'salary_receipt', 'salary_statement', 'quotation', 'invoice', 'delivery_note', 'payment_reminder', 'customer_receipt', 'customer_statement', 'employee_document', 'petty_cash_statement'])
     for (const k of SHARE_KINDS) expect(shareBodyProblems(k, SHARE[k].body)).toEqual([])
   })
   it('fills the payslip message without any salary amount', () => {
@@ -27,7 +27,8 @@ describe('free WhatsApp sharing messages', () => {
     expect(sharePerms('payslip')).toEqual(['salary.view']); expect(sharePerms('salary_statement')).toEqual(['salary.view'])
     expect(sharePerms('customer_receipt')).toEqual(['finance.view']); expect(sharePerms('customer_statement')).toEqual(['finance.view'])
     expect(sharePerms('employee_document')).toEqual(['documents.view', 'employees.view_sensitive'])
-    for (const k of SHARE_KINDS) expect(SHARE[k].party).toBe(['payslip', 'salary_receipt', 'salary_statement', 'employee_document'].includes(k) ? 'employee' : 'customer')
+    expect(sharePerms('petty_cash_statement')).toEqual(['expenses.approve'])
+    for (const k of SHARE_KINDS) expect(SHARE[k].party).toBe(['payslip', 'salary_receipt', 'salary_statement', 'employee_document', 'petty_cash_statement'].includes(k) ? 'employee' : 'customer')
   })
   it('the salary statement and employee document messages carry no salary amounts', () => {
     const st = fillShare('salary_statement', SHARE.salary_statement.body, { employee: 'Ali Hassan', from: '1 Oct 2026', to: '29 Oct 2026', company: 'Al Saqr' })
