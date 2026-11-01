@@ -4,10 +4,10 @@ import { Alert, Badge, EmptyState, Field, LinkButton, Money, Textarea, Td, Th, T
 import { ActionForm } from '@/components/ui/action-form'
 import { AccountSelect } from '@/components/banking/account-select'
 import { FilterTabs } from '@/components/ui/mobile'
-import { ChevronRight, Download, Link2, Wallet, X } from '@/components/icons'
+import { ChevronRight, Download, Link2, Paperclip, Wallet, X } from '@/components/icons'
 import { decidePettyRequest } from '@/app/actions/petty'
 import { canManagePetty, ENTRY_COLS, REQUEST_COLS, wallets } from '@/lib/petty'
-import { FUNDED_ADMIN, KIND, REQUEST_STATUS, kindLabel, matchHandovers, methodLabel, type PettyKind } from '@/lib/petty-math'
+import { FUNDED_ADMIN, KIND, REQUEST_STATUS, attachmentUrl, kindLabel, matchHandovers, methodLabel, type PettyKind } from '@/lib/petty-math'
 import { formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { IssueButton, SettleButton } from './forms'
@@ -77,6 +77,8 @@ export async function PettyPanel({ c, sp, projects }: { c: Ctx; sp: Record<strin
             <div key={k} className="min-w-0"><dt className="text-[12px] text-muted">{k}</dt><dd className="mt-0.5 font-medium [overflow-wrap:anywhere]">{v}</dd></div>)}
         </dl>
         {f.notes && <p className="rounded-xl bg-surface px-3 py-2 text-[13.5px] text-muted [overflow-wrap:anywhere]">“{f.notes}”</p>}
+        {f.document_id ? <a href={attachmentUrl(f.document_id)} target="_blank" rel="noopener noreferrer" data-petty-file className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-[13.5px] font-medium shadow-key hover:bg-surface-2"><Paperclip size={15} aria-hidden />Open attachment</a>
+          : <p className="text-[13px] text-muted">No attachment.</p>}
         {f.decision_note && f.status !== 'pending' && <p className="text-[13.5px]"><b className="font-semibold">Decision note:</b> {f.decision_note}{f.decider?.full_name ? ` · ${f.decider.full_name}` : ''}</p>}
         <Link href={`/expenses/petty-cash/${f.employee_id}`} className="inline-flex items-center gap-1 text-[13.5px] font-medium text-primary hover:underline">Open {nm(f.employee_id)}&apos;s wallet<ChevronRight size={14} aria-hidden /></Link>
       </div>

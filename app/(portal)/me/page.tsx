@@ -62,7 +62,7 @@ export default async function MyHome() {
       <div className="px-4 pb-4 sm:px-5"><NewClaim today={c.today} suppliers={sups} cards={cards} projects={projects} pettyBalance={wallet.available} /></div>
     </PortalCard>
 
-    <WalletCard w={wallet} />
+    <WalletCard w={wallet} today={c.today} projects={projects} />
 
     {settings.checkin && <Today c={c} rec={todayRec} settings={settings} />}
 

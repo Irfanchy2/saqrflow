@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getMe, myProjects } from '@/lib/me'
 import { flat } from '@/lib/queries'
@@ -40,8 +39,7 @@ export default async function MyExpenses({ searchParams }: { searchParams: Promi
       <div className="hidden sm:block"><NewClaim today={c.today} size="sm" suppliers={sups} cards={cards} projects={projects} pettyBalance={wallet.available} /></div>
     </div>
     <div className="sm:hidden"><NewClaim today={c.today} suppliers={sups} cards={cards} projects={projects} pettyBalance={wallet.available} /></div>
-    <WalletCard w={wallet} />
-    {!wallet.received && !wallet.pending_requests && <Link href="/me/expenses/petty-cash" className="block text-[13px] font-medium text-primary hover:underline" data-petty-link>Petty cash: received money from the company for purchases? Add it here</Link>}
+    <WalletCard w={wallet} today={c.today} projects={projects} />
     <PortalCard title={status === 'all' ? 'All expenses' : FILTERS.find(([k]) => k === status)![1]} sub={list.length ? <>Total <Money value={list.reduce((s, r) => s + Number(r.amount) + Number(r.vat_amount), 0)} /></> : undefined}>
       <FilterTabs label="Filter by status" className="px-3 sm:px-4" tabs={FILTERS.filter(([k]) => k === 'all' || k === status || n(k) > 0).map(([k, l]) => ({ href: k === 'all' ? '/me/expenses' : `/me/expenses?status=${k}`, label: l, active: k === status, count: n(k) }))} />
       {list.length ? <ClaimList rows={list} /> : <EmptyState compact icon={Receipt} title={status === 'all' ? 'No expenses yet' : 'Nothing here'} body={status === 'all' ? 'Scan a receipt or enter an expense: it goes to your manager for approval.' : 'No expenses with this status.'} />}

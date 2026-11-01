@@ -28,7 +28,7 @@ function tenure(from: string | null, today: string) {
 const wa = (p: string) => `https://wa.me/${p.replace(/[^\d]/g, '').replace(/^0+/, '')}`
 
 /** One person on one card: who they are, how to reach them, their documents and what they are on today. */
-export function EmployeeCard({ e, x, today, sensitive, upload }: { e: EmpCardData; x: EmpCardExtra; today: string; sensitive: boolean; /** room for the card's Add document button */ upload?: boolean }) {
+export function EmployeeCard({ e, x, today, sensitive, upload, action }: { e: EmpCardData; x: EmpCardExtra; today: string; sensitive: boolean; /** room for the card's Add document button */ upload?: boolean; /** e.g. Log in as employee */ action?: React.ReactNode }) {
   const cl = x.checklist, t = tenure(e.joining_date, today)
   const row = (I: typeof Phone, label: string, value: React.ReactNode) => <div className="flex min-w-0 items-start gap-2.5"><I size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden /><div className="min-w-0"><dt className="sr-only">{label}</dt><dd className="truncate">{value}</dd></div></div>
   return <div className="flex h-full flex-col">
@@ -71,6 +71,7 @@ export function EmployeeCard({ e, x, today, sensitive, upload }: { e: EmpCardDat
       {sensitive && <Link href={`/employees/${e.id}?tab=documents`} className="text-muted hover:text-fg">Documents</Link>}
       {x.salary !== undefined && <Link href={`/employees/${e.id}?tab=salary`} className="text-muted hover:text-fg">Salary</Link>}
       {sensitive && <Link href={`/employees/${e.id}?tab=leave`} className="text-muted hover:text-fg">Leave</Link>}
+      {action && <span className="ms-auto">{action}</span>}
     </footer>
   </div>
 }

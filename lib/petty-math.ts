@@ -7,8 +7,10 @@ export type PettyKind = 'received' | 'expense_settled' | 'returned' | 'adjustmen
 export type PettyEntry = {
   id: string; book: 'wallet' | 'reimbursement'; kind: PettyKind; reverses_kind: PettyKind | null; amount: number | string
   entry_date: string; created_at: string; description: string; reference: string | null; method?: string | null
-  project?: { name: string } | null; claim_id?: string | null; reverses_id?: string | null
+  project?: { name: string } | null; claim_id?: string | null; reverses_id?: string | null; document_id?: string | null
 }
+/** Opens a petty cash attachment (a vault document; RLS decides who may see it). */
+export const attachmentUrl = (id: string) => `/api/documents/${id}/download?mode=preview`
 
 export const KIND: Record<PettyKind, { label: string; tone: 'green' | 'blue' | 'amber' | 'red' | 'neutral' }> = {
   received: { label: 'Petty cash received', tone: 'green' },

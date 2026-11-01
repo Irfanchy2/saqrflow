@@ -1,5 +1,6 @@
 'use server'
 import { redirect } from 'next/navigation'
+import { clearImpersonation, readImpersonation } from '@/lib/impersonation'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { safe, str } from '@/lib/action'
@@ -98,7 +99,15 @@ export async function signOut(fd?: FormData) {
     await logLogin('sign_out', { userId: user.id, email: user.email, sessionId: sid })
     if (sid) { try { await createAdminClient().from('user_sessions').update({ revoked_at: new Date().toISOString(), revoked_by: user.id }).eq('id', sid).eq('user_id', user.id).is('revoked_at', null) } catch {} }
   }
-  await sb.auth.signOut(); redirect(fd instanceof FormData && fd.get('next') === 'signup' ? '/signup' : '/login')
+  await sb.auth.signOut()
+  // signed out while viewing an employee portal: the owner's kept session is ended too, not left valid
+  const imp = await readImpersonation()
+  if (imp) {
+    await clearImpersonation()
+    const { error } = await sb.auth.refreshSession({ refresh_token: imp.rt }).catch(() => ({ error: true }))
+    if (!error) await sb.auth.signOut().catch(() => {})
+  }
+  redirect(fd instanceof FormData && fd.get('next') === 'signup' ? '/signup' : '/login')
 }
 
 /** Forgot password: always the same answer (it never reveals whether the email has an account). Rate-limited. */
