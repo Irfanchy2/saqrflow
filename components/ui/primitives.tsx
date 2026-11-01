@@ -143,7 +143,7 @@ export function StatCard({ label, value, hint, href, tone: t = 'neutral', icon, 
   return href ? <Link href={href} className="kpi block h-full rounded-xl focus-visible:ring-offset-0">{inner}</Link> : <div className="kpi h-full">{inner}</div>
 }
 /** A row of KPI cards. Columns follow the number of cards; each card gets the next tile colour. */
-export function Metrics({ children, className, cols }: { children: ReactNode; className?: string; cols?: 2 | 3 | 4 | 5 | 6 }) {
+export function Metrics({ children, className, cols, phone = 'strip' }: { children: ReactNode; className?: string; cols?: 2 | 3 | 4 | 5 | 6; /** phones: a swipeable strip (default) or a 2-column grid showing every card */ phone?: 'strip' | 'grid' }) {
   const kids = Children.toArray(children).filter(Boolean)
   const n = cols ?? (Math.min(6, Math.max(2, kids.length)) as 2 | 3 | 4 | 5 | 6)
   const lg = { 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-3 xl:grid-cols-5', 6: 'lg:grid-cols-3 2xl:grid-cols-6' }[n]
@@ -152,6 +152,8 @@ export function Metrics({ children, className, cols }: { children: ReactNode; cl
   let i = 0
   // phones: one swipeable strip of compact cards, so the list below starts near the top of the screen. Every card has the
   // same width and stretches to the tallest one (a card's own h-full would stop the stretch, so it is reset to auto there)
+  if (phone === 'grid') return <div className={cn('metrics grid grid-cols-2 gap-3 sm:gap-4 items-stretch', md3 && 'md:grid-cols-3', lg, className)}>
+    {kids.map(k => isValidElement(k) && k.type === StatCard ? cloneElement(k as React.ReactElement<{ index?: number }>, { index: (k.props as { index?: number }).index ?? i++ }) : k)}</div>
   return <div className={cn('metrics tabstrip -mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 items-stretch [&>*]:w-[46%] [&>*]:min-w-[158px] [&>*]:max-w-[220px] [&>*]:shrink-0 [&>*]:snap-start max-sm:[&>*]:!h-auto sm:[&>*]:w-auto sm:[&>*]:min-w-0 sm:[&>*]:max-w-none', md3 && 'md:grid-cols-3', lg, className)}>
     {kids.map(k => isValidElement(k) && k.type === StatCard ? cloneElement(k as React.ReactElement<{ index?: number }>, { index: (k.props as { index?: number }).index ?? i++ }) : k)}</div>
 }
