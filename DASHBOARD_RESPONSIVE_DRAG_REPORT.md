@@ -54,13 +54,26 @@ The page itself never scrolled sideways.
 - It is the same layout **Customize** uses; show/hide and reset still work there.
 - If a save fails, the cards go back to where they were and an error is shown.
 
+## 3b. Notifications panel on phones
+
+**What was wrong:** on phones the bell's panel opened as a thin strip, about the width of the bell.
+
+**Why:** the panel uses "fixed" positioning so it can span the screen. The bell's round button, and the portal header, use a blur effect, and in browsers a blur effect turns that element into the reference frame for "fixed" children. So the panel was sized against the 56-pixel bell instead of the screen.
+
+**Fix:** the panel is now drawn on the page body.
+- **Phones:** it spans the screen under the header.
+- **Larger screens:** it sits under the bell at full size.
+- It closes on a tap outside, on Escape, or when a page opens.
+- This covers both the admin app and the employee portal.
+
 ## 4. Tests actually run
 
 | Check | Result |
 | --- | --- |
 | `npx tsc --noEmit` | passed |
 | Unit tests | 310 / 310 |
-| New e2e `tests/e2e/dashboard-board.mjs` | 41 / 41 (see below) |
+| New e2e `tests/e2e/dashboard-board.mjs` | 47 / 47 (see below; 6 notification-panel checks at 390 and 1440 px) |
+| `portal.mjs`, `petty-extra.mjs` after the bell change | 119 / 119, 26 / 26 |
 | Full `scripts/e2e.sh` (production build + 27 suites) | the other 26 suites all passed (smoke 141, portal 119, share 119, demo 38, QA sweep 56, …). dashboard-board failed only at setup in that run (the demo company already existed); after the fix it passed 41 / 41 run straight after the demo suite, as in the full run |
 
 **What `dashboard-board.mjs` covers:**

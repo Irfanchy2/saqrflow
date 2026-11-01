@@ -47,6 +47,19 @@ try {
   const all = { items: KEYS.map(k => ({ key: k, col: ['banner', 'finance'].includes(k) ? 'top' : LEFT.includes(k) ? 'left' : 'right', hidden: false })) }
   await db.query(`insert into user_preferences(user_id,key,value) values ($1,'dashboard.layout',$2) on conflict (user_id,key) do update set value=excluded.value`, [uid, JSON.stringify(all)])
 
+  const co = (await one(`select company_id from profiles where id=$1`, [uid])).company_id
+  await db.query(`insert into in_app_notifications(company_id,user_id,title,body,link,severity,dedupe_key) values ($1,$2,'Invoice INV-612 is overdue (AED 66,937.50)','12 days late · Gulf Horizon Contracting','/invoices','warning',$3)`, [co, uid, `bell-${Date.now()}`])
+  /** opens the bell; the panel must sit inside the screen, readable, and close on a tap outside */
+  const bell = async (page, label) => {
+    await page.locator('[data-bell]').first().click(); await page.waitForTimeout(300)
+    const panel = page.locator('[data-notifications]')
+    const b = await panel.boundingBox(), vw = page.viewportSize().width
+    ok(b && b.x >= 0 && b.x + b.width <= vw && b.width >= Math.min(352, vw - 16) - 1, `${label}: notifications panel opens at full size inside the screen (${b ? Math.round(b.width) : 0}px of ${vw}px)`)
+    ok((await panel.innerText()).includes('Invoice INV-612 is overdue'), `${label}: notifications are readable`)
+    await page.mouse.click(5, page.viewportSize().height / 2); await page.waitForTimeout(300)
+    ok(await panel.count() === 0, `${label}: a tap outside closes it`)
+  }
+
   console.log('\n[1] Nothing cut off or beside the screen')
   for (const [w, h] of [[360, 780], [390, 844], [768, 1024], [1024, 768], [1280, 800], [1440, 900], [1920, 1080]]) {
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: w < 800, hasTouch: w < 800 }); const p = watch(await ctx.newPage())
@@ -69,6 +82,7 @@ try {
     ok(r.tbl <= 1, `${w}px: latest documents table fits its card (${r.tbl}px)`)
     ok(r.metrics <= 1, `${w}px: every key figure card visible (${r.metrics}px hidden)`)
     await p.screenshot({ path: `${OUT}/${w}.png`, fullPage: w <= 1024 })
+    if (w === 390 || w === 1440) { await bell(p, `${w}px`); if (w === 390) { await p.locator('[data-bell]').first().click(); await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/m-bell.png` }) } }
     await ctx.close()
   }
 
