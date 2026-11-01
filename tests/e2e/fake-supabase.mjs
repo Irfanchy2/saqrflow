@@ -67,6 +67,15 @@ http.createServer(async (req, res) => {
       if (passwords.has(email) || (await pool.query('select 1 from auth.users where email=$1', [email])).rows.length) return json(res, 422, { code: 422, error_code: 'email_exists', msg: 'A user with this email address has already been registered' })
       const { rows } = await pool.query('insert into auth.users(email) values ($1) returning id,email', [email]); passwords.set(email, 'invited-password-123'); return json(res, 200, user(rows[0]))
     }
+    // admin API (service role): look up a user; a sign-in link for "Log in as employee" (verified via /verify, type magiclink)
+    const au = path.match(/^\/auth\/v1\/admin\/users\/([0-9a-f-]{36})$/)
+    if (au || path === '/auth/v1/admin/generate_link') {
+      const c = verify((req.headers.authorization ?? '').replace(/^Bearer /, '')); if (!c || c.role !== 'service_role') return json(res, 403, { code: 403, msg: 'not admin' })
+      if (au) { const { rows } = await pool.query('select id,email from auth.users where id=$1', [au[1]]); return rows[0] ? json(res, 200, user(rows[0])) : json(res, 404, { code: 404, msg: 'User not found' }) }
+      const b = JSON.parse((await body(req)).toString()); const { rows } = await pool.query('select id,email from auth.users where email=$1', [b.email])
+      if (!rows[0]) return json(res, 404, { code: 404, msg: 'User not found' })
+      return json(res, 200, { ...user(rows[0]), action_link: 'http://localhost/verify', email_otp: '000000', hashed_token: `e2e-${b.type}:${b.email}`, redirect_to: '', verification_type: b.type })
+    }
     if (path === '/auth/v1/user') {
       const c = verify((req.headers.authorization ?? '').replace(/^Bearer /, '')); if (!c || c.role !== 'authenticated') return json(res, 401, { code: 401, msg: 'invalid JWT' })
       return json(res, 200, user({ id: c.sub, email: c.email }))

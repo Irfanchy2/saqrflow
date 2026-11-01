@@ -11,6 +11,7 @@ import { employeeChecklist } from '@/lib/compliance'
 import { EmployeeFields, EMP_STATUS } from '@/components/employees/employee-fields'
 import { SavedViews } from '@/components/saved-views'
 import { EmployeeCard, type EmpCardExtra } from '@/components/employees/employee-card'
+import { LoginAsButton } from '@/components/employees/login-as'
 import { EmployeeDropCard } from '@/components/employees/drop-card'
 import { cn } from '@/lib/utils'
 
@@ -45,6 +46,15 @@ export default async function Employees({ searchParams }: { searchParams: Promis
     cards && canUpload ? c.supabase.from('document_categories').select('id,name,scope').eq('scope', 'employee').order('name') : none,
     cards && canUpload ? c.supabase.from('profiles').select('id,full_name').eq('is_active', true).order('full_name') : none,
   ])
+  // "Log in as employee": owners only, for active Employee portal logins
+  const portalLogins = new Set<string>()
+  if (cards && c.can('users.manage') && ids.length) {
+    const { data: linked } = await c.supabase.from('employees').select('id,user_id').in('id', ids).not('user_id', 'is', null)
+    const uids = (linked ?? []).map(l => l.user_id as string)
+    const { data: logins } = uids.length ? await c.supabase.from('profiles').select('id').in('id', uids).eq('role', 'employee').eq('is_active', true) : { data: [] as { id: string }[] }
+    const ok = new Set((logins ?? []).map(l => l.id))
+    for (const l of linked ?? []) if (ok.has(l.user_id as string) && l.user_id !== c.userId) portalLogins.add(l.id)
+  }
   const deptList = [...new Set((depts ?? []).map(d => d.department as string))].sort()
   const cls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm'
   const docsOf = (id: string) => (docs ?? []).filter((d: any) => d.owner_id === id).map((d: any) => ({ category_name: d.category?.name, expiry_date: d.expiry_date, status: d.status }))
@@ -77,7 +87,8 @@ export default async function Employees({ searchParams }: { searchParams: Promis
       <ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3" aria-label="Employees">{rows.map(r => <li key={r.id} className="min-w-0">
         <EmployeeDropCard id={r.id} name={r.full_name} cats={(cats ?? []) as any} people={(people ?? []) as any} canUpload={canUpload}
           className="h-full rounded-2xl border border-border/80 bg-surface p-5 shadow-card transition-shadow hover:shadow-lift">
-          <EmployeeCard e={r} x={extra(r.id)} today={c.today} sensitive={canDocs} upload={canUpload} /></EmployeeDropCard></li>)}</ul>
+          <EmployeeCard e={r} x={extra(r.id)} today={c.today} sensitive={canDocs} upload={canUpload}
+            action={portalLogins.has(r.id) ? <LoginAsButton id={r.id} name={r.full_name} /> : undefined} /></EmployeeDropCard></li>)}</ul>
       <Card className="mt-4"><Pagination page={page} pageSize={size} total={count ?? 0} params={sp} base="/employees" /></Card></>) :
     <Card className="overflow-hidden">{!rows.length ? <EmptyState icon={Users} title={term || sp.status || sp.department ? 'No employees match' : 'No employees yet'} body="Add your first employee to start tracking passports, Emirates IDs, visas and labour documents." /> : <>
       <TableWrap><thead className="border-b border-border bg-surface-2/60"><tr><SortTh label="ID" col="employee_no" params={sp} base="/employees" /><SortTh label="Name" col="full_name" params={sp} base="/employees" />

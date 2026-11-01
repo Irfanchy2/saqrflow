@@ -10,6 +10,9 @@ import { fmtMoney } from '@/lib/sales/money'
 // Approver forms for Employee Petty Cash. Each posts through one database function, once per form (request key).
 type Opt = { id: string; name: string }
 const Method = ({ value = 'cash' }: { value?: string }) => <Field label="Payment method"><Select name="method" defaultValue={value}>{METHODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+/** Optional supporting attachment: a photo or PDF of the voucher, transfer slip or receipt. */
+export const Attachment = ({ className }: { className?: string }) => <Field label="Supporting attachment" hint="Optional: photo or PDF of the voucher, slip or receipt (max 15 MB)" className={className}>
+  <Input name="attachment" type="file" accept="image/*,application/pdf" data-petty-attachment className="h-auto py-2" /></Field>
 const Amount = ({ hint, max }: { hint?: string; max?: number }) => <Field label="Amount (AED) *" hint={hint}><Input name="amount" type="number" inputMode="decimal" step="0.01" min="0.01" max={max} required placeholder="0.00" /></Field>
 
 /** Issue Petty Cash: an employee is handed money for company purchases. */
@@ -29,6 +32,7 @@ export function IssueButton({ today, employees, projects, employee, variant = 'p
         <Field label="Project / site"><Select name="project_id" defaultValue=""><option value="">— General —</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         <Field label="Payment reference"><Input name="reference" maxLength={120} placeholder="Voucher or transfer no." /></Field>
         <Field label="Notes" className="sm:col-span-2"><Textarea name="notes" rows={2} maxLength={2000} /></Field>
+        <Attachment className="sm:col-span-2" />
       </div>
       <p className="mt-3 text-[13px] text-muted">Confirm only once the money has really been handed over. This is company money for business expenses: it is not salary and is never deducted from salary. When you choose the account it came from, that account&apos;s balance goes down once.</p>
     </ActionForm></DialogButton>

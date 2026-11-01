@@ -378,3 +378,31 @@ describe('corrections, reversals, project allocation, cash flow', () => {
     expect(a).toBe(n)
   })
 })
+
+describe('attachments (0038)', () => {
+  const doc = async (owner: string, co = A) => (await sup(`insert into documents(company_id,name,owner_type,owner_id) values ($1,'Voucher','petty_cash',$2) returning id`, [co, owner])).rows[0].id as string
+  it('the employee opens only their own petty cash attachments; managers and finance open all', async () => {
+    const mine = await doc(ayub), theirs = await doc(irfan)
+    const see = async (uid: string, id: string) => (await as(uid, `select count(*)::int n from documents where id=$1`, [id])).rows[0].n
+    expect(await see(U.ayub, mine)).toBe(1); expect(await see(U.ayub, theirs)).toBe(0)
+    expect(await see(U.owner, theirs)).toBe(1); expect(await see(U.acc, theirs)).toBe(1)
+    expect(await see(U.viewer, theirs)).toBe(0); expect(await see(U.ownerB, theirs)).toBe(0)
+  })
+  it('a report may carry only a petty cash attachment filed for the reporting employee', async () => {
+    const mine = await doc(ayub), theirs = await doc(irfan)
+    const r = await as(U.ayub, `insert into petty_cash_requests(company_id,employee_id,kind,amount,entry_date,counterparty,document_id) values ($1,$2,'received',10,'2026-10-20','Owner',$3) returning id`, [A, ayub, mine])
+    expect(r.rows[0].id).toBeTruthy()
+    await fails(as(U.ayub, `insert into petty_cash_requests(company_id,employee_id,kind,amount,entry_date,document_id) values ($1,$2,'received',10,'2026-10-20',$3)`, [A, ayub, theirs]), /row-level security/)
+    await fails(as(U.ayub, `update petty_cash_requests set document_id=$2 where id=$1`, [r.rows[0].id, theirs]), /row-level security/)
+    // confirming the report carries the attachment onto the ledger entry
+    const eid = (await as(U.owner, `select petty_decide_request($1,'approved',null,null,null) id`, [r.rows[0].id])).rows[0].id
+    expect((await sup(`select document_id from petty_cash_entries where id=$1`, [eid])).rows[0].document_id).toBe(mine)
+  })
+  it("issuing petty cash accepts only this employee's petty cash attachment", async () => {
+    const good = await doc(sara), wrongEmp = await doc(irfan), otherCo = await doc(empB, B)
+    const id = (await as(U.owner, `select petty_issue($1,20,'2026-10-20','cash',null,null,'Tools',null,null,$2,$3) id`, [sara, good, uuid()])).rows[0].id
+    expect((await sup(`select document_id from petty_cash_entries where id=$1`, [id])).rows[0].document_id).toBe(good)
+    await fails(as(U.owner, `select petty_issue($1,20,'2026-10-20','cash',null,null,'Tools',null,null,$2,$3)`, [sara, wrongEmp, uuid()]), /Attachment not found/)
+    await fails(as(U.owner, `select petty_issue($1,20,'2026-10-20','cash',null,null,'Tools',null,null,$2,$3)`, [sara, otherCo, uuid()]), /Attachment not found/)
+  })
+})

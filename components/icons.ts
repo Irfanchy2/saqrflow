@@ -163,6 +163,7 @@ export {
   FloppyDiskIcon as Save,
   HandCoinsIcon as HandCoins,
   ScalesIcon as Scale,
+  SignInIcon as LogIn,
 } from '@phosphor-icons/react/dist/ssr'
 export type { Icon as LucideIcon, IconWeight } from '@phosphor-icons/react'
 // drawn for Averiqo (not Phosphor): the Projects icon

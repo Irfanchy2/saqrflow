@@ -4,11 +4,11 @@ import { NewClaim } from '@/components/portal/new-claim'
 import { claimSuppliers } from '@/lib/expenses/claim-suppliers'
 import { companyCards } from '@/lib/cards'
 import { Badge, EmptyState, LinkButton, Money } from '@/components/ui/primitives'
-import { ArrowLeft, CheckCircle2, Clock, Download, HandCoins, Wallet } from '@/components/icons'
+import { ArrowLeft, CheckCircle2, Clock, Download, HandCoins, Paperclip, Wallet } from '@/components/icons'
 import { PortalCard, PortalStat } from '@/components/portal/stat'
 import { EditReport, ReportReceived, ReportReturn, myWallet } from '@/components/petty/portal'
 import { ENTRY_COLS, REQUEST_COLS } from '@/lib/petty'
-import { KIND, REQUEST_STATUS, statement, statementRange, type PettyEntry, type PettyKind } from '@/lib/petty-math'
+import { KIND, REQUEST_STATUS, attachmentUrl, statement, statementRange, type PettyEntry, type PettyKind } from '@/lib/petty-math'
 import { formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
@@ -79,7 +79,8 @@ export default async function MyPettyCash() {
           return <li key={x.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
             <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full', x.in ? 'bg-success/10 text-success' : 'bg-surface-2 text-muted')} aria-hidden><Wallet size={16} /></span>
             <span className="min-w-0 flex-1"><span className="block truncate text-[14.5px] font-medium">{x.label}</span>
-              <span className="block truncate text-[12.5px] text-muted">{formatShortDate(x.date)} · {x.detail}</span></span>
+              <span className="block truncate text-[12.5px] text-muted">{formatShortDate(x.date)} · {x.detail}</span>
+              {e.document_id && <a href={attachmentUrl(e.document_id)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[12px] font-medium text-primary"><Paperclip size={11} aria-hidden />Attachment</a>}</span>
             <span className="shrink-0 text-end"><span className={cn('block font-semibold tabular-nums', x.in ? 'text-success' : '')}>{x.in ? '+' : '−'}<Money value={x.in || x.out} /></span>
               <span className="block text-[11.5px] text-muted tabular-nums">Balance <Money value={x.balance} /></span></span>
             <span className="sr-only">{KIND[e.kind as PettyKind].label}</span></li> })}</ul>}

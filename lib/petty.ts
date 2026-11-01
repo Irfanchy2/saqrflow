@@ -5,8 +5,8 @@ import type { PettyEntry } from './petty-math'
 // Reads for Employee Petty Cash. Every read goes through the caller's own session: RLS (migration 0037) keeps an employee
 // to their own wallet and everyone inside their company. Petty cash never reads or writes salary data.
 
-export const ENTRY_COLS = 'id,book,kind,reverses_kind,amount,entry_date,created_at,description,reference,method,bank_id,project_id,claim_id,request_id,reverses_id,notes,project:projects(name),bank:banks(name,account_display_name),creator:profiles!petty_cash_entries_created_by_fkey(full_name)'
-export const REQUEST_COLS = 'id,employee_id,kind,status,amount,entry_date,method,counterparty,project_id,purpose,reference,notes,decision_note,decided_at,entry_id,linked,created_at,updated_at,project:projects(name),decider:profiles!petty_cash_requests_decided_by_fkey(full_name)'
+export const ENTRY_COLS = 'id,book,kind,reverses_kind,amount,entry_date,created_at,description,reference,method,bank_id,project_id,claim_id,request_id,reverses_id,document_id,notes,project:projects(name),bank:banks(name,account_display_name),creator:profiles!petty_cash_entries_created_by_fkey(full_name)'
+export const REQUEST_COLS = 'id,employee_id,kind,status,amount,entry_date,method,counterparty,project_id,purpose,reference,notes,document_id,decision_note,decided_at,entry_id,linked,created_at,updated_at,project:projects(name),decider:profiles!petty_cash_requests_decided_by_fkey(full_name)'
 
 export type WalletRow = {
   employee_id: string; available: number; received: number; settled: number; returned: number; adjusted: number; reimbursement_due: number; reimbursed: number

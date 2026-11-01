@@ -8,6 +8,8 @@ import { reportPettyCash, updatePettyReport, withdrawPettyReport } from '@/app/a
 import { METHODS } from '@/lib/petty-math'
 import { fmtMoney } from '@/lib/sales/money'
 import { emptyWallet, type WalletRow } from '@/lib/petty'
+import { Attachment } from './forms'
+import { attachmentUrl } from '@/lib/petty-math'
 
 // Employee Portal side of Employee Petty Cash: the employee's own wallet and the two reports they can make. Reports are
 // pending until an approver confirms them; the wallet balance only ever comes from confirmed ledger entries.
@@ -29,6 +31,8 @@ function ReportFields({ kind, today, projects, r }: { kind: 'received' | 'return
     {kind === 'received' && projects.length > 0 && <Field label="Project / site"><Select name="project_id" defaultValue={r?.project_id ?? ''}><option value="">No project</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}
     <Field label="Reference" hint="Voucher or transfer number, if any"><Input name="reference" maxLength={120} defaultValue={r?.reference ?? ''} /></Field>
     <Field label="Notes" className="sm:col-span-2"><Textarea name="notes" rows={2} maxLength={2000} defaultValue={r?.notes ?? ''} /></Field>
+    {r?.document_id && <a href={attachmentUrl(r.document_id)} target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium text-primary hover:underline sm:col-span-2">Open the attached file</a>}
+    <Attachment className="sm:col-span-2" />
   </div>
 }
 
@@ -62,14 +66,21 @@ export function EditReport({ r, today, projects }: { r: any; today: string; proj
     <ActionButton variant="ghost" action={withdrawPettyReport.bind(null, r.id)} confirm="Withdraw this report?">Withdraw</ActionButton></div>
 }
 
-/** Compact wallet card for My expenses / Home: the balance and a link to the full page. Hidden until there is activity. */
-export function WalletCard({ w }: { w: WalletRow }) {
-  const any = w.received || w.available || w.pending_requests || w.reimbursement_due || w.pending_claims
-  if (!any) return null
-  return <Link href="/me/expenses/petty-cash" data-petty-card className="flex items-center gap-3 rounded-2xl border border-border/80 bg-surface p-4 shadow-card transition-[border-color,box-shadow] duration-200 hover:border-border-strong/80 hover:shadow-lift">
-    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300" aria-hidden><Wallet size={22} /></span>
-    <span className="min-w-0 flex-1"><span className="block text-[13px] font-medium text-muted">Available petty cash</span>
-      <span className="block text-[22px] font-semibold leading-tight tracking-[-0.03em] tabular-nums" data-petty-available><Money value={w.available} /></span>
-      <span className="block truncate text-[12.5px] text-muted">{[w.pending_requests > 0 && `${w.pending_requests} waiting for confirmation`, w.reimbursement_due > 0 && `AED ${fmtMoney(w.reimbursement_due)} to be paid back to you`].filter(Boolean).join(' · ') || 'Company money for business expenses'}</span></span>
-    <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden /></Link>
+/**
+ * Petty cash card for Home and My expenses, always shown: the balance (AED 0.00 until the company gives some), what is
+ * waiting, and the two things an employee does most: report money received, and open the full petty cash page.
+ */
+export function WalletCard({ w, today, projects }: { w: WalletRow; today: string; projects: P[] }) {
+  return <section data-petty-card className="overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-card">
+    <Link href="/me/expenses/petty-cash" className="flex items-center gap-3 p-4 transition-colors hover:bg-surface-2/40">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300" aria-hidden><Wallet size={22} /></span>
+      <span className="min-w-0 flex-1"><span className="block text-[13px] font-medium text-muted">Available petty cash</span>
+        <span className="block text-[22px] font-semibold leading-tight tracking-[-0.03em] tabular-nums" data-petty-available><Money value={w.available} /></span>
+        <span className="block truncate text-[12.5px] text-muted">{[w.pending_requests > 0 && `${w.pending_requests} waiting for confirmation`, w.reimbursement_due > 0 && `AED ${fmtMoney(w.reimbursement_due)} to be paid back to you`].filter(Boolean).join(' · ') || 'Company money for business expenses'}</span></span>
+      <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden /></Link>
+    <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3" data-petty-card-actions>
+      <ReportReceived today={today} projects={projects} />
+      <Link href="/me/expenses/petty-cash" className="inline-flex h-10 items-center rounded-lg px-3 text-[14px] font-medium text-primary hover:bg-primary-soft">Open petty cash</Link>
+    </div>
+  </section>
 }

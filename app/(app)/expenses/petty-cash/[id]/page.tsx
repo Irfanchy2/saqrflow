@@ -3,11 +3,11 @@ import { notFound, redirect } from 'next/navigation'
 import { getCtx } from '@/lib/auth'
 import { flat } from '@/lib/queries'
 import { Badge, Card, CardHeader, EmptyState, LinkButton, Metrics, Money, PageHeader, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
-import { Download, FileText, HandCoins, Wallet } from '@/components/icons'
+import { Download, FileText, HandCoins, Paperclip, Wallet } from '@/components/icons'
 import { ShareSheet } from '@/components/whatsapp/share-sheet'
 import { AdjustButton, IssueButton, ReimburseButton, ReturnButton, ReverseButton, SettleButton } from '@/components/petty/forms'
 import { canManagePetty, walletOf } from '@/lib/petty'
-import { FUNDED_ADMIN, KIND, REQUEST_STATUS, kindLabel, methodLabel, statement, statementRange, type PettyKind } from '@/lib/petty-math'
+import { FUNDED_ADMIN, KIND, REQUEST_STATUS, attachmentUrl, kindLabel, methodLabel, statement, statementRange, type PettyKind } from '@/lib/petty-math'
 import { formatShortDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
@@ -72,7 +72,8 @@ export default async function PettyWalletPage({ params, searchParams }: { params
               return <tr key={r.id} className={cn('hover:bg-surface-2/50', reversed.has(r.id) && 'text-muted')} data-petty-row={e.kind}>
                 <Td className="whitespace-nowrap tabular-nums">{formatShortDate(r.date)}</Td>
                 <Td><Badge tone={KIND[e.kind as PettyKind].tone}>{r.label}</Badge>{reversed.has(r.id) && <span className="ms-1.5 text-[12px]">reversed</span>}</Td>
-                <Td><div className="max-w-[360px] [overflow-wrap:anywhere]">{r.detail}</div><div className="text-xs text-muted">{[r.reference, e.project?.name, e.method && methodLabel(e.method), e.bank && `${e.bank.name}`, e.creator?.full_name && `by ${e.creator.full_name}`].filter(Boolean).join(' · ')}</div></Td>
+                <Td><div className="max-w-[360px] [overflow-wrap:anywhere]">{r.detail}</div><div className="text-xs text-muted">{[r.reference, e.project?.name, e.method && methodLabel(e.method), e.bank && `${e.bank.name}`, e.creator?.full_name && `by ${e.creator.full_name}`].filter(Boolean).join(' · ')}
+                  {e.document_id && <a href={attachmentUrl(e.document_id)} target="_blank" rel="noopener noreferrer" data-petty-file className="ms-2 inline-flex items-center gap-0.5 text-primary hover:underline"><Paperclip size={11} aria-hidden />attachment</a>}</div></Td>
                 <Td className="text-right tabular-nums">{r.in ? <Money value={r.in} /> : ''}</Td><Td className="text-right tabular-nums">{r.out ? <Money value={r.out} /> : ''}</Td>
                 <Td className="text-right font-medium tabular-nums"><Money value={r.balance} /></Td>
                 {manage && <Td className="text-right">{e.kind !== 'reversal' && !reversed.has(r.id) && <ReverseButton id={r.id} employeeId={id} what={`${r.label} of ${formatShortDate(r.date)}`} />}</Td>}</tr> })}

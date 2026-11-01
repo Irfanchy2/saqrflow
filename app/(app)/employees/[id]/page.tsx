@@ -1,4 +1,5 @@
 import { WhatsAppHistory } from '@/components/whatsapp/history'
+import { LoginAsButton } from '@/components/employees/login-as'
 import { WhatsAppSend } from '@/components/whatsapp/send'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -159,6 +160,7 @@ async function PortalAccess({ id, c, e }: { id: string; c: Awaited<ReturnType<ty
     <div className="space-y-3 p-4 pt-0 text-sm">{login ? <>
       <div className="flex items-center justify-between gap-2"><span className="min-w-0"><span className="block truncate font-medium">{login.full_name}</span><span className="text-xs text-muted">{ROLE_LABELS[login.role as Role] ?? login.role}{login.is_active ? '' : ' · switched off'}</span></span>
         <Badge tone={login.is_active ? 'green' : 'neutral'}>{login.is_active ? 'Active' : 'Off'}</Badge></div>
+      {c.can('users.manage') && login.role === 'employee' && login.is_active && login.id !== c.userId && <LoginAsButton id={id} name={e.full_name} variant="secondary" />}
       <ActionButton variant="ghost" action={revokePortalAccess.bind(null, id)} confirm={`Remove ${e.full_name}'s portal access?${login.role === 'employee' ? ' Their employee login is switched off.' : ''} Their records are kept.`}>Remove access</ActionButton></>
       : <DialogButton size="sm" label="Give portal access" title={`Portal access for ${e.full_name}`}>
         <ActionForm action={grantPortalAccess.bind(null, id)} submit="Give access">

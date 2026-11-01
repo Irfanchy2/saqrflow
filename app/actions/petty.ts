@@ -7,6 +7,7 @@ import { ForbiddenError } from '@/lib/permissions'
 import { getMe } from '@/lib/me'
 import { canManagePetty } from '@/lib/petty'
 import type { ActionState } from '@/lib/utils'
+import { discardAttachment, readAttachment, storeAttachment } from '@/lib/petty-files'
 
 // Employee Petty Cash: company money an employee holds for business purchases. Every posting is one database function
 // (migration 0037) that checks the caller's permission again, locks the employee's wallet, refuses a negative balance and
@@ -45,9 +46,20 @@ export async function issuePettyCash(_: ActionState, fd: FormData): Promise<Acti
     if (!r.success) return bad(r.error)
     const v = r.data
     if (v.entry_date > c.today) return { error: 'The hand-over date cannot be in the future.', fieldErrors: { entry_date: 'In the future' } }
+    const file = await readAttachment(c, fd)
+    if (file && 'error' in file) return { error: file.error, fieldErrors: { attachment: file.error } }
+    // a retry of the same form (same request key) never stores the file twice
+    const { data: done } = await c.supabase.from('petty_cash_entries').select('id').eq('source_event', `issue:${v.idempotency_key}`).maybeSingle()
+    if (done) return { ok: true, message: 'Petty cash already issued.' }
+    let doc: string | null = null
+    if (file) {
+      const { data: e } = await c.supabase.from('employees').select('full_name').eq('id', v.employee_id).maybeSingle()
+      if (!e) return { error: 'Employee not found.' }
+      doc = await storeAttachment(c, v.employee_id, `Petty cash issued: ${e.full_name}, AED ${v.amount.toFixed(2)}${v.reference ? ` ${v.reference}` : ''}`, v.entry_date, file)
+    }
     const { error } = await c.supabase.rpc('petty_issue', { p_employee: v.employee_id, p_amount: v.amount, p_date: v.entry_date, p_method: v.method, p_bank: v.paid_from_bank_id ?? null,
-      p_project: v.project_id ?? null, p_purpose: v.purpose, p_reference: v.reference || null, p_notes: v.notes || null, p_document: null, p_key: v.idempotency_key })
-    if (error) return dbError(error.message)
+      p_project: v.project_id ?? null, p_purpose: v.purpose, p_reference: v.reference || null, p_notes: v.notes || null, p_document: doc, p_key: v.idempotency_key })
+    if (error) { if (doc) await discardAttachment(doc); return dbError(error.message) }
     refresh(v.employee_id)
     return { ok: true, message: `Petty cash issued: AED ${v.amount.toFixed(2)}.` }
   })
@@ -175,9 +187,12 @@ export async function reportPettyCash(_: ActionState, fd: FormData): Promise<Act
       const { data: bal } = await c.supabase.rpc('petty_wallet_balance', { p_employee: emp.id })
       if (v.amount > Number(bal ?? 0) + 0.004) return { error: `You hold AED ${Number(bal ?? 0).toFixed(2)} of petty cash: you cannot return more than that.`, fieldErrors: { amount: 'More than you hold' } }
     }
+    const file = await readAttachment(c, fd)
+    if (file && 'error' in file) return { error: file.error, fieldErrors: { attachment: file.error } }
+    const doc = file ? await storeAttachment(c, emp.id, `Petty cash ${v.kind === 'received' ? 'received' : 'returned'}: ${emp.full_name}, AED ${v.amount.toFixed(2)}${v.reference ? ` ${v.reference}` : ''}`, v.entry_date, file) : null
     const { error } = await c.supabase.from('petty_cash_requests').insert({ company_id: c.company.id, employee_id: emp.id, kind: v.kind, amount: v.amount, entry_date: v.entry_date, method: v.method,
-      counterparty: v.counterparty || null, project_id: v.project_id ?? null, purpose: v.purpose || null, reference: v.reference || null, notes: v.notes || null, idempotency_key: v.idempotency_key ?? null })
-    if (error) throw error
+      counterparty: v.counterparty || null, project_id: v.project_id ?? null, purpose: v.purpose || null, reference: v.reference || null, notes: v.notes || null, idempotency_key: v.idempotency_key ?? null, document_id: doc })
+    if (error) { if (doc) await discardAttachment(doc); throw error }
     refresh(emp.id)
     return { ok: true, message: v.kind === 'received' ? 'Sent for admin approval. Your balance changes once it is confirmed.' : 'Return sent for confirmation. Your balance changes once the admin confirms receiving it.' }
   })
@@ -191,10 +206,13 @@ export async function updatePettyReport(id: string, _: ActionState, fd: FormData
     const r = reportSchema.omit({ kind: true }).safeParse(pick(fd, REPORT_KEYS.filter(k => k !== 'kind')))
     if (!r.success) return bad(r.error)
     const v = r.data
-    const { data, error } = await c.supabase.from('petty_cash_requests').update({ amount: v.amount, entry_date: v.entry_date, method: v.method, counterparty: v.counterparty || null,
+    const file = await readAttachment(c, fd)
+    if (file && 'error' in file) return { error: file.error, fieldErrors: { attachment: file.error } }
+    const doc = file ? await storeAttachment(c, emp.id, `Petty cash report: ${emp.full_name}, AED ${v.amount.toFixed(2)}`, v.entry_date, file) : null
+    const { data, error } = await c.supabase.from('petty_cash_requests').update({ ...(doc ? { document_id: doc } : {}), amount: v.amount, entry_date: v.entry_date, method: v.method, counterparty: v.counterparty || null,
       project_id: v.project_id ?? null, purpose: v.purpose || null, reference: v.reference || null, notes: v.notes || null, status: 'pending' }).eq('id', id).eq('employee_id', emp.id).in('status', ['pending', 'correction_requested']).select('id')
-    if (error) throw error
-    if (!data?.length) return { error: 'This report has already been decided and cannot be changed.' }
+    if (error) { if (doc) await discardAttachment(doc); throw error }
+    if (!data?.length) { if (doc) await discardAttachment(doc); return { error: 'This report has already been decided and cannot be changed.' } }
     refresh(emp.id)
     return { ok: true, message: 'Saved and sent for approval again.' }
   })
