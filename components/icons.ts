@@ -164,6 +164,7 @@ export {
   HandCoinsIcon as HandCoins,
   ScalesIcon as Scale,
   SignInIcon as LogIn,
+  DotsSixVerticalIcon as GripVertical,
 } from '@phosphor-icons/react/dist/ssr'
 export type { Icon as LucideIcon, IconWeight } from '@phosphor-icons/react'
 // drawn for Averiqo (not Phosphor): the Projects icon

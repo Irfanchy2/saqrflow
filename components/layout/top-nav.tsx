@@ -67,10 +67,10 @@ export function SubTabs({ items }: { items: TopItem[] }) {
   const { top, path, tab } = useCurrent(items)
   const group = top ? items.filter(i => i.top === top) : []
   if (group.length < 2) return null
-  return <nav aria-label="Section" className="subtabs tabstrip -mx-1 flex max-w-full items-center gap-1 overflow-x-auto px-1 py-0.5">
+  return <nav aria-label="Section" className="subtabs tabstrip -mx-1 flex max-w-full items-center gap-1 overflow-x-auto px-1 py-0.5 max-sm:flex-wrap max-sm:gap-y-1.5 max-sm:overflow-visible">
     {group.map(i => { const on = isActive(i, path, tab)
       return <Link key={i.key} href={i.href} aria-current={on ? 'page' : undefined}
-        className={cn('relative flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-medium transition-colors duration-200', on ? 'text-fg' : 'text-muted hover:text-fg')}>
+        className={cn('relative flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-medium transition-colors duration-200 max-sm:px-3', on ? 'text-fg' : 'text-muted hover:text-fg')}>
         {on && <m.span layoutId="sub-pill" transition={SPRING} aria-hidden className="absolute inset-0 rounded-full border border-white/80 bg-surface shadow-card dark:border-white/[.06]" />}
         <span className="relative whitespace-nowrap">{i.label}</span><NavDot n={i.alert} className="relative ms-1.5" /></Link> })}
   </nav>
