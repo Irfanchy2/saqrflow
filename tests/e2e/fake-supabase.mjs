@@ -127,14 +127,15 @@ http.createServer(async (req, res) => {
       let mm
       if (req.method === 'POST' && rest === 'instance/create') {
         if (evoInstances.has(j.instanceName)) return json(res, 403, { status: 403, error: 'Forbidden', response: { message: [`This name "${j.instanceName}" is already in use.`] } })
-        evoInstances.set(j.instanceName, { state: 'connecting', webhook: j.webhook ?? null, n: 0 })
-        return json(res, 201, { instance: { instanceName: j.instanceName, instanceId: crypto.randomUUID(), integration: j.integration, status: 'connecting' }, hash: 'tok', qrcode: { pairingCode: null, code: '2@e2e', base64: QR, count: 1 } })
+        evoInstances.set(j.instanceName, { state: 'close', webhook: j.webhook ?? null, n: 0, connects: 0 })
+        // like the real server: the first answers carry no QR yet (it arrives from WhatsApp a few seconds later)
+        return json(res, 201, { instance: { instanceName: j.instanceName, instanceId: crypto.randomUUID(), integration: j.integration, status: 'close' }, hash: 'tok', qrcode: { count: 0 } })
       }
       const inst = (mm = rest.match(/^[a-z]+\/[A-Za-z]+\/([^/]+)$/)) ? evoInstances.get(decodeURIComponent(mm[1])) : null
       if (/^instance\/connectionState\//.test(rest)) return inst ? json(res, 200, { instance: { instanceName: decodeURIComponent(mm[1]), state: inst.state } }) : json(res, 404, { status: 404, error: 'Not Found', response: { message: ['The instance does not exist'] } })
       if (!inst) return json(res, 404, { status: 404, error: 'Not Found', response: { message: ['The instance does not exist'] } })
       if (req.method === 'POST' && /^webhook\/set\//.test(rest)) { inst.webhook = j.webhook; return json(res, 201, { webhook: j.webhook }) }
-      if (req.method === 'GET' && /^instance\/connect\//.test(rest)) { if (inst.state === 'open') return json(res, 200, { instance: { state: 'open' } }); inst.state = 'connecting'; return json(res, 200, { pairingCode: null, code: '2@e2e', base64: QR, count: 2 }) }
+      if (req.method === 'GET' && /^instance\/connect\//.test(rest)) { if (inst.state === 'open') return json(res, 200, { instance: { state: 'open' } }); inst.connects++; if (inst.connects < 2) return json(res, 200, { count: 0 }); inst.state = 'connecting'; return json(res, 200, { pairingCode: null, code: '2@e2e', base64: QR, count: 1 }) }
       if (req.method === 'DELETE' && /^instance\/logout\//.test(rest)) { inst.state = 'close'; return json(res, 200, { status: 'SUCCESS', error: false, response: { message: 'Instance logged out' } }) }
       if (req.method === 'POST' && /^message\/send(Text|Media)\//.test(rest)) {
         if (inst.state !== 'open') return json(res, 500, { status: 500, error: 'Internal Server Error', response: { message: ['Connection Closed'] } })

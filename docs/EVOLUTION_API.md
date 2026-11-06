@@ -19,6 +19,25 @@ HTTP API. It **cannot run on Vercel**: it needs a server that is always on. Aver
 Any small Linux VPS (1 vCPU, 2 GB RAM: Hetzner, DigitalOcean, Contabo, AWS Lightsail…) with Docker and a domain name
 pointing at it, e.g. `wa.yourcompany.com`. Railway or Render also work with the same image and variables.
 
+### Quickest: the installer (Ubuntu / Debian VPS)
+
+1. At your domain's DNS provider add an **A record**: name `wa` (or any subdomain), value = the VPS IP address
+   (Cloudflare: proxy **off**, grey cloud).
+2. Log in to the VPS (`ssh root@<server IP>`) and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Irfanchy2/saqrflow/main/deploy/evolution/install.sh -o install.sh
+sudo bash install.sh wa.yourcompany.com
+```
+
+It checks the DNS record, installs Docker, creates `/opt/evolution` with random secrets generated on the server,
+starts Evolution API v2.3.7 + Postgres + Redis + Caddy (automatic HTTPS), waits until `https://wa.yourcompany.com`
+answers and prints the server URL and API key to paste into Averiqo. Running it again keeps the existing secrets,
+WhatsApp session and data. Chat history is not stored on the server (only what delivery receipts need), and the
+project's telemetry is switched off.
+
+### Manually
+
 `docker-compose.yml` (Caddy gets the HTTPS certificate automatically):
 
 ```yaml
