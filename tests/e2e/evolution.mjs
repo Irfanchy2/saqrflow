@@ -60,7 +60,8 @@ try {
 
   console.log('\n[2] Link the phone by QR code')
   await ev().getByRole('button', { name: 'Link WhatsApp' }).click()
-  ok(await waitFor(async () => (await ev().locator('img[data-evo-qr]').count()) > 0), 'the QR code from the server is shown')
+  ok(await waitFor(async () => (await ev().innerText()).includes('Waiting for the phone')), 'linking starts even before WhatsApp has sent a code')
+  ok(await waitFor(async () => (await ev().locator('img[data-evo-qr]').count()) > 0, 20000), 'the QR code appears as soon as the server has it')
   ok((await ev().innerText()).includes('Linked devices'), 'with step-by-step instructions')
   await ev().screenshot({ path: `${OUT}/qr.png` })
   const create = (await evo()).find(c => c.path === 'instance/create' && c.json?.instanceName === INSTANCE)
