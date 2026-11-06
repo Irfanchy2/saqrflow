@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { auditAction } from '@/lib/security'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
 import { allowPrivate } from '@/lib/net-guard'
+import { appUrl } from '@/lib/portal'
 import { companyWhatsApp } from '@/lib/whatsapp/outbox'
 import { INSTANCE_RE, normaliseUrl, serverUrlProblem } from '@/lib/whatsapp/evolution-core'
 import { evoConnect, evoLogout, evoState } from '@/lib/whatsapp/evolution'
@@ -30,10 +31,8 @@ async function webhookSecret(companyId: string): Promise<string> {
   const { error } = await admin().from('integration_secrets').upsert({ company_id: companyId, name: 'evolution_webhook_secret', ciphertext: encryptSecret(s), updated_at: new Date().toISOString() }); if (error) throw error
   return s
 }
-const webhookUrl = (companyId: string) => {
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/+$/, '')
-  return base ? `${base}/api/webhooks/evolution/${companyId}` : null
-}
+/** NEXT_PUBLIC_APP_URL, APP_URL, or Vercel's production domain (same rule as portal links). */
+const webhookUrl = (companyId: string) => { const base = appUrl(); return base ? `${base}/api/webhooks/evolution/${companyId}` : null }
 
 export async function saveEvolution(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {
@@ -45,7 +44,7 @@ export async function saveEvolution(_: ActionState, fd: FormData): Promise<Actio
     if (instance && !INSTANCE_RE.test(instance)) return { error: 'Instance name: 2–64 letters, digits, - or _ (e.g. alsaqr-main).' }
     if (key && (key.length < 8 || key.length > 200 || /\s/.test(key))) return { error: 'That does not look like an API key (8–200 characters, no spaces).' }
     if (use && (!url || !instance)) return { error: 'Enter the server URL and an instance name to use Evolution API.' }
-    if (key && noKey()) return { error: 'Cannot store the API key: SETTINGS_ENCRYPTION_KEY is not set on the server.' }
+    if (key && noKey()) return { error: 'Cannot store the API key: SETTINGS_ENCRYPTION_KEY is not set on the server (Vercel → Settings → Environment Variables; value from: openssl rand -base64 32).' }
     const { count } = await admin().from('integration_secrets').select('name', { count: 'exact', head: true }).eq('company_id', c.company.id).eq('name', 'evolution_api_key')
     if (use && !key && !count) return { error: 'Enter the API key (AUTHENTICATION_API_KEY of your Evolution API server).' }
     await Promise.all([setting(c, 'whatsapp.provider', use ? 'evolution' : 'meta'), setting(c, 'whatsapp.evolution_url', url), setting(c, 'whatsapp.evolution_instance', instance)])
@@ -65,7 +64,7 @@ export async function linkEvolution(): Promise<ActionState> {
     const c = await guard()
     const { cfg } = await companyWhatsApp(c.company.id)
     if (!cfg.evolution) return { error: 'Save the server URL, instance name and API key first.' }
-    const hook = webhookUrl(c.company.id); if (!hook) return { error: 'NEXT_PUBLIC_APP_URL is not set on the server, so Evolution would not know where to send delivery receipts.' }
+    const hook = webhookUrl(c.company.id); if (!hook) return { error: 'The app address is unknown (set NEXT_PUBLIC_APP_URL on the server), so Evolution would not know where to send delivery receipts.' }
     const r = await evoConnect(cfg.evolution, hook, await webhookSecret(c.company.id))
     if ('error' in r) return { error: r.error }
     if (r.created) await auditAction(c.company.id, c.userId, 'SETTINGS_CHANGED', 'app_settings', { evolution_instance_created: cfg.evolution.instance })
