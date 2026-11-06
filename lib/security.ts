@@ -88,7 +88,7 @@ export async function recordDenied(c: { userId: string; company: { id: string };
 }
 
 /** Audit-log entry for an admin action whose table is not audited row by row (secrets: the value itself is never logged). */
-export async function auditAction(companyId: string, userId: string | null, action: 'SECRET_SET' | 'SECRET_REMOVED', table: string, changes: Record<string, unknown>) {
+export async function auditAction(companyId: string, userId: string | null, action: 'SECRET_SET' | 'SECRET_REMOVED' | 'SETTINGS_CHANGED', table: string, changes: Record<string, unknown>) {
   try { await createAdminClient().from('audit_logs').insert({ company_id: companyId, user_id: userId, action, table_name: table, record_id: null, changes }) }
   catch (e) { console.warn('[audit]', action, (e as Error).message) }
 }

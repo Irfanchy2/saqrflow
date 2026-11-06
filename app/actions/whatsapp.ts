@@ -38,6 +38,14 @@ export async function testWhatsAppConnection(): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); demoGuard(c, 'the WhatsApp connection'); need(c, 'settings.manage')
     const { cfg } = await companyWhatsApp(c.company.id)
+    if (cfg.provider === 'evolution') {
+      if (!cfg.evolution) return { error: 'Add the Evolution API server URL, instance name and API key first.' }
+      const { evoState } = await import('@/lib/whatsapp/evolution')
+      const st = await evoState(cfg.evolution)
+      if ('error' in st) return { error: st.error }
+      return st.state === 'open' ? { ok: true, message: `Connected: instance “${cfg.evolution.instance}” is linked to WhatsApp.${cfg.forceSandbox ? ' Sandbox mode is on, so nothing is sent yet.' : ''}` }
+        : { error: `The server answers, but no WhatsApp number is linked (state: ${st.state}). Use “Link WhatsApp” and scan the QR code.` }
+    }
     const r = await phoneInfo(cfg)
     return 'error' in r ? { error: r.error } : { ok: true, message: `Connected: ${r.name} · ${r.number}${r.quality ? ` · quality ${r.quality.toLowerCase()}` : ''}` }
   })
@@ -64,6 +72,7 @@ export async function submitWaTemplate(kind: string): Promise<ActionState> {
     const c = await getCtx(); demoGuard(c, 'submitting WhatsApp templates'); need(c, 'settings.manage')
     if (!KINDS[kind]) return { error: 'Unknown message type.' }
     const wa = await companyWhatsApp(c.company.id)
+    if (wa.provider === 'evolution') return { error: 'Not needed: with Evolution API messages are sent as normal WhatsApp messages, without Meta templates.' }
     if (!wa.live) return { error: 'Connect WhatsApp first (phone number ID, access token, sandbox off).' }
     if (!wa.wabaId) return { error: 'Add your WhatsApp Business Account ID first.' }
     const t = (await loadTemplates(c.supabase, c.company.id))[kind]
@@ -82,6 +91,7 @@ export async function refreshWaTemplates(): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); demoGuard(c, 'the WhatsApp connection'); need(c, 'settings.manage')
     const wa = await companyWhatsApp(c.company.id)
+    if (wa.provider === 'evolution') return { error: 'Not needed: with Evolution API messages are sent without Meta templates.' }
     if (!wa.live || !wa.wabaId) return { error: 'Connect WhatsApp and add the Business Account ID first.' }
     const list = await listTemplates(wa.cfg, wa.wabaId); if ('error' in list) return { error: list.error }
     const tpls = await loadTemplates(c.supabase, c.company.id); let n = 0

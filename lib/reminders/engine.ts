@@ -4,7 +4,7 @@ import { planNotifications, type Recipient, type Source } from './planner'
 import { processBatch, type LogRow, type RecipientInfo, type Senders, type Store } from './dispatch'
 import { parseSettings, type ReminderSettings } from './settings'
 import { digestParams, renderText, type Params } from '../whatsapp/templates'
-import { sendEmail, sendWhatsApp, type WhatsAppConfig } from '../whatsapp/client'
+import { isConfigured, sendEmail, sendWhatsApp, type WhatsAppConfig } from '../whatsapp/client'
 import { decryptSecret } from '../crypto'
 import { addDays, localHm, todayInTz } from '../time'
 import { advanceDue } from './schedule'
@@ -13,12 +13,16 @@ import { isDemoCompany } from '../demo'
 type Admin = SupabaseClient
 
 export async function loadWhatsAppConfig(admin: Admin, companyId: string, settings: ReminderSettings): Promise<WhatsAppConfig> {
-  let token = process.env.WHATSAPP_ACCESS_TOKEN
-  const { data } = await admin.from('integration_secrets').select('ciphertext').eq('company_id', companyId).eq('name', 'whatsapp_token').maybeSingle()
-  if (data?.ciphertext) { try { token = decryptSecret(data.ciphertext) } catch { /* bad key → fall back to env */ } }
+  let token = process.env.WHATSAPP_ACCESS_TOKEN, evoKey: string | undefined
+  const { data } = await admin.from('integration_secrets').select('name,ciphertext').eq('company_id', companyId).in('name', ['whatsapp_token', 'evolution_api_key'])
+  const secret = (n: string) => { const c = (data ?? []).find(r => r.name === n)?.ciphertext; if (!c) return undefined; try { return decryptSecret(c) } catch { return undefined /* bad key → fall back to env */ } }
+  token = secret('whatsapp_token') ?? token
+  if (settings.whatsappProvider === 'evolution') evoKey = secret('evolution_api_key')
   return {
+    provider: settings.whatsappProvider,
     phoneNumberId: settings.phoneNumberId ?? process.env.WHATSAPP_PHONE_NUMBER_ID, accessToken: token,
     apiVersion: process.env.WHATSAPP_API_VERSION ?? 'v21.0', forceSandbox: settings.whatsappMode === 'sandbox' || await isDemoCompany(companyId),   // the shared demo never sends for real
+    ...(settings.whatsappProvider === 'evolution' && settings.evolutionUrl && settings.evolutionInstance && evoKey ? { evolution: { url: settings.evolutionUrl, instance: settings.evolutionInstance, apiKey: evoKey } } : {}),
   }
 }
 
@@ -29,7 +33,11 @@ export function makeSenders(admin: Admin): Senders {
     return cache.get(companyId)!
   }
   return {
-    whatsapp: async (to, t, p, companyId) => sendWhatsApp(await cfg(companyId), to, t, p),
+    whatsapp: async (to, t, p, companyId) => {
+      const c = await cfg(companyId)
+      if (c.provider === 'evolution' && isConfigured(c)) { const { evoSendText } = await import('../whatsapp/evolution'); return evoSendText(c.evolution!, to, renderText(t, p)) }
+      return sendWhatsApp({ ...c, provider: 'meta', ...(c.provider === 'evolution' ? { phoneNumberId: undefined } : {}) }, to, t, p)   // evolution not set up → sandbox, never Meta by accident
+    },
     email: async (to, subject, text, companyId) => (await isDemoCompany(companyId)) ? sendEmail({}, to, subject, text) : sendEmail({ apiKey: process.env.RESEND_API_KEY, from: process.env.EMAIL_FROM }, to, subject, text),
     party: async log => { const { deliverParty } = await import('../whatsapp/outbox'); return deliverParty(admin, log as any) },
   }

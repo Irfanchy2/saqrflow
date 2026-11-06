@@ -24,6 +24,7 @@ import { Integrations } from '@/components/settings/integrations'
 import { MySessions } from '@/components/settings/sessions'
 import { WhatsAppTemplates } from '@/components/settings/whatsapp-templates'
 import { ShareMessages } from '@/components/settings/share-messages'
+import { EvolutionSettings } from '@/components/settings/evolution'
 import { testWhatsAppConnection } from '@/app/actions/whatsapp'
 import Link from 'next/link'
 
@@ -35,7 +36,7 @@ export default async function Settings() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
   // order follows how a business sets Averiqo up: who we are → how documents look → how they are numbered → who gets told → integrations → data
   const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['builder', 'Template builder', admin], ['templates', 'Terms templates', admin], ['numbering', 'Numbering', admin], ['approvals', 'Approvals', admin], ['custom', 'Custom fields & statuses', admin], ['forms', 'Public forms', admin],
-    ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['whatsapp', 'WhatsApp', admin && !!wa], ['wa-templates', 'WhatsApp templates', admin && !!wa], ['wa-share', 'WhatsApp sharing messages', admin], ['ai', 'AI & OCR', admin],
+    ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['evolution', 'WhatsApp (Evolution API)', admin && !!wa], ['whatsapp', 'WhatsApp (Meta)', admin && !!wa], ['wa-templates', 'WhatsApp templates', admin && !!wa], ['wa-share', 'WhatsApp sharing messages', admin], ['ai', 'AI & OCR', admin],
     ['integrations', 'API & webhooks', admin], ['account', 'Account & security', true], ['data', 'Data & backup', true]]
   return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
     <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -80,6 +81,8 @@ export default async function Settings() {
 
       {admin && <NotificationRules c={c} />}
       {admin && <ScheduledReports c={c} />}
+
+      {admin && wa && <EvolutionSettings companyId={c.company.id} s={s} wa={wa} />}
 
       {admin && wa && <Card id="whatsapp"><CardHeader title="WhatsApp Business Platform (Meta Cloud API)" action={<Badge tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.mode === 'live' ? 'Live' : 'Sandbox'}</Badge>} />
         <div className="grid gap-6 p-4 lg:grid-cols-2"><div className="space-y-4">
