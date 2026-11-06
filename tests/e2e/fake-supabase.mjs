@@ -24,7 +24,7 @@ const session = (u, sid = crypto.randomUUID(), method = 'password') => {   // li
 const user = u => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, email_confirmed_at: new Date().toISOString(), app_metadata: {}, user_metadata: {}, factors: [], created_at: new Date().toISOString() })
 const body = req => new Promise(r => { const c = []; req.on('data', d => c.push(d)); req.on('end', () => r(Buffer.concat(c))) })
 const json = (res, code, o) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)) }
-const ocrFixtures = new Map(), geminiFixtures = [], mockCalls = { ocrspace: [], gemini: [], graph: [] }, graphTemplates = new Map()
+const ocrFixtures = new Map(), geminiFixtures = [], mockCalls = { ocrspace: [], gemini: [], graph: [], evolution: [] }, graphTemplates = new Map(), evoInstances = new Map()
 const UNKNOWN_DOC = { document_type: 'unknown', category: 'other', document_owner_type: 'unknown', company_name: null, employee_name: null, document_number: null, issue_date: null, expiry_date: null, issuing_authority: null, confidence: 0.3, fields: [], requires_manual_review: true }
 
 // Optional realism for performance runs: FAKE_LATENCY_MS delays every request like a real network hop would, and
@@ -116,6 +116,36 @@ http.createServer(async (req, res) => {
       if (req.method === 'POST' && rest.startsWith('tpl-')) { const t = [...graphTemplates.values()].find(x => x.id === rest); if (t) { t.components = call.json.components; t.status = 'PENDING' } return json(res, 200, { success: true }) }
       return json(res, 404, { error: { message: `unknown graph path ${rest}` } })
     }
+    // Evolution API v2 stand-in (self-hosted WhatsApp Web gateway): same paths, apikey header and response shapes.
+    const em = path.match(/^\/mock\/evolution\/(.+)$/)
+    if (em) {
+      const rest = em[1], raw = ['POST', 'PUT'].includes(req.method) ? await body(req) : Buffer.alloc(0)
+      let j = null; try { j = raw.length ? JSON.parse(raw.toString()) : null } catch {}
+      if (req.headers.apikey !== 'e2e-evo-global-key') return json(res, 401, { status: 401, error: 'Unauthorized', response: { message: 'Unauthorized' } })
+      mockCalls.evolution.push({ method: req.method, path: rest, json: j && j.media ? { ...j, media: `${j.media.slice(0, 12)}…(${j.media.length})`, pdf: Buffer.from(j.media, 'base64').subarray(0, 5).toString() } : j })
+      const QR = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+      let mm
+      if (req.method === 'POST' && rest === 'instance/create') {
+        if (evoInstances.has(j.instanceName)) return json(res, 403, { status: 403, error: 'Forbidden', response: { message: [`This name "${j.instanceName}" is already in use.`] } })
+        evoInstances.set(j.instanceName, { state: 'connecting', webhook: j.webhook ?? null, n: 0 })
+        return json(res, 201, { instance: { instanceName: j.instanceName, instanceId: crypto.randomUUID(), integration: j.integration, status: 'connecting' }, hash: 'tok', qrcode: { pairingCode: null, code: '2@e2e', base64: QR, count: 1 } })
+      }
+      const inst = (mm = rest.match(/^[a-z]+\/[A-Za-z]+\/([^/]+)$/)) ? evoInstances.get(decodeURIComponent(mm[1])) : null
+      if (/^instance\/connectionState\//.test(rest)) return inst ? json(res, 200, { instance: { instanceName: decodeURIComponent(mm[1]), state: inst.state } }) : json(res, 404, { status: 404, error: 'Not Found', response: { message: ['The instance does not exist'] } })
+      if (!inst) return json(res, 404, { status: 404, error: 'Not Found', response: { message: ['The instance does not exist'] } })
+      if (req.method === 'POST' && /^webhook\/set\//.test(rest)) { inst.webhook = j.webhook; return json(res, 201, { webhook: j.webhook }) }
+      if (req.method === 'GET' && /^instance\/connect\//.test(rest)) { if (inst.state === 'open') return json(res, 200, { instance: { state: 'open' } }); inst.state = 'connecting'; return json(res, 200, { pairingCode: null, code: '2@e2e', base64: QR, count: 2 }) }
+      if (req.method === 'DELETE' && /^instance\/logout\//.test(rest)) { inst.state = 'close'; return json(res, 200, { status: 'SUCCESS', error: false, response: { message: 'Instance logged out' } }) }
+      if (req.method === 'POST' && /^message\/send(Text|Media)\//.test(rest)) {
+        if (inst.state !== 'open') return json(res, 500, { status: 500, error: 'Internal Server Error', response: { message: ['Connection Closed'] } })
+        if (String(j?.number).endsWith('000')) return json(res, 400, { status: 400, error: 'Bad Request', response: { message: [{ jid: `${j.number}@s.whatsapp.net`, exists: false, number: j.number }] } })
+        if (/sendMedia/.test(rest) && (j.mediatype !== 'document' || !Buffer.from(j.media, 'base64').subarray(0, 5).equals(Buffer.from('%PDF-')))) return json(res, 400, { status: 400, error: 'Bad Request', response: { message: ['Not a PDF document'] } })
+        inst.n++
+        return json(res, 201, { key: { remoteJid: `${j.number}@s.whatsapp.net`, fromMe: true, id: `3EB0E2E${String(inst.n).padStart(4, '0')}` }, messageTimestamp: Math.floor(Date.now() / 1000), status: 'PENDING' })
+      }
+      return json(res, 404, { status: 404, error: 'Not Found', response: { message: [`unknown evolution path ${rest}`] } })
+    }
+    if (path === '/mock/evolution-scan' && req.method === 'POST') { const b = JSON.parse((await body(req)).toString()); const i = evoInstances.get(b.instance); if (i) i.state = b.state ?? 'open'; return json(res, 200, { ok: !!i, webhook: i?.webhook ?? null }) }
     if (path === '/mock/graph-approve' && req.method === 'POST') { const b = JSON.parse((await body(req)).toString()); for (const n of b.names) { const t = graphTemplates.get(n); if (t) t.status = 'APPROVED' } return json(res, 200, { ok: true }) }
     if (path === '/mock/ocrspace/parse/image' && req.method === 'POST') {
       const buf = await body(req)

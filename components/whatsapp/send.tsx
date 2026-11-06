@@ -5,7 +5,7 @@ import { Alert, Badge, Button, Field, Input, Textarea } from '@/components/ui/pr
 import { prepareWhatsApp, sendViaWhatsApp } from '@/app/actions/whatsapp'
 import type { ActionState } from '@/lib/utils'
 
-type Prep = { kind: string; label: string; party: { type: string; id: string; name: string }; phone: string | null; preview: string; attachment: boolean; mode: 'live' | 'sandbox'; templateReady: boolean; templateStatus: string; windowOpen: boolean; optedOut: boolean }
+type Prep = { kind: string; label: string; party: { type: string; id: string; name: string }; phone: string | null; preview: string; attachment: boolean; mode: 'live' | 'sandbox'; provider?: 'meta' | 'evolution'; templateReady: boolean; templateStatus: string; windowOpen: boolean; optedOut: boolean }
 
 /**
  * “Send via WhatsApp”: loads the recipient (number auto-filled), the exact message and the PDF that will be attached,
@@ -52,7 +52,7 @@ export function WhatsAppSend({ kind, recordId, label = 'WhatsApp', variant = 'se
               {prep.attachment && <div className="mb-2 flex items-center gap-2 rounded-md bg-white/70 px-2.5 py-2 text-xs dark:bg-black/20"><FileText size={16} aria-hidden />PDF attached: the {prep.label.toLowerCase()} generated from Averiqo</div>}
               {custom ? <Textarea name="text" rows={5} maxLength={1000} value={text} onChange={e => setText(e.target.value)} aria-label="Custom message" className="bg-white/80 text-[#111]" /> : <p className="whitespace-pre-line break-words">{prep.preview}</p>}
             </div>
-            {prep.windowOpen && <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" name="custom" checked={custom} onChange={e => setCustom(e.target.checked)} />Write a custom message (allowed: they messaged you in the last 24 hours)</label>}
+            {prep.windowOpen && <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" name="custom" checked={custom} onChange={e => setCustom(e.target.checked)} />{prep.provider === 'evolution' ? 'Write a custom message' : 'Write a custom message (allowed: they messaged you in the last 24 hours)'}</label>}
             <p className="mt-1.5 text-xs text-muted">ID, passport and bank account numbers are masked automatically; salaries are never written in the message text.</p></div>
           {result?.error && <Alert tone="red">{result.error}</Alert>}
           {result?.ok && result.message && <Alert tone={result.data?.status === 'sandbox' || result.data?.status === 'retry' ? 'amber' : 'green'}>{result.message}</Alert>}

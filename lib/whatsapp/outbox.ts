@@ -15,8 +15,9 @@ import { formatAed, formatShortDate } from '../time'
 import { methodLabel, periodLabel, sum } from '../salary-math'
 import { loadWhatsAppConfig } from '../reminders/engine'
 import { parseSettings } from '../reminders/settings'
-import { isConfigured, type SendResult } from './client'
+import { isConfigured, isEvolution, type SendResult } from './client'
 import { sendMessage, uploadMedia } from './cloud'
+import { evoSendDocument, evoSendText } from './evolution'
 import { KINDS, WINDOW_MS, fill, placeholders, safeFreeText, safeValue, type PartyType } from './messages'
 
 type Admin = SupabaseClient
@@ -175,20 +176,21 @@ export async function companyWhatsApp(companyId: string) {
   const { data } = await admin.from('app_settings').select('key,value').eq('company_id', companyId)
   const s = parseSettings(data ?? []), cfg = await loadWhatsAppConfig(admin, companyId, s)
   const raw = Object.fromEntries((data ?? []).map(r => [r.key, r.value]))
-  return { admin, cfg, live: isConfigured(cfg), wabaId: s.wabaId, appId: typeof raw['whatsapp.app_id'] === 'string' ? raw['whatsapp.app_id'] as string : null }
+  return { admin, cfg, live: isConfigured(cfg), provider: isEvolution(cfg) ? 'evolution' as const : 'meta' as const, wabaId: s.wabaId, appId: typeof raw['whatsapp.app_id'] === 'string' ? raw['whatsapp.app_id'] as string : null }
 }
 
 /** Everything the send dialog shows before anything leaves Averiqo. */
 export async function prepare(c: Ctx, kind: string, recordId: string) {
   const r = await resolveMessage(c, kind, recordId)
   const [tpls, wa] = await Promise.all([loadTemplates(c.supabase, c.company.id), companyWhatsApp(c.company.id)])
-  const t = tpls[kind], body = wa.live ? t.submitted?.body ?? t.body : t.body
+  const evo = wa.provider === 'evolution'   // WhatsApp Web via Evolution API: no Meta templates, no 24-hour window
+  const t = tpls[kind], body = wa.live && !evo ? t.submitted?.body ?? t.body : t.body
   const contact = r.phone ? (await wa.admin.from('whatsapp_contacts').select('last_inbound_at,opted_out_at').eq('company_id', c.company.id).eq('phone', r.phone).maybeSingle()).data : null
-  const windowOpen = !!contact?.last_inbound_at && Date.now() - new Date(contact.last_inbound_at).getTime() < WINDOW_MS
+  const windowOpen = evo || (!!contact?.last_inbound_at && Date.now() - new Date(contact.last_inbound_at).getTime() < WINDOW_MS)
   const approved = t.meta?.status === 'APPROVED'
   return {
-    kind, label: KINDS[kind].label, party: r.party, phone: r.phone, preview: fill(kind, body, r.values), attachment: KINDS[kind].pdf, mode: wa.live ? 'live' as const : 'sandbox' as const,
-    templateReady: !wa.live || approved, templateStatus: wa.live ? (t.meta?.status ?? 'NOT_SUBMITTED') : 'SANDBOX', windowOpen, optedOut: !!contact?.opted_out_at,
+    kind, label: KINDS[kind].label, party: r.party, phone: r.phone, preview: fill(kind, body, r.values), attachment: KINDS[kind].pdf, mode: wa.live ? 'live' as const : 'sandbox' as const, provider: wa.provider,
+    templateReady: !wa.live || evo || approved, templateStatus: !wa.live ? 'SANDBOX' : evo ? 'NOT_NEEDED' : (t.meta?.status ?? 'NOT_SUBMITTED'), windowOpen, optedOut: !!contact?.opted_out_at,
   }
 }
 
@@ -199,12 +201,12 @@ export async function queueAndSend(c: Ctx, kind: string, recordId: string, toRaw
   const p = await prepare(c, kind, recordId)
   const contact = (await createAdminClient().from('whatsapp_contacts').select('opted_out_at,last_inbound_at').eq('company_id', c.company.id).eq('phone', to).maybeSingle()).data
   if (contact?.opted_out_at) fail('This number replied STOP and has opted out of WhatsApp messages.')
-  const windowOpen = !!contact?.last_inbound_at && Date.now() - new Date(contact.last_inbound_at).getTime() < WINDOW_MS
+  const windowOpen = p.provider === 'evolution' || (!!contact?.last_inbound_at && Date.now() - new Date(contact.last_inbound_at).getTime() < WINDOW_MS)
   const useFree = freeText !== undefined && freeText.trim() !== ''
   if (useFree && !windowOpen) fail('A custom message can only be sent within 24 hours of the customer’s last WhatsApp message. Use the template instead.')
   if (!useFree && !p.templateReady) fail(`The “${p.label}” template is not approved by WhatsApp yet (${p.templateStatus.replace('_', ' ').toLowerCase()}). Submit it under Settings → WhatsApp, or send a custom message while the 24-hour window is open.`)
   const tpls = await loadTemplates(c.supabase, c.company.id), wa = await companyWhatsApp(c.company.id)
-  const body = wa.live ? tpls[kind].submitted?.body ?? tpls[kind].body : tpls[kind].body
+  const body = wa.live && wa.provider !== 'evolution' ? tpls[kind].submitted?.body ?? tpls[kind].body : tpls[kind].body
   const order = placeholders(kind, body), values = Object.fromEntries(Object.entries(r.values).map(([k, v]) => [k, safeValue(v)]))
   const text = useFree ? safeFreeText(freeText!) : fill(kind, body, r.values)
   const id = randomUUID(), admin = wa.admin
@@ -233,6 +235,13 @@ export async function deliverParty(admin: Admin, log: { company_id: string; to_n
   const { data: ct } = await admin.from('whatsapp_contacts').select('opted_out_at').eq('company_id', log.company_id).eq('phone', log.to_number).maybeSingle()
   if (ct?.opted_out_at) return { ok: false, retryable: false, error: 'The number has opted out (replied STOP).' }
   if (!live) return { ok: true, sandbox: true }
+  if (isEvolution(cfg)) {   // the stored PDF itself as a WhatsApp document, the message as its caption
+    const text = log.body_text ?? ''
+    if (!log.attachment_path) return evoSendText(cfg.evolution!, log.to_number, text)
+    const { data: blob, error } = await admin.storage.from('vault').download(log.attachment_path)
+    if (error || !blob) return { ok: false, retryable: true, error: `PDF not available: ${error?.message ?? 'missing'}` }
+    return evoSendDocument(cfg.evolution!, log.to_number, new Uint8Array(await blob.arrayBuffer()), log.attachment_name ?? 'document.pdf', text || undefined)
+  }
   let doc: { id: string; filename: string } | undefined
   if (log.attachment_path) {
     const { data: blob, error } = await admin.storage.from('vault').download(log.attachment_path)
