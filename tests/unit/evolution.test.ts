@@ -46,6 +46,7 @@ describe('Evolution API answers', () => {
     expect(parseConnect({ instance: { instanceName: 'x', state: 'open' } })).toEqual({ state: 'open' })
     expect(parseConnect({ instance: { status: 'connecting' }, qrcode: { base64: 'data:image/png;base64,BBB' } }).qr).toBe('data:image/png;base64,BBB')
     expect(parseConnect({ base64: 'javascript:alert(1)' }).qr).toBeUndefined()   // only data:image URLs reach the <img>
+    expect(parseConnect({ count: 0 })).toEqual({ state: 'close', qr: undefined, pairingCode: undefined })   // real server before WhatsApp sent the first code
   })
   it('errors: number not on WhatsApp is permanent, server trouble is retried, auth errors say what to check', () => {
     const notOn = classify(400, { status: 400, error: 'Bad Request', response: { message: [{ exists: false, jid: '971500000000@s.whatsapp.net', number: '971500000000' }] } })

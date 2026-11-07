@@ -26,15 +26,21 @@ export function EvolutionLink({ configured, initialState }: { configured: boolea
     if (r?.error || !r?.data) { setPhase({ kind: 'error', message: r?.error ?? 'Could not start linking.' }); return }
     if (r.data.state === 'open') { setPhase({ kind: 'open' }); router.refresh(); return }
     setPhase({ kind: 'qr', qr: r.data.qr, pairingCode: r.data.pairingCode })
-    timers.current.push(window.setInterval(async () => {
-      const s = await evolutionLinkState().catch(() => null)
-      if (s?.data?.state === 'open') { stop(); setPhase({ kind: 'open' }); router.refresh() }
-    }, 3000))
-    timers.current.push(window.setInterval(async () => {
+    let hasQr = !!r.data.qr, polls = 0
+    const refreshQr = async () => {
       const q = await linkEvolution().catch(() => null)
       if (q?.data?.state === 'open') { stop(); setPhase({ kind: 'open' }); router.refresh() }
-      else if (q?.data?.qr) setPhase({ kind: 'qr', qr: q.data.qr, pairingCode: q.data.pairingCode })
-    }, 40000))
+      else if (q?.data?.qr) { hasQr = true; setPhase({ kind: 'qr', qr: q.data.qr, pairingCode: q.data.pairingCode }) }
+    }
+    timers.current.push(window.setInterval(async () => {
+      polls++
+      const s = await evolutionLinkState().catch(() => null)
+      if (s?.data?.state === 'open') { stop(); setPhase({ kind: 'open' }); router.refresh(); return }
+      // the server can take a few seconds to receive the first code from WhatsApp: keep asking until it shows
+      if (!hasQr && polls % 2 === 0) await refreshQr()
+      if (!hasQr && polls >= 40) { stop(); setPhase({ kind: 'error', message: 'The server did not get a QR code from WhatsApp. Check that the server has internet access, then try again.' }) }
+    }, 3000))
+    timers.current.push(window.setInterval(refreshQr, 40000))
   }
   const unlink = async () => {
     if (!window.confirm('Unlink this WhatsApp number? Averiqo stops sending until a number is linked again.')) return
