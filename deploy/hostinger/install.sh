@@ -3,6 +3,7 @@
 # The database and files stay on Supabase.
 #
 #   sudo bash install.sh app.yourcompany.com wa.yourcompany.com
+#   sudo bash install.sh yourcompany.com wa.yourcompany.com      (app on the main domain; www redirects when its DNS is set)
 #
 # Safe to run again (it then updates the code and keeps every secret and the WhatsApp session).
 # Secrets are typed here, on the server (hidden input); nothing is sent anywhere else.
@@ -29,6 +30,9 @@ for d in "$APP" "$WA"; do
   ip=$(dig +short A "$d" | tail -1); echo "   $d -> ${ip:-nothing}   (this server: ${MYIP:-unknown})"
   [ -n "$ip" ] && [ "$ip" = "$MYIP" ] || die "add an A record for $d pointing to ${MYIP:-the server IP} (hPanel -> Domains -> DNS / Nameservers), wait a few minutes and run this again"
 done
+# www.<app domain>: served (redirecting to the main address) only when its DNS record already points here
+WWW=
+if [ "$(dig +short A "www.$APP" | tail -1)" = "$MYIP" ]; then WWW="www.$APP"; echo "   www.$APP -> this server: will redirect to https://$APP"; fi
 
 say "2/8  Memory and Docker"
 if [ "$(swapon --show --noheadings | wc -l)" = 0 ] && [ "$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)" -lt 7000 ]; then
@@ -136,6 +140,7 @@ $WA {
 	reverse_proxy evolution:8080
 }
 EOF
+[ -n "$WWW" ] && printf '%s {\n\tredir https://%s{uri} permanent\n}\n' "$WWW" "$APP" >> Caddyfile
 
 cat > docker-compose.yml <<'EOF'
 services:

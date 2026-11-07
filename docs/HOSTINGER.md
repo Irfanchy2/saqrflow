@@ -29,6 +29,9 @@ WhatsApp server <──https── wa.yourcompany.com ─┘     Evolution API +
    sudo bash install.sh app.yourcompany.com wa.yourcompany.com
    ```
 
+   To run the app on the main domain instead, use `sudo bash install.sh yourcompany.com wa.yourcompany.com` and add A
+   records for `@`, `www` and `wa`; `www` then redirects to the main address.
+
    It asks for the Supabase values and keys (hidden input, stored only in `/opt/averiqo/app.env`, root-only), builds the
    app (10–20 minutes the first time), starts everything, schedules the daily jobs and prints the next steps.
 4. **Supabase → Authentication → URL Configuration**: Site URL `https://app.yourcompany.com`, and add
