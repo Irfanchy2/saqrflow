@@ -1,11 +1,17 @@
 import { cloudApiPayload, renderText, type Params, type TemplateName } from './templates'
+import type { EvolutionConfig } from './evolution-core'
 
-export interface WhatsAppConfig { phoneNumberId?: string; accessToken?: string; apiVersion: string; forceSandbox?: boolean }
+/** provider "meta": WhatsApp Business Cloud API (templates, 24-hour window). "evolution": a self-hosted Evolution API server
+ *  linked to a normal WhatsApp number by QR code (free text and PDFs at any time). */
+export interface WhatsAppConfig { provider?: 'meta' | 'evolution'; phoneNumberId?: string; accessToken?: string; apiVersion: string; forceSandbox?: boolean; evolution?: EvolutionConfig }
 export type SendResult = { ok: true; sandbox: boolean; messageId?: string } | { ok: false; retryable: boolean; error: string }
 
 /** Graph API base (WHATSAPP_GRAPH_URL only for a local test stand-in). */
 export const graphBase = () => (process.env.WHATSAPP_GRAPH_URL || 'https://graph.facebook.com').replace(/\/$/, '')
-export const isConfigured = (c: WhatsAppConfig) => !!c.phoneNumberId && !!c.accessToken && !c.forceSandbox
+export const isConfigured = (c: WhatsAppConfig) => !c.forceSandbox && (c.provider === 'evolution'
+  ? !!c.evolution?.url && !!c.evolution.apiKey && !!c.evolution.instance
+  : !!c.phoneNumberId && !!c.accessToken)
+export const isEvolution = (c: WhatsAppConfig) => c.provider === 'evolution'
 
 /** Meta error codes that are worth retrying (throttling / transient). Everything else is permanent. */
 const RETRYABLE_CODES = new Set([1, 2, 4, 17, 32, 613, 80007, 130429, 131016, 131048, 131056])

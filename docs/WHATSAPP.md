@@ -4,6 +4,9 @@ Averiqo sends documents and messages to customers, suppliers and employees throu
 WhatsApp Business **Cloud API** (Meta). Sending uses the existing notification queue, which provides
 retries, delivery receipts and the delivery log under **Reminders → Log**.
 
+> Alternative: a normal WhatsApp number linked by QR code through a self-hosted **Evolution API** server
+> (no Meta templates or 24-hour window). See [EVOLUTION_API.md](EVOLUTION_API.md).
+
 ## What can be sent
 
 | Message | Where the button is | PDF attached | Goes to |

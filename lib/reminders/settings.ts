@@ -6,10 +6,12 @@ export interface ReminderSettings extends ScheduleOptions {
   digestEnabled: boolean; digestHour: number          // local company hour (0-23)
   whatsappMode: 'auto' | 'sandbox'; whatsappCostPerMessage: number | null
   phoneNumberId: string | null; wabaId: string | null
+  whatsappProvider: 'meta' | 'evolution'; evolutionUrl: string | null; evolutionInstance: string | null
 }
 export const DEFAULT_SETTINGS: ReminderSettings = {
   offsets: DEFAULT_OFFSETS, overdueEveryDays: 7, overdueMax: 4, emailFallback: true,
   digestEnabled: true, digestHour: 8, whatsappMode: 'auto', whatsappCostPerMessage: null, phoneNumberId: null, wabaId: null,
+  whatsappProvider: 'meta', evolutionUrl: null, evolutionInstance: null,
 }
 /** app_settings rows → typed settings (invalid/missing values fall back to defaults). */
 export function parseSettings(rows: { key: string; value: any }[]): ReminderSettings {
@@ -24,5 +26,8 @@ export function parseSettings(rows: { key: string; value: any }[]): ReminderSett
     whatsappCostPerMessage: typeof m['whatsapp.cost_per_message'] === 'number' ? m['whatsapp.cost_per_message'] : null,
     phoneNumberId: typeof m['whatsapp.phone_number_id'] === 'string' ? m['whatsapp.phone_number_id'] : null,
     wabaId: typeof m['whatsapp.waba_id'] === 'string' ? m['whatsapp.waba_id'] : null,
+    whatsappProvider: m['whatsapp.provider'] === 'evolution' ? 'evolution' : 'meta',
+    evolutionUrl: typeof m['whatsapp.evolution_url'] === 'string' ? m['whatsapp.evolution_url'] : null,
+    evolutionInstance: typeof m['whatsapp.evolution_instance'] === 'string' ? m['whatsapp.evolution_instance'] : null,
   }
 }
