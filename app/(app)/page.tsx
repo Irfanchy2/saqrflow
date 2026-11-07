@@ -14,6 +14,7 @@ import { PROJECT_STATUS } from '@/lib/projects'
 import { ACTION_LABEL, TABLE_LABEL } from '@/lib/audit'
 import { QuickActions } from '@/components/layout/quick-actions'
 import { DashboardCustomize } from '@/components/dashboard-customize'
+import { ArrangeButton, DashboardBoard } from '@/components/dashboard/board'
 import { normalizeLayout, type WidgetKey } from '@/lib/dashboard-widgets'
 import { canDecide } from '@/lib/approvals'
 import { buildTrend, greeting } from '@/lib/dashboard-trend'
@@ -188,7 +189,7 @@ export default async function Dashboard() {
 
   const W: Partial<Record<WidgetKey, React.ReactNode>> = {
     finance: (sk && ageing && cs && trend) ? <section aria-label="Key figures" className="mb-5">
-      <Metrics cols={4}>
+      <Metrics cols={4} phone="grid">
         <StatCard label="Revenue this month" value={formatAed(salesNet)} change={trend.change.sales} hint="Invoiced ex VAT, vs same days last month" bars={months8.map(m => m.sales)} href="/reports?period=month" icon={Receipt} index={0} />
         {docsView && <StatCard label="Work orders completed" value={wo14?.count ?? 0} change={pctChange(wo14?.count ?? 0, woPrev14?.count ?? 0)} hint="Last 14 days, vs the 14 before" href="/work-orders?status=completed" icon={HardHat} index={1} />}
         {book && <StatCard label="Open order book" value={formatAed(book.value)} hint={book.projects ? `Left to invoice on ${book.projects} project${book.projects === 1 ? '' : 's'}` : 'Contract values of open projects'} href="/projects" icon={Briefcase} index={2} />}
@@ -265,19 +266,13 @@ export default async function Dashboard() {
         <span className="min-w-0 flex-1 truncate">{a.title}</span>{a.amount !== null && <span className="shrink-0 text-xs tabular-nums text-muted">{formatAed(a.amount)}</span>}</Link></li>)}</ul>}</Card> : null,
   }
   // the hero carries the page actions (Customize lists the widgets that have something to show, the hero included)
-  const headerActions = <><span className="contents max-sm:hidden"><DashboardCustomize layout={layout} available={['banner', ...(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))]} /></span>
+  const headerActions = <><ArrangeButton /><span className="contents max-sm:hidden"><DashboardCustomize layout={layout} available={['banner', ...(Object.keys(W) as WidgetKey[]).filter(k => k === 'mytasks' || (k === 'approvals' ? c.can('approvals.decide') || c.can('sales.approve') : !!W[k]))]} /></span>
     <QuickActions label="Create new" can={can} /></>
   W.banner = <TodayHero greet={`${greeting(tz)}${firstName ? `, ${firstName}` : ''}`} date={date} time={time} tz={tz} canEdit={c.can('settings.manage')} demo={!!c.company.is_demo} now={time} events={events} cash={cash}
       chip={[...(docsView ? [`${visitN} site visit${visitN === 1 ? '' : 's'}`] : []), ...(woTodayN ? [`${woTodayN} work order${woTodayN === 1 ? '' : 's'} due`] : [])]} actions={headerActions} />
   const visible = layout.items.filter(i => !i.hidden && W[i.key])
   const shown = new Set(visible.map(i => i.key))
-  const SPAN: Partial<Record<WidgetKey, string>> = {
-    trend: shown.has('funnel') ? 'lg:col-span-8' : 'lg:col-span-12', funnel: shown.has('trend') ? 'lg:col-span-4' : 'lg:col-span-12',
-    floor: shown.has('road') ? 'lg:col-span-7' : 'lg:col-span-12', road: shown.has('floor') ? 'lg:col-span-5' : 'lg:col-span-12',
-    activity: shown.has('projects') ? 'lg:col-span-6' : 'lg:col-span-12', projects: shown.has('activity') ? 'lg:col-span-6' : 'lg:col-span-12',
-  }
-  const PHONE_HIDDEN = new Set<WidgetKey>(['calendar', 'inbox'])   // phones get the same dashboard; only the month grid and the inbox panel stay on bigger screens
-  const col = (k: 'top' | 'left' | 'right') => visible.filter(i => i.col === k).map(i => <div key={i.key} className={cn('min-w-0', k === 'left' && cn('col-span-12', SPAN[i.key] ?? 'lg:col-span-12'), PHONE_HIDDEN.has(i.key) && 'max-sm:hidden')}>{W[i.key]}</div>)
+  const PHONE_HIDDEN: WidgetKey[] = ['calendar', 'inbox']   // phones get the same dashboard; only the month grid and the inbox panel stay on bigger screens
 
   return <>
     {!shown.has('banner') && <div className="mb-6 hidden flex-wrap items-center justify-between gap-x-4 gap-y-3 sm:flex">
@@ -290,24 +285,20 @@ export default async function Dashboard() {
       <ol className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">{[['Add company documents', '/documents', 'Trade licence, VAT certificate, tenancy'], ['Add employees', '/employees', 'Passports, visas, Emirates IDs'], ['Create a quotation', '/invoices', 'Your letterhead, stamp and terms'], ['Set up reminders', '/reminders', 'Recipients and WhatsApp opt-in']].map(([t, h, s], i) =>
         <li key={h}><Link href={h} className="flex h-full gap-3 rounded-xl border border-border p-3.5 transition-colors hover:border-border-strong hover:bg-surface-2/50"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">{i + 1}</span><span><span className="block font-medium">{t}</span><span className="mt-0.5 block text-xs text-muted">{s}</span></span></Link></li>)}</ol></Card>}
 
-    <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-rows-[auto_1fr]">
-      {/* the top zone (banner, KPI cards) is replaced by the summary on phones: drop its empty grid row there too */}
-      <div className={cn('flex min-w-0 flex-col gap-5 2xl:col-start-1 2xl:row-start-1 [&>*>section]:mb-0', visible.every(i => i.col !== 'top' || PHONE_HIDDEN.has(i.key)) && 'max-sm:hidden')}>{col('top')}</div>
-      <div className="grid min-w-0 grid-cols-1 content-start items-start gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:col-start-2 2xl:row-span-2 2xl:row-start-1 2xl:grid-cols-1">{col('right')}</div>
-      <div className="grid min-w-0 grid-cols-12 content-start items-stretch gap-5 self-start 2xl:col-start-1 2xl:row-start-2">{col('left')}</div>
-    </div>
+    {/* the cards in the user's order; drag a card's grip (or Arrange on touch screens) to move it */}
+    <DashboardBoard layout={layout} nodes={Object.fromEntries(visible.map(i => [i.key, W[i.key]]))} phoneHidden={PHONE_HIDDEN} />
   </>
 }
 
 /** Latest sales documents: number (with issue date), customer, project or subject, the relevant date, amount, status. */
 function DocTable({ rows, dateCol, date, empty }: { rows: any[]; dateCol: string; date: (r: any) => string | null; empty: string }) {
   if (!rows.length) return <EmptyState compact title={empty} />
-  return <TableWrap><thead><tr><Th>No.</Th><Th>Customer</Th><Th>Project / subject</Th><Th>Date</Th><Th>{dateCol}</Th><Th className="text-right">Amount (AED)</Th><Th>Status</Th></tr></thead>
+  return <TableWrap><thead><tr><Th>No.</Th><Th>Customer</Th><Th className="sm:max-lg:hidden">Project / subject</Th><Th className="sm:max-xl:hidden">Date</Th><Th>{dateCol}</Th><Th className="text-right">Amount (AED)</Th><Th>Status</Th></tr></thead>
     <tbody className="divide-y divide-border">{rows.map(r => <tr key={r.id}>
       <Td className="whitespace-nowrap"><Link href={`/invoices/${r.id}`} className="font-medium text-primary hover:underline">{r.number}</Link></Td>
       <Td className="max-w-[200px] truncate font-medium">{r.customer_name ?? '—'}</Td>
-      <Td className="max-w-[200px] truncate text-muted">{r.project?.name ?? r.subject ?? r.site ?? '—'}</Td>
-      <Td className="whitespace-nowrap tabular-nums text-muted">{formatShortDate(r.issue_date)}</Td>
+      <Td className="max-w-[200px] truncate text-muted sm:max-lg:hidden">{r.project?.name ?? r.subject ?? r.site ?? '—'}</Td>
+      <Td className="whitespace-nowrap tabular-nums text-muted sm:max-xl:hidden">{formatShortDate(r.issue_date)}</Td>
       <Td className="whitespace-nowrap tabular-nums text-muted">{date(r) ? formatShortDate(date(r)!) : '—'}</Td>
       <Td className="text-right font-medium tabular-nums">{fmtMoney(r.total)}</Td>
       <Td badge><SalesDocBadge r={r} /></Td></tr>)}</tbody></TableWrap>
