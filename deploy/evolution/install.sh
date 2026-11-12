@@ -115,6 +115,14 @@ EOF
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
   ufw allow 22/tcp >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; echo "   firewall: opened 80 and 443"
 fi
+# Oracle Cloud (and some other images) ship iptables rules that reject everything except SSH: open 80 and 443 there too
+if command -v iptables >/dev/null && iptables -S INPUT 2>/dev/null | grep -q -- "-j REJECT"; then
+  for port in 80 443; do
+    iptables -C INPUT -p tcp -m state --state NEW --dport "$port" -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp -m state --state NEW --dport "$port" -j ACCEPT
+  done
+  command -v netfilter-persistent >/dev/null && netfilter-persistent save >/dev/null 2>&1
+  echo "   server firewall (iptables): opened 80 and 443"
+fi
 
 say "4/5  Starting (first start downloads about 1 GB, give it a few minutes)"
 docker compose pull -q
