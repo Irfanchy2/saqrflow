@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { LiveSearch } from '@/components/ui/live-search'
 import { Receipt } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, pageOf, sanitizeQ } from '@/lib/queries'
@@ -57,7 +58,7 @@ export async function InvoicesTab({ sp, edit }: { sp: Record<string, string | un
   return <Card>
     <FilterTabs label="Payment status" className="px-2" tabs={VIEWS.map(v => ({ href: href(v.k), label: v.label, active: view.k === v.k, count: v.k ? n[v.k] : undefined }))} />
     <form className="border-b border-border p-3"><input type="hidden" name="tab" value="invoice" />{view.k && <input type="hidden" name="view" value={view.k} />}
-      <FilterBar active={false} search={<input name="q" type="search" defaultValue={sp.q} aria-label="Search tax invoices" placeholder="Search number, customer, site, LPO…" className={`${cls} h-11 min-w-0 flex-1 sm:h-10`} />}>
+      <FilterBar active={false} search={<LiveSearch name="q" defaultValue={sp.q} aria-label="Search tax invoices" placeholder="Search number, customer, site, LPO…" className={`${cls} h-11 min-w-0 flex-1 sm:h-10`} />}>
         <button className="h-10 cursor-pointer rounded-lg border border-border px-4 text-sm hover:bg-surface-2">Search</button></FilterBar></form>
     {(filtered || view.k === 'open') && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-primary-soft/50 px-4 py-2 text-sm">
       <span>Filtered list{view.k === 'open' ? ': open invoices (not fully paid)' : ''}{sp.from || sp.to ? ` · issued ${sp.from ?? '…'} to ${sp.to ?? '…'}` : ''}{sp.customer ? ' · one customer' : ''}{sp.project ? ' · one project' : ''}</span>

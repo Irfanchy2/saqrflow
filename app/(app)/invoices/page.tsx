@@ -1,6 +1,7 @@
 import { WhatsAppSend } from '@/components/whatsapp/send'
 import { ShareSheet } from '@/components/whatsapp/share-sheet'
 import Link from 'next/link'
+import { LiveSearch } from '@/components/ui/live-search'
 import { redirect } from 'next/navigation'
 import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, ScrollText, Target, Truck, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
@@ -63,7 +64,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <t.icon size={15} aria-hidden />{t.label}{t.k in counts && <span className={cn('rounded-full px-1.5 text-[11px] tabular-nums sm:rounded-sm sm:bg-surface-2 sm:text-muted', a ? 'bg-white/20' : 'bg-surface-2 text-muted')}>{counts[t.k]}</span>}</Link> })}
     </TabStrip>
 
-    {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'followups' ? <FollowupsTab /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} /> : tab === 'invoice' ? <InvoicesTab sp={sp} edit={edit} /> : <DocsTab t={tab as SalesType} sp={sp} edit={edit} />}
+    {tab === 'payments' ? <PaymentsTab sp={sp} /> : tab === 'followups' ? <FollowupsTab sp={sp} /> : tab === 'receivables' ? <Ageing rows={rows} today={c.today} sp={sp} /> : tab === 'invoice' ? <InvoicesTab sp={sp} edit={edit} /> : <DocsTab t={tab as SalesType} sp={sp} edit={edit} />}
   </>
 }
 
@@ -92,7 +93,7 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
   return <Card>
     <FilterTabs label="Status" className="px-2 sm:hidden" tabs={[{ href: `/invoices?tab=${t}`, label: 'All', active: !sp.status }, ...meta.statuses.filter(x => x !== 'cancelled').slice(0, 4).map(x => ({ href: `/invoices?tab=${t}&status=${x}`, label: statusLabel(t, x), active: sp.status === x }))]} />
     <form className="border-b border-border p-3"><input type="hidden" name="tab" value={t} />
-      <FilterBar active={!!sp.status} search={<input name="q" type="search" defaultValue={sp.q} aria-label={`Search ${meta.plural.toLowerCase()}`} placeholder="Search number, customer, site, LPO…" className={`${cls} h-11 min-w-0 flex-1 sm:h-10`} />}>
+      <FilterBar active={!!sp.status} search={<LiveSearch name="q" defaultValue={sp.q} aria-label={`Search ${meta.plural.toLowerCase()}`} placeholder="Search number, customer, site, LPO…" className={`${cls} h-11 min-w-0 flex-1 sm:h-10`} />}>
         <select name="status" defaultValue={sp.status ?? ''} aria-label="Status" className={`${cls} min-w-0 sm:flex-none`}><option value="">Any status</option>{meta.statuses.map(s => <option key={s} value={s}>{statusLabel(t, s)}</option>)}</select>
         <button className="h-10 cursor-pointer rounded-lg border border-border px-4 text-sm hover:bg-surface-2">Filter</button></FilterBar></form>
     {(sp.due || sp.issued || sp.won || sp.from || sp.to || sp.customer || sp.project) && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-primary-soft/50 px-4 py-2 text-sm">
@@ -125,11 +126,22 @@ async function DocsTab({ t, sp, edit }: { t: SalesType; sp: Record<string, strin
   </Card>
 }
 
-async function FollowupsTab() {
+/** Search row for the Payments / Receivables / Follow-ups tabs (same look as the document tabs; Enter searches). */
+function TabSearch({ tab, q, label, placeholder }: { tab: string; q?: string; label: string; placeholder: string }) {
+  return <form className="border-b border-border p-3"><input type="hidden" name="tab" value={tab} />
+    <FilterBar search={<LiveSearch name="q" defaultValue={q} aria-label={label} placeholder={placeholder} className="h-11 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm sm:h-10" />}>
+      <button className="h-10 cursor-pointer rounded-lg border border-border px-4 text-sm hover:bg-surface-2">Search</button>
+      {q && <Link href={`/invoices?tab=${tab}`} className="inline-flex h-10 items-center rounded-lg px-3 text-sm text-primary hover:underline">Clear</Link>}</FilterBar></form>
+}
+const matches = (term: string, ...xs: (string | null | undefined)[]) => { const t = term.toLowerCase(); return xs.some(x => (x ?? '').toLowerCase().includes(t)) }
+
+async function FollowupsTab({ sp }: { sp: Record<string, string | undefined> }) {
   const c = await getCtx()
   const { data } = await c.supabase.from('sales_followups').select('id,due_date,note,invoice:invoices(id,number,customer_name,total,status)').is('done_at', null).order('due_date').limit(200)
-  const rows = (data ?? []).filter((f: any) => f.invoice)
-  return <Card>{!rows.length ? <EmptyState icon={BellRing} title="No follow-ups open" body="When a quotation is marked as sent, follow-up reminders are created automatically (Settings → Document branding → Quotation workflow)." />
+  const term = sanitizeQ(sp.q)
+  const rows = (data ?? []).filter((f: any) => f.invoice && (!term || matches(term, f.invoice.number, f.invoice.customer_name, f.note)))
+  return <Card><TabSearch tab="followups" q={sp.q} label="Search follow-ups" placeholder="Search quotation number, customer, note…" />
+    {!rows.length ? <EmptyState icon={BellRing} title={term ? 'No follow-ups match' : 'No follow-ups open'} body={term ? 'Try a different name or number.' : 'When a quotation is marked as sent, follow-up reminders are created automatically (Settings → Document branding → Quotation workflow).'} />
     : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Due</Th><Th>Quotation</Th><Th>Customer</Th><Th>Note</Th><Th className="text-right">Value (AED)</Th></tr></thead>
       <tbody className="divide-y divide-border">{rows.map((f: any) => <tr key={f.id} className="hover:bg-surface-2/50">
         <Td className={cn('whitespace-nowrap tabular-nums', f.due_date <= c.today && 'font-medium text-warning')}>{showDate(f.due_date)}{f.due_date < c.today ? ' · late' : f.due_date === c.today ? ' · today' : ''}</Td>
@@ -139,9 +151,21 @@ async function FollowupsTab() {
 
 async function PaymentsTab({ sp }: { sp: Record<string, string | undefined> }) {
   const c = await getCtx()
-  const page = pageOf(sp.page), edit = c.can('records.edit')
-  const { data, count } = await c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name),customer:customers(id,name),project:projects(id,name)', { count: 'exact' }).order('paid_on', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-  return <Card>{!data?.length ? <EmptyState icon={Banknote} title="No payments yet" body="Open an issued tax invoice and use “Record payment”. Partial payments update the balance and status automatically." />
+  const page = pageOf(sp.page), edit = c.can('records.edit'), term = sanitizeQ(sp.q)
+  let q = c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice:invoices(id,number,customer_name),customer:customers(id,name),project:projects(id,name)', { count: 'exact' })
+  if (term) {   // a payment matches through its invoice (number / customer on it), its customer, or its own reference
+    const like = `%${term}%`
+    const [{ data: invs }, { data: custs }] = await Promise.all([
+      c.supabase.from('invoices').select('id').eq('doc_type', 'invoice').or(`number.ilike.${like},customer_name.ilike.${like}`).limit(500),
+      c.supabase.from('customers').select('id').ilike('name', like).limit(200)])
+    const ors = [`reference.ilike.${like}`]
+    if (invs?.length) ors.push(`invoice_id.in.(${invs.map(r => r.id).join(',')})`)
+    if (custs?.length) ors.push(`customer_id.in.(${custs.map(r => r.id).join(',')})`)
+    q = q.or(ors.join(','))
+  }
+  const { data, count } = await q.order('paid_on', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+  return <Card><TabSearch tab="payments" q={sp.q} label="Search payments" placeholder="Search invoice number, customer, reference…" />
+    {!data?.length ? <EmptyState icon={Banknote} title={term ? 'No payments match' : 'No payments yet'} body={term ? 'Try a different name, invoice number or reference.' : 'Open an issued tax invoice and use “Record payment”. Partial payments update the balance and status automatically.'} />
     : <TableWrap><thead className="bg-surface-2/50"><tr><Th>Date</Th><Th>Invoice</Th><Th>Customer</Th><Th>Method</Th><Th>Reference</Th><Th className="text-right">Amount (AED)</Th><Th><span className="sr-only">Share receipt</span></Th></tr></thead>
       <tbody className="divide-y divide-border">{data.map((p: any) => <tr key={p.id} className="hover:bg-surface-2/50">
         <Td className="tabular-nums">{showDate(p.paid_on)}</Td>
@@ -153,10 +177,12 @@ async function PaymentsTab({ sp }: { sp: Record<string, string | undefined> }) {
     <Pagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} params={sp} base="/invoices" /></Card>
 }
 
-function Ageing({ rows, today }: { rows: InvRow[]; today: string }) {
-  const a = receivablesAgeing(rows, today)
-  if (!a.list.length) return <Card><EmptyState icon={Wallet} title="No outstanding receivables" body="Issued invoices with an unpaid balance appear here, grouped by how many days they are past due." /></Card>
-  return <Card>
+function Ageing({ rows, today, sp }: { rows: InvRow[]; today: string; sp: Record<string, string | undefined> }) {
+  const term = sanitizeQ(sp.q)
+  const a = receivablesAgeing(term ? rows.filter(r => matches(term, r.customer_name, r.number)) : rows, today)
+  const search = <TabSearch tab="receivables" q={sp.q} label="Search receivables" placeholder="Search customer or invoice number…" />
+  if (!a.list.length) return <Card>{(term || rows.length > 0) && search}<EmptyState icon={Wallet} title={term ? 'No receivables match' : 'No outstanding receivables'} body={term ? 'Try a different customer name or invoice number.' : 'Issued invoices with an unpaid balance appear here, grouped by how many days they are past due.'} /></Card>
+  return <Card>{search}
     <div className="grid grid-cols-2 gap-px overflow-hidden rounded-t-lg border-b border-border bg-border sm:grid-cols-5">
       {AGE_BUCKETS.map((b, i) => <div key={b} className="bg-surface p-3"><div className="text-xs text-muted">{i === 0 ? 'Not yet due' : `${b} days late`}</div>
         <div className={cn('mt-1 text-lg font-semibold tabular-nums', a.totals[i] > 0 && (i >= 3 ? 'text-danger' : i >= 1 ? 'text-warning' : ''))}>{fmtMoney(a.totals[i])}</div>

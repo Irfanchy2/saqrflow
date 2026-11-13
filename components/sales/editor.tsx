@@ -48,8 +48,8 @@ function ago(ts: number | null, now: number) {
   return s < 10 ? 'Saved just now' : s < 60 ? `Saved ${Math.floor(s / 5) * 5} seconds ago` : s < 3600 ? `Saved ${Math.floor(s / 60)} min ago` : 'Saved'
 }
 
-export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false, statusView, invoicedAs = null, cloudLive = false }: {
-  doc: Record<string, any>; items: (PaperItem & { id?: string })[]; branding: Branding; paid: number; customers: CustomerOpt[]; projects: ProjectOpt[]
+export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false, statusView, invoicedAs = null, cloudLive = false, paidStamp = null }: {
+  doc: Record<string, any>; items: (PaperItem & { id?: string })[]; branding: Branding; paid: number; paidStamp?: { date: string | null } | null; customers: CustomerOpt[]; projects: ProjectOpt[]
   catalog: CatalogOpt[]; templates: TemplateOpt[]; salespeople: { id: string; full_name: string }[]; delivery: Record<string, { ordered: number; delivered: number }>
   editable: boolean; lockedReason?: string | null; canStatus: boolean; canDelete: boolean; canVault: boolean; requireApproval: boolean; canRenumber?: boolean
   /** WhatsApp Business (paid Cloud API) is connected: the phone capsule sends through it; otherwise it opens the free share sheet */
@@ -466,7 +466,7 @@ export function SalesEditor({ doc, items: initialItems, branding, paid, customer
         <div className="sticky top-32">
           <div className="mb-2 flex items-center justify-between text-xs text-muted"><span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />Live A4 preview</span><span>Same layout as Print → Save as PDF</span></div>
           <div className="rounded-xl bg-[repeating-linear-gradient(45deg,hsl(var(--surface-2)),hsl(var(--surface-2))_10px,hsl(var(--bg))_10px,hsl(var(--bg))_20px)] p-3 sm:p-5">
-            <FitPaper><SalesPaper doc={paperDoc as any} items={paperItems} branding={branding} paid={paid} pageGuides /></FitPaper>
+            <FitPaper><SalesPaper doc={paperDoc as any} items={paperItems} branding={branding} paid={paid} stamp={paidStamp} pageGuides /></FitPaper>
           </div>
         </div>
       </div>

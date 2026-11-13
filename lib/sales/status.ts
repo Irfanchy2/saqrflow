@@ -35,6 +35,16 @@ export function payState(x: { status: string; total: number | string; paid?: num
   return paid > 0 ? 'partially_paid' : 'unpaid'
 }
 
+/**
+ * The "PAID" stamp on a tax invoice (screen, print and PDF): only an issued invoice whose payments cover what is due
+ * (the same rule as the Paid badge). Fully credited invoices get no stamp: nothing was paid. The date is the last payment.
+ */
+export function paidStamp(x: { doc_type: string; status: string; total: number | string; paid?: number | string | null; credited?: number | string | null }, payments: { paid_on?: string | null }[] = []): { date: string | null } | null {
+  if (x.doc_type !== 'invoice' || cents(x.total) <= 0 || cents(x.paid) <= 0 || payState(x, '') !== 'paid') return null
+  const dates = payments.map(p => p.paid_on).filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}/.test(d)).sort()
+  return { date: dates.length ? dates[dates.length - 1].slice(0, 10) : null }
+}
+
 /** Balance still owed (never negative), in AED. */
 export const balanceOf = (x: { total: number | string; paid?: number | string | null; credited?: number | string | null }) =>
   Math.max(0, cents(x.total) - cents(x.paid) - cents(x.credited)) / 100

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { balanceOf, daysOverdue, docState, payState, paymentActions } from '@/lib/sales/status'
+import { balanceOf, daysOverdue, docState, paidStamp, payState, paymentActions } from '@/lib/sales/status'
 import { fmtQty, unitChoices, UNITS } from '@/lib/sales/docs'
 
 const T = '2026-10-16'
@@ -46,4 +46,24 @@ describe('units', () => {
   it('offers the trade units by their printed code', () => { for (const u of ['L.S', 'LM', 'SQM', 'PCS', 'KG', 'TON', 'SET', 'LOT', 'Nos']) expect(UNITS).toContain(u) })
   it('keeps a line’s own older unit in its picker', () => { expect(unitChoices('Sq.Mtr')[0]).toBe('Sq.Mtr'); expect(unitChoices('L.S')).toEqual(UNITS) })
   it('formats quantities for print', () => { expect(fmtQty(1250)).toBe('1,250'); expect(fmtQty('42.5')).toBe('42.5'); expect(fmtQty(0.125)).toBe('0.125'); expect(fmtQty(null)).toBe('0') })
+})
+
+describe('PAID stamp', () => {
+  const inv = { doc_type: 'invoice', status: 'paid', total: 10500 }
+  it('shows on a fully paid tax invoice, with the last payment date', () => {
+    expect(paidStamp({ ...inv, paid: 10500 }, [{ paid_on: '2026-10-02' }, { paid_on: '2026-11-12' }, { paid_on: '2026-10-20' }])).toEqual({ date: '2026-11-12' })
+    expect(paidStamp({ ...inv, paid: 10500 })).toEqual({ date: null })
+  })
+  it('counts a credit note towards the amount due, but needs a real payment', () => {
+    expect(paidStamp({ ...inv, paid: 8000, credited: 2500 }, [{ paid_on: '2026-11-01' }])).toEqual({ date: '2026-11-01' })
+    expect(paidStamp({ ...inv, paid: 0, credited: 10500 })).toBeNull()                 // fully credited: nothing was paid
+  })
+  it('never on partly paid, draft, cancelled, zero-value or non-invoice documents', () => {
+    expect(paidStamp({ ...inv, status: 'partially_paid', paid: 10499.99 })).toBeNull()
+    expect(paidStamp({ ...inv, status: 'draft', paid: 10500 })).toBeNull()
+    expect(paidStamp({ ...inv, status: 'cancelled', paid: 10500 })).toBeNull()
+    expect(paidStamp({ ...inv, total: 0, paid: 0 })).toBeNull()
+    expect(paidStamp({ ...inv, doc_type: 'quotation', paid: 10500 })).toBeNull()
+    expect(paidStamp({ ...inv, doc_type: 'credit_note', paid: 10500 })).toBeNull()
+  })
 })
