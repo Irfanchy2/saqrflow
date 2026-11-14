@@ -5,7 +5,7 @@ import { DOC_META } from '@/lib/sales/docs'
 import { SalesPaper } from '@/components/sales/paper'
 import { salesPdfName } from '@/lib/sales/filename'
 import { PrintButton } from '@/components/print-button'
-import { paidStamp } from '@/lib/sales/status'
+import { invoicePaidStamp } from '@/lib/sales/paid-stamp'
 
 export const dynamic = 'force-dynamic'
 /** Chrome uses the page title as the “Save as PDF” file name → AS0025180-2026_Customer_Quotation */
@@ -23,12 +23,12 @@ export default async function PrintSales({ params, searchParams }: { params: Pro
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
   const c = await getCtx(); if (!c.can('finance.view')) redirect('/')
   const d = await loadSalesDoc(c, id); if (!d) notFound()
-  const branding = await brandingFor(c)
+  const [branding, stamp] = await Promise.all([brandingFor(c), invoicePaidStamp(c, d)])
   return <div className="print-sheet min-h-screen bg-neutral-200 py-8 print:py-0">
     <div className="no-print mx-auto mb-4 flex max-w-[794px] items-center justify-between px-2 text-sm text-neutral-700">
       <span>{DOC_META[d.doc.doc_type].label} {d.doc.number}: A4, no margins. Turn on “Background graphics” for the shaded boxes.</span>
       <PrintButton auto={(await searchParams).auto === '1'} />
     </div>
-    <SalesPaper doc={d.doc} items={d.items} branding={branding} paid={d.paid + ((d as any).credited ?? 0)} stamp={paidStamp({ ...d.doc, paid: d.paid, credited: (d as any).credited }, d.payments)} className="shadow-pop print:shadow-none" />
+    <SalesPaper doc={d.doc} items={d.items} branding={branding} paid={d.paid + ((d as any).credited ?? 0)} stamp={stamp} className="shadow-pop print:shadow-none" />
   </div>
 }

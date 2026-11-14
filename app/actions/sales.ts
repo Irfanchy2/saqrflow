@@ -614,6 +614,25 @@ export async function markInvoiceUnpaid(invoiceId: string, _: ActionState, fd: F
   })
 }
 
+/**
+ * Per-invoice switch for the green PAID stamp (screen, print and PDF). Only the switch changes: the invoice, its
+ * number, totals and payments stay as they are. The stamp still appears only while the invoice is fully paid.
+ */
+export async function setPaidStamp(invoiceId: string, show: boolean): Promise<ActionState> {
+  return safe(async () => {
+    const c = await getCtx(); need(c, 'records.edit')
+    const { data, error } = await c.supabase.from('invoices').update({ show_paid_stamp: show === true }).eq('id', invoiceId).eq('doc_type', 'invoice').select('id')
+    if (error) {
+      if (error.code === '42703' || error.code === 'PGRST204' || /show_paid_stamp/.test(error.message ?? '')) return { error: 'The PAID stamp switch needs a one-time database update (migration 0039). Ask your administrator to run it.' }
+      throw error
+    }
+    if (!data?.length) return { error: 'Invoice not found.' }
+    await logEvent(c, invoiceId, 'status', show ? 'PAID stamp shown' : 'PAID stamp removed')
+    done(invoiceId)
+    return { ok: true, message: show ? 'The PAID stamp is shown on this invoice.' : 'The PAID stamp is removed from this invoice.' }
+  })
+}
+
 /** The customer confirmed they have the invoice (phone, email …): document status "Viewed". Opening it through a secure link or reading it on WhatsApp sets this automatically. */
 export async function markInvoiceViewed(id: string): Promise<ActionState> {
   return safe(async () => {

@@ -25,6 +25,16 @@ export async function saveCompany(_: ActionState, fd: FormData): Promise<ActionS
     const c = await getCtx(); demoGuard(c, 'editing the company details'); need(c, 'settings.manage')
     const v = z.object({ name: z.string().min(2).max(200), trade_name: z.string().max(200).optional() }).parse({ name: str(fd, 'name'), trade_name: str(fd, 'trade_name') })
     const { error } = await c.supabase.from('companies').update(v).eq('id', c.company.id); if (error) throw error
+    // Arabic name for the PAID stamp: saved on its own so the rest still saves on a database without migration 0039
+    if (fd.has('name_ar')) {
+      const ar = (str(fd, 'name_ar') ?? '').trim().replace(/\s+/g, ' ')
+      if (ar && (ar.length < 2 || ar.length > 200)) return { error: 'Company name in Arabic: 2 to 200 characters, or leave it empty.', fieldErrors: { name_ar: '2 to 200 characters' } }
+      const { error: e2 } = await c.supabase.from('companies').update({ name_ar: ar || null }).eq('id', c.company.id)
+      if (e2) {
+        if (e2.code === '42703' || e2.code === 'PGRST204' || /name_ar/.test(e2.message ?? '')) { revalidatePath('/', 'layout'); return { ok: true, message: 'Saved. The Arabic name needs a one-time database update (migration 0039) before it can be stored.' } }
+        throw e2
+      }
+    }
     revalidatePath('/', 'layout'); return { ok: true, message: 'Saved.' }
   })
 }

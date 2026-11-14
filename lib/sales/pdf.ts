@@ -1,5 +1,6 @@
 import 'server-only'
-import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
+import { LineCapStyle, PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
+import type { PaidStampInfo } from '@/components/sales/paid-stamp'
 import { amountInWords, computeTotals, fmtMoney, lineAmount, lineVat, VAT_CATEGORIES, type VatCategory } from './money'
 import { DOC_META, fmtQty, isTaxDoc } from './docs'
 import { docDiscount, vatOn, type PaperDoc, type PaperItem } from '@/components/sales/paper'
@@ -10,8 +11,8 @@ import { parseRich, type Run } from './rich'
 /** A4 PDF in the Al Saqr template layout. Arabic text in images (letterhead/stamp) is preserved; typed text uses Helvetica. */
 export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
   companyName: string; images: Partial<Record<BrandKind, { bytes: Uint8Array; png: boolean }>>; showHeaderFooter: boolean; showStamp: boolean; bankDetails?: string | null; paid?: number
-  /** fully paid tax invoice: red PAID stamp with the last payment date (see paidStamp) */
-  stamp?: { date: string | null } | null
+  /** fully paid tax invoice (stamp switch on): the green PAID stamp, drawn as vectors under the paid / balance box */
+  stamp?: PaidStampInfo | null
   companyTrn?: string | null; sealSize?: number; signatureWidth?: number; signAlign?: 'left' | 'center' | 'right'; signSpacing?: number
   signatoryName?: string | null; signatoryTitle?: string | null; brandColor?: string | null; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null; companyWebsite?: string | null
   templates?: Partial<Record<TemplateKind, unknown>>
@@ -246,18 +247,29 @@ export async function renderSalesPdf(doc: PaperDoc, items: PaperItem[], opts: {
     words.slice(0, 3).forEach((l, i) => text(l, M + 6, y - 16 - i * 12 + (words.length > 2 ? 6 : 0), 10, bold))
     rect(M + ww, y - 22, pw, 22); if (adv > 0) { center('Paid Amount', M + ww + pw / 2, y - 11, 10, bold); center(`incl. advance ${fmtMoney(adv)}`, M + ww + pw / 2, y - 19, 6.5) } else center('Paid Amount', M + ww + pw / 2, y - 15, 10, bold); rect(M + ww + pw, y - 22, vw, 22); right(fmtMoney(paid), M + CW - 4, y - 15, 10, bold)
     rect(M + ww, y - 44, pw, 22); center('Total Balance', M + ww + pw / 2, y - 37, 10, bold); rect(M + ww + pw, y - 44, vw, 22); right(fmtMoney(t.total - paid), M + CW - 4, y - 37, 10, bold)
-    if (opts.stamp) {   // rubber-stamp look: rotated 12° anticlockwise, over the right end of the amount-in-words cell
-      const st = opts.stamp, red = rgb(0.725, 0.11, 0.11), a = (12 * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a)
-      const big = 22, small = 8, label = 'PAID', date = st.date ? `${st.date.slice(8, 10)}.${st.date.slice(5, 7)}.${st.date.slice(0, 4)}` : ''
-      const lw = bold.widthOfTextAtSize(label, big), dw = date ? bold.widthOfTextAtSize(date, small) : 0
-      const w = Math.max(lw, dw) + 22, h = date ? 38 : 30, cx = M + ww - 20 - w / 2, cy = y - 22
-      const ox = cx - (w / 2) * cos + (h / 2) * sin, oy = cy - (w / 2) * sin - (h / 2) * cos   // bottom-left corner after rotation
-      const at = (dx: number, dy: number) => ({ x: ox + dx * cos - dy * sin, y: oy + dx * sin + dy * cos })
-      page.drawRectangle({ ...at(0, 0), width: w, height: h, rotate: degrees(12), color: rgb(1, 1, 1), opacity: 0.6, borderColor: red, borderWidth: 2.4, borderOpacity: 0.9 })
-      page.drawText(label, { ...at((w - lw) / 2, date ? 14 : 8), size: big, font: bold, color: red, opacity: 0.9, rotate: degrees(12) })
-      if (date) page.drawText(date, { ...at((w - dw) / 2, 5), size: small, font: bold, color: red, opacity: 0.9, rotate: degrees(12) })
-    }
     y -= 56
+    if (opts.stamp) drawPaidStamp(opts.stamp)
+  }
+
+  /** green PAID stamp in its own space at the right, below the paid / balance box (moves to a new page if it would not fit) */
+  function drawPaidStamp(st: PaidStampInfo) {
+    const D = 108, sc = D / 200                                   // 38 mm across
+    const moved = y - D - 6 < bottom; if (moved) newPage()
+    const x0 = W - M - 26 - D, top = moved ? y : y + 6            // y already has 12 pt of gap under the box
+    const ink = st.art?.ink ?? '#15803D', mix = (v: number) => (v / 255) * 0.92 + 0.08   // 92 % ink, like the screen stamp
+    const green = rgb(mix(parseInt(ink.slice(1, 3), 16)), mix(parseInt(ink.slice(3, 5), 16)), mix(parseInt(ink.slice(5, 7), 16)))
+    const cx = x0 + D / 2, cy = top - D / 2
+    if (st.art) {
+      for (const c of st.art.circles) page.drawCircle({ x: cx, y: cy, size: c.r * sc, borderColor: green, borderWidth: c.w * sc })
+      for (const l of st.art.lines) page.drawLine({ start: { x: x0 + l.x1 * sc, y: top - l.y1 * sc }, end: { x: x0 + l.x2 * sc, y: top - l.y2 * sc }, thickness: l.w * sc, color: green, lineCap: LineCapStyle.Round })
+      for (const d of st.art.fills) page.drawSvgPath(d, { x: x0, y: top, scale: sc, color: green, borderWidth: 0 })
+      for (const s of st.art.specks) page.drawCircle({ x: x0 + s.x * sc, y: top - s.y * sc, size: s.r * sc, color: rgb(1, 1, 1) })   // worn-rubber gaps (the space is empty paper)
+    } else {   // fonts unavailable: a plain round stamp in Helvetica
+      page.drawCircle({ x: cx, y: cy, size: D / 2 - 2, borderColor: green, borderWidth: 2.4 }); page.drawCircle({ x: cx, y: cy, size: D / 2 - 6, borderColor: green, borderWidth: 0.8 })
+      const big = 24, lw = bold.widthOfTextAtSize('PAID', big); page.drawText('PAID', { x: cx - lw / 2, y: cy - 12, size: big, font: bold, color: green })
+      if (st.date) { const ds = `DATE: ${st.date.slice(8, 10)}-${st.date.slice(5, 7)}-${st.date.slice(0, 4)}`, dw = bold.widthOfTextAtSize(ds, 7.5); page.drawText(ds, { x: cx - dw / 2, y: cy + 16, size: 7.5, font: bold, color: green }) }
+    }
+    y -= D + 6
   }
 
   // closing / terms / bank / signatures
