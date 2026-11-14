@@ -11,7 +11,7 @@ import { matchesFormat, NUMBER_FORMAT_COLS } from '@/lib/numbering'
 import { Badge, Card, CardHeader, Field, Input, Money, Select, Td, Th, TableWrap, Textarea } from '@/components/ui/primitives'
 import { InvoiceStatus, PayStatusBadge } from '@/components/sales/status-badges'
 import { InvoicePaymentActions } from '@/components/sales/invoice-actions'
-import { balanceOf, daysOverdue, docState, payState } from '@/lib/sales/status'
+import { balanceOf, daysOverdue, docState, payState, paidStamp } from '@/lib/sales/status'
 import { cn } from '@/lib/utils'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
@@ -78,7 +78,7 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   const { data: fmt } = edit && d.doc.status === 'draft' && !(d.doc as any).sent_at && !d.doc.revision ? await c.supabase.from('document_number_formats').select(NUMBER_FORMAT_COLS).eq('doc_type', d.doc.doc_type).maybeSingle() : { data: null }
   const canRenumber = !!fmt && !matchesFormat(d.doc.number, fmt)
   return <>
-    <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} customers={[...new Map([...(customers ?? []), ...(projects ?? []).map((x: any) => x.customer).filter(Boolean)].map((x: any) => [x.id, x])).values()] as any} projects={(projects ?? []).map(({ customer: _c, ...x }: any) => x) as any}
+    <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} paidStamp={paidStamp({ ...d.doc, paid: d.paid, credited }, d.payments)} customers={[...new Map([...(customers ?? []), ...(projects ?? []).map((x: any) => x.customer).filter(Boolean)].map((x: any) => [x.id, x])).values()] as any} projects={(projects ?? []).map(({ customer: _c, ...x }: any) => x) as any}
       catalog={(catalog ?? []).map((x: any) => ({ ...x, rate: Number(x.rate) }))} templates={(templates ?? []) as any} salespeople={people ?? []} delivery={delivery}
       editable={edit && !locked} lockedReason={!edit ? 'You can view this document but not change it.' : locked} requireApproval={settings.requireApproval}
       canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber} invoicedAs={invoicedAs} cloudLive={await waP}

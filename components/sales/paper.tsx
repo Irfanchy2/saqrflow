@@ -39,7 +39,9 @@ const headLabel = (s: string) => { const m = /^(.*\S)\s+(\(.+\))$/.exec(s); retu
 const fmtDate = (iso?: string | null) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : '—')
 const dash = (s?: string | null) => (s && s.trim() ? s : '—')
 
-function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = false }: { doc: PaperDoc; items: PaperItem[]; branding: Branding; paid?: number; className?: string; pageGuides?: boolean }) {
+function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = false, stamp = null }: { doc: PaperDoc; items: PaperItem[]; branding: Branding; paid?: number; className?: string; pageGuides?: boolean
+  /** fully paid tax invoice: a red PAID stamp (with the last payment date) next to the paid / balance box */
+  stamp?: { date: string | null } | null }) {
   const meta = DOC_META[doc.doc_type]
   const tp = resolveTemplate(doc.doc_type, branding.templates?.[templateKind(doc.doc_type) as TemplateKind]), f = tp.fields
   const isTax = isTaxDoc(doc.doc_type), isCn = doc.doc_type === 'credit_note'
@@ -145,10 +147,11 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
           </tbody>
         </table>
 
-        {isInv && !isCn && <table className="paper-items paper-keep mt-0 text-[14px]"><colgroup><col /><col style={{ width: '36mm' }} /><col style={{ width: '30mm' }} /></colgroup><tbody><tr>
+        {isInv && !isCn && <div className="paper-paid-wrap paper-keep"><table className="paper-items mt-0 text-[14px]"><colgroup><col /><col style={{ width: '36mm' }} /><col style={{ width: '30mm' }} /></colgroup><tbody><tr>
           <td className="px-[3mm] font-bold" rowSpan={2}>{tp.showWords && <>Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</>}</td>
           <td className="text-center font-bold">Paid Amount{adv > 0 && <span className="block text-[10px] font-normal" data-advance>incl. advance {fmtMoney(adv)}</span>}</td><td className="text-right font-bold">{fmtMoney(paidShown)}</td></tr>
-          <tr><td className="text-center font-bold">Total Balance</td><td className="text-right font-bold">{fmtMoney(t.total - paidShown)}</td></tr></tbody></table>}
+          <tr><td className="text-center font-bold">Total Balance</td><td className="text-right font-bold">{fmtMoney(t.total - paidShown)}</td></tr></tbody></table>
+          {stamp && <div className="paper-paid-stamp" data-paid-stamp role="img" aria-label={`Paid${stamp.date ? ` on ${fmtDate(stamp.date)}` : ''}`}>PAID{stamp.date && <span>{fmtDate(stamp.date)}</span>}</div>}</div>}
 
         {isCn && tp.showWords && <div className="paper-keep mt-[2mm] text-[14px] font-bold">Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</div>}
         {isQtn && doc.closing && <div className="paper-keep mt-[3mm] text-[14px]">{doc.closing.split('\n').map((l, i) => <div key={i} className={`paper-text ${i === 0 ? 'font-bold' : ''}`}>{l}</div>)}</div>}

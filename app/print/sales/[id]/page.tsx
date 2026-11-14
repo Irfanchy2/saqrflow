@@ -5,6 +5,7 @@ import { DOC_META } from '@/lib/sales/docs'
 import { SalesPaper } from '@/components/sales/paper'
 import { salesPdfName } from '@/lib/sales/filename'
 import { PrintButton } from '@/components/print-button'
+import { paidStamp } from '@/lib/sales/status'
 
 export const dynamic = 'force-dynamic'
 /** Chrome uses the page title as the “Save as PDF” file name → AS0025180-2026_Customer_Quotation */
@@ -28,6 +29,6 @@ export default async function PrintSales({ params, searchParams }: { params: Pro
       <span>{DOC_META[d.doc.doc_type].label} {d.doc.number}: A4, no margins. Turn on “Background graphics” for the shaded boxes.</span>
       <PrintButton auto={(await searchParams).auto === '1'} />
     </div>
-    <SalesPaper doc={d.doc} items={d.items} branding={branding} paid={d.paid + ((d as any).credited ?? 0)} className="shadow-pop print:shadow-none" />
+    <SalesPaper doc={d.doc} items={d.items} branding={branding} paid={d.paid + ((d as any).credited ?? 0)} stamp={paidStamp({ ...d.doc, paid: d.paid, credited: (d as any).credited }, d.payments)} className="shadow-pop print:shadow-none" />
   </div>
 }

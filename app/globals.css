@@ -307,6 +307,13 @@ main :where(p, dd, li, h1, h2, h3, label) { overflow-wrap: break-word; }
 .paper-red { color: var(--red); }
 .paper-keep { break-inside: avoid; page-break-inside: avoid; }
 .paper-keep-next { break-after: avoid; page-break-after: avoid; }
+/* PAID stamp on a fully paid tax invoice: a red rubber stamp over the amount-in-words cell, never over the figures */
+.paper-paid-wrap { position: relative; }
+.paper-paid-stamp { position: absolute; right: 72mm; top: 50%; transform: translateY(-50%) rotate(-12deg); pointer-events: none;
+  border: 0.9mm solid #b91c1c; border-radius: 2mm; padding: 1mm 4.5mm 1.2mm; color: #b91c1c; background: rgba(255,255,255,.55);
+  font: 800 24pt/1 Arial, Helvetica, sans-serif; letter-spacing: 2.5pt; text-align: center; opacity: .88;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.paper-paid-stamp span { display: block; margin-top: .8mm; font-size: 8.5pt; font-weight: 700; letter-spacing: .6pt; }
 /* seal + signature float beside the first lines of the terms; long terms then continue at full width underneath */
 .paper-tail { margin-top: 3mm; display: flow-root; }
 .paper-tail-text { min-width: 0; font-size: 15px; }
