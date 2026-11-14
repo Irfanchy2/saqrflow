@@ -1,9 +1,10 @@
-// Sales search + PAID stamp: search as you type on every sales tab (tax invoices, quotations, payments, receivables,
-// follow-ups) by customer name, short name and number; a fully paid tax invoice carries a PAID stamp with the last
+// Sales search + green PAID stamp: search as you type on every sales tab (tax invoices, quotations, payments, receivables,
+// follow-ups) by customer name, short name and number; a fully paid tax invoice carries a circular green PAID stamp with the last
 // payment date on screen, in the print view and in the PDF; partly paid / unpaid / credited invoices do not.
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 import pg from 'pg'
+import sharp from 'sharp'
 import { execFileSync } from 'node:child_process'
 
 const BASE = process.env.E2E_BASE
@@ -80,28 +81,84 @@ try {
   await p.goto(`${BASE}/invoices?tab=followups&q=procurement`); await settle()
   ok(await p.getByRole('searchbox', { name: 'Search follow-ups' }).isVisible(), 'Follow-ups tab has a search box')
 
-  console.log('\n[3] PAID stamp')
+  console.log('\n[3] Green PAID stamp')
+  // Arabic company name (Settings → Company): drawn around the top of the stamp
+  await p.goto(`${BASE}/settings#company`); await settle()
+  const arField = p.getByLabel('Company name in Arabic')
+  ok(await arField.isVisible() && await arField.getAttribute('dir') === 'rtl', 'Settings → Company has an Arabic company name field (right-to-left)')
+  await arField.fill('شركة الصقر للاختبار ذ.م.م'); await p.locator('#company').getByRole('button', { name: 'Save' }).click()
+  ok(await waitFor(async () => (await one(`select name_ar from companies where id=$1`, [co])).name_ar === 'شركة الصقر للاختبار ذ.م.م'), 'Arabic name saved on the company')
+  const coName = (await one(`select name from companies where id=$1`, [co])).name
+  ok(coName === 'Al Saqr Paid Test', 'English company name unchanged by the save')
+
   await p.goto(`${BASE}/print/sales/${paidInv}`); await settle(800)
   const stamp = p.locator('[data-paid-stamp]')
-  ok(await stamp.count() === 1 && (await stamp.innerText()).replace(/\s+/g, ' ').startsWith('PAID'), 'print view of the fully paid invoice shows the PAID stamp')
-  const d3 = day(-3); ok((await stamp.innerText()).includes(`${d3.slice(8, 10)}.${d3.slice(5, 7)}.${d3.slice(0, 4)}`), 'stamp shows the last payment date')
-  const red = await stamp.evaluate(e => getComputedStyle(e).color); ok(/rgb\(185, 28, 28\)/.test(red), `stamp is red (${red})`)
-  const over = await p.evaluate(() => { const s = document.querySelector('[data-paid-stamp]').getBoundingClientRect(); const cells = [...document.querySelectorAll('.paper-paid-wrap td')].slice(1); return cells.some(c => { const r = c.getBoundingClientRect(); return !(s.right < r.left || s.left > r.right || s.bottom < r.top || s.top > r.bottom) }) })
-  ok(over === false, 'stamp does not cover the Paid Amount / Total Balance figures')
+  const d3 = day(-3), dmy = `${d3.slice(8, 10)}-${d3.slice(5, 7)}-${d3.slice(0, 4)}`
+  ok(await stamp.count() === 1, 'print view of the fully paid invoice shows the PAID stamp')
+  ok(await stamp.getAttribute('aria-label') === `Paid on ${dmy}` && await stamp.getAttribute('data-stamp-date') === d3, `stamp is dated with the payment that completed the invoice (${dmy}), no time`)
+  const look = await stamp.evaluate(e => { const r = e.getBoundingClientRect(); return { tag: e.tagName.toLowerCase(), w: r.width, h: r.height, color: getComputedStyle(e).color, paths: e.querySelectorAll('path').length, circles: e.querySelectorAll(':scope > g > circle').length, img: e.querySelectorAll('image').length } })
+  ok(look.tag === 'svg' && look.img === 0 && look.paths > 40, `stamp is vector SVG, not an image (${look.paths} shapes)`)
+  ok(/rgb\(21, 128, 61\)/.test(look.color), `stamp ink is green #15803D (${look.color})`)
+  ok(Math.abs(look.w - look.h) < 1 && look.w > 130 && look.w < 160 && look.circles >= 2, `round stamp about 38 mm across with a double border (${Math.round(look.w)}px)`)
+  const shapesAr = look.paths
+  const clash = await p.evaluate(() => {
+    const s = document.querySelector('[data-paid-stamp]').getBoundingClientRect(), paper = document.querySelector('.sales-paper'), hits = []
+    const w = document.createTreeWalker(paper, NodeFilter.SHOW_TEXT)
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (!n.textContent.trim() || n.parentElement.closest('[data-paid-stamp]')) continue
+      const rg = document.createRange(); rg.selectNodeContents(n)
+      for (const r of rg.getClientRects()) if (!(s.right <= r.left || s.left >= r.right || s.bottom <= r.top || s.top >= r.bottom)) hits.push(n.textContent.trim().slice(0, 30))
+    }
+    for (const el of paper.querySelectorAll('img, .paper-paid-wrap td')) { const r = el.getBoundingClientRect(); if (!(s.right <= r.left || s.left >= r.right || s.bottom <= r.top || s.top >= r.bottom)) hits.push(el.tagName) }
+    const pr = paper.getBoundingClientRect(); return { hits, inside: s.right <= pr.right && s.left >= pr.left, right: s.left > pr.left + pr.width / 2 }
+  })
+  ok(clash.hits.length === 0, `stamp covers no text, amount, table cell or signature${clash.hits.length ? `: ${clash.hits.join(', ')}` : ''}`)
+  ok(clash.inside && clash.right, 'stamp sits on the right, inside the A4 page')
   await p.locator('.sales-paper').screenshot({ path: `${OUT}/print-paid.png` })
   await p.emulateMedia({ media: 'print' }); ok(await stamp.isVisible(), 'stamp is kept when printing'); await p.emulateMedia({ media: 'screen' })
   await p.goto(`${BASE}/print/sales/${partInv}`); await settle(600)
   ok(await p.locator('[data-paid-stamp]').count() === 0, 'partly paid invoice: no stamp')
   await p.goto(`${BASE}/print/sales/${otherInv}`); await settle(600)
   ok(await p.locator('[data-paid-stamp]').count() === 0, 'unpaid invoice: no stamp')
+
+  // PDF: the stamp is vector artwork, so look for its green ink in the rendered page
+  const green = async id => {
+    const r = await ctx.request.get(`${BASE}/api/sales/${id}/pdf`); const f = `${OUT}/${id}.pdf`; fs.writeFileSync(f, await r.body())
+    execFileSync('pdftoppm', ['-png', '-r', '60', '-f', '1', '-l', '1', '-singlefile', f, `${OUT}/${id}`])
+    const { data, info } = await sharp(`${OUT}/${id}.png`).raw().toBuffer({ resolveWithObject: true }); let n = 0, minX = 1e9, maxX = 0
+    for (let i = 0; i < data.length; i += info.channels) { const [rr, g, b] = [data[i], data[i + 1], data[i + 2]]; if (g > rr + 50 && g > b + 30) { n++; const x = (i / info.channels) % info.width; minX = Math.min(minX, x); maxX = Math.max(maxX, x) } }
+    return { n, right: n ? minX > info.width / 2 : false }
+  }
+  let g1 = await green(paidInv); const g2 = await green(partInv)
+  ok(g1.n > 400 && g1.right, `PDF of the paid invoice carries the green stamp on the right (${g1.n} green px)`)
+  ok(g2.n === 0, 'PDF of the partly paid invoice has no stamp')
+  fs.copyFileSync(`${OUT}/${paidInv}.png`, `${OUT}/pdf-paid.png`)
+
+  console.log('\n[3b] Remove / keep the stamp per invoice')
   await p.goto(`${BASE}/invoices/${paidInv}`); await settle(1000)
   ok(await p.locator('[data-paid-stamp]').count() === 1, 'the invoice page preview shows the stamp too')
+  const ctl = p.locator('[data-stamp-control]')
+  ok(await ctl.getAttribute('data-stamp-control') === 'on' && (await ctl.innerText()).includes(`dated ${dmy}`), 'Payment panel says the PAID stamp is shown, with its date')
+  await ctl.getByRole('button', { name: 'Remove PAID stamp' }).click()
+  ok(await waitFor(async () => (await one(`select show_paid_stamp from invoices where id=$1`, [paidInv])).show_paid_stamp === false), 'Remove PAID stamp turns the switch off')
+  ok(await waitFor(async () => await p.locator('[data-paid-stamp]').count() === 0 && await ctl.getAttribute('data-stamp-control') === 'off'), 'stamp disappears from the preview at once')
+  const after = await one(`select status, total, number from invoices where id=$1`, [paidInv]), pays = await one(`select count(*)::int n, sum(amount)::float s from payments where invoice_id=$1`, [paidInv])
+  ok(after.status === 'paid' && Number(after.total) === 10500 && after.number === 'INV-G1' && pays.n === 2 && pays.s === 10500, 'removing the stamp changes nothing else (status, total, number, payments)')
+  await p.goto(`${BASE}/print/sales/${paidInv}`); await settle(600)
+  ok(await p.locator('[data-paid-stamp]').count() === 0, 'removed: no stamp in the print view')
+  ok((await green(paidInv)).n === 0, 'removed: no stamp in the PDF')
+  await p.goto(`${BASE}/invoices/${paidInv}`); await settle(800)
+  await p.locator('[data-stamp-control]').getByRole('button', { name: 'Show PAID stamp' }).click()
+  ok(await waitFor(async () => await p.locator('[data-paid-stamp]').count() === 1), 'Show PAID stamp puts it back')
+  g1 = await green(paidInv); ok(g1.n > 400, 'and it is back in the PDF')
+  ok(await p.locator('[data-paid-stamp] path').count() === shapesAr, 'the same stamp artwork as the print view')
 
-  const pdf = async id => { const r = await ctx.request.get(`${BASE}/api/sales/${id}/pdf`); const f = `${OUT}/${id}.pdf`; fs.writeFileSync(f, await r.body()); return execFileSync('pdftotext', ['-raw', f, '-']).toString() }
-  const t1 = await pdf(paidInv), t2 = await pdf(partInv)
-  ok(/\bPAID\b/.test(t1) && t1.includes(`${d3.slice(8, 10)}.${d3.slice(5, 7)}.${d3.slice(0, 4)}`), 'PDF of the paid invoice carries PAID and the payment date')
-  ok(!/\bPAID\b/.test(t2), 'PDF of the partly paid invoice has no PAID stamp')
-  execFileSync('pdftoppm', ['-png', '-r', '70', '-f', '1', '-l', '1', `${OUT}/${paidInv}.pdf`, `${OUT}/pdf-paid`])
+  console.log('\n[3c] Back to unpaid → stamp goes automatically')
+  await db.query(`delete from payments where invoice_id=$1 and reference='CHQ-778'`, [paidInv])
+  await p.goto(`${BASE}/print/sales/${paidInv}`); await settle(600)
+  ok(await p.locator('[data-paid-stamp]').count() === 0, 'a payment taken off (now partly paid): the stamp is gone')
+  await p.goto(`${BASE}/invoices/${paidInv}`); await settle(800)
+  ok(await p.locator('[data-stamp-control]').count() === 0, 'and the stamp switch is hidden until it is fully paid again')
 
   console.log('\n[4] Phone')
   const m = await browser.newContext({ viewport: { width: 375, height: 800 }, isMobile: true, hasTouch: true, storageState: await ctx.storageState() }); const mp = await m.newPage()

@@ -9,6 +9,7 @@ import {
   ArrowDown, ArrowLeft, ArrowUp, Banknote, Building2, CheckCircle2, ChevronDown, Copy, Download, Eye, FileMinus, FileText, FolderArchive, Hash, Loader2, Mail, MessageCircle, WhatsApp,
   MoreHorizontal, PenLine, Plus, Printer, Receipt, Repeat, Save, ScrollText, Send, Trash2, Truck, X, ClipboardList, Wallet, ProjectDoc } from '@/components/icons'
 import { SalesPaper, docDiscount, vatOn, type Branding, type PaperItem } from './paper'
+import type { PaidStampInfo } from './paid-stamp'
 import { FitPaper } from './preview'
 import { RichTextField } from './rich-field'
 import { UnitPicker } from './unit-picker'
@@ -49,7 +50,7 @@ function ago(ts: number | null, now: number) {
 }
 
 export function SalesEditor({ doc, items: initialItems, branding, paid, customers, projects, catalog, templates, salespeople, delivery, editable, lockedReason, canStatus, canDelete, canVault, requireApproval, canRenumber = false, statusView, invoicedAs = null, cloudLive = false, paidStamp = null }: {
-  doc: Record<string, any>; items: (PaperItem & { id?: string })[]; branding: Branding; paid: number; paidStamp?: { date: string | null } | null; customers: CustomerOpt[]; projects: ProjectOpt[]
+  doc: Record<string, any>; items: (PaperItem & { id?: string })[]; branding: Branding; paid: number; paidStamp?: PaidStampInfo | null; customers: CustomerOpt[]; projects: ProjectOpt[]
   catalog: CatalogOpt[]; templates: TemplateOpt[]; salespeople: { id: string; full_name: string }[]; delivery: Record<string, { ordered: number; delivered: number }>
   editable: boolean; lockedReason?: string | null; canStatus: boolean; canDelete: boolean; canVault: boolean; requireApproval: boolean; canRenumber?: boolean
   /** WhatsApp Business (paid Cloud API) is connected: the phone capsule sends through it; otherwise it opens the free share sheet */

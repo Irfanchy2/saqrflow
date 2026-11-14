@@ -6,6 +6,7 @@ import { amountInWords, computeTotals, fmtMoney, lineAmount, lineVat, VAT_CATEGO
 import { DOC_META, fmtQty, isTaxDoc, type SalesType } from '@/lib/sales/docs'
 import { resolveTemplate, templateKind, type TemplateKind } from '@/lib/sales/template'
 import { RichBlocks } from './rich-text'
+import { PaidStamp, type PaidStampInfo } from './paid-stamp'
 
 export interface PaperItem { description: string; materials?: string | null; quantity: number | string; unit?: string | null; unit_price: number | string; vat_category?: string | null; discount_pct?: number | string | null }
 export interface PaperDoc {
@@ -40,8 +41,8 @@ const fmtDate = (iso?: string | null) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)
 const dash = (s?: string | null) => (s && s.trim() ? s : '—')
 
 function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = false, stamp = null }: { doc: PaperDoc; items: PaperItem[]; branding: Branding; paid?: number; className?: string; pageGuides?: boolean
-  /** fully paid tax invoice: a red PAID stamp (with the last payment date) next to the paid / balance box */
-  stamp?: { date: string | null } | null }) {
+  /** fully paid tax invoice (and its stamp switch on): the green PAID stamp, in its own space below the paid / balance box */
+  stamp?: PaidStampInfo | null }) {
   const meta = DOC_META[doc.doc_type]
   const tp = resolveTemplate(doc.doc_type, branding.templates?.[templateKind(doc.doc_type) as TemplateKind]), f = tp.fields
   const isTax = isTaxDoc(doc.doc_type), isCn = doc.doc_type === 'credit_note'
@@ -151,7 +152,8 @@ function Paper({ doc, items, branding, paid = 0, className = '', pageGuides = fa
           <td className="px-[3mm] font-bold" rowSpan={2}>{tp.showWords && <>Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</>}</td>
           <td className="text-center font-bold">Paid Amount{adv > 0 && <span className="block text-[10px] font-normal" data-advance>incl. advance {fmtMoney(adv)}</span>}</td><td className="text-right font-bold">{fmtMoney(paidShown)}</td></tr>
           <tr><td className="text-center font-bold">Total Balance</td><td className="text-right font-bold">{fmtMoney(t.total - paidShown)}</td></tr></tbody></table>
-          {stamp && <div className="paper-paid-stamp" data-paid-stamp role="img" aria-label={`Paid${stamp.date ? ` on ${fmtDate(stamp.date)}` : ''}`}>PAID{stamp.date && <span>{fmtDate(stamp.date)}</span>}</div>}</div>}
+          {stamp && <div className="paper-paid-stamp-row">{stamp.art ? <PaidStamp art={stamp.art} date={stamp.date} />
+            : <div className="paper-paid-stamp-plain" data-paid-stamp role="img" aria-label={`Paid${stamp.date ? ` on ${fmtDate(stamp.date)}` : ''}`}>{stamp.date && <span>DATE: {fmtDate(stamp.date).replace(/\./g, '-')}</span>}PAID</div>}</div>}</div>}
 
         {isCn && tp.showWords && <div className="paper-keep mt-[2mm] text-[14px] font-bold">Amount in Words: - {amountInWords(t.total).replace(/^UAE Dirhams /, '')}</div>}
         {isQtn && doc.closing && <div className="paper-keep mt-[3mm] text-[14px]">{doc.closing.split('\n').map((l, i) => <div key={i} className={`paper-text ${i === 0 ? 'font-bold' : ''}`}>{l}</div>)}</div>}
