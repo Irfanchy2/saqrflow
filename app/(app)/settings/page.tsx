@@ -27,10 +27,12 @@ import { ShareMessages } from '@/components/settings/share-messages'
 import { EvolutionSettings } from '@/components/settings/evolution'
 import { testWhatsAppConnection } from '@/app/actions/whatsapp'
 import Link from 'next/link'
+import { companyNameAr } from '@/lib/sales/paid-stamp'
 
 export const metadata = { title: 'Settings' }
 export default async function Settings() {
   const c = await getCtx(); const admin = c.can('settings.manage')
+  const nameAr = admin ? await companyNameAr(c) : null
   const { data: st } = await c.supabase.from('app_settings').select('key,value'); const s = parseSettings(st ?? [])
   const wa = admin ? await whatsappStatus(c.company.id) : null
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
@@ -56,6 +58,7 @@ export default async function Settings() {
     <div className="flex min-w-0 max-w-4xl flex-col gap-5 [&>*]:scroll-mt-32 lg:[&>*]:scroll-mt-20">
       {admin && <Card id="company"><CardHeader title="Company, tax & currency" sub="The legal company name prints on quotations, invoices and delivery notes." /><div className="p-4"><ActionForm action={saveCompany} resetOnSuccess={false}>
         <Field label="Company name"><Input name="name" defaultValue={c.company.name} required /></Field><Field label="Trade name"><Input name="trade_name" /></Field>
+        <Field label="Company name in Arabic" hint="Printed around the top of the green PAID stamp on fully paid tax invoices. Enter the registered Arabic name exactly as on your trade licence. Leave empty to show the English name only."><Input name="name_ar" defaultValue={nameAr ?? ''} dir="rtl" lang="ar" maxLength={200} placeholder="اسم الشركة بالعربية" /></Field>
         <p className="text-xs text-muted">Time zone: {c.company.timezone} · Currency: {c.company.currency} (fixed in this version).</p></ActionForm></div></Card>}
 
 

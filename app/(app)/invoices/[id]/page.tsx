@@ -15,7 +15,8 @@ import { balanceOf, daysOverdue, docState, payState, paidStamp } from '@/lib/sal
 import { cn } from '@/lib/utils'
 import { DialogButton } from '@/components/ui/dialog'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
-import { addFollowup, applyProjectAdvance, completeFollowup, decideApproval, deletePayment, unapplyProjectAdvance } from '@/app/actions/sales'
+import { addFollowup, applyProjectAdvance, completeFollowup, decideApproval, deletePayment, setPaidStamp, unapplyProjectAdvance } from '@/app/actions/sales'
+import { invoicePaidStamp, stampDate } from '@/lib/sales/paid-stamp'
 import { formatLongDate, showDate } from '@/lib/time'
 import { RecordActivity } from '@/components/record-activity'
 import { RecordTasks } from '@/components/record-tasks'
@@ -77,8 +78,11 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
   // a draft still carrying a number from before the custom format was configured (e.g. QTN-2026-0004) can take a new one
   const { data: fmt } = edit && d.doc.status === 'draft' && !(d.doc as any).sent_at && !d.doc.revision ? await c.supabase.from('document_number_formats').select(NUMBER_FORMAT_COLS).eq('doc_type', d.doc.doc_type).maybeSingle() : { data: null }
   const canRenumber = !!fmt && !matchesFormat(d.doc.number, fmt)
+  // green PAID stamp: offered once the invoice is fully paid; the per-invoice switch can remove it (and put it back)
+  const stampBase = isInv ? paidStamp({ ...d.doc, paid: d.paid, credited }, d.payments) : null, stampOn = (d.doc as any).show_paid_stamp !== false
+  const stamp = stampBase ? await invoicePaidStamp(c, { ...d, credited }) : null
   return <>
-    <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} paidStamp={paidStamp({ ...d.doc, paid: d.paid, credited }, d.payments)} customers={[...new Map([...(customers ?? []), ...(projects ?? []).map((x: any) => x.customer).filter(Boolean)].map((x: any) => [x.id, x])).values()] as any} projects={(projects ?? []).map(({ customer: _c, ...x }: any) => x) as any}
+    <SalesEditor doc={d.doc as any} items={d.items} branding={branding} paid={d.paid + credited} paidStamp={stamp} customers={[...new Map([...(customers ?? []), ...(projects ?? []).map((x: any) => x.customer).filter(Boolean)].map((x: any) => [x.id, x])).values()] as any} projects={(projects ?? []).map(({ customer: _c, ...x }: any) => x) as any}
       catalog={(catalog ?? []).map((x: any) => ({ ...x, rate: Number(x.rate) }))} templates={(templates ?? []) as any} salespeople={people ?? []} delivery={delivery}
       editable={edit && !locked} lockedReason={!edit ? 'You can view this document but not change it.' : locked} requireApproval={settings.requireApproval}
       canStatus={edit && !(pendingApproval && !c.can('sales.approve'))} canDelete={c.can('records.delete')} canVault={c.can('documents.upload') && edit} canRenumber={canRenumber} invoicedAs={invoicedAs} cloudLive={await waP}
@@ -101,6 +105,11 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
           <Figure k="Payment status" v={pay ? <PayStatusBadge state={pay} daysLate={late} /> : <span className="text-muted">Not issued</span>} className="col-span-2 sm:col-span-1" />
         </dl>
         <div className="h-1.5 overflow-hidden bg-surface-2" aria-hidden><div className={cn('h-full transition-all', pay === 'overdue' ? 'bg-danger' : 'bg-success')} style={{ width: `${Math.min(100, Number(d.doc.total) ? ((d.paid + credited) / Number(d.doc.total)) * 100 : 0)}%` }} /></div>
+        {stampBase && <div className="flex flex-col gap-2 border-b border-border px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between" data-stamp-control={stampOn ? 'on' : 'off'}>
+          <p><span className="font-medium">PAID stamp: {stampOn ? <span className="text-success">shown</span> : <span className="text-muted">removed</span>}</span>
+            <span className="text-muted"> · {stampOn ? 'on the invoice, its print and PDF' : 'not on the invoice, its print or PDF'}{stampBase.date ? `, dated ${stampDate(stampBase.date)}` : ''}</span></p>
+          {edit && <ActionButton action={setPaidStamp.bind(null, id, !stampOn)} variant={stampOn ? 'ghost' : 'secondary'}>{stampOn ? 'Remove PAID stamp' : 'Show PAID stamp'}</ActionButton>}
+        </div>}
         {edit && !['draft', 'cancelled'].includes(d.doc.status) && <div className="flex flex-col gap-2 border-b border-border p-3 sm:flex-row sm:items-center sm:justify-end">
           {unapplied > 0 && balance > 0 && <DialogButton size="sm" variant="secondary" label="Apply project advance" title={`Apply project advance: ${d.doc.number}`} icon={<Wallet size={14} />}>
             <ActionForm action={applyProjectAdvance.bind(null, id)} submit="Apply advance">

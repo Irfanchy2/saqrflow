@@ -22,6 +22,7 @@
     "@types/qrcode": "^1.5.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "fontkit": "2.0.4",
     "framer-motion": "^11.18.2",
     "geist": "^1.7.2",
     "gsap": "^3.15.0",
