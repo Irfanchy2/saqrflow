@@ -40,7 +40,7 @@ export async function saveAiSettings(_: ActionState, fd: FormData): Promise<Acti
       if (name !== 'google_service_account' && !/^[\w\-.]{8,200}$/.test(v!)) return { error: `${SECRETS[name].label} does not look like a valid key.` }
       await saveSecret(c.company.id, name, v!.trim(), c.userId)
     }
-    revalidatePath('/settings'); revalidatePath('/inbox')
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/inbox')
     return { ok: true, message: given.length ? `Saved. ${given.length} key(s) encrypted. They will never be displayed again.` : 'Saved.' }
   })
 }
@@ -50,7 +50,7 @@ export async function clearAiSecret(name: string): Promise<ActionState> {
     const c = await getCtx(); demoGuard(c, 'changing AI keys and settings'); need(c, 'settings.manage')
     const n = z.enum(Object.keys(SECRETS) as [SecretName, ...SecretName[]]).parse(name)
     await saveSecret(c.company.id, n, null, c.userId)
-    revalidatePath('/settings'); return { ok: true, message: `${SECRETS[n].label} removed.` }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: `${SECRETS[n].label} removed.` }
   })
 }
 
@@ -63,7 +63,7 @@ export async function testOcrProvider(provider: string): Promise<ActionState> {
     if (!p.configured()) return { error: `${p.label} is not configured.` }
     const r = await p.healthCheck()
     await c.supabase.from('ocr_logs').insert({ company_id: c.company.id, created_by: c.userId, provider: id, ok: r.ok, processing_ms: r.ms, error: r.ok ? null : r.message.slice(0, 300) })
-    revalidatePath('/settings')
+    revalidatePath('/settings/[category]', 'page')
     return r.ok ? { ok: true, message: `${p.label}: ${r.message} (${(r.ms / 1000).toFixed(1)}s)` } : { error: `${p.label}: ${r.message}` }
   })
 }
@@ -76,7 +76,7 @@ export async function testAiProvider(provider: string): Promise<ActionState> {
     if (!p.configured()) return { error: `${p.label} is not configured.` }
     const r = await p.healthCheck()
     if (id === 'gemini') await c.supabase.from('ai_processing_logs').insert({ company_id: c.company.id, created_by: c.userId, provider: id, model: p.model, purpose: 'test', ok: r.ok, processing_ms: r.ms, error: r.ok ? null : r.message.slice(0, 300) })
-    revalidatePath('/settings')
+    revalidatePath('/settings/[category]', 'page')
     return r.ok ? { ok: true, message: `${p.label}: ${r.message}` } : { error: `${p.label}: ${r.message}` }
   })
 }

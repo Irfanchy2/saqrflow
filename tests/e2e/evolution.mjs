@@ -41,7 +41,7 @@ try {
   ok(true, 'seeded a customer with a WhatsApp number, a tax invoice and an opted-in internal recipient')
 
   console.log('\n[1] Settings: validation, encrypted key')
-  await p.goto(`${BASE}/settings#evolution`); await settle()
+  await p.goto(`${BASE}/settings/whatsapp#evolution`); await settle()
   ok(await ev().isVisible() && (await ev().innerText()).includes('WhatsApp via Evolution API'), 'the Evolution API card is in Settings')
   ok((await ev().innerText()).includes('Save the server URL, instance name and API key first'), 'linking waits until the server is configured')
   await ev().getByLabel(/Send WhatsApp messages through Evolution API/).check()
@@ -149,13 +149,13 @@ try {
 
   console.log('\n[7] Phone layout')
   const m = await browser.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, storageState: await ctx.storageState() }); const mp = await m.newPage()
-  await mp.goto(`${BASE}/settings#evolution`); await mp.waitForLoadState('networkidle').catch(() => {}); await mp.waitForTimeout(800)
+  await mp.goto(`${BASE}/settings/whatsapp#evolution`); await mp.waitForLoadState('networkidle').catch(() => {}); await mp.waitForTimeout(800)
   const fit = await mp.evaluate(() => { const c = document.querySelector('#evolution'); if (!c) return null; return [...c.querySelectorAll('*')].every(e => e.getBoundingClientRect().right <= innerWidth + 1) && document.documentElement.scrollWidth <= innerWidth + 1 })
   ok(fit === true, 'Evolution card fits a 360px phone (no sideways scroll)')
   await mp.locator('#evolution').screenshot({ path: `${OUT}/m-settings.png` }); await m.close()
 
   console.log('\n[8] Unlink, switch back to Meta')
-  await p.goto(`${BASE}/settings#evolution`); await settle()
+  await p.goto(`${BASE}/settings/whatsapp#evolution`); await settle()
   await ev().getByRole('button', { name: 'Unlink number' }).click()
   ok(await waitFor(async () => (await ev().getByRole('button', { name: 'Link WhatsApp' }).count()) === 1), 'Unlink logs the number out on the server')
   ok((await evo()).some(c => c.method === 'DELETE' && c.path === `instance/logout/${INSTANCE}`), 'logout called on the server')

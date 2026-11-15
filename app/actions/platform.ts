@@ -19,7 +19,7 @@ import type { ActionState } from '@/lib/utils'
 const UUID = /^[0-9a-f-]{36}$/i
 const CHANNELS = ['in_app', 'email', 'whatsapp'] as const
 const all = (fd: FormData, k: string) => fd.getAll(k).map(String).filter(Boolean)
-const settingsPath = () => revalidatePath('/settings')
+const settingsPath = () => revalidatePath('/settings/[category]', 'page')
 
 /** Recipients must be this company's; returns the valid ids (RLS-scoped read). */
 async function validRecipients(c: Ctx, ids: string[]) {
@@ -198,7 +198,7 @@ export async function revokeSession(sid: string): Promise<ActionState> {
     const c = await getCtx(); demoGuard(c, 'signing out devices'); if (!UUID.test(sid)) return { error: 'Unknown session.' }
     if (sid === await currentSid(c)) return { error: 'This is the device you are using. Use Sign out instead.' }
     const { data, error } = await c.supabase.rpc('revoke_session', { p_sid: sid }); if (error) throw error
-    revalidatePath('/settings'); revalidatePath('/users/activity')
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/users/activity')
     return data ? { ok: true, message: 'Signed out. That device must sign in again.' } : { error: 'That session has already ended.' }
   })
 }
@@ -210,7 +210,7 @@ export async function revokeOtherSessions(userId?: string): Promise<ActionState>
     const keep = target === c.userId ? await currentSid(c) : null
     const { data, error } = await c.supabase.rpc('revoke_other_sessions', { p_keep: keep, p_user: target }); if (error) throw error
     if (target === c.userId) { try { await c.supabase.auth.signOut({ scope: 'others' }) } catch { /* the app-level revocation above already applies */ } }
-    revalidatePath('/settings'); revalidatePath('/users/activity')
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/users/activity')
     return { ok: true, message: data ? `Signed out ${data} other device(s).` : 'No other devices were signed in.' }
   })
 }

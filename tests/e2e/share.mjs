@@ -269,7 +269,7 @@ try {
   ok(await owed(ali) === before.owed && (await one(`select count(*)::int n from salary_payments where company_id=$1`, [co])).n === before.pays && (await one(`select count(*)::int n from salary_ledger where company_id=$1`, [co])).n === before.acc, 'nothing posted, paid or changed by sharing')
 
   console.log('\n[10] Editable messages in Settings')
-  await p.goto(`${BASE}/settings#wa-share`); await settle()
+  await p.goto(`${BASE}/settings/whatsapp#wa-share`); await settle()
   const tpl = p.locator('[data-share-template=payslip]'); await tpl.locator('summary').click()
   await tpl.locator('textarea[name=body]').fill('Salam {employee}, your {period} payslip from {company} is attached.'); await tpl.getByRole('button', { name: 'Save message' }).click(); await settle(p, 800)
   await tpl.locator('textarea[name=body]').fill('Hi {employee}, you are owed {balance}'); await tpl.getByRole('button', { name: 'Save message' }).click(); await p.waitForTimeout(800)

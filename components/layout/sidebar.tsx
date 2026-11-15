@@ -127,7 +127,7 @@ export function Sidebar({ items, company, rtl, user = '', role = '' }: { items: 
       {(open || drawerReady) && <>
       <div className="flex h-[72px] shrink-0 items-center gap-2 ps-4 pe-3"><div className="min-w-0 flex-1">{brand(false)}</div>
         <button aria-label="Close menu" className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-surface text-fg shadow-card ring-1 ring-border/70 transition-transform active:scale-95" onClick={() => setOpen(false)}><XIcon size={17} /></button></div>
-      <Link href="/settings#account" className="mx-3 mb-3 flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-card ring-1 ring-border/60 transition-colors hover:bg-surface-2">
+      <Link href="/settings/security#account" className="mx-3 mb-3 flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-card ring-1 ring-border/60 transition-colors hover:bg-surface-2">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[hsl(185_30%_86%)] text-[13px] font-semibold text-[hsl(190_30%_20%)] dark:bg-[hsl(185_20%_24%)] dark:text-[hsl(185_30%_88%)]" aria-hidden>{user.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('')}</span>
         <span className="min-w-0 leading-tight"><span className="block truncate text-[14px] font-semibold">{user}</span><span className="block truncate text-[12px] capitalize text-muted">{role.replace(/_/g, ' ')} · {company}</span></span></Link>
       {search(false)}

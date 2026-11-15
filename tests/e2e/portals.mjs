@@ -146,7 +146,7 @@ try {
   ok((await main()).includes('Delivery confirmed by Rakesh (ESt)'), 'PO page shows the supplier’s confirmation')
 
   console.log('\n[6] Public enquiry form')
-  await p.goto(`${BASE}/settings#forms`); await settle()
+  await p.goto(`${BASE}/settings/integrations#forms`); await settle()
   const pf = p.locator('#forms')
   await pf.getByLabel('Title *').fill('Request a quotation'); await pf.getByLabel('Web address *').fill('alsaqr-test-quote'); await pf.getByRole('button', { name: 'Publish form' }).click(); await settle(p, 900)
   ok(!!(await one(`select 1 from public_forms where slug='alsaqr-test-quote' and company_id=$1`, [co])), 'form published')

@@ -6,7 +6,7 @@ import { safe, str } from '@/lib/action'
 import type { ActionState } from '@/lib/utils'
 
 // Settings → Company cards. Only a name and the last four digits are kept: never a full card number.
-const done = () => { revalidatePath('/settings'); revalidatePath('/me', 'layout') }
+const done = () => { revalidatePath('/settings/[category]', 'page'); revalidatePath('/me', 'layout') }
 
 export async function addCompanyCard(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {

@@ -711,7 +711,7 @@ export async function uploadBranding(_: ActionState, fd: FormData): Promise<Acti
     if (up.error && !/exists|duplicate/i.test(up.error.message)) return { error: 'Upload failed. Please try again.' }
     const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: `branding.${kind}`, value: path, updated_at: new Date().toISOString() })
     if (error) throw error
-    revalidatePath('/settings'); revalidatePath('/invoices', 'layout')
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/invoices', 'layout')
     return { ok: true, message: 'Image saved.' }
   })
 }
@@ -722,7 +722,7 @@ export async function removeBranding(kind: string): Promise<ActionState> {
     const k = z.enum(BRAND_KINDS).parse(kind)
     const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: `branding.${k}`, value: '', updated_at: new Date().toISOString() })
     if (error) throw error
-    revalidatePath('/settings'); return { ok: true, message: 'Image removed.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Image removed.' }
   })
 }
 
@@ -756,7 +756,7 @@ export async function saveSalesSettings(_: ActionState, fd: FormData): Promise<A
     ]
     const { error } = await c.supabase.from('app_settings').upsert(rows.map(([key, value]) => ({ company_id: c.company.id, key, value, updated_at: new Date().toISOString() })))
     if (error) throw error
-    revalidatePath('/settings'); revalidatePath('/invoices', 'layout')
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/invoices', 'layout')
     return { ok: true, message: 'Document settings saved.' }
   })
 }

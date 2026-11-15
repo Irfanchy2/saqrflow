@@ -33,7 +33,7 @@ export default async function BackupStatus() {
   const ref = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1]
   const labels = ['Customers', 'Suppliers', 'Sales documents', 'Payments', 'Projects', 'Employees', 'Documents', 'Vehicles & assets', 'Leads', 'Service tickets', 'Audit log entries']
   return <>
-    <Link href="/settings#data" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} className="rtl:rotate-180" />Settings</Link>
+    <Link href="/settings/data" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg"><ArrowLeft size={14} className="rtl:rotate-180" />Settings</Link>
     <PageHeader title="Backup status" sub="How your data is protected, when the last copy was taken and whether the scheduled jobs are running."
       actions={c.can('data.export') ? <a href="/api/backup" className="inline-flex h-11 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-fg hover:bg-primary/90 sm:h-9" data-full-backup><Download size={15} aria-hidden />Download full backup (.xlsx)</a> : undefined} />
     <div className="mb-5 grid gap-3 lg:grid-cols-2">

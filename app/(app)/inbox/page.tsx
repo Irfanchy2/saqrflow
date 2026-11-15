@@ -45,7 +45,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       actions={<>{n('ready') > 0 && <ActionButton action={confirmAllReady} variant="secondary" size="md" confirm={`File all ${n('ready')} high-confidence document(s) to their suggested destinations?`}><CheckCheck size={15} />Confirm all suggested ({n('ready')})</ActionButton>}
         <DialogButton wide label="Upload documents" title="Upload to Smart Inbox" icon={<Upload size={15} />}><UploadPanel /></DialogButton></>} />
     <div className="mb-5"><Alert tone={ai ? 'green' : 'blue'}>{ai ? <><Sparkles size={14} className="me-1 inline" /><b>AI classification: {ai.label}</b>{ai.id === 'gemini' ? ` (${ai.model}). Only the OCR text is sent${st.redact ? ', with ID numbers removed' : ''}` : '. Reads the file itself'}.</> : <><b>Local reading mode</b>. No AI service is used.</>}
-      {' '}OCR: {ocrNames.length ? ocrNames.join(' → ') : 'none configured'} (digital PDFs are read directly on the server). {c.can('settings.manage') && <Link href="/settings#ai" className="font-medium text-primary hover:underline">Settings → AI & Automation</Link>}</Alert></div>
+      {' '}OCR: {ocrNames.length ? ocrNames.join(' → ') : 'none configured'} (digital PDFs are read directly on the server). {c.can('settings.manage') && <Link href="/settings/integrations#ai" className="font-medium text-primary hover:underline">Settings → AI & Automation</Link>}</Alert></div>
     <h2 className="mb-2 text-xs font-medium text-muted">Today</h2>
     <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
       <StatCard label="Documents uploaded" value={todayRows.length} icon={UploadCloud} tone="blue" />

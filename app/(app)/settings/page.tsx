@@ -1,121 +1,45 @@
-import { getCtx } from '@/lib/auth'
-import { Alert, Badge, Card, CardHeader, Field, Input, PageHeader, Select } from '@/components/ui/primitives'
-import { ActionButton, ActionForm } from '@/components/ui/action-form'
-import { MfaSetup } from '@/components/mfa-setup'
-import { clearWhatsAppToken, saveCompany, saveReminderSettings, saveWhatsApp, setLocale } from '@/app/actions/admin'
-import { parseSettings } from '@/lib/reminders/settings'
-import { whatsappStatus } from '@/lib/reminders/mode'
-import { TEMPLATE_META, templateBody } from '@/lib/whatsapp/templates'
-import { LOCALE_NAMES, LOCALES } from '@/lib/i18n'
-import { BrandingSettings } from '@/components/sales/branding-settings'
-import { NumberingSettings } from '@/components/settings/numbering'
-import { AiAutomation } from '@/components/settings/ai-automation'
-import { TemplatesSettings } from '@/components/settings/templates'
-import { TemplateBuilderSection } from '@/components/settings/templates-section'
-import { DataBackup } from '@/components/settings/data-backup'
-import { ApprovalRules } from '@/components/settings/approval-rules'
-import { PortalSettingsCard } from '@/components/settings/portal-settings'
-import { CompanyCardsSettings } from '@/components/settings/company-cards'
-import { CustomFieldsSettings } from '@/components/settings/custom-fields'
-import { PublicFormsSettings } from '@/components/settings/public-forms'
-import { NotificationRules } from '@/components/settings/notification-rules'
-import { ScheduledReports } from '@/components/settings/scheduled-reports'
-import { Integrations } from '@/components/settings/integrations'
-import { MySessions } from '@/components/settings/sessions'
-import { WhatsAppTemplates } from '@/components/settings/whatsapp-templates'
-import { ShareMessages } from '@/components/settings/share-messages'
-import { EvolutionSettings } from '@/components/settings/evolution'
-import { testWhatsAppConnection } from '@/app/actions/whatsapp'
 import Link from 'next/link'
-import { companyNameAr } from '@/lib/sales/paid-stamp'
+import { getCtx } from '@/lib/auth'
+import { PageHeader } from '@/components/ui/primitives'
+import { ChevronRight } from '@/components/icons'
+import { searchIndex } from '@/lib/settings/catalog'
+import { categoriesFor } from '@/lib/settings/perms'
+import { CategoryIcon } from '@/components/settings/hub/icon'
+import { SettingsSearch } from '@/components/settings/hub/search'
+import { LegacySettingsHash } from '@/components/settings/hub/legacy-hash'
 
 export const metadata = { title: 'Settings' }
+
+/** Settings Hub: heading, search and one card per category. The forms themselves live on the category pages. */
 export default async function Settings() {
-  const c = await getCtx(); const admin = c.can('settings.manage')
-  const nameAr = admin ? await companyNameAr(c) : null
-  const { data: st } = await c.supabase.from('app_settings').select('key,value'); const s = parseSettings(st ?? [])
-  const wa = admin ? await whatsappStatus(c.company.id) : null
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://YOUR-APP-URL'
-  // order follows how a business sets Averiqo up: who we are → how documents look → how they are numbered → who gets told → integrations → data
-  const sections: [string, string, boolean][] = [['company', 'Company, tax & currency', admin], ['branding', 'Branding & document layout', admin], ['builder', 'Template builder', admin], ['templates', 'Terms templates', admin], ['numbering', 'Numbering', admin], ['approvals', 'Approvals', admin], ['custom', 'Custom fields & statuses', admin], ['forms', 'Public forms', admin],
-    ['notifications', 'Notifications', admin], ['rules', 'Notification rules', admin], ['schedules', 'Scheduled reports', admin], ['evolution', 'WhatsApp (Evolution API)', admin && !!wa], ['whatsapp', 'WhatsApp (Meta)', admin && !!wa], ['wa-templates', 'WhatsApp templates', admin && !!wa], ['wa-share', 'WhatsApp sharing messages', admin], ['ai', 'AI & OCR', admin],
-    ['integrations', 'API & webhooks', admin], ['account', 'Account & security', true], ['data', 'Data & backup', true]]
-  return <><PageHeader title="Settings" sub={`${c.company.name} · ${c.company.timezone} · ${c.company.currency}`} />
-    <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
-    {/* phones and tablets: a sticky row of section chips under the top bar (with the admin pages at the end); lg: a side list */}
-    <nav aria-label="Settings sections" className="sticky top-16 z-10 -mx-4 border-b border-border bg-bg/95 px-4 py-2 backdrop-blur-md sm:-mx-6 sm:px-6 lg:top-20 lg:mx-0 lg:self-start lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
-      <ul className="tabstrip flex gap-2 overflow-x-auto text-sm lg:flex-col lg:gap-1 lg:overflow-visible">
-        {sections.filter(x => x[2]).map(([id, l]) => <li key={id} className="shrink-0"><a href={`#${id}`} className="flex h-9 items-center rounded-full border border-border bg-surface px-3.5 text-fg/80 active:bg-surface-2 lg:block lg:h-auto lg:rounded-md lg:border-0 lg:bg-transparent lg:px-2.5 lg:py-1.5 lg:text-muted lg:hover:bg-surface-2 lg:hover:text-fg">{l}</a></li>)}
-        {c.can('users.manage') && <li className="shrink-0 lg:hidden"><Link href="/users" className="flex h-9 items-center rounded-full border border-border bg-surface px-3.5 text-primary">Users & permissions</Link></li>}
-        {c.can('audit.view') && <li className="shrink-0 lg:hidden"><Link href="/audit" className="flex h-9 items-center rounded-full border border-border bg-surface px-3.5 text-primary">Audit log</Link></li>}
-        {c.can('records.delete') && <li className="shrink-0 lg:hidden"><Link href="/trash" className="flex h-9 items-center rounded-full border border-border bg-surface px-3.5 text-primary">Trash</Link></li>}
-      </ul>
-      {(c.can('users.manage') || c.can('records.delete') || c.can('audit.view')) && <ul className="mt-3 hidden border-t border-border pt-3 text-sm lg:block">
-        {c.can('users.manage') && <li><Link href="/users" className="block rounded-md px-2.5 py-1.5 text-muted hover:bg-surface-2 hover:text-fg">Users & permissions</Link></li>}
-        {c.can('audit.view') && <li><Link href="/audit" className="block rounded-md px-2.5 py-1.5 text-muted hover:bg-surface-2 hover:text-fg">Audit log</Link></li>}
-        {c.can('records.delete') && <li><Link href="/trash" className="block rounded-md px-2.5 py-1.5 text-muted hover:bg-surface-2 hover:text-fg">Trash</Link></li>}</ul>}
-    </nav>
-    <div className="flex min-w-0 max-w-4xl flex-col gap-5 [&>*]:scroll-mt-32 lg:[&>*]:scroll-mt-20">
-      {admin && <Card id="company"><CardHeader title="Company, tax & currency" sub="The legal company name prints on quotations, invoices and delivery notes." /><div className="p-4"><ActionForm action={saveCompany} resetOnSuccess={false}>
-        <Field label="Company name"><Input name="name" defaultValue={c.company.name} required /></Field><Field label="Trade name"><Input name="trade_name" /></Field>
-        <Field label="Company name in Arabic" hint="Printed around the top of the green PAID stamp on fully paid tax invoices. Enter the registered Arabic name exactly as on your trade licence. Leave empty to show the English name only."><Input name="name_ar" defaultValue={nameAr ?? ''} dir="rtl" lang="ar" maxLength={200} placeholder="اسم الشركة بالعربية" /></Field>
-        <p className="text-xs text-muted">Time zone: {c.company.timezone} · Currency: {c.company.currency} (fixed in this version).</p></ActionForm></div></Card>}
-
-
-
-
-      {admin && <BrandingSettings c={c} />}
-
-      {admin && <TemplateBuilderSection c={c} />}
-      {admin && <TemplatesSettings c={c} />}
-
-      {admin && <NumberingSettings c={c} />}
-      {admin && <ApprovalRules c={c} />}
-      {admin && <PortalSettingsCard c={c} />}
-      {admin && <CompanyCardsSettings c={c} />}
-      {admin && <CustomFieldsSettings c={c} />}
-      {admin && <PublicFormsSettings c={c} />}
-
-      {admin && <Card id="notifications"><CardHeader title="Notifications and reminder schedule" sub="Applies to every document, cheque and reminder unless overridden on the item or category." /><div className="p-4"><ActionForm action={saveReminderSettings} resetOnSuccess={false}>
-        <Field label="Remind … days before" hint="Comma-separated. 0 = on the due date."><Input name="offsets" defaultValue={s.offsets!.join(', ')} /></Field>
-        <div className="grid gap-4 sm:grid-cols-3"><Field label="Overdue: repeat every (days)"><Input type="number" name="overdue_every" min="0" max="90" defaultValue={s.overdueEveryDays} /></Field><Field label="Max overdue reminders"><Input type="number" name="overdue_max" min="0" max="52" defaultValue={s.overdueMax} /></Field><Field label="Daily summary hour"><Input type="number" name="digest_hour" min="0" max="23" defaultValue={s.digestHour} /></Field></div>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="digest" defaultChecked={s.digestEnabled} />Send the daily summary to recipients who opted in</label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="fallback" defaultChecked={s.emailFallback} />Email fallback when a WhatsApp message fails permanently</label></ActionForm></div></Card>}
-
-      {admin && <NotificationRules c={c} />}
-      {admin && <ScheduledReports c={c} />}
-
-      {admin && wa && <EvolutionSettings companyId={c.company.id} s={s} wa={wa} />}
-
-      {admin && wa && <Card id="whatsapp"><CardHeader title="WhatsApp Business Platform (Meta Cloud API)" action={<Badge tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.mode === 'live' ? 'Live' : 'Sandbox'}</Badge>} />
-        <div className="grid gap-6 p-4 lg:grid-cols-2"><div className="space-y-4">
-          <Alert tone={wa.mode === 'live' ? 'green' : 'amber'}>{wa.reason}</Alert>
-          <ActionForm action={saveWhatsApp} resetOnSuccess={false}>
-            <Field label="Phone number ID"><Input name="phone_number_id" defaultValue={s.phoneNumberId ?? wa.phoneNumberId ?? ''} inputMode="numeric" /></Field>
-            <Field label="WhatsApp Business Account ID" hint="needed to submit and check message templates"><Input name="waba_id" defaultValue={s.wabaId ?? ''} inputMode="numeric" /></Field>
-            <Field label="Meta App ID" hint="optional; needed only to submit templates that attach a PDF (example document upload)"><Input name="app_id" defaultValue={typeof st?.find(x => x.key === 'whatsapp.app_id')?.value === 'string' ? st!.find(x => x.key === 'whatsapp.app_id')!.value : ''} inputMode="numeric" /></Field>
-            <Field label="Access token" hint={wa.hasToken ? 'A token is configured. Leave blank to keep it. Tokens are encrypted at rest and never shown again.' : 'Use a permanent System User token. Alternatively set WHATSAPP_ACCESS_TOKEN as a server environment variable.'}><Input name="token" type="password" autoComplete="off" placeholder={wa.hasToken ? '••••••••••••' : ''} /></Field>
-            <Field label="Estimated cost per message (AED)" hint="Optional – only used to show an estimate in the delivery log."><Input name="cost" type="number" step="0.0001" min="0" defaultValue={s.whatsappCostPerMessage ?? ''} /></Field>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="sandbox" defaultChecked={s.whatsappMode === 'sandbox'} />Force sandbox mode (never send real messages)</label></ActionForm>
-          <div className="flex flex-wrap gap-2"><ActionButton action={testWhatsAppConnection} variant="secondary">Test connection</ActionButton><ActionButton action={clearWhatsAppToken} variant="ghost" confirm="Remove the stored WhatsApp token?">Remove stored token</ActionButton></div></div>
-          <div className="space-y-3 text-sm"><h3 className="font-medium">Webhook (delivery receipts &amp; STOP replies)</h3>
-            <p className="text-muted">In Meta → WhatsApp → Configuration set:</p>
-            <dl className="space-y-1 rounded-md bg-surface-2 p-3 font-mono text-xs"><div>Callback URL: <b className="select-all">{appUrl}/api/webhooks/whatsapp</b></div><div>Verify token: the value of <b>WHATSAPP_VERIFY_TOKEN</b></div><div>Subscribe to field: <b>messages</b></div></dl>
-            <p className="text-muted">The server also needs <code>META_APP_SECRET</code> to verify signatures; unsigned requests are rejected.</p>
-            <h3 className="pt-2 font-medium">Message templates to approve in Meta</h3>
-            {(Object.keys(TEMPLATE_META) as (keyof typeof TEMPLATE_META)[]).map(k => <details key={k} className="rounded-md border border-border p-2"><summary className="cursor-pointer font-mono text-xs">{TEMPLATE_META[k].metaName} <span className="text-muted">({TEMPLATE_META[k].language}, utility)</span></summary><pre className="mt-2 whitespace-pre-wrap text-xs text-muted">{templateBody(k)}</pre></details>)}</div></div></Card>}
-
-      {admin && wa && <WhatsAppTemplates c={c} live={wa.mode === 'live'} />}
-      {admin && <ShareMessages c={c} />}
-      {admin && <AiAutomation c={c} wa={wa} />}
-      {admin && <Integrations c={c} />}
-
-      <Card id="account"><CardHeader title="Your account & security" sub="Language, two-step verification, signed-in devices and sign-in history. Light / dark theme is in the toolbar." /><div className="space-y-5 p-4 text-sm">
-        <div><div className="text-xs text-muted">Signed in as</div><div>{c.email} · <span className="capitalize">{c.profile.role.replace('_', ' ')}</span></div></div>
-        <ActionForm action={setLocale} submit="Save language" resetOnSuccess={false}><Field label="Interface language" hint="Arabic (right-to-left) and Bengali currently translate navigation and chrome only; page content is English."><Select name="locale" defaultValue={c.profile.locale}>{LOCALES.map(l => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}</Select></Field></ActionForm>
-        <div><h3 className="mb-2 font-medium">Two-step verification</h3>{c.company.is_demo ? <p className="text-muted">Not available in the shared demo (it would lock other visitors out).</p> : <MfaSetup />}</div>
-        <MySessions c={c} /></div></Card>
-
-      <DataBackup c={c} />
-    </div></div></>
+  const c = await getCtx()
+  const cats = categoriesFor(c)
+  return <div className="mx-auto w-full max-w-6xl">
+    <LegacySettingsHash />
+    <PageHeader title="Settings" sub={`Everything that shapes how Averiqo works for ${c.company.name}. Pick a category, or search for a setting.`} />
+    <SettingsSearch items={searchIndex(cats)}>
+      <nav aria-label="Settings categories">
+        <ul className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-4" data-settings-cards>
+          {cats.map(cat => {
+            const parts = [...cat.sections.map(s => s.title), ...(cat.links ?? []).map(l => l.title)]
+            return <li key={cat.id} className="min-w-0">
+              {/* narrow phones: a compact row; from 400 px: a card (2 columns on phones, 3–4 on wide screens) */}
+              <Link href={`/settings/${cat.id}`} data-category={cat.id}
+                className="group relative flex h-full min-h-[72px] items-center gap-3.5 rounded-2xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[border-color,box-shadow,transform] duration-200 hover:border-primary/35 hover:shadow-[0_6px_20px_-8px_rgb(0_0_0/0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.985] motion-reduce:transform-none motion-reduce:transition-none min-[400px]:min-h-[148px] min-[400px]:flex-col min-[400px]:items-stretch min-[400px]:gap-0 min-[400px]:p-4 sm:p-5">
+                <div className="flex shrink-0 items-start justify-between gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-primary-fg"><CategoryIcon name={cat.icon} size={20} /></span>
+                  <ChevronRight size={16} className="mt-1 hidden shrink-0 text-muted transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-primary rtl:rotate-180 rtl:group-hover:-translate-x-0.5 min-[400px]:block" aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1 min-[400px]:mt-3 min-[400px]:flex min-[400px]:flex-col">
+                  <h2 className="text-[15px] font-semibold leading-snug tracking-[-0.01em] sm:text-base">{cat.title}</h2>
+                  <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-muted min-[400px]:mt-1">{cat.desc}</p>
+                  <p className="mt-auto hidden truncate pt-3 text-xs text-muted/80 min-[400px]:block" title={parts.join(' · ')}>{parts.join(' · ')}</p>
+                </div>
+                <ChevronRight size={16} className="shrink-0 text-muted rtl:rotate-180 min-[400px]:hidden" aria-hidden />
+              </Link></li>
+          })}
+        </ul>
+      </nav>
+    </SettingsSearch>
+  </div>
 }

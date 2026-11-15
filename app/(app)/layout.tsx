@@ -121,8 +121,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     </div><BottomNav items={visible} /><ShortcutsDialog /><Dock can={{ sales: c.can('records.edit') && c.can('finance.view'), docs: c.can('documents.upload'), people: c.can('records.edit'), assets: c.can('records.edit') && c.can('documents.view'), projects: c.can('records.edit') && c.can('documents.view'), crm: c.can('crm.view') && c.can('records.edit'), stock: c.can('records.edit') && c.can('documents.view') }} /><NavProgress /><Toaster /><Pwa /><CommandPalette links={[...visible.map(i => ({ label: i.label, href: i.href, group: i.group })),
       ...(c.can('records.edit') ? [{ label: 'Import data (Excel / CSV)', href: '/import', group: 'Data' }] : []),
       ...(c.can('data.export') || c.can('settings.manage') ? [{ label: 'Backup status', href: '/backup', group: 'Data' }] : []),
-      ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings#integrations', group: 'Settings' }] : []),
+      ...(c.can('settings.manage') ? [{ label: 'Notification rules', href: '/settings/notifications#rules', group: 'Settings' }, { label: 'Scheduled reports', href: '/settings/notifications#schedules', group: 'Settings' }, { label: 'API & webhooks', href: '/settings/integrations#integrations', group: 'Settings' }] : []),
       ...(c.can('users.manage') ? [{ label: 'Sign-in activity', href: '/users/activity', group: 'Security' }] : []),
-      { label: 'My devices & sign-in history', href: '/settings#account', group: 'Security' }]} canSales={c.can('records.edit') && c.can('finance.view')} /><RowNavigator /><StripEdges /></div></MotionRoot>
+      { label: 'My devices & sign-in history', href: '/settings/security#account', group: 'Security' }]} canSales={c.can('records.edit') && c.can('finance.view')} /><RowNavigator /><StripEdges /></div></MotionRoot>
 }
 

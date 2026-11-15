@@ -82,7 +82,7 @@ try {
   ok((await dlg().innerText()).includes('Not available in the shared demo'), 'inviting users is refused')
   ok((await one(`select count(*)::int n from profiles where company_id = $1`, [D])).n === 1, 'no user was added')
   await p.keyboard.press('Escape')
-  await p.goto(`${BASE}/settings#account`); await settle()
+  await p.goto(`${BASE}/settings/security#account`); await settle()
   ok((await text()).includes('Not available in the shared demo (it would lock other visitors out)'), 'two-step setup is not offered')
   // the forgot-password form never sends anything for the shared address
   const anon = await browser.newContext(); const q = await anon.newPage()

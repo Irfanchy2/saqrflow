@@ -96,11 +96,11 @@ export async function saveShareTemplate(kind: string, _: ActionState, fd: FormDa
     const body = (str(fd, 'body') ?? '').replace(/\r/g, '')
     if (fd.get('reset') === '1' || !body.trim()) {
       const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: shareSettingKey(kind), value: { body: null }, updated_at: new Date().toISOString() }); if (error) throw error
-      revalidatePath('/settings'); return { ok: true, message: 'Back to the default message.' }
+      revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Back to the default message.' }
     }
     const problems = shareBodyProblems(kind, body); if (problems.length) return { error: problems.join(' ') }
     const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: shareSettingKey(kind), value: { body }, updated_at: new Date().toISOString() })
     if (error) throw error
-    revalidatePath('/settings'); return { ok: true, message: 'Message saved.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Message saved.' }
   })
 }

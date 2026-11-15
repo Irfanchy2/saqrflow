@@ -62,7 +62,7 @@ try {
   await close()
 
   console.log('\n[2] Connect the WhatsApp Business number')
-  await p.goto(`${BASE}/settings#whatsapp`); await settle()
+  await p.goto(`${BASE}/settings/whatsapp#whatsapp`); await settle()
   const w = p.locator('#whatsapp')
   await w.getByLabel('Phone number ID').fill('1234567890'); await w.getByLabel('WhatsApp Business Account ID').fill('9876543210'); await w.getByLabel('Meta App ID').fill('1122334455')
   await w.getByLabel('Access token').fill('test-wa-token'); await w.getByRole('button', { name: 'Save' }).click(); await settle(900)
@@ -89,7 +89,7 @@ try {
   ok((await wa().innerText()).includes('pending at WhatsApp') && await wa().getByRole('button', { name: 'Send' }).isDisabled(), 'cannot send with a template that is not approved yet')
   await close()
   await fetch(`${GW}/mock/graph-approve`, { method: 'POST', body: JSON.stringify({ names: ['averiqo_invoice'] }) })
-  await p.goto(`${BASE}/settings#wa-templates`); await settle(); await p.locator('#wa-templates').getByRole('button', { name: 'Check status' }).click()
+  await p.goto(`${BASE}/settings/whatsapp#wa-templates`); await settle(); await p.locator('#wa-templates').getByRole('button', { name: 'Check status' }).click()
   ok(await waitFor(async () => (await tpl('invoice').innerText()).includes('approved')), 'Check status picks up the approval')
 
   console.log('\n[4] Live send with the PDF')
@@ -140,7 +140,7 @@ try {
   await hook({ entry: [{ changes: [{ value: { metadata: { phone_number_id: '1234567890' }, messages: [{ from: '971501112222', type: 'text', text: { body: 'START' }, timestamp: String(Math.floor(Date.now() / 1000)) }] } }] }] })
 
   console.log('\n[7] Every message type (templates submitted and approved)')
-  await p.goto(`${BASE}/settings#wa-templates`); await settle()
+  await p.goto(`${BASE}/settings/whatsapp#wa-templates`); await settle()
   for (const k of ['quotation', 'delivery_note', 'receipt', 'payslip', 'statement', 'payment_reminder', 'quotation_followup', 'document_expiry', 'cheque_reminder', 'project_update']) {
     await tpl(k).locator('summary').click(); await tpl(k).getByRole('button', { name: /Submit to WhatsApp/ }).click(); await waitFor(async () => (await tpl(k).innerText()).toLowerCase().includes('pending'))
   }
@@ -199,7 +199,7 @@ try {
   const fit = await mp.evaluate(() => { const d = document.querySelector('dialog[data-wa-dialog][open]'); if (!d) return null; const r = d.getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1 && [...d.querySelectorAll('*')].every(e => e.getBoundingClientRect().right <= innerWidth + 1) })
   ok(fit === true, 'send dialog fits a 360px phone')
   await mp.screenshot({ path: `${OUT}/m-dialog.png` }); await m.close()
-  await p.goto(`${BASE}/settings#wa-templates`); await settle(); await p.locator('#wa-templates').screenshot({ path: `${OUT}/templates.png` })
+  await p.goto(`${BASE}/settings/whatsapp#wa-templates`); await settle(); await p.locator('#wa-templates').screenshot({ path: `${OUT}/templates.png` })
 } catch (e) {
   ok(false, `aborted: ${e.message.split('\n').slice(0, 12).join(' | ')}`); await p.screenshot({ path: `${OUT}/abort.png`, fullPage: true }).catch(() => {})
 }

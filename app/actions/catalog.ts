@@ -57,13 +57,13 @@ export async function saveTemplate(id: string | null, _: ActionState, fd: FormDa
     const row = { ...v.data, lines: ls, is_default: isDefault, updated_at: new Date().toISOString() }
     const { error } = id ? await c.supabase.from('terms_templates').update(row).eq('id', id) : await c.supabase.from('terms_templates').insert({ ...row, company_id: c.company.id })
     if (error) { if (error.code === '23505') return { error: 'A template with this name already exists.' }; throw error }
-    revalidatePath('/settings'); return { ok: true, message: 'Template saved.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Template saved.' }
   })
 }
 export async function deleteTemplate(id: string): Promise<ActionState> {
   return safe(async () => {
     const c = await getCtx(); need(c, 'settings.manage')
     const { error } = await c.supabase.from('terms_templates').delete().eq('id', id); if (error) throw error
-    revalidatePath('/settings'); return { ok: true, message: 'Template deleted.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Template deleted.' }
   })
 }

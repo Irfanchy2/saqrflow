@@ -71,7 +71,7 @@ try {
   })
 
   console.log('\n[A2] Settings → AI & Automation')
-  await p.goto(`${BASE}/settings`); await settle()
+  await p.goto(`${BASE}/settings/integrations`); await settle()
   const st = await p.locator('#ai').innerText()
   ok(st.includes('AI & Automation') && /OCR\.Space\s*Configured/.test(st) && /Google Gemini[^\n]*\n?[^\n]*Configured/.test(st) && /Google Cloud Vision\s*Not configured/.test(st), 'shows OCR.Space + Gemini configured, Google Vision not configured')
   ok(st.includes('••••••••-key') && !st.includes('test-ocr-key') && !st.includes('test-gemini-key'), 'API keys are masked (••••••••-key), never displayed')

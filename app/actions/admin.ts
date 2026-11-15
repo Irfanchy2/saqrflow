@@ -57,7 +57,7 @@ export async function saveReminderSettings(_: ActionState, fd: FormData): Promis
       setting(c, 'reminders.offsets', offs), setting(c, 'reminders.overdue_every_days', n.every), setting(c, 'reminders.overdue_max', n.max),
       setting(c, 'reminders.digest_hour', n.hour), setting(c, 'reminders.digest_enabled', fd.get('digest') === 'on'), setting(c, 'reminders.email_fallback', fd.get('fallback') === 'on'),
     ])
-    revalidatePath('/settings'); return { ok: true, message: 'Reminder settings saved.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Reminder settings saved.' }
   })
 }
 export async function saveWhatsApp(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -74,11 +74,11 @@ export async function saveWhatsApp(_: ActionState, fd: FormData): Promise<Action
       const { error } = await createAdminClient().from('integration_secrets').upsert({ company_id: c.company.id, name: 'whatsapp_token', ciphertext: encryptSecret(token), updated_at: new Date().toISOString() }); if (error) throw error
       await auditAction(c.company.id, c.userId, 'SECRET_SET', 'integration_secrets', { name: 'whatsapp_token', hint: `…${token.slice(-4)}` })
     }
-    revalidatePath('/settings'); revalidatePath('/reminders'); return { ok: true, message: token ? 'Saved. The token is encrypted and can never be displayed again.' : 'Saved.' }
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/reminders'); return { ok: true, message: token ? 'Saved. The token is encrypted and can never be displayed again.' : 'Saved.' }
   })
 }
 export async function clearWhatsAppToken(): Promise<ActionState> {
-  return safe(async () => { const c = await getCtx(); demoGuard(c, 'the WhatsApp connection'); need(c, 'settings.manage'); await createAdminClient().from('integration_secrets').delete().eq('company_id', c.company.id).eq('name', 'whatsapp_token'); await auditAction(c.company.id, c.userId, 'SECRET_REMOVED', 'integration_secrets', { name: 'whatsapp_token' }); revalidatePath('/settings'); return { ok: true, message: 'Stored token removed.' } })
+  return safe(async () => { const c = await getCtx(); demoGuard(c, 'the WhatsApp connection'); need(c, 'settings.manage'); await createAdminClient().from('integration_secrets').delete().eq('company_id', c.company.id).eq('name', 'whatsapp_token'); await auditAction(c.company.id, c.userId, 'SECRET_REMOVED', 'integration_secrets', { name: 'whatsapp_token' }); revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Stored token removed.' } })
 }
 export async function setLocale(_: ActionState, fd: FormData): Promise<ActionState> {
   return safe(async () => {

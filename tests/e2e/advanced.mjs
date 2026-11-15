@@ -69,7 +69,7 @@ try {
   ok(!!(await one(`select 1 from sales_doc_events where invoice_id=$1 and event='approval'`, [q])), 'decision shows in the quotation history')
 
   // rules: expense threshold
-  await p.goto(`${BASE}/settings#approvals`); await settle()
+  await p.goto(`${BASE}/settings/team#approvals`); await settle()
   await p.getByLabel('Expenses from (AED)').fill('1000'); await p.getByRole('button', { name: 'Save approval rules' }).click(); await settle()
   ok((await one(`select value from app_settings where company_id=$1 and key='approvals.expense_threshold'`, [co]))?.value === 1000, 'Settings → Approvals: expense threshold saved')
   await db.query(`insert into project_expenses(company_id,category,description,amount,created_by) values ($1,'equipment','Welding machine',3200,$2)`, [co, owner])   // triggers run for every insert path
@@ -93,7 +93,7 @@ try {
   ok((await p.getByRole('button', { name: 'Urgent overdue' }).count()) === 1, 'the Views button shows the active view name')
 
   console.log('\n[3] Custom fields & statuses')
-  await p.goto(`${BASE}/settings#custom`); await settle()
+  await p.goto(`${BASE}/settings/integrations#custom`); await settle()
   const cf = p.locator('#custom')
   await cf.locator('select[name=entity]').selectOption('project'); await cf.getByLabel('Field name *').fill('Site supervisor'); await cf.getByRole('button', { name: 'Add field' }).click(); await settle()
   await cf.locator('select[name=entity]').selectOption('project'); await cf.getByLabel('Field name *').fill('Paint system'); await cf.locator('select[name=field_type]').selectOption('select'); await cf.getByLabel('Dropdown options').fill('Epoxy, Polyurethane, Galvanised'); await cf.getByRole('button', { name: 'Add field' }).click(); await settle()

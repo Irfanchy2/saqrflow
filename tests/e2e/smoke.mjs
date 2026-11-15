@@ -219,7 +219,7 @@ try {
   const fid = (await db.query(`insert into notification_logs(company_id,recipient_id,channel,template,params,dedupe_key,status,attempts,last_error) select company_id,id,'whatsapp','test_message','{"note":"x"}','manual-failed','failed',5,'HTTP 503' from notification_recipients where id=$1 returning id`, [rid])).rows[0].id
   await p.goto(`${BASE}/reminders?tab=log`); await p.getByRole('button', { name: 'Retry' }).first().click(); await settle(p, 1500); ok((await db.query(`select status from notification_logs where id=$1`, [fid])).rows[0].status === 'queued', 'failed message can be re-queued from the UI')
   // notification bell
-  await p.goto(`${BASE}/`); await p.locator('summary[aria-label^="Notifications"]').click(); ok(await p.getByText('Mark all read').isVisible(), 'notification center lists in-app notifications'); await p.keyboard.press('Escape')
+  await p.goto(`${BASE}/`); await p.locator('button[aria-label^="Notifications"]').first().click(); ok(await p.getByText('Mark all read').isVisible(), 'notification center lists in-app notifications'); await p.keyboard.press('Escape')
 
   console.log('\n[6] Scheduler endpoint, webhook')
   const c0 = await fetch(`${BASE}/api/cron/reminders`); ok(c0.status === 401, 'cron endpoint rejects missing secret')
@@ -244,7 +244,7 @@ try {
   await p.goto(`${BASE}/calendar?m=${plus(10).slice(0, 7)}`); await settle(p); ok((await bodyText(p)).includes('Emirates ID') || (await bodyText(p)).includes('Trade License'), 'calendar shows due items'); await shot(p, '08-calendar')
   await p.goto(`${BASE}/search?q=Mohammed`); ok((await bodyText(p)).includes('Mohammed Ali'), 'global search finds the employee')
   const csv = await p.context().request.get(`${BASE}/api/export/cheques`); ok(csv.ok() && (await csv.text()).includes('ABC Trading'), 'cheques CSV export works for owner')
-  await p.goto(`${BASE}/reports?section=compliance`); ok((await bodyText(p)).includes('Employee compliance') && (await bodyText(p)).includes('Document expiry on'), 'reports page renders (documents & staff)'); await p.goto(`${BASE}/settings`); await settle(p); ok((await bodyText(p)).includes('saqrflow_document_reminder'), 'settings lists WhatsApp templates to approve'); await shot(p, '09-settings')
+  await p.goto(`${BASE}/reports?section=compliance`); ok((await bodyText(p)).includes('Employee compliance') && (await bodyText(p)).includes('Document expiry on'), 'reports page renders (documents & staff)'); await p.goto(`${BASE}/settings/whatsapp`); await settle(p); ok((await bodyText(p)).includes('saqrflow_document_reminder'), 'settings lists WhatsApp templates to approve'); await shot(p, '09-settings')
   await p.goto(`${BASE}/users`); ok((await bodyText(p)).includes('Permission matrix'), 'user management page renders')
   await p.setViewportSize({ width: 390, height: 844 }); await p.goto(`${BASE}/`); await settle(p); ok(await p.getByRole('button', { name: 'Open menu' }).isVisible(), 'mobile: hamburger menu visible'); await shot(p, '10-mobile')
   for (const path of ['/', '/documents', '/cheques', '/reminders', '/employees']) { await p.goto(`${BASE}${path}`); await settle(p, 400); const ov = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); ok(ov <= 1, `mobile: no horizontal overflow on ${path} (${ov}px)`) }
