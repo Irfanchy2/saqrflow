@@ -1,8 +1,22 @@
 // Content-Security-Policy is set per request in middleware.ts (it carries a fresh script nonce).
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
 
 /** @type {import('next').NextConfig} */
 export default {
   poweredByHeader: false,
+  // Backports a React hydration fix into the browser copy of React that Next 15 bundles: without it, pages hydrating
+  // while their data is still streaming in hit React #418 at random (see scripts/react-hydration-fix-loader.cjs).
+  // Remove when upgrading to Next 16, which ships the fixed React.
+  webpack(config) {
+    config.module.rules.push({
+      test: /[\\/]next[\\/]dist[\\/]compiled[\\/]react-dom(-experimental)?[\\/]cjs[\\/]react-dom-(client|profiling)\.(production|development|profiling)\.js$/,
+      enforce: 'pre',
+      use: [{ loader: require.resolve('./scripts/react-hydration-fix-loader.cjs') }],
+    })
+    return config
+  },
   // Local OCR loads its models from disk (PaddleOCR through the ONNX Runtime native add-on; Tesseract in a worker thread as
   // the fallback) — keep these unbundled and ship the model files.
   serverExternalPackages: ['tesseract.js', 'tesseract.js-core', 'onnxruntime-node', 'paddleocr', 'fontkit'],

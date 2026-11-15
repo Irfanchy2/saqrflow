@@ -95,9 +95,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const visible = items.filter(i => i.show).map(i => (i.key === 'expenses' && claims ? { ...i, alert: claims } : i))
   return <MotionRoot><div className="flex min-h-screen"><div className="mesh" aria-hidden><i className="mesh__a" /><i className="mesh__b" /><i className="mesh__c" /></div>
     <a href="#main" className="sr-only z-toast rounded-md bg-primary px-3 py-2 text-sm text-primary-fg focus:not-sr-only focus:fixed focus:start-3 focus:top-3">Skip to content</a>
-    {/* the shell (sidebar, progress bar, tap skeleton) renders in the first HTML chunk, with no Suspense boundary: a boundary
-        here streamed the sidebar in a later chunk on every load, and when that chunk landed while React was hydrating the
-        page threw React #418 (seen intermittently on any page) */}
+    {/* the shell (sidebar, progress bar, tap skeleton) renders in the first HTML chunk, with no Suspense boundary, so it
+        never waits on a later chunk. (The intermittent React #418 seen on any page was a React bug in hydrating while the
+        page's data is still streaming in; it is fixed by scripts/react-hydration-fix-loader.cjs, see next.config.mjs.) */}
     <Sidebar items={visible} company={c.company.name} user={c.profile.full_name} role={c.profile.role} rtl={isRtl(l)} />
     <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
       {c.company.is_demo && <div role="note" data-demo-banner className="no-print flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-primary/15 bg-primary-soft px-4 py-2 text-center text-[13px]">
