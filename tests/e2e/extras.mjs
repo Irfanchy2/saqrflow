@@ -59,7 +59,7 @@ try {
 
   console.log('\n[2] Template builder')
   const q = (await one(`insert into invoices(company_id,doc_type,number,customer_name,attention,customer_address,total,status,issue_date,valid_until,subject) values ($1,'quotation','AS-002600/2026','Falcon Towers LLC','Mr. Khalid','Business Bay, Dubai',0,'draft',$2,$3,'Canopy works') returning id`, [co, day(0), day(30)])).id
-  await p.goto(`${BASE}/settings#builder`); await settle()
+  await p.goto(`${BASE}/settings/documents#builder`); await settle()
   const tb = p.locator('[data-template-builder]')
   await tb.getByLabel('Document title').fill('PROPOSAL'); await tb.getByLabel('Attention').uncheck(); await tb.getByLabel('Footer note').fill('Thank you for choosing Al Saqr')
   await tb.getByLabel('Description column').fill('ITEM DESCRIPTION')
@@ -122,7 +122,7 @@ try {
 
   console.log('\n[5] Phone')
   const m = await browser.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, storageState: await ctx.storageState() }); const mp = await m.newPage()
-  for (const path of ['/assistant?q=Who%20owes%20us%20money%3F', '/settings#builder']) {
+  for (const path of ['/assistant?q=Who%20owes%20us%20money%3F', '/settings/documents#builder']) {
     await mp.goto(BASE + path); await mp.waitForLoadState('networkidle').catch(() => {}); await mp.waitForTimeout(1200)
     const clip = await mp.evaluate(() => { const main = document.querySelector('main'); const edge = Math.min(innerWidth, main.getBoundingClientRect().right) + 1
       const scroller = e => { for (let a = e.parentElement; a && a !== main; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if (o === 'auto' || o === 'scroll' || o === 'hidden') return true } return false }
@@ -130,7 +130,7 @@ try {
     ok(clip === 0, `${path}: nothing cut off on a 360px phone (${clip})`)
   }
   await mp.goto(`${BASE}/assistant?q=Who%20owes%20us%20money%3F`); await mp.waitForTimeout(1500); await mp.screenshot({ path: `${OUT}/m-assistant.png`, fullPage: true }); await m.close()
-  await p.goto(`${BASE}/settings#builder`); await settle(); await p.locator('#builder').screenshot({ path: `${OUT}/builder.png` })
+  await p.goto(`${BASE}/settings/documents#builder`); await settle(); await p.locator('#builder').screenshot({ path: `${OUT}/builder.png` })
 
   console.log('\n[6] Sign-out wipes device drafts')
   await p.goto(`${BASE}/tickets?new=ticket`); await settle(); await dlg().getByLabel('Issue *').fill('Draft that must not survive sign-out'); await p.waitForTimeout(700); await p.keyboard.press('Escape')

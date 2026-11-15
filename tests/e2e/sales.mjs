@@ -41,7 +41,7 @@ try {
   ok(true, 'palette navigates to Projects')
 
   console.log('\n[S2] Branding in Settings')
-  await p.goto(`${BASE}/settings`); await settle()
+  await p.goto(`${BASE}/settings/documents`); await settle()
   for (const [kind, label] of [['header', 'Letterhead (quotation & delivery note) image'], ['stamp', 'Company stamp image']]) {
     const f = p.getByLabel(label); await f.setInputFiles({ name: `${kind}.png`, mimeType: 'image/png', buffer: PNG })
     await f.locator('xpath=ancestor::form').getByRole('button', { name: 'Upload' }).click(); await settle(900)

@@ -61,7 +61,7 @@ export async function saveWaTemplate(kind: string, _: ActionState, fd: FormData)
     const cur = (await loadTemplates(c.supabase, c.company.id))[kind]
     const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: `whatsapp.template.${kind}`, value: { ...cur, body, language }, updated_at: new Date().toISOString() })
     if (error) throw error
-    revalidatePath('/settings')
+    revalidatePath('/settings/[category]', 'page')
     return { ok: true, message: cur.submitted && cur.submitted.body !== body ? 'Saved. Submit it to WhatsApp again: messages keep using the approved text until the new one is approved.' : 'Saved.' }
   })
 }
@@ -82,7 +82,7 @@ export async function submitWaTemplate(kind: string): Promise<ActionState> {
     if ('error' in r) return { error: r.error }
     const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: `whatsapp.template.${kind}`, value: { ...t, submitted: { body: t.body, at: new Date().toISOString() }, meta: { id: r.id, status: r.status } }, updated_at: new Date().toISOString() })
     if (error) throw error
-    revalidatePath('/settings')
+    revalidatePath('/settings/[category]', 'page')
     return { ok: true, message: `Submitted to WhatsApp (${r.status.toLowerCase()}). Approval usually takes minutes to a few hours; use “Check status”.` }
   })
 }
@@ -101,7 +101,7 @@ export async function refreshWaTemplates(): Promise<ActionState> {
       await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: `whatsapp.template.${k}`, value: { ...t, submitted: t.submitted ?? (matches ? { body: t.body, at: new Date().toISOString() } : undefined), meta: { id: m.id, status: m.status, reason: m.rejected_reason } }, updated_at: new Date().toISOString() })
       n++
     }
-    revalidatePath('/settings')
+    revalidatePath('/settings/[category]', 'page')
     return { ok: true, message: n ? `Status updated for ${n} template(s).` : 'No Averiqo templates found in your WhatsApp account yet.' }
   })
 }

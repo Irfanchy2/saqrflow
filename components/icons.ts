@@ -165,6 +165,11 @@ export {
   ScalesIcon as Scale,
   SignInIcon as LogIn,
   DotsSixVerticalIcon as GripVertical,
+  PaletteIcon as Palette,
+  PlugsConnectedIcon as Plug,
+  IdentificationBadgeIcon as IdCard,
+  UserGearIcon as UserCog,
+  TranslateIcon as Languages,
 } from '@phosphor-icons/react/dist/ssr'
 export type { Icon as LucideIcon, IconWeight } from '@phosphor-icons/react'
 // drawn for Averiqo (not Phosphor): the Projects icon

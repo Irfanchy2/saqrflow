@@ -15,7 +15,7 @@ export async function saveNumbering(docType: string, _: ActionState, fd: FormDat
       if (t === 'quotation') return { error: 'Quotations always use a custom format. Change its fields instead.' }
       const { error } = await c.supabase.from('document_number_formats').delete().eq('doc_type', t)
       if (error) throw error
-      revalidatePath('/settings'); return { ok: true, message: 'Back to the standard format.' }
+      revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Back to the standard format.' }
     }
     const yf = (fd.get('year_format') as string) ?? 'yyyy'
     const v = z.object({
@@ -32,6 +32,6 @@ export async function saveNumbering(docType: string, _: ActionState, fd: FormDat
     if (!v.prefix && !v.number_separator && !v.fixed_digits) return { error: 'Add a prefix (e.g. AS or INV) so numbers are recognisable.' }
     const { error } = await c.supabase.from('document_number_formats').upsert({ ...v, reset_to: 1, company_id: c.company.id, doc_type: t, updated_by: c.userId, updated_at: new Date().toISOString() })
     if (error) throw error
-    revalidatePath('/settings'); return { ok: true, message: 'Numbering saved. New documents use it; existing numbers are unchanged.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Numbering saved. New documents use it; existing numbers are unchanged.' }
   })
 }

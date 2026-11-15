@@ -57,7 +57,7 @@ try {
   const ownerDoc = (await one(`insert into documents(company_id,name,owner_type) values ($1,'Trade licence','company') returning id`, [co])).id
 
   console.log('\n[1] Settings → Employee portal: self check-in on, advance limit 25%')
-  await p.goto(`${BASE}/settings#employee-portal`); await settle()
+  await p.goto(`${BASE}/settings/team#employee-portal`); await settle()
   const card = p.locator('#employee-portal')
   await card.locator('input[name=checkin]').check(); await card.locator('input[name=advance_limit_pct]').fill('25')
   await card.locator('input[name=work_start]').fill('00:00'); await card.locator('input[name=work_end]').fill('23:59'); await card.locator('input[name=overtime_max_hours]').fill('5')

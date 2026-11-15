@@ -45,7 +45,7 @@ try {
   ok((await one(`select count(*)::int n from login_events where user_id=$1 and event='sign_in_failed'`, [me.id])).n === 1, 'failed attempt recorded against the account')
   await q.getByLabel('Password').fill(PASS); await q.getByRole('button', { name: 'Sign in' }).click(); await q.waitForURL(`${BASE}/`); await settle(q)
   ok((await one(`select count(*)::int n from login_events where user_id=$1 and event='sign_in' and user_agent like '%iPhone%'`, [me.id])).n === 1, 'sign-in recorded with the device')
-  await p.goto(`${BASE}/settings#account`); await settle()
+  await p.goto(`${BASE}/settings/security#account`); await settle()
   const devices = p.locator('[data-sessions] li')
   ok(await devices.count() === 2 && (await p.locator('[data-sessions]').innerText()).includes('Safari on iPhone') && (await p.locator('[data-sessions]').innerText()).includes('This device'), 'Settings lists both devices, this one marked')
   ok((await p.locator('#account').innerText()).includes('Wrong password'), 'recent activity shows the failed attempt')
@@ -57,7 +57,7 @@ try {
   await other.close()
 
   console.log('\n[2] Webhooks')
-  await p.goto(`${BASE}/settings#integrations`); await settle()
+  await p.goto(`${BASE}/settings/integrations#integrations`); await settle()
   await p.getByRole('button', { name: 'Add webhook' }).click()
   await dlg().getByLabel('Endpoint URL *').fill('http://127.0.0.1:3999/ok'); await dlg().getByLabel('Description').fill('Test receiver')
   await dlg().getByLabel('New customer').check(); await dlg().getByLabel('Quotation accepted').check()
@@ -85,7 +85,7 @@ try {
   ok(got.filter(g => g.path === '/ok' && g.headers['x-averiqo-event'] === 'customer.created').length === 2, 'the healthy endpoint is not affected by the failing one')
 
   console.log('\n[3] Notification rules')
-  await p.goto(`${BASE}/settings#rules`); await settle()
+  await p.goto(`${BASE}/settings/notifications#rules`); await settle()
   await p.getByRole('button', { name: 'New rule' }).click()
   await dlg().getByLabel('Rule name *').fill('Big quotation accepted'); await dlg().getByLabel('When *').selectOption('quotation.accepted')
   await dlg().getByLabel('Only if the amount is at least (AED)').fill('50000'); await dlg().getByLabel('Platform Owner').check()
@@ -102,7 +102,7 @@ try {
   ok(got.some(g => g.headers['x-averiqo-event'] === 'quotation.accepted' && JSON.parse(g.body).data.number === 'QT-BIG-1'), 'the same event also reached the webhook')
 
   console.log('\n[4] API keys')
-  await p.goto(`${BASE}/settings#integrations`); await settle()
+  await p.goto(`${BASE}/settings/integrations#integrations`); await settle()
   await p.getByRole('button', { name: 'Create API key' }).click()
   await dlg().getByLabel('Name *').fill('Accounting sync'); await dlg().getByLabel('Customers').check(); await dlg().getByRole('button', { name: 'Create key' }).click()
   const key = await (await waitFor(async () => (await dlg().locator('input[data-secret]').count()) ? dlg().locator('input[data-secret]') : null)).inputValue()
@@ -125,7 +125,7 @@ try {
 
   console.log('\n[5] Scheduled reports')
   await db.query(`insert into payments(company_id,amount,paid_on) values ($1,7500,current_date - 3)`, [co]).catch(() => null)
-  await p.goto(`${BASE}/settings#schedules`); await settle()
+  await p.goto(`${BASE}/settings/notifications#schedules`); await settle()
   await p.getByRole('button', { name: 'Schedule a report' }).click()
   await dlg().getByLabel('Report name *').fill('Weekly owner summary'); await dlg().getByLabel('Expenses').check(); await dlg().getByLabel('Leads & pipeline').check(); await dlg().getByLabel('Service tickets').check(); await dlg().getByLabel('Email').uncheck(); await dlg().getByLabel('In-app (bell)').check(); await dlg().getByLabel('Platform Owner').check()
   await dlg().getByRole('button', { name: 'Save schedule' }).click(); await settle()
@@ -195,8 +195,8 @@ try {
       return [...main.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > edge && !scroller(e) }).length })
     ok(clip === 0, `${path}: nothing cut off on a 360px phone (${clip})`)
   }
-  await mp.goto(`${BASE}/settings#integrations`); await mp.screenshot({ path: `${OUT}/m-settings.png`, fullPage: true }); await m.close()
-  for (const [path, name] of [['/settings#integrations', 'integrations'], ['/import', 'import'], ['/backup', 'backup'], ['/users/activity', 'activity']]) { await p.goto(BASE + path); await settle(); await p.screenshot({ path: `${OUT}/${name}.png`, fullPage: true }) }
+  await mp.goto(`${BASE}/settings/integrations#integrations`); await mp.screenshot({ path: `${OUT}/m-settings.png`, fullPage: true }); await m.close()
+  for (const [path, name] of [['/settings/integrations#integrations', 'integrations'], ['/import', 'import'], ['/backup', 'backup'], ['/users/activity', 'activity']]) { await p.goto(BASE + path); await settle(); await p.screenshot({ path: `${OUT}/${name}.png`, fullPage: true }) }
 } catch (e) {
   ok(false, `aborted: ${e.message.split('\n').slice(0, 12).join(' | ')}`); await p.screenshot({ path: `${OUT}/abort.png`, fullPage: true }).catch(() => {})
 }

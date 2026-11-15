@@ -110,7 +110,7 @@ export async function setAiOcr(enabled: boolean): Promise<ActionState> {
     if (enabled && !claudeAvailable()) return { error: 'ANTHROPIC_API_KEY is not set on the server.' }
     const { error } = await c.supabase.from('app_settings').upsert({ company_id: c.company.id, key: 'ai.ocr_provider', value: enabled ? 'claude' : 'rules', updated_at: new Date().toISOString() })
     if (error) throw error
-    revalidatePath('/settings'); revalidatePath('/inbox')
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/inbox')
     return { ok: true, message: enabled ? 'AI reading enabled.' : 'AI reading disabled. Local rules only.' }
   })
 }

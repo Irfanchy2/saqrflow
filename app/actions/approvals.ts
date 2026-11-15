@@ -88,7 +88,7 @@ export async function saveApprovalRules(_: ActionState, fd: FormData): Promise<A
     ].map(r => ({ ...r, company_id: c.company.id, updated_at: new Date().toISOString() }))
     const { error } = await c.supabase.from('app_settings').upsert(rows)
     if (error) throw error
-    revalidatePath('/settings'); return { ok: true, message: 'Approval rules saved. They apply to new records from now on.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'Approval rules saved. They apply to new records from now on.' }
   })
 }
 
@@ -110,6 +110,6 @@ export async function savePortalSettings(_: ActionState, fd: FormData): Promise<
     ].map(r => ({ ...r, company_id: c.company.id, updated_at: new Date().toISOString() }))
     const { error } = await c.supabase.from('app_settings').upsert(rows)
     if (error) throw error
-    revalidatePath('/settings'); revalidatePath('/me'); return { ok: true, message: 'Employee portal settings saved.' }
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/me'); return { ok: true, message: 'Employee portal settings saved.' }
   })
 }

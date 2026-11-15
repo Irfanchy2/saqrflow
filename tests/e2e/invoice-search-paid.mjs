@@ -83,7 +83,7 @@ try {
 
   console.log('\n[3] Green PAID stamp')
   // Arabic company name (Settings → Company): drawn around the top of the stamp
-  await p.goto(`${BASE}/settings#company`); await settle()
+  await p.goto(`${BASE}/settings/company#company`); await settle()
   const arField = p.getByLabel('Company name in Arabic')
   ok(await arField.isVisible() && await arField.getAttribute('dir') === 'rtl', 'Settings → Company has an Arabic company name field (right-to-left)')
   await arField.fill('شركة الصقر للاختبار ذ.م.م'); await p.locator('#company').getByRole('button', { name: 'Save' }).click()

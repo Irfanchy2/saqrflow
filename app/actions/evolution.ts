@@ -53,7 +53,7 @@ export async function saveEvolution(_: ActionState, fd: FormData): Promise<Actio
       await auditAction(c.company.id, c.userId, 'SECRET_SET', 'integration_secrets', { name: 'evolution_api_key', hint: `…${key.slice(-4)}` })
     }
     await auditAction(c.company.id, c.userId, 'SETTINGS_CHANGED', 'app_settings', { whatsapp_provider: use ? 'evolution' : 'meta', evolution_url: url, evolution_instance: instance })
-    revalidatePath('/settings'); revalidatePath('/reminders')
+    revalidatePath('/settings/[category]', 'page'); revalidatePath('/reminders')
     return { ok: true, message: use ? 'Saved. WhatsApp messages now go through your Evolution API server. Link the number with “Link WhatsApp” if you have not yet.' : 'Saved. Evolution API is switched off; the Meta Cloud API settings below apply.' }
   })
 }
@@ -90,7 +90,7 @@ export async function unlinkEvolution(): Promise<ActionState> {
     if (!cfg.evolution) return { error: 'Not configured.' }
     const r = await evoLogout(cfg.evolution); if ('error' in r) return { error: r.error }
     await auditAction(c.company.id, c.userId, 'SETTINGS_CHANGED', 'app_settings', { evolution_unlinked: cfg.evolution.instance })
-    revalidatePath('/settings'); return { ok: true, message: 'The WhatsApp number was unlinked. Messages are not sent until you link a number again.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'The WhatsApp number was unlinked. Messages are not sent until you link a number again.' }
   })
 }
 
@@ -100,6 +100,6 @@ export async function clearEvolutionKey(): Promise<ActionState> {
     await admin().from('integration_secrets').delete().eq('company_id', c.company.id).in('name', ['evolution_api_key', 'evolution_webhook_secret'])
     await setting(c, 'whatsapp.provider', 'meta')
     await auditAction(c.company.id, c.userId, 'SECRET_REMOVED', 'integration_secrets', { name: 'evolution_api_key' })
-    revalidatePath('/settings'); return { ok: true, message: 'API key removed and Evolution API switched off.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: 'API key removed and Evolution API switched off.' }
   })
 }

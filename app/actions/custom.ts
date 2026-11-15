@@ -25,7 +25,7 @@ export async function saveFieldDef(_: ActionState, fd: FormData): Promise<Action
     if ((count ?? 0) >= 30) return { error: 'Up to 30 custom fields per record type.' }
     const { error } = await c.supabase.from('custom_field_defs').insert({ company_id: c.company.id, entity: v.entity, key: fieldKey(v.label), label: v.label, field_type: v.field_type, options, required: v.required, position: count ?? 0 })
     if (error) { if (error.code === '23505') return { error: 'A field with that name already exists for this record type.' }; throw error }
-    revalidatePath('/settings'); return { ok: true, message: `Added “${v.label}” to ${CUSTOM_ENTITIES[v.entity].toLowerCase()}.` }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: `Added “${v.label}” to ${CUSTOM_ENTITIES[v.entity].toLowerCase()}.` }
   })
 }
 
@@ -36,7 +36,7 @@ export async function setFieldActive(id: string, active: boolean): Promise<Actio
     if (!UUID.test(id)) return { error: 'Unknown field.' }
     const { error } = await c.supabase.from('custom_field_defs').update({ active }).eq('id', id)
     if (error) throw error
-    revalidatePath('/settings'); return { ok: true, message: active ? 'Field shown again.' : 'Field hidden. Saved values are kept.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: active ? 'Field shown again.' : 'Field hidden. Saved values are kept.' }
   })
 }
 
@@ -51,7 +51,7 @@ export async function saveCustomStatus(_: ActionState, fd: FormData): Promise<Ac
     const { count } = await c.supabase.from('custom_statuses').select('id', { count: 'exact', head: true }).eq('entity', entity)
     const { error } = await c.supabase.from('custom_statuses').insert({ company_id: c.company.id, entity, label, base_status: base, color, position: count ?? 0 })
     if (error) { if (error.code === '23505') return { error: 'That status name already exists.' }; throw error }
-    revalidatePath('/settings'); return { ok: true, message: `Added status “${label}”.` }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: `Added status “${label}”.` }
   })
 }
 
@@ -61,7 +61,7 @@ export async function setCustomStatusActive(id: string, active: boolean): Promis
     if (!UUID.test(id)) return { error: 'Unknown status.' }
     const { error } = await c.supabase.from('custom_statuses').update({ active }).eq('id', id)
     if (error) throw error
-    revalidatePath('/settings'); return { ok: true, message: active ? 'Status available again.' : 'Status retired. Records keep it until changed.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: active ? 'Status available again.' : 'Status retired. Records keep it until changed.' }
   })
 }
 

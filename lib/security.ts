@@ -56,7 +56,7 @@ export async function alertAdmins(companyId: string, n: { title: string; body?: 
 export async function alertUser(companyId: string, userId: string, n: { title: string; body?: string; link?: string; key: string; severity?: 'info' | 'warning' }) {
   try {
     await createAdminClient().from('in_app_notifications').upsert({ company_id: companyId, user_id: userId, title: n.title.slice(0, 200), body: n.body?.slice(0, 500) ?? null,
-      link: n.link ?? '/settings#account', severity: n.severity ?? 'warning', dedupe_key: n.key.slice(0, 200) }, { onConflict: 'user_id,dedupe_key', ignoreDuplicates: true })
+      link: n.link ?? '/settings/security#account', severity: n.severity ?? 'warning', dedupe_key: n.key.slice(0, 200) }, { onConflict: 'user_id,dedupe_key', ignoreDuplicates: true })
   } catch (e) { console.warn('[security-alert]', (e as Error).message) }
 }
 

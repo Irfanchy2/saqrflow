@@ -18,7 +18,7 @@ export async function savePublicForm(_: ActionState, fd: FormData): Promise<Acti
     if ((count ?? 0) >= 10) return { error: 'Up to 10 public forms per company.' }
     const { error } = await c.supabase.from('public_forms').insert({ company_id: c.company.id, ...v, intro: v.intro ?? null, created_by: c.userId })
     if (error) { if (error.code === '23505') return { error: 'That web address is taken. Try another, e.g. your company name.' }; throw error }
-    revalidatePath('/settings'); return { ok: true, message: `Form published at /f/${v.slug}.` }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: `Form published at /f/${v.slug}.` }
   })
 }
 
@@ -28,6 +28,6 @@ export async function setPublicFormEnabled(id: string, enabled: boolean): Promis
     if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: 'Unknown form.' }
     const { error } = await c.supabase.from('public_forms').update({ enabled }).eq('id', id)
     if (error) throw error
-    revalidatePath('/settings'); return { ok: true, message: enabled ? 'Form is live again.' : 'Form switched off. Its link shows “not available”.' }
+    revalidatePath('/settings/[category]', 'page'); return { ok: true, message: enabled ? 'Form is live again.' : 'Form switched off. Its link shows “not available”.' }
   })
 }

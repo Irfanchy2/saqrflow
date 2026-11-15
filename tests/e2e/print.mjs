@@ -29,7 +29,7 @@ try {
   await p.goto(`${BASE}/signup`); await p.getByLabel('Work email').fill('print-owner@alsaqr.test'); await p.getByLabel('Password').fill('correct-horse-battery'); await p.getByRole('button', { name: 'Create account' }).click()
   await p.waitForURL('**/onboarding'); await p.getByLabel('Company name').fill('Al Saqr Al Ahmar Welding & Blacksmith LLC'); await p.getByLabel('Your full name').fill('Print Owner'); await p.getByRole('button', { name: 'Create company' }).click(); await p.waitForURL(`${BASE}/`)
   const co = (await one(`select p.company_id from profiles p join auth.users u on u.id=p.id where u.email='print-owner@alsaqr.test'`)).company_id
-  await p.goto(`${BASE}/settings`); await settle()
+  await p.goto(`${BASE}/settings/documents`); await settle()
   for (const [label, file] of [['Letterhead (quotation & delivery note) image', img('img1.png', PNG1)], ['Footer image', img('img3.jpg', PNG1)], ['Company stamp image', img('img4.png', PNG1)], ['Authorised signature image', img('img5.png', PNG1)]]) {
     const f = p.getByLabel(label); await f.setInputFiles(file); await f.locator('xpath=ancestor::form').getByRole('button', { name: 'Upload' }).click(); await settle(800)
   }
@@ -38,6 +38,7 @@ try {
 
   console.log('\n[P1] AS numbering')
   const yr = new Date().getFullYear()
+  await p.goto(`${BASE}/settings/sales`); await settle()
   ok((await p.locator('#numbering').innerText()).includes(`AS-002600/${yr}`), `Settings → Document numbering previews AS-002600/${yr}`)
   await p.goto(`${BASE}/invoices`); await p.getByRole('button', { name: 'New quotation' }).first().click(); await p.waitForURL(/\/invoices\/[0-9a-f-]{36}$/); await settle()
   const qid = p.url().split('/').pop()
@@ -52,7 +53,7 @@ try {
     await p.waitForURL(u => /\/invoices\/[0-9a-f-]{36}$/.test(u.href) && u.href !== before); await settle(); return (await one(`select number from invoices where id=$1`, [p.url().split('/').pop()])).number }
   ok(/^INV-610$/.test(await newDoc('New tax invoice')), 'new tax invoice numbered INV-610')
   ok(/^DL-1300$/.test(await newDoc('New delivery note')), 'new delivery note numbered DL-1300')
-  const qForm = async () => { await p.goto(`${BASE}/settings#numbering`); await settle(); return p.locator('#numbering details').first() }
+  const qForm = async () => { await p.goto(`${BASE}/settings/sales#numbering`); await settle(); return p.locator('#numbering details').first() }
   let qf = await qForm()
   await qf.getByLabel('Year format').selectOption('yy'); await qf.getByLabel('Starting number').fill('2600')
   ok((await qf.locator('[aria-live]').innerText()) === `AS-002600/${String(yr).slice(2)}`, 'live preview follows the edited fields (AS-002600/YY)')
