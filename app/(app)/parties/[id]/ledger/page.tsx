@@ -37,8 +37,8 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
     <Link href={`/parties/${id}`} className="mb-1 -ms-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-sm text-muted hover:text-fg sm:mb-3 sm:min-h-0"><ArrowLeft size={14} className="rtl:rotate-180" />{cu.name}</Link>
     <PageHeader title="Customer ledger" sub={`${cu.name}. Opening balance, invoices, payments, cheques and credit notes with a running balance.`}
       actions={<>
-        <LinkButton href={`/print/statement/${id}?${qs}${qs ? '&' : ''}auto=1`} variant="secondary" target="_blank"><Printer size={14} />Print statement</LinkButton>
-        <LinkButton href={`/api/statements/${id}?${qs}`} variant="secondary"><Download size={14} />Statement PDF</LinkButton>
+        <LinkButton href={`/print/statement/${id}?${qs}${qs ? '&' : ''}auto=1`} variant="secondary" target="_blank"><Printer size={14} />{f.type === 'unpaid' ? 'Print unpaid statement' : 'Print statement'}</LinkButton>
+        <LinkButton href={`/api/statements/${id}?${qs}`} variant="secondary"><Download size={14} />{f.type === 'unpaid' ? 'Unpaid statement PDF' : 'Statement PDF'}</LinkButton>
         <LinkButton href={mail} variant="secondary"><Mail size={14} />Email</LinkButton>
         <ShareSheet kind="customer_statement" recordId={id} label="Share statement" size="md" />
         {c.can('records.edit') && <WhatsAppSend kind="statement" recordId={id} label="Business" ariaLabel="Send statement with WhatsApp Business" size="md" />}
@@ -60,6 +60,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
     </Metrics>
     <Card>
       <form className="flex flex-wrap items-end gap-2 border-b border-border p-3">
+        <label className="flex flex-col gap-1 text-xs text-muted">Statement<select name="type" defaultValue={f.type} className={cls} data-statement-type><option value="full">Full statement of account</option><option value="unpaid">Unpaid invoices only</option></select></label>
         <label className="flex flex-col gap-1 text-xs text-muted">From<input type="date" name="from" defaultValue={f.from} className={cls} /></label>
         <label className="flex flex-col gap-1 text-xs text-muted">To<input type="date" name="to" defaultValue={f.to} className={cls} /></label>
         <label className="flex flex-col gap-1 text-xs text-muted">Project<select name="project" defaultValue={f.project ?? ''} className={cls}><option value="">All projects</option>{(projects ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
