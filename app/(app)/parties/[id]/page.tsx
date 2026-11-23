@@ -9,6 +9,7 @@ import { ArrowLeft, BookOpen, Clock, FileText, Landmark, Mail, MapPin, MessageCi
 import { getCtx } from '@/lib/auth'
 import { Badge, Card, CardHeader, EmptyState, LinkButton, Metrics, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { DialogButton } from '@/components/ui/dialog'
+import { StatementPicker } from '@/components/sales/statement-picker'
 import { ActionButton, ActionForm } from '@/components/ui/action-form'
 import { NewSalesButtons } from '@/components/sales/new-buttons'
 import { PartyFields } from '@/components/parties/party-fields'
@@ -78,6 +79,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           {cu.notes && <p className="mt-2 max-w-3xl whitespace-pre-line text-sm text-muted">{cu.notes}</p>}</div></div>
       <div className="flex flex-wrap gap-2">
         {fin && <LinkButton href={`/parties/${id}/ledger`} variant="secondary"><BookOpen size={14} />Ledger & statement</LinkButton>}
+        {fin && edit && <LinkButton href={`/invoices/previous?customer=${id}#add`} variant="secondary"><Clock size={14} />Add previous invoice</LinkButton>}
+        {fin && <DialogButton label="Statement" title={`Statement: ${cu.name}`} variant="secondary" icon={<Receipt size={14} />} wide><StatementPicker customer={{ id, name: cu.name }} /></DialogButton>}
         {fin && <ShareSheet kind="customer_statement" recordId={id} label="Share statement" size="md" />}
         {fin && edit && <WhatsAppSend kind="statement" recordId={id} label="Business" ariaLabel="Send statement with WhatsApp Business" size="md" />}
         {edit && <DialogButton wide variant="secondary" label="Edit" title="Edit client" icon={<Pencil size={14} />}><ActionForm action={updateParty.bind(null, 'customers', id)} resetOnSuccess={false}><PartyFields p={cu} fin={fin} /></ActionForm></DialogButton>}

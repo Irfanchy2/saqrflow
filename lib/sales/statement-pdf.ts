@@ -4,6 +4,8 @@ import { fmtMoney } from './money'
 import type { Ledger } from '../ledger'
 import type { BrandKind } from './data'
 import type { StatementCustomer } from '@/components/sales/statement'
+import type { StatementType } from '../statement-params'
+import { unpaidStatement } from './unpaid-statement'
 
 const fd = (iso?: string | null) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : '-')
 
@@ -11,9 +13,12 @@ const fd = (iso?: string | null) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `$
 export async function renderStatementPdf(cu: StatementCustomer, l: Ledger, o: {
   companyName: string; images: Partial<Record<BrandKind, { bytes: Uint8Array; png: boolean }>>; showHeaderFooter: boolean; companyTrn?: string | null; bankDetails?: string | null
   from?: string; to?: string; today: string; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null
+  /** full statement of account (default) or only the unpaid invoices */
+  type?: StatementType; project?: string; projectName?: string | null
 }): Promise<Uint8Array> {
+  const unpaid = o.type === 'unpaid'
   const pdf = await PDFDocument.create()
-  pdf.setTitle(`Statement of account: ${cu.name}`); pdf.setCreator('Averiqo'); pdf.setProducer('Averiqo')
+  pdf.setTitle(`${unpaid ? 'Statement of unpaid invoices' : 'Statement of account'}: ${cu.name}`); pdf.setCreator('Averiqo'); pdf.setProducer('Averiqo')
   const font = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold), it = await pdf.embedFont(StandardFonts.HelveticaOblique)
   const img: Partial<Record<BrandKind, PDFImage>> = {}
   for (const [k, v] of Object.entries(o.images)) { try { img[k as BrandKind] = v!.png ? await pdf.embedPng(v!.bytes) : await pdf.embedJpg(v!.bytes) } catch { /* skip */ } }
@@ -38,16 +43,60 @@ export async function renderStatementPdf(cu: StatementCustomer, l: Ledger, o: {
     if (img.header) y -= image(img.header, M, y, CW, 82) + 8
     else { center(o.companyName, W / 2, y - 14, 15, bold); y -= 22; const c = [o.companyAddress, o.companyPhone && `Tel: ${o.companyPhone}`, o.companyEmail].filter(Boolean).join('  ·  '); if (c) { center(c, W / 2, y - 6, 8.5); y -= 14 } }
   }
-  center('STATEMENT OF ACCOUNT', W / 2, y - 12, 13, bold); y -= 22
+  center(unpaid ? 'STATEMENT OF UNPAID INVOICES' : 'STATEMENT OF ACCOUNT', W / 2, y - 12, 13, bold); y -= 22
   if (o.companyTrn) { center(`TRN: ${o.companyTrn}`, W / 2, y - 4, 9, bold); y -= 12 }
   const left = [['Customer:', cu.name], ...(cu.contact_person ? [['Attention:', cu.contact_person]] : []), ...(cu.trn ? [['TRN:', cu.trn]] : []), ...(cu.address ? [['Address:', cu.address]] : []), ...(cu.phone ? [['Tel:', cu.phone]] : []), ...(cu.email ? [['Email:', cu.email]] : [])]
-  const rightRows = [['Date:', fd(o.today)], ['Period:', `${o.from ? fd(o.from) : 'Start'} - ${fd(o.to ?? o.today)}`], ['Opening:', fmtMoney(l.opening)], ['Closing:', `AED ${fmtMoney(l.closing)}`]]
+  const u = unpaid ? unpaidStatement(l, { from: o.from, to: o.to, project: o.project }, o.today) : null
+  const rightRows = u ? [['Date:', fd(o.today)], ...(o.from || o.to ? [['Invoices:', `${o.from ? fd(o.from) : 'Start'} - ${fd(o.to ?? o.today)}`]] : []), ...(o.projectName ? [['Project:', o.projectName]] : []),
+    ['Unpaid:', `${u.rows.length} invoice${u.rows.length === 1 ? '' : 's'}`], ['Balance due:', `AED ${fmtMoney(u.netDue ?? u.totals.balance)}`]]
+    : [['Date:', fd(o.today)], ['Period:', `${o.from ? fd(o.from) : 'Start'} - ${fd(o.to ?? o.today)}`], ['Opening:', fmtMoney(l.opening)], ['Closing:', `AED ${fmtMoney(l.closing)}`]]
   const lw = CW - 170, lines = left.map(([k, v]) => [k, wrap(v, font, 9, lw - 90)] as const)
   const bh = Math.max(lines.reduce((s, [, ls]) => s + ls.length * 12, 0), rightRows.length * 12) + 12
   rect(M, y - bh, lw, bh, boxBg); rect(M + lw + 10, y - bh, CW - lw - 10, bh, boxBg)
   let ly = y - 14; for (const [k, ls] of lines) { text(k, M + 8, ly, 9, bold); ls.forEach((x, i) => text(x, M + 82, ly - i * 12)); ly -= ls.length * 12 }
   rightRows.forEach(([k, v], i) => { text(k, M + lw + 18, y - 14 - i * 12, 9, bold); text(v, M + lw + 70, y - 14 - i * 12) })
   y -= bh + 12
+
+  if (u) {
+    // unpaid invoices only: SR, invoice, date, LPO / ref, due, amount, paid, balance, days late; then ageing and the total due
+    const uc = [{ h: 'SR', w: 24 }, { h: 'Invoice No.', w: 82 }, { h: 'Date', w: 56 }, { h: 'LPO / Ref.', w: CW - 24 - 82 - 56 - 56 - 68 - 62 - 70 - 40 }, { h: 'Due date', w: 56 }, { h: 'Amount', w: 68 }, { h: 'Paid', w: 62 }, { h: 'Balance', w: 70 }, { h: 'Days late', w: 40 }]
+    const uh = () => { let x = M; for (const c of uc) { rect(x, y - 18, c.w, 18); center(c.h, x + c.w / 2, y - 12, 8, bold); x += c.w }; y -= 18 }
+    const urow = (vals: string[], b = false) => {
+      const ref = wrap(vals[3], font, 8, uc[3].w - 6), rh = Math.max(16, ref.length * 10 + 6)
+      if (y - rh < bottom + 20) { newPage(); uh() }
+      let x = M
+      uc.forEach((c, i) => { rect(x, y - rh, c.w, rh); const v = vals[i]
+        if (i === 3) ref.forEach((d, j) => center(d, x + c.w / 2, y - 11 - j * 10, 8))
+        else if (v) (i >= 5 && i <= 7 ? right(v, x + c.w - 4, y - rh / 2 - 3, 8.5, b || i === 7 ? bold : font) : center(v, x + c.w / 2, y - rh / 2 - 3, 8.5, b ? bold : font))
+        x += c.w })
+      y -= rh
+    }
+    if (!u.rows.length) { center(`No unpaid invoices${o.from || o.to || o.project ? ' for this selection' : ''}. Thank you.`, W / 2, y - 20, 11, bold); y -= 40 }
+    else {
+      uh()
+      u.rows.forEach((i, k) => urow([String(k + 1).padStart(2, '0'), i.number, fd(i.issue_date), i.lpo_ref || i.reference || '-', fd(i.due_date), fmtMoney(i.total), i.paid ? fmtMoney(i.paid) : '-', fmtMoney(i.balance), i.daysOverdue ? String(i.daysOverdue) : '-']))
+      urow(['', '', '', 'Total', '', fmtMoney(u.totals.amount), fmtMoney(u.totals.paid), fmtMoney(u.totals.balance), ''], true)
+      y -= 10
+      if (y - 40 < bottom) newPage()
+      const aw = CW / (u.ageing.length + 1); let x = M
+      for (const a of [...u.ageing, { label: 'Total', amount: u.totals.balance }]) { rect(x, y - 16, aw, 16, boxBg); center(a.label, x + aw / 2, y - 11, 8, bold); rect(x, y - 32, aw, 16); center(a.amount ? fmtMoney(a.amount) : '-', x + aw / 2, y - 27, 8.5, a.label === 'Total' ? bold : font); x += aw }
+      y -= 42
+    }
+    const lines: [string, string][] = []
+    if (u.unapplied !== null) lines.push(['Unpaid invoices:', `AED ${fmtMoney(u.totals.balance)}`], [u.unapplied < 0 ? 'Less: paid on account:' : 'Opening balance:', `${u.unapplied < 0 ? '- ' : ''}AED ${fmtMoney(Math.abs(u.unapplied))}`])
+    lines.push(['Total due:', `AED ${fmtMoney(u.netDue ?? u.totals.balance)}`])
+    const th = lines.length * 13 + 6
+    if (y - th - 8 < bottom) newPage()
+    rect(W - M - 220, y - th, 220, th, boxBg)
+    lines.forEach(([k, v], i) => { const last = i === lines.length - 1; text(k, W - M - 212, y - 13 - i * 13, 9.5, bold); right(v, W - M - 8, y - 13 - i * 13, 9.5, last ? bold : font) })
+    y -= th + 12
+    if (o.bankDetails) { text('Bank Details: -', M, y - 8, 10, bold); y -= 13; for (const b of wrap(o.bankDetails, font, 8.5, CW)) { if (y - 12 < bottom) newPage(); text(b, M, y - 8, 8.5); y -= 11 } }
+    if (y - 20 < bottom) newPage()
+    center('Kindly arrange payment of the balance above. Please inform us of any difference within 15 days. This is a computer-generated statement.', W / 2, y - 12, 8, it)
+    drawFooter()
+    const pg = pdf.getPages(); if (pg.length > 1) pg.forEach((p, i) => p.drawText(`Page ${i + 1} of ${pg.length}`, { x: W - M - 60, y: 14, size: 7.5, font }))
+    return pdf.save()
+  }
 
   const cols = [{ h: 'Date', w: 60 }, { h: 'Reference', w: 80 }, { h: 'Description', w: CW - 60 - 80 - 72 - 72 - 78 }, { h: 'Debit', w: 72 }, { h: 'Credit', w: 72 }, { h: 'Balance', w: 78 }]
   const head = () => { let x = M; for (const c of cols) { rect(x, y - 18, c.w, 18); center(c.h, x + c.w / 2, y - 12, 8.5, bold); x += c.w }; y -= 18 }

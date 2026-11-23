@@ -120,6 +120,13 @@ export default async function SalesDocPage({ params }: { params: Promise<{ id: s
             cheques={applicable.map((q: any) => ({ id: q.id, label: `#${q.cheque_no} · ${q.party_name} · AED ${fmtMoney(q.amount)} · ${q.cheque_date}` }))} canEdit={edit} canDelete={c.can('records.delete')} canUpload={c.can('documents.upload')} />
         </div>}
         {d.doc.status === 'cancelled' && <p className="border-b border-border px-4 py-3 text-sm text-muted">This invoice is cancelled. It keeps its number and stays on record.</p>}
+        {(d.doc as any).external_provider === 'previous' && <p className="border-b border-border bg-surface-2/50 px-4 py-2.5 text-sm text-muted" data-previous-note>Previous invoice: entered from your earlier records with its original number (not created in Averiqo). Record payments here as usual.</p>}
+        {d.doc.customer_id && d.doc.status !== 'draft' && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5 text-sm" data-invoice-statement>
+          <span className="text-muted">Customer statement{d.doc.customer_name ? ` (${d.doc.customer_name})` : ''}:</span>
+          <a href={`/print/statement/${d.doc.customer_id}?type=unpaid`} target="_blank" rel="noopener" className="font-medium text-primary hover:underline">Unpaid invoices</a>
+          <a href={`/print/statement/${d.doc.customer_id}`} target="_blank" rel="noopener" className="font-medium text-primary hover:underline">Full statement</a>
+          <a href={`/api/statements/${d.doc.customer_id}?type=unpaid`} className="text-primary hover:underline">Unpaid PDF</a>
+        </div>}
         <h3 className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted">Payment history</h3>
         {d.doc.status === 'draft' ? <p className="px-4 pb-5 pt-1 text-sm text-muted">Issue the invoice (⋯ → Issue tax invoice) before recording payments.</p>
           : d.payments.length === 0 ? <p className="px-4 pb-5 pt-1 text-sm text-muted">No payments recorded yet.</p>

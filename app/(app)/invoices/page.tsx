@@ -3,10 +3,10 @@ import { ShareSheet } from '@/components/whatsapp/share-sheet'
 import Link from 'next/link'
 import { LiveSearch } from '@/components/ui/live-search'
 import { redirect } from 'next/navigation'
-import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, Receipt, ScrollText, Target, Truck, Wallet } from '@/components/icons'
+import { AlertTriangle, Banknote, BellRing, FileClock, FileMinus, History, Receipt, ScrollText, Target, Truck, Wallet } from '@/components/icons'
 import { getCtx } from '@/lib/auth'
 import { PAGE_SIZE, flat, pageOf, sanitizeQ } from '@/lib/queries'
-import { Badge, Card, EmptyState, PageHeader, Pagination, Metrics, Money, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
+import { Badge, Card, EmptyState, LinkButton, PageHeader, Pagination, Metrics, Money, StatCard, Td, Th, TableWrap } from '@/components/ui/primitives'
 import { NewDocFab, NewSalesButtons } from '@/components/sales/new-buttons'
 import { FilterBar, FilterTabs, MList, MRow, Tile, TINTS } from '@/components/ui/mobile'
 import { DOC_META, STATUS_TONE, statusLabel, type SalesType } from '@/lib/sales/docs'
@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils'
 import { SavedViews } from '@/components/saved-views'
 import { TabStrip } from '@/components/ui/tab-strip'
 import { InvoicesTab } from './invoices-tab'
+import { DialogButton } from '@/components/ui/dialog'
+import { StatementPicker } from '@/components/sales/statement-picker'
 
 export const metadata = { title: 'Sales & invoices' }
 const TABS = [
@@ -46,7 +48,10 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const tabHref = (t: string) => `${base}?tab=${t}`
   return <>
     <PageHeader title="Sales & invoices" sub="Quotations, tax invoices, delivery notes and the payments against them."
-      actions={<><SavedViews page="/invoices" />{edit && <NewSalesButtons />}</>} />
+      actions={<><SavedViews page="/invoices" />
+        <DialogButton label="Customer statement" title="Customer statement" variant="secondary" icon={<ScrollText size={15} />} wide><StatementPicker /></DialogButton>
+        {edit && <LinkButton href="/invoices/previous" variant="secondary"><History size={15} />Previous invoices</LinkButton>}
+        {edit && <NewSalesButtons />}</>} />
 
     <Metrics className="mb-5" cols={4}>
       <StatCard label="Outstanding receivables" value={formatAed(k.outstanding)} hint={`${k.openCount} open invoice${k.openCount === 1 ? '' : 's'}`} icon={Wallet} tone="blue" href={tabHref('receivables')} />
@@ -188,11 +193,12 @@ function Ageing({ rows, today, sp }: { rows: InvRow[]; today: string; sp: Record
         <div className={cn('mt-1 text-lg font-semibold tabular-nums', a.totals[i] > 0 && (i >= 3 ? 'text-danger' : i >= 1 ? 'text-warning' : ''))}>{fmtMoney(a.totals[i])}</div>
         <div className="mt-2 h-1.5 rounded-full bg-surface-2"><div className={cn('h-full rounded-full', i === 0 ? 'bg-primary' : i < 3 ? 'bg-warning' : 'bg-danger')} style={{ width: `${a.grand ? (a.totals[i] / a.grand) * 100 : 0}%` }} /></div></div>)}
     </div>
-    <TableWrap><thead className="bg-surface-2/50"><tr><Th>Customer</Th>{AGE_BUCKETS.map(b => <Th key={b} className="text-right">{b}</Th>)}<Th className="text-right">Total</Th></tr></thead>
+    <TableWrap><thead className="bg-surface-2/50"><tr><Th>Customer</Th>{AGE_BUCKETS.map(b => <Th key={b} className="text-right">{b}</Th>)}<Th className="text-right">Total</Th><Th><span className="sr-only">Statement</span></Th></tr></thead>
       <tbody className="divide-y divide-border">{a.list.map(e => <tr key={e.customer} className="hover:bg-surface-2/50">
         <Td className="font-medium">{e.customerId ? <Link href={`/parties/${e.customerId}`} className="hover:text-primary hover:underline">{e.customer}</Link> : e.customer}<span className="ms-2 text-xs text-muted">{e.count} inv.</span></Td>
         {e.buckets.map((v, i) => <Td key={i} className={cn('text-right tabular-nums', !v && 'text-muted/50', i >= 3 && v > 0 && 'text-danger')}>{v ? fmtMoney(v) : '—'}</Td>)}
-        <Td className="text-right font-semibold tabular-nums">{fmtMoney(e.total)}</Td></tr>)}</tbody>
-      <tfoot className="border-t-2 border-border bg-surface-2/40 font-semibold"><tr><Td>Total</Td>{a.totals.map((v, i) => <Td key={i} className="text-right tabular-nums">{fmtMoney(v)}</Td>)}<Td className="text-right tabular-nums">{fmtMoney(a.grand)}</Td></tr></tfoot></TableWrap>
+        <Td className="text-right font-semibold tabular-nums">{fmtMoney(e.total)}</Td>
+        <Td className="whitespace-nowrap text-right">{e.customerId && <a href={`/print/statement/${e.customerId}?type=unpaid`} target="_blank" rel="noopener" data-unpaid-statement={e.customerId} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium text-primary hover:bg-surface-2"><ScrollText size={14} aria-hidden />Statement</a>}</Td></tr>)}</tbody>
+      <tfoot className="border-t-2 border-border bg-surface-2/40 font-semibold"><tr><Td>Total</Td>{a.totals.map((v, i) => <Td key={i} className="text-right tabular-nums">{fmtMoney(v)}</Td>)}<Td className="text-right tabular-nums">{fmtMoney(a.grand)}</Td><Td /></tr></tfoot></TableWrap>
   </Card>
 }

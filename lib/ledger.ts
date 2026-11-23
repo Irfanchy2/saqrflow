@@ -5,7 +5,7 @@ import { r2 } from './sales/money'
 export interface LedgerEntry { date: string; kind: 'opening' | 'invoice' | 'payment' | 'credit_note'; ref: string; description: string; debit: number; credit: number; balance: number; href?: string; projectId?: string | null }
 export interface Ledger {
   entries: LedgerEntry[]; opening: number; closing: number; totalDebit: number; totalCredit: number; outstanding: number; overdue: number
-  invoices: { id: string; number: string; issue_date: string; due_date: string | null; total: number; balance: number; status: string; daysOverdue: number }[]
+  invoices: { id: string; number: string; issue_date: string; due_date: string | null; total: number; balance: number; status: string; daysOverdue: number; lpo_ref?: string | null; reference?: string | null; projectId?: string | null }[]
 }
 const METHOD: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank transfer', cheque: 'Cheque', pdc: 'PDC cheque', card: 'Card', other: 'Payment' }
 
@@ -16,7 +16,7 @@ const METHOD: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank tran
 export async function buildLedger(c: Ctx, customerId: string, f: { from?: string; to?: string; project?: string; status?: string } = {}): Promise<Ledger> {
   const [{ data: cu }, { data: docs }, { data: pays }] = await Promise.all([
     c.supabase.from('customers').select('opening_balance,opening_balance_date').eq('id', customerId).eq('company_id', c.company.id).maybeSingle(),
-    c.supabase.from('invoices').select('id,doc_type,number,status,issue_date,due_date,total,project_id,subject,source_invoice_id').eq('customer_id', customerId).eq('company_id', c.company.id).is('deleted_at', null)
+    c.supabase.from('invoices').select('id,doc_type,number,status,issue_date,due_date,total,project_id,subject,source_invoice_id,lpo_ref,reference').eq('customer_id', customerId).eq('company_id', c.company.id).is('deleted_at', null)
       .in('doc_type', ['invoice', 'credit_note']).not('status', 'in', '(draft,cancelled)').order('issue_date').limit(5000),
     c.supabase.from('payments').select('id,amount,paid_on,method,reference,invoice_id,project_id,cheque:cheques(cheque_no),invoice:invoices(number,project_id),project:projects(name)').eq('customer_id', customerId).eq('company_id', c.company.id).order('paid_on').limit(5000),
   ])
@@ -55,7 +55,7 @@ export async function buildLedger(c: Ctx, customerId: string, f: { from?: string
   const day = (s: string) => Date.parse(s + 'T00:00:00Z') / 864e5
   let invoices = (docs ?? []).filter(d => d.doc_type === 'invoice' && projOk(d.project_id)).map(d => {
     const balance = balMap.get(d.id) ?? 0
-    return { id: d.id, number: d.number, issue_date: d.issue_date, due_date: d.due_date, total: Number(d.total), balance, status: d.status, daysOverdue: d.due_date && balance > 0 && d.due_date < c.today ? Math.round(day(c.today) - day(d.due_date)) : 0 }
+    return { id: d.id, number: d.number, issue_date: d.issue_date, due_date: d.due_date, total: Number(d.total), balance, status: d.status, daysOverdue: d.due_date && balance > 0 && d.due_date < c.today ? Math.round(day(c.today) - day(d.due_date)) : 0, lpo_ref: (d as any).lpo_ref ?? null, reference: (d as any).reference ?? null, projectId: d.project_id }
   })
   if (f.status === 'open') invoices = invoices.filter(i => i.balance > 0.004)
   else if (f.status === 'paid') invoices = invoices.filter(i => i.balance <= 0.004)
